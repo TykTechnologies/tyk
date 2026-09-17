@@ -246,11 +246,11 @@ func (t *Service) Apply(session *user.SessionState) error {
 		}
 
 		if policy.Partitions.PerAPI {
-			if err := t.applyPerAPI(policy, session, run.rights, run); err != nil {
+			if err := run.applyPerAPI(policy); err != nil {
 				return err
 			}
 		} else {
-			if err := t.applyPartitions(policy, session, run.rights, run); err != nil {
+			if err := run.applyPartitions(policy); err != nil {
 				return err
 			}
 		}
@@ -282,12 +282,36 @@ func (t *Service) Logger() *logrus.Entry {
 	return logrus.NewEntry(t.logger)
 }
 
-// ApplyRateLimits will write policy limits to session and apiLimits.
+// The exported Service methods below are thin wrappers kept for the package
+// tests, which live in package policy_test and cannot see applyRun. The
+// logic lives on applyRun; these helpers use no run state.
+
+// ApplyRateLimits see applyRun.applyRateLimits.
+func (t *Service) ApplyRateLimits(session *user.SessionState, policy user.Policy, apiLimits *user.APILimit) {
+	(&applyRun{}).applyRateLimits(session, policy, apiLimits)
+}
+
+// ApplyEndpointLevelLimits see applyRun.applyEndpointLevelLimits.
+func (t *Service) ApplyEndpointLevelLimits(policyEndpoints user.Endpoints, currEndpoints user.Endpoints) user.Endpoints {
+	return (&applyRun{}).applyEndpointLevelLimits(policyEndpoints, currEndpoints)
+}
+
+// ApplyJSONRPCMethodLimits see applyRun.applyJSONRPCMethodLimits.
+func (t *Service) ApplyJSONRPCMethodLimits(policy, current []user.JSONRPCMethodLimit) []user.JSONRPCMethodLimit {
+	return (&applyRun{}).applyJSONRPCMethodLimits(policy, current)
+}
+
+// ApplyMCPPrimitiveLimits see applyRun.applyMCPPrimitiveLimits.
+func (t *Service) ApplyMCPPrimitiveLimits(policy, current []user.MCPPrimitiveLimit) []user.MCPPrimitiveLimit {
+	return (&applyRun{}).applyMCPPrimitiveLimits(policy, current)
+}
+
+// applyRateLimits will write policy limits to session and apiLimits.
 // The limits get written if either are empty.
 // The limits get written if filled and policyLimits allows a higher request rate.
-func (t *Service) ApplyRateLimits(session *user.SessionState, policy user.Policy, apiLimits *user.APILimit) {
+func (r *applyRun) applyRateLimits(session *user.SessionState, policy user.Policy, apiLimits *user.APILimit) {
 	policyLimits := policy.APILimit()
-	if t.emptyRateLimit(policyLimits) {
+	if r.emptyRateLimit(policyLimits) {
 		return
 	}
 
@@ -303,7 +327,7 @@ func (t *Service) ApplyRateLimits(session *user.SessionState, policy user.Policy
 	// a minimum possible api rate limit setting,
 	// raising apiLimits.
 
-	if t.emptyRateLimit(*apiLimits) || apiLimits.Duration() > policyLimits.Duration() {
+	if r.emptyRateLimit(*apiLimits) || apiLimits.Duration() > policyLimits.Duration() {
 		apiLimits.Rate = policyLimits.Rate
 		apiLimits.Per = policyLimits.Per
 		apiLimits.Smoothing = policyLimits.Smoothing
@@ -312,22 +336,22 @@ func (t *Service) ApplyRateLimits(session *user.SessionState, policy user.Policy
 	// sessionLimits, similar to apiLimits, get policy
 	// rate applied if the policy allows more requests.
 	sessionLimits := session.APILimit()
-	if t.emptyRateLimit(sessionLimits) || sessionLimits.Duration() > policyLimits.Duration() {
+	if r.emptyRateLimit(sessionLimits) || sessionLimits.Duration() > policyLimits.Duration() {
 		session.Rate = policyLimits.Rate
 		session.Per = policyLimits.Per
 		session.Smoothing = policyLimits.Smoothing
 	}
 }
 
-func (t *Service) emptyRateLimit(m user.APILimit) bool {
+func (r *applyRun) emptyRateLimit(m user.APILimit) bool {
 	return m.Rate == 0 || m.Per == 0
 }
 
-func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, rights rightsByAPI,
-	run *applyRun) error {
+func (r *applyRun) applyPerAPI(policy user.Policy) error {
+	session, rights := r.session, r.rights
 
-	if run.didPartition {
-		t.logger.Error(ErrMixedPartitionAndPerAPIPolicies)
+	if r.didPartition {
+		r.logger.Error(ErrMixedPartitionAndPerAPIPolicies)
 		return ErrMixedPartitionAndPerAPIPolicies
 	}
 
@@ -355,14 +379,14 @@ func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, ri
 		}
 
 		if currAD, ok := rights[apiID]; ok {
-			accessRights = t.applyAPILevelLimits(accessRights, currAD)
+			accessRights = r.applyAPILevelLimits(accessRights, currAD)
 		}
 
 		// overwrite session access right for this API
 		rights[apiID] = accessRights
 
 		// identify that limit for that API is set (to allow set it only once)
-		run.mark(apiID, func(p *appliedPartitions) {
+		r.mark(apiID, func(p *appliedPartitions) {
 			p.acl = true
 			p.quota = true
 			p.rateLimit = true
@@ -371,7 +395,7 @@ func (t *Service) applyPerAPI(policy user.Policy, session *user.SessionState, ri
 	}
 
 	if len(policy.AccessRights) > 0 {
-		run.didPerAPI = true
+		r.didPerAPI = true
 	}
 
 	return nil
@@ -393,13 +417,13 @@ func (t *Service) policyIds(session *user.SessionState) []model.PolicyID {
 	})
 }
 
-func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState, rights rightsByAPI,
-	run *applyRun) error {
+func (r *applyRun) applyPartitions(policy user.Policy) error {
+	session, rights := r.session, r.rights
 
 	usePartitions := policy.Partitions.Enabled()
 
-	if usePartitions && run.didPerAPI {
-		t.logger.Error(ErrMixedPartitionAndPerAPIPolicies)
+	if usePartitions && r.didPerAPI {
+		r.logger.Error(ErrMixedPartitionAndPerAPIPolicies)
 		return ErrMixedPartitionAndPerAPIPolicies
 	}
 
@@ -417,7 +441,7 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 		ar := rights[k]
 
 		if !usePartitions || policy.Partitions.Acl {
-			run.mark(k, func(p *appliedPartitions) { p.acl = true })
+			r.mark(k, func(p *appliedPartitions) { p.acl = true })
 
 			// Merge ACLs for the same API
 			if r, ok := rights[k]; ok {
@@ -520,7 +544,7 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 		}
 
 		if !usePartitions || policy.Partitions.Quota {
-			run.mark(k, func(p *appliedPartitions) { p.quota = true })
+			r.mark(k, func(p *appliedPartitions) { p.quota = true })
 
 			if greaterThanInt64(policy.QuotaMax, ar.Limit.QuotaMax) {
 				ar.Limit.QuotaMax = policy.QuotaMax
@@ -538,14 +562,14 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 		}
 
 		if !usePartitions || policy.Partitions.RateLimit {
-			run.mark(k, func(p *appliedPartitions) { p.rateLimit = true })
+			r.mark(k, func(p *appliedPartitions) { p.rateLimit = true })
 
-			t.ApplyRateLimits(session, policy, &ar.Limit)
+			r.applyRateLimits(session, policy, &ar.Limit)
 
 			if rightsAR, ok := rights[k]; ok {
-				ar.Endpoints = t.ApplyEndpointLevelLimits(v.Endpoints, rightsAR.Endpoints)
-				ar.JSONRPCMethods = t.ApplyJSONRPCMethodLimits(v.JSONRPCMethods, rightsAR.JSONRPCMethods)
-				ar.MCPPrimitives = t.ApplyMCPPrimitiveLimits(v.MCPPrimitives, rightsAR.MCPPrimitives)
+				ar.Endpoints = r.applyEndpointLevelLimits(v.Endpoints, rightsAR.Endpoints)
+				ar.JSONRPCMethods = r.applyJSONRPCMethodLimits(v.JSONRPCMethods, rightsAR.JSONRPCMethods)
+				ar.MCPPrimitives = r.applyMCPPrimitiveLimits(v.MCPPrimitives, rightsAR.MCPPrimitives)
 			}
 
 			if policy.ThrottleRetryLimit > ar.Limit.ThrottleRetryLimit {
@@ -564,7 +588,7 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 		}
 
 		if !usePartitions || policy.Partitions.Complexity {
-			run.mark(k, func(p *appliedPartitions) { p.complexity = true })
+			r.mark(k, func(p *appliedPartitions) { p.complexity = true })
 
 			if greaterThanInt(policy.MaxQueryDepth, ar.Limit.MaxQueryDepth) {
 				ar.Limit.MaxQueryDepth = policy.MaxQueryDepth
@@ -610,7 +634,7 @@ func (t *Service) applyPartitions(policy user.Policy, session *user.SessionState
 		session.EnableHTTPSignatureValidation = policy.EnableHTTPSignatureValidation
 	}
 
-	run.didPartition = usePartitions
+	r.didPartition = usePartitions
 
 	return nil
 }
@@ -829,7 +853,7 @@ func (r *applyRun) updateSessionRootVars(c partitionCounts) {
 	}
 }
 
-func (t *Service) applyAPILevelLimits(policyAD user.AccessDefinition, currAD user.AccessDefinition) user.AccessDefinition {
+func (r *applyRun) applyAPILevelLimits(policyAD user.AccessDefinition, currAD user.AccessDefinition) user.AccessDefinition {
 	var updated bool
 	if policyAD.Limit.Duration() > currAD.Limit.Duration() {
 		policyAD.Limit.Per = currAD.Limit.Per
@@ -856,16 +880,16 @@ func (t *Service) applyAPILevelLimits(policyAD user.AccessDefinition, currAD use
 		policyAD.AllowanceScope = currAD.AllowanceScope
 	}
 
-	policyAD.Endpoints = t.ApplyEndpointLevelLimits(policyAD.Endpoints, currAD.Endpoints)
-	policyAD.JSONRPCMethods = t.ApplyJSONRPCMethodLimits(policyAD.JSONRPCMethods, currAD.JSONRPCMethods)
-	policyAD.MCPPrimitives = t.ApplyMCPPrimitiveLimits(policyAD.MCPPrimitives, currAD.MCPPrimitives)
+	policyAD.Endpoints = r.applyEndpointLevelLimits(policyAD.Endpoints, currAD.Endpoints)
+	policyAD.JSONRPCMethods = r.applyJSONRPCMethodLimits(policyAD.JSONRPCMethods, currAD.JSONRPCMethods)
+	policyAD.MCPPrimitives = r.applyMCPPrimitiveLimits(policyAD.MCPPrimitives, currAD.MCPPrimitives)
 
 	return policyAD
 }
 
-// ApplyEndpointLevelLimits combines policyEndpoints and currEndpoints and returns the combined value.
+// applyEndpointLevelLimits combines policyEndpoints and currEndpoints and returns the combined value.
 // The returned endpoints would have the highest request rate from policyEndpoints and currEndpoints.
-func (t *Service) ApplyEndpointLevelLimits(policyEndpoints user.Endpoints, currEndpoints user.Endpoints) user.Endpoints {
+func (r *applyRun) applyEndpointLevelLimits(policyEndpoints user.Endpoints, currEndpoints user.Endpoints) user.Endpoints {
 	currEPMap := currEndpoints.Map()
 	if len(currEPMap) == 0 {
 		return policyEndpoints
@@ -917,9 +941,9 @@ func mergeACLRules(dst, src user.AccessControlRules) user.AccessControlRules {
 	}
 }
 
-// ApplyJSONRPCMethodLimits merges per-method rate limits: higher rate (lower duration) wins,
-// matching the semantics of ApplyEndpointLevelLimits.
-func (t *Service) ApplyJSONRPCMethodLimits(policy, current []user.JSONRPCMethodLimit) []user.JSONRPCMethodLimit {
+// applyJSONRPCMethodLimits merges per-method rate limits: higher rate (lower duration) wins,
+// matching the semantics of applyEndpointLevelLimits.
+func (r *applyRun) applyJSONRPCMethodLimits(policy, current []user.JSONRPCMethodLimit) []user.JSONRPCMethodLimit {
 	if len(current) == 0 {
 		return policy
 	}
@@ -949,9 +973,9 @@ func (t *Service) ApplyJSONRPCMethodLimits(policy, current []user.JSONRPCMethodL
 	return out
 }
 
-// ApplyMCPPrimitiveLimits merges per-primitive rate limits keyed on type+name:
-// higher rate (lower duration) wins, matching ApplyEndpointLevelLimits semantics.
-func (t *Service) ApplyMCPPrimitiveLimits(policy, current []user.MCPPrimitiveLimit) []user.MCPPrimitiveLimit {
+// applyMCPPrimitiveLimits merges per-primitive rate limits keyed on type+name:
+// higher rate (lower duration) wins, matching applyEndpointLevelLimits semantics.
+func (r *applyRun) applyMCPPrimitiveLimits(policy, current []user.MCPPrimitiveLimit) []user.MCPPrimitiveLimit {
 	if len(current) == 0 {
 		return policy
 	}
