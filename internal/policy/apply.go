@@ -250,28 +250,9 @@ func (t *Service) Apply(session *user.SessionState) error {
 			return err
 		}
 		appliedPoliciesCount++
-		// Check ownership, policy org owner must be the same as API,
-		// otherwise you could overwrite a session key with a policy from a different org!
-		if t.orgID != nil && policy.OrgID != *t.orgID {
-			err := errors.New("attempting to apply policy from different organisation to key, skipping")
-			t.logger.Error(err)
-			return err
-		}
 
-		if policy.Partitions.PerAPI && policy.Partitions.Enabled() {
-			err := fmt.Errorf("cannot apply policy %s which has per_api and any of partitions set", policy.ID)
-			t.logger.Error(err)
+		if err := run.applyPolicy(policy); err != nil {
 			return err
-		}
-
-		if policy.Partitions.PerAPI {
-			if err := run.applyPerAPI(policy); err != nil {
-				return err
-			}
-		} else {
-			if err := run.applyPartitions(policy); err != nil {
-				return err
-			}
 		}
 
 		sessionInactiveState = sessionInactiveState || policy.IsInactive
@@ -415,6 +396,32 @@ func (r *applyRun) applyPerAPI(policy user.Policy) error {
 	}
 
 	return nil
+}
+
+// applyPolicy validates one policy against this run and writes its access
+// rights and limits into the working state. A policy must belong to the
+// run's org and may be either per_api or partitioned, never both; the two
+// kinds are handled by applyPerAPI and applyPartitions respectively.
+func (r *applyRun) applyPolicy(policy user.Policy) error {
+	// Check ownership, policy org owner must be the same as API,
+	// otherwise you could overwrite a session key with a policy from a different org!
+	if r.orgID != nil && policy.OrgID != *r.orgID {
+		err := errors.New("attempting to apply policy from different organisation to key, skipping")
+		r.logger.Error(err)
+		return err
+	}
+
+	if policy.Partitions.PerAPI && policy.Partitions.Enabled() {
+		err := fmt.Errorf("cannot apply policy %s which has per_api and any of partitions set", policy.ID)
+		r.logger.Error(err)
+		return err
+	}
+
+	if policy.Partitions.PerAPI {
+		return r.applyPerAPI(policy)
+	}
+
+	return r.applyPartitions(policy)
 }
 
 // resolvePolicies decides where policies come from for this run. A session
