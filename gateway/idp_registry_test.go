@@ -2,22 +2,22 @@ package gateway
 
 import (
 	"context"
-	"crypto/rand"
-	"crypto/rsa"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/go-jose/go-jose/v3"
 	"github.com/golang-jwt/jwt/v4"
+	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
-	"github.com/TykTechnologies/tyk/internal/cache"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -44,6 +44,18 @@ func (f *fakeRPCLoader) GetClientIdPs(orgID string, tags []string) string {
 
 // mustWriteJSON writes a mock HTTP response body, failing the test on error.
 // Runs in the httptest server goroutine, so it uses Errorf (not Fatalf).
+func loadedAPI(apiID string) *APISpec {
+	return &APISpec{APIDefinition: &apidef.APIDefinition{APIID: apiID}}
+}
+
+func loadedAPIs(apiIDs ...string) map[string]*APISpec {
+	apis := make(map[string]*APISpec, len(apiIDs))
+	for _, id := range apiIDs {
+		apis[id] = loadedAPI(id)
+	}
+	return apis
+}
+
 func mustWriteJSON(t *testing.T, w http.ResponseWriter, body string) {
 	t.Helper()
 	if _, err := w.Write([]byte(body)); err != nil {
@@ -155,7 +167,6 @@ func TestScopeToPolicyMapForRequest_NoBinding(t *testing.T) {
 func TestScopeToPolicyMapForRequest_ManualWinsBindingFills(t *testing.T) {
 	manual := map[string]string{"read": "pol-manual"}
 	binding := &Binding{
-		IdPID: "idp-1",
 		ScopeToPolicy: map[string]string{
 			"read":  "pol-binding", // collides with manual -> manual must win
 			"write": "pol-write",   // absent from manual -> binding fills it
@@ -190,11 +201,9 @@ func TestScopeToPolicyMapForRequest_BindingOnly(t *testing.T) {
 // zero surviving mappings entirely.
 func TestIdPRegistry_RebuildSegmentBackstop(t *testing.T) {
 	gw := &Gateway{
-		apisByID: map[string]*APISpec{
-			"api-a": {},
-			"api-b": {},
-		},
+		apisByID: loadedAPIs("api-a", "api-b"),
 	}
+	gw.SetConfig(config.Config{})
 	r := newIdPRegistry(gw)
 
 	idps := []IdP{
@@ -222,8 +231,8 @@ func TestIdPRegistry_RebuildSegmentBackstop(t *testing.T) {
 	if len(bindingsA) != 1 {
 		t.Fatalf("api-a: want 1 binding, got %d", len(bindingsA))
 	}
-	if bindingsA[0].IdPID != "idp-1" {
-		t.Errorf("api-a binding IdPID: want idp-1, got %q", bindingsA[0].IdPID)
+	if bindingsA[0].IdP.ID != "idp-1" {
+		t.Errorf("api-a binding IdP: want idp-1, got %q", bindingsA[0].IdP.ID)
 	}
 	if bindingsA[0].ScopeToPolicy["read"] != "pol-read" {
 		t.Errorf("api-a binding scope map wrong: %#v", bindingsA[0].ScopeToPolicy)
@@ -238,19 +247,21 @@ func TestIdPRegistry_RebuildSegmentBackstop(t *testing.T) {
 		t.Errorf("api-b: unbound api must have no bindings, got %#v", got)
 	}
 
-	// idp-1 retained a mapping -> present. idp-2 had zero surviving -> omitted.
-	if _, ok := r.IdP("idp-1"); !ok {
-		t.Errorf("idp-1 should be retained")
-	}
-	if _, ok := r.IdP("idp-2"); ok {
-		t.Errorf("idp-2 had zero surviving mappings and must be omitted")
+	// idp-2 had zero surviving mappings -> no binding references it.
+	for apiID, bs := range r.bindingsByAPI {
+		for _, b := range bs {
+			if b.IdP.ID == "idp-2" {
+				t.Errorf("idp-2 had zero surviving mappings but binds %s", apiID)
+			}
+		}
 	}
 }
 
-// rebuild denormalises the IdP's scope_claim_name into each binding so the JWT
-// hot path can resolve it without a second registry lookup.
+// Each binding points at its record, so the JWT hot path reads the scope claim
+// name without a second registry lookup.
 func TestIdPRegistry_RebuildCarriesScopeClaimName(t *testing.T) {
-	gw := &Gateway{apisByID: map[string]*APISpec{"api-a": {}}}
+	gw := &Gateway{apisByID: loadedAPIs("api-a")}
+	gw.SetConfig(config.Config{})
 	r := newIdPRegistry(gw)
 
 	r.rebuild([]IdP{{
@@ -265,26 +276,76 @@ func TestIdPRegistry_RebuildCarriesScopeClaimName(t *testing.T) {
 	if len(b) != 1 {
 		t.Fatalf("want 1 binding, got %d", len(b))
 	}
-	if b[0].ScopeClaimName != "scp" {
-		t.Errorf("binding ScopeClaimName: want scp, got %q", b[0].ScopeClaimName)
+	if b[0].IdP.ScopeClaimName != "scp" {
+		t.Errorf("binding ScopeClaimName: want scp, got %q", b[0].IdP.ScopeClaimName)
+	}
+}
+
+// client_idp_id is unique only within an org, and the direct Dashboard feed
+// carries every org's records: each API must resolve to its own org's record.
+func TestIdPRegistry_RebuildSameIDInTwoOrgs(t *testing.T) {
+	gw := &Gateway{apisByID: map[string]*APISpec{
+		"api-a": {APIDefinition: &apidef.APIDefinition{APIID: "api-a", OrgID: "org-a"}},
+		"api-b": {APIDefinition: &apidef.APIDefinition{APIID: "api-b", OrgID: "org-b"}},
+	}}
+	gw.SetConfig(config.Config{})
+	r := newIdPRegistry(gw)
+	r.rebuild([]IdP{
+		{ID: "shared", OrgID: "org-a", Issuer: "https://a", APIMappings: map[string]ScopeMapping{"api-a": {}}},
+		{ID: "shared", OrgID: "org-b", Issuer: "https://b", APIMappings: map[string]ScopeMapping{"api-b": {}}},
+	})
+
+	for apiID, wantIssuer := range map[string]string{"api-a": "https://a", "api-b": "https://b"} {
+		b := r.BindingsForAPI(apiID)
+		if len(b) != 1 || b[0].IdP.Issuer != wantIssuer {
+			t.Errorf("%s: want one binding to %s, got %#v", apiID, wantIssuer, b)
+		}
+	}
+}
+
+// A record never binds an API owned by another org; each rebuild says why.
+func TestIdPRegistry_RebuildRejectsCrossOrgMapping(t *testing.T) {
+	gw := &Gateway{apisByID: map[string]*APISpec{
+		"api-a": {APIDefinition: &apidef.APIDefinition{APIID: "api-a", OrgID: "org-a"}},
+	}}
+	gw.SetConfig(config.Config{})
+	r := newIdPRegistry(gw)
+
+	hook := &logrustest.Hook{}
+	prevHooks, prevLevel := log.ReplaceHooks(logrus.LevelHooks{}), log.GetLevel()
+	log.AddHook(hook)
+	log.SetLevel(logrus.WarnLevel)
+	defer func() {
+		log.ReplaceHooks(prevHooks)
+		log.SetLevel(prevLevel)
+	}()
+
+	r.rebuild([]IdP{{ID: "idp-b", OrgID: "org-b", APIMappings: map[string]ScopeMapping{"api-a": {}}}})
+
+	if b := r.BindingsForAPI("api-a"); len(b) != 0 {
+		t.Fatalf("cross-org mapping must not bind, got %#v", b)
+	}
+	var rejections int
+	for _, e := range hook.AllEntries() {
+		if e.Data["client_idp_id"] == "idp-b" && e.Data["api_id"] == "api-a" {
+			rejections++
+		}
+	}
+	if rejections != 1 {
+		t.Errorf("want one warning for the rejected mapping, got %d", rejections)
 	}
 }
 
 // rebuild is build-then-swap: a previous snapshot must be fully replaced.
 func TestIdPRegistry_RebuildReplacesSnapshot(t *testing.T) {
-	gw := &Gateway{apisByID: map[string]*APISpec{"api-a": {}}}
+	gw := &Gateway{apisByID: loadedAPIs("api-a")}
+	gw.SetConfig(config.Config{})
 	r := newIdPRegistry(gw)
 
 	r.rebuild([]IdP{{ID: "old", APIMappings: map[string]ScopeMapping{"api-a": {}}}})
 	r.rebuild([]IdP{{ID: "new", APIMappings: map[string]ScopeMapping{"api-a": {}}}})
 
-	if _, ok := r.IdP("old"); ok {
-		t.Errorf("old IdP must be gone after rebuild")
-	}
-	if _, ok := r.IdP("new"); !ok {
-		t.Errorf("new IdP must be present after rebuild")
-	}
-	if b := r.BindingsForAPI("api-a"); len(b) != 1 || b[0].IdPID != "new" {
+	if b := r.BindingsForAPI("api-a"); len(b) != 1 || b[0].IdP.ID != "new" {
 		t.Errorf("api-a should bind only the new IdP, got %#v", b)
 	}
 }
@@ -425,22 +486,9 @@ func TestIdPRegistry_FetchFromDashboard_Forbidden(t *testing.T) {
 	}
 }
 
-// fetchJWKSKey must reject a non-HTTP(S) jwks_uri before building any client or
-// issuing a request — guards against non-HTTP SSRF vectors (file://, gopher://).
-func TestFetchJWKSKey_RejectsNonHTTPScheme(t *testing.T) {
-	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
-	k := &JWTMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec}}
-
-	for _, url := range []string{"file:///etc/passwd", "gopher://127.0.0.1", "ftp://host/jwks"} {
-		if got := k.fetchJWKSKey(url, "kid"); got != nil {
-			t.Errorf("non-HTTP scheme %q must be rejected, got %v", url, got)
-		}
-	}
-}
-
 // doRefresh fetches and rebuilds end-to-end (RPC mode via injected loader).
 func TestIdPRegistry_DoRefresh(t *testing.T) {
-	gw := &Gateway{apisByID: map[string]*APISpec{"api-a": {}}}
+	gw := &Gateway{apisByID: loadedAPIs("api-a")}
 	conf := config.Config{}
 	conf.SlaveOptions.UseRPC = true
 	conf.SlaveOptions.RPCKey = "org-1"
@@ -456,7 +504,7 @@ func TestIdPRegistry_DoRefresh(t *testing.T) {
 		t.Fatalf("doRefresh error: %v", err)
 	}
 	b := r.BindingsForAPI("api-a")
-	if len(b) != 1 || b[0].IdPID != "idp-1" || b[0].ScopeToPolicy["read"] != "pol-read" {
+	if len(b) != 1 || b[0].IdP.ID != "idp-1" || b[0].ScopeToPolicy["read"] != "pol-read" {
 		t.Fatalf("registry not populated after doRefresh: %#v", b)
 	}
 }
@@ -466,7 +514,7 @@ func TestIdPRegistry_DoRefresh(t *testing.T) {
 func TestIdPRegistry_DoRefresh_ShutdownNoOp(t *testing.T) {
 	cancelledCtx, cancel := context.WithCancel(context.Background())
 	cancel()
-	gw := &Gateway{apisByID: map[string]*APISpec{"api-a": {}}, ctx: cancelledCtx}
+	gw := &Gateway{apisByID: loadedAPIs("api-a"), ctx: cancelledCtx}
 	conf := config.Config{}
 	conf.SlaveOptions.UseRPC = true
 	gw.SetConfig(conf)
@@ -496,11 +544,11 @@ func TestCtxMatchedBinding_Roundtrip(t *testing.T) {
 		t.Fatalf("empty request must have no matched binding, got %#v", got)
 	}
 
-	b := &Binding{IdPID: "idp-1", ScopeToPolicy: map[string]string{"read": "pol"}}
+	b := &Binding{IdP: &IdP{ID: "idp-1"}, ScopeToPolicy: map[string]string{"read": "pol"}}
 	ctxSetMatchedBinding(r, b)
 
 	got := ctxGetMatchedBinding(r)
-	if got == nil || got.IdPID != "idp-1" || got.ScopeToPolicy["read"] != "pol" {
+	if got == nil || got.IdP.ID != "idp-1" || got.ScopeToPolicy["read"] != "pol" {
 		t.Fatalf("matched binding roundtrip failed: %#v", got)
 	}
 }
@@ -588,6 +636,7 @@ func TestIdPRegistry_JWT_ResolvesKeyAndScope(t *testing.T) {
 	// rebuild AFTER load so apisByID contains apiID (else the segment backstop
 	// drops the binding).
 	ts.Gw.idpRegistry.rebuild([]IdP{{
+		OrgID:   "default",
 		ID:      "idp-1",
 		Issuer:  "my-issuer",
 		JWKSURI: testHttpJWK,
@@ -639,6 +688,7 @@ func TestIdPRegistry_JWT_ManualSourceWins(t *testing.T) {
 	// A registry binding pointing at a BOGUS JWKS URL — if the probe ran it would
 	// fail; manual must win so this is never consulted.
 	ts.Gw.idpRegistry.rebuild([]IdP{{
+		OrgID:   "default",
 		ID:      "idp-bogus",
 		JWKSURI: "http://127.0.0.1:1/nope.json",
 		APIMappings: map[string]ScopeMapping{
@@ -690,6 +740,7 @@ func TestIdPRegistry_JWT_ResolvesScopeClaimNameFromRegistry(t *testing.T) {
 
 	// rebuild AFTER load so apisByID contains apiID (segment backstop).
 	ts.Gw.idpRegistry.rebuild([]IdP{{
+		OrgID:          "default",
 		ID:             "idp-scp",
 		Issuer:         "my-issuer",
 		JWKSURI:        testHttpJWK,
@@ -743,6 +794,7 @@ func TestIdPRegistry_JWT_NoScopeClaimNameRejects(t *testing.T) {
 	})
 
 	ts.Gw.idpRegistry.rebuild([]IdP{{
+		OrgID:   "default",
 		ID:      "idp-noscp",
 		Issuer:  "my-issuer",
 		JWKSURI: testHttpJWK,
@@ -788,7 +840,7 @@ func TestScopeClaimNameForRequest(t *testing.T) {
 	}
 
 	// Binding fills the gap when the API def sets nothing.
-	b := &Binding{ScopeClaimName: "scp"}
+	b := &Binding{IdP: &IdP{ScopeClaimName: "scp"}}
 	if got := k.scopeClaimNameForRequest(jwt.MapClaims{}, b); got != "scp" {
 		t.Errorf("binding fallback: want scp, got %q", got)
 	}
@@ -820,35 +872,6 @@ func TestUnverifiedIssuerHint(t *testing.T) {
 	}
 }
 
-func TestKeyFromJWKSet(t *testing.T) {
-	if got := keyFromJWKSet(nil, "kid"); got != nil {
-		t.Errorf("nil set must return nil, got %v", got)
-	}
-	if got := keyFromJWKSet(&jose.JSONWebKeySet{}, "kid"); got != nil {
-		t.Errorf("set without kid must return nil, got %v", got)
-	}
-}
-
-func TestCachedJWKSet(t *testing.T) {
-	k := newTestJWTMiddleware("api-a")
-	jwkCache := k.loadOrCreateJWKCache()
-
-	if got := cachedJWKSet(jwkCache, "https://miss"); got != nil {
-		t.Errorf("cache miss must return nil, got %v", got)
-	}
-
-	set := &jose.JSONWebKeySet{}
-	jwkCache.Set("https://hit", set, cache.DefaultExpiration)
-	if got := cachedJWKSet(jwkCache, "https://hit"); got != set {
-		t.Errorf("cache hit must return the set, got %v", got)
-	}
-
-	jwkCache.Set("https://wrong", 1234, cache.DefaultExpiration)
-	if got := cachedJWKSet(jwkCache, "https://wrong"); got != nil {
-		t.Errorf("unexpected cache value type must return nil, got %v", got)
-	}
-}
-
 func TestSecretFromIdPRegistry_EarlyReturns(t *testing.T) {
 	tok := &jwt.Token{Header: map[string]interface{}{KID: "kid-1"}, Claims: jwt.MapClaims{}}
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -875,7 +898,7 @@ func TestSecretFromIdPRegistry_EarlyReturns(t *testing.T) {
 
 	// Binding exists but the token has no kid.
 	k.Gw.apisMu.Lock()
-	k.Gw.apisByID["api-a"] = &APISpec{}
+	k.Gw.apisByID["api-a"] = loadedAPI("api-a")
 	k.Gw.apisMu.Unlock()
 	k.Gw.idpRegistry.rebuild([]IdP{{
 		ID: "idp-1", JWKSURI: "https://i1/jwks",
@@ -887,24 +910,12 @@ func TestSecretFromIdPRegistry_EarlyReturns(t *testing.T) {
 	}
 }
 
-func TestKeyForBinding_SkipBranches(t *testing.T) {
+func TestKeyForBinding_IssuerMismatchSkips(t *testing.T) {
 	k := newTestJWTMiddleware("api-a")
-	k.Gw.idpRegistry.rebuild([]IdP{}) // empty registry
-
-	// Unknown IdP id -> nil (no fetch).
-	if got := k.keyForBinding(Binding{IdPID: "missing"}, "", "kid"); got != nil {
-		t.Errorf("unknown IdP must return nil, got %v", got)
-	}
-
-	// Known IdP but issuer hint mismatches -> nil (no fetch).
-	k.Gw.apisMu.Lock()
-	k.Gw.apisByID["api-a"] = &APISpec{}
-	k.Gw.apisMu.Unlock()
-	k.Gw.idpRegistry.rebuild([]IdP{{
-		ID: "idp-1", Issuer: "https://real", JWKSURI: "https://i1/jwks",
-		APIMappings: map[string]ScopeMapping{"api-a": {}},
-	}})
-	if got := k.keyForBinding(Binding{IdPID: "idp-1"}, "https://other", "kid"); got != nil {
+	b := Binding{IdP: &IdP{ID: "idp-1", Issuer: "https://real", JWKSURI: "https://i1/jwks"}}
+	b.JWKS = newJWKSEntry(b.IdP.JWKSURI, time.Minute)
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	if got := k.keyForBinding(r, b, "https://other", "kid"); got != nil {
 		t.Errorf("issuer mismatch must return nil, got %v", got)
 	}
 }
@@ -938,23 +949,6 @@ func TestIdPRegistry_FetchFromDashboard_Non200(t *testing.T) {
 	}
 }
 
-func TestFetchJWKSKey_CacheHit(t *testing.T) {
-	k := newTestJWTMiddleware("api-a")
-	priv, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		t.Fatal(err)
-	}
-	set := &jose.JSONWebKeySet{Keys: []jose.JSONWebKey{
-		{Key: &priv.PublicKey, KeyID: "kid-1", Algorithm: "RS256", Use: "sig"},
-	}}
-	k.loadOrCreateJWKCache().Set("https://jwks", set, cache.DefaultExpiration)
-
-	// Cache hit: returns the key without any network fetch.
-	if k.fetchJWKSKey("https://jwks", "kid-1") == nil {
-		t.Fatal("cache hit should return the key")
-	}
-}
-
 // fetchFromRPC with the default loader (a real RPCStorageHandler) exercises the
 // newIdPRegistry rpcLoaderFn closure; with the RPC client down it yields nil.
 func TestIdPRegistry_FetchFromRPC_DefaultLoader(t *testing.T) {
@@ -976,7 +970,7 @@ func TestIdPRegistry_FetchFromRPC_DefaultLoader(t *testing.T) {
 
 // Refresh debounces and then rebuilds via doRefresh on the timer.
 func TestIdPRegistry_Refresh_DebouncedRebuild(t *testing.T) {
-	gw := &Gateway{apisByID: map[string]*APISpec{"api-a": {}}}
+	gw := &Gateway{apisByID: loadedAPIs("api-a")}
 	conf := config.Config{}
 	conf.SlaveOptions.UseRPC = true
 	gw.SetConfig(conf)
@@ -997,17 +991,8 @@ func TestIdPRegistry_Refresh_DebouncedRebuild(t *testing.T) {
 			break
 		}
 	}
-	if len(b) != 1 || b[0].IdPID != "idp-1" {
+	if len(b) != 1 || b[0].IdP.ID != "idp-1" {
 		t.Fatalf("Refresh did not rebuild the registry: %#v", b)
-	}
-}
-
-// fetchJWKSKey returns nil when every fetch path fails (factory client, plain
-// client, and the x5c legacy fallback) — covers the error + legacy branches.
-func TestFetchJWKSKey_FetchError(t *testing.T) {
-	k := newTestJWTMiddleware("api-a")
-	if got := k.fetchJWKSKey("http://127.0.0.1:1/jwks", "kid-1"); got != nil {
-		t.Errorf("unreachable JWKS must return nil, got %v", got)
 	}
 }
 
@@ -1065,5 +1050,63 @@ func TestIdPRegistry_FetchFromRPC_EmergencyMode(t *testing.T) {
 	}
 	if len(idps) != 1 || idps[0].ID != "idp-1" {
 		t.Fatalf("emergency mode must load from backup, got %#v", idps)
+	}
+}
+
+// An API with its own OAS jwksURIs never consults the registry, even when a
+// record is bound to it: the record's JWKS is never fetched and its entry stays
+// empty, so the per-URI cacheTimeout is the only one that applies.
+func TestIdPRegistry_PerAPIJWKSURIsWinOverRecord(t *testing.T) {
+	var manualFetches, recordFetches atomic.Int32
+	jwksServer := func(counter *atomic.Int32) *httptest.Server {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			counter.Add(1)
+			_, _ = w.Write([]byte(jwkTestJson))
+		}))
+		t.Cleanup(srv.Close)
+		return srv
+	}
+	manualSrv, recordSrv := jwksServer(&manualFetches), jwksServer(&recordFetches)
+
+	const apiID = "api-collide"
+	k := newTestJWTMiddleware(apiID)
+	k.Spec.OrgID = "org-1"
+	k.Spec.IsOAS = true
+	k.Spec.JWTSigningMethod = RSASign
+	k.Spec.JWTJwksURIs = []apidef.JWK{{URL: manualSrv.URL, CacheTimeout: tyktime.ReadableDuration(10 * time.Second)}}
+	k.Gw.apisByID[apiID] = k.Spec
+
+	// The record would resolve the same key set, so only the fetch counters and
+	// the entry show which source served the request.
+	k.Gw.idpRegistry.rebuild([]IdP{{
+		OrgID: "org-1", ID: "idp-1", JWKSURI: recordSrv.URL, JWKSCacheTimeout: "10m",
+		APIMappings: map[string]ScopeMapping{apiID: {ScopeToPolicy: map[string]string{"read": "unused-policy"}}},
+	}})
+
+	token := &jwt.Token{Header: map[string]interface{}{KID: "12345"}, Claims: jwt.MapClaims{}}
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	key, err := k.getSecretToVerifySignature(r, token)
+	if err != nil || key == nil {
+		t.Fatalf("the per-API jwksURIs must resolve the key: key=%v err=%v", key, err)
+	}
+
+	// No matched binding means the record's scope_to_policy never merges into
+	// the API's own mapping for this request.
+	if b := ctxGetMatchedBinding(r); b != nil {
+		t.Errorf("want no matched binding, got %#v", b)
+	}
+
+	if got := manualFetches.Load(); got != 1 {
+		t.Errorf("want one fetch of the API's own JWKS, got %d", got)
+	}
+	if got := recordFetches.Load(); got != 0 {
+		t.Errorf("the record's JWKS must never be fetched, got %d fetches", got)
+	}
+	bindings := k.Gw.idpRegistry.BindingsForAPI(apiID)
+	if len(bindings) != 1 {
+		t.Fatalf("want the record still bound, got %d bindings", len(bindings))
+	}
+	if bindings[0].JWKS.cached.Load() != nil {
+		t.Error("the record's entry must stay empty while the API has its own jwksURIs")
 	}
 }

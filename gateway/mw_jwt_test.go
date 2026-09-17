@@ -11,6 +11,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -3655,16 +3656,18 @@ func TestJWTMiddleware_InitThenUnload(t *testing.T) {
 		APIDefinition: api,
 	}
 	m.Init()
+	// The key set plus the JWKsAPIDef marker the request path checks for.
+	const wantCached = 2
 	var numberOfCachedJWKItems = 0
 	for i := 0; i < 10; i++ {
 		jwkCache := ts.Gw.loadOrCreateJWKCacheByApiID(api.APIID)
 		numberOfCachedJWKItems = jwkCache.Count()
-		if numberOfCachedJWKItems == 1 {
+		if numberOfCachedJWKItems == wantCached {
 			break
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
-	assert.Equal(t, 1, numberOfCachedJWKItems)
+	assert.Equal(t, wantCached, numberOfCachedJWKItems)
 
 	// A child test for checking Unload behavior
 	// Unload method flushes the cache for the API Id, if it cannot be found in
@@ -5444,4 +5447,36 @@ func Test_mapScopeToPolicies_TT5893(t *testing.T) {
 			assert.ElementsMatch(t, []string{"policy1"}, res)
 		})
 	})
+}
+
+// The prefetch in Init must leave the cache in a state the request path accepts,
+// so the first request after a load is served without another fetch.
+func TestJWTMiddleware_InitPrefetchServesFirstRequest(t *testing.T) {
+	originalGetJWK := GetJWK
+	defer func() { GetJWK = originalGetJWK }()
+
+	var fetches atomic.Int32
+	GetJWK = func(string, bool) (*jose.JSONWebKeySet, error) {
+		fetches.Add(1)
+		return &jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{KeyID: "kid-1", Key: "secret-key"}}}, nil
+	}
+
+	gw := &Gateway{}
+	gw.SetConfig(config.Config{})
+	uris := []apidef.JWK{{URL: "https://idp.example/certs"}}
+	k := &JWTMiddleware{BaseMiddleware: &BaseMiddleware{Gw: gw, Spec: &APISpec{APIDefinition: &apidef.APIDefinition{
+		APIID: "api-a", OrgID: "org-a", IsOAS: true, JWTJwksURIs: uris,
+	}}}}
+
+	k.Init()
+	marker := k.specCacheKey(k.Spec, JWKsAPIDef)
+	require.Eventually(t, func() bool {
+		_, ok := k.loadOrCreateJWKCache().Get(marker)
+		return ok
+	}, 5*time.Second, 10*time.Millisecond)
+
+	key, err := k.getSecretFromMultipleJWKURIs(uris, "kid-1", RSASign)
+	require.NoError(t, err)
+	assert.Equal(t, "secret-key", key)
+	assert.Equal(t, int32(1), fetches.Load(), "the first request must reuse the prefetched set")
 }

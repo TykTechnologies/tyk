@@ -1964,6 +1964,77 @@ paths:
       summary: Invalidate JWK cache for all APIs
       tags:
         - JWK cache invalidation
+  /tyk/clientidps/{orgID}/{idpID}/jwks-cache:
+    delete:
+      description: >
+        Invalidate this node's cached JWKS for one client IdP registry record. The next request
+        that needs a key from the record fetches its JWKS again. The per-API JWK cache is not affected.
+      operationId: invalidateClientIdPJWKCache
+      parameters:
+        - description: The organisation that owns the client IdP record.
+          example: 5e9d9544a1dcd60001d0ed20
+          in: path
+          name: orgID
+          required: true
+          schema:
+            type: string
+        - description: The client IdP record's client_idp_id.
+          example: okta-prod
+          in: path
+          name: idpID
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              example:
+                message: cache invalidated
+                status: ok
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Cache invalidated.
+        "403":
+          content:
+            application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+      summary: Invalidate the JWK cache for one client IdP.
+      tags:
+        - JWK cache invalidation
+  /tyk/clientidps/jwks-cache:
+    delete:
+      description: >
+        Invalidate this node's cached JWKS for every client IdP registry record. The per-API JWK
+        cache is not affected.
+      operationId: invalidateClientIdPJWKCacheForAll
+      responses:
+        "200":
+          content:
+            application/json:
+              example:
+                message: cache invalidated
+                status: ok
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Cache invalidated.
+        "403":
+          content:
+            application/json:
+              example:
+                message: Attempted administrative access with invalid or missing key!
+                status: error
+              schema:
+                $ref: '#/components/schemas/ApiStatusMessage'
+          description: Forbidden
+      summary: Invalidate the JWK cache for all client IdPs.
+      tags:
+        - JWK cache invalidation
   /tyk/certs:
     get:
       description: List all certificates in the Tyk Gateway.

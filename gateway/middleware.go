@@ -719,6 +719,14 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 		return session, true
 	}
 
+	// The API's auth store usually reads the same keys as the global session
+	// store, so asking it again would repeat the same miss. LDAP- and RPC-backed
+	// stores differ.
+	if sameKeyStore(t.Spec.AuthManager.Store(), t.Gw.GlobalSessionManager.Store()) {
+		session.KeyID = key
+		return session, false
+	}
+
 	if _, ok := t.Spec.AuthManager.Store().(*RPCStorageHandler); ok && rpc.IsEmergencyMode() {
 		session.KeyID = key
 		return session.Clone(), false
@@ -770,6 +778,24 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 	session.KeyID = key
 
 	return session, false
+}
+
+// sameKeyStore reports whether two handlers read the same keys from the same
+// Redis. A reload builds a new store for the global session manager while
+// unchanged APIs keep the one they were loaded with, so pointer identity alone
+// misses most matches.
+func sameKeyStore(a, b storage.Handler) bool {
+	if a == b {
+		return true
+	}
+	ra, okA := a.(*storage.RedisCluster)
+	rb, okB := b.(*storage.RedisCluster)
+	return okA && okB &&
+		ra.ConnectionHandler == rb.ConnectionHandler &&
+		ra.KeyPrefix == rb.KeyPrefix &&
+		ra.HashKeys == rb.HashKeys &&
+		ra.IsCache == rb.IsCache &&
+		ra.IsAnalytics == rb.IsAnalytics
 }
 
 // FireEvent is added to the BaseMiddleware object so it is available across the entire stack
