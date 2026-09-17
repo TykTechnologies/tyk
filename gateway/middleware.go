@@ -242,12 +242,7 @@ func (gw *Gateway) isDisabledForMCP(mw TykMiddleware) bool {
 		return false
 	}
 
-	switch mw.(type) {
-	case *RedisCacheMiddleware:
-		return true
-	default:
-		return false
-	}
+	return false
 }
 
 func (gw *Gateway) mwAppendEnabled(chain *[]alice.Constructor, mw TykMiddleware) bool {

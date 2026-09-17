@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 
@@ -393,33 +394,58 @@ func (m *JSONRPCMiddleware) syntheticMCPToolViewForCaller(r *http.Request) (oas.
 func (m *JSONRPCMiddleware) writeSyntheticMCPToolsListResponse(w http.ResponseWriter, r *http.Request, rec *bufferedResponseWriter, view oas.MCPToolView, filter bool, policyCtx *restAsMCPPolicyContext) {
 	body := rec.body.Bytes()
 	if filter && rec.statusCode < http.StatusBadRequest {
-		rewritten, err := rewriteMCPToolsListResponse(body, view)
+		rewritten, changed, err := rewriteMCPToolsListResponse(body, view)
 		if err != nil {
 			m.Logger().WithError(err).Warn("failed to rewrite REST-as-MCP tools/list response")
 			m.writeJSONRPCError(w, r, nil, mcp.JSONRPCInternalError, "Internal error", nil)
 			return
 		}
 		body = rewritten
+		if changed {
+			markMCPResponseEdited(r)
+		}
 	}
 	if rec.statusCode < http.StatusBadRequest {
 		if filtered, ok := filterRESTAsMCPListResponse(body, policyCtx); ok {
 			body = filtered
+			markMCPResponseEdited(r)
 		}
 	}
 	rec.writeTo(w, body)
 }
 
-func rewriteMCPToolsListResponse(body []byte, view oas.MCPToolView) ([]byte, error) {
-	var envelope map[string]any
+func rewriteMCPToolsListResponse(body []byte, view oas.MCPToolView) ([]byte, bool, error) {
+	var envelope mcp.JSONRPCResponse
 	if err := json.Unmarshal(body, &envelope); err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	result, ok := envelope["result"].(map[string]any)
-	if !ok {
-		return body, nil
+	var result map[string]json.RawMessage
+	if err := json.Unmarshal(envelope.Result, &result); err != nil {
+		return nil, false, err
 	}
-	result["tools"] = view.Tools
-	return json.Marshal(envelope)
+	callerTools, err := json.Marshal(view.Tools)
+	if err != nil {
+		return nil, false, err
+	}
+	if jsonBytesEqual(result["tools"], callerTools) {
+		return body, false, nil
+	}
+	result["tools"] = callerTools
+	mcp.SetPrivateCacheHints(result)
+	envelope.Result, err = json.Marshal(result)
+	if err != nil {
+		return nil, false, err
+	}
+	rewritten, err := json.Marshal(envelope)
+	return rewritten, err == nil, err
+}
+
+func jsonBytesEqual(left, right []byte) bool {
+	var leftValue, rightValue any
+	if json.Unmarshal(left, &leftValue) != nil || json.Unmarshal(right, &rightValue) != nil {
+		return false
+	}
+	return reflect.DeepEqual(leftValue, rightValue)
 }
 
 // bufferedResponseWriter is intentionally local to synthetic REST-as-MCP
