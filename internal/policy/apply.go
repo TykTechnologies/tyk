@@ -223,7 +223,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 
 		if !ok {
 			err := fmt.Errorf("policy not found: %q", polID)
-			t.Logger().Error(err)
+			t.logger.Error(err)
 			if len(policyIDs) > 1 {
 				continue
 			}
@@ -235,7 +235,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 		// otherwise you could overwrite a session key with a policy from a different org!
 		if t.orgID != nil && policy.OrgID != *t.orgID {
 			err := errors.New("attempting to apply policy from different organisation to key, skipping")
-			t.Logger().Error(err)
+			t.logger.Error(err)
 			return err
 		}
 
@@ -275,11 +275,6 @@ func (t *Service) Apply(session *user.SessionState) error {
 	}
 
 	return nil
-}
-
-// Logger implements a typical logger signature with service context.
-func (t *Service) Logger() *logrus.Entry {
-	return logrus.NewEntry(t.logger)
 }
 
 // The exported Service methods below are thin wrappers kept for the package
