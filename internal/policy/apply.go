@@ -169,6 +169,11 @@ type applyRun struct {
 	// an error, and these two flags are how it is detected.
 	didPerAPI    bool
 	didPartition bool
+
+	// multipleACL is set by finaliseRights when the ACLs in rights came from
+	// more than one policy; it decides whether AllowanceScope is pinned to
+	// the policy that set each limit.
+	multipleACL bool
 }
 
 // newApplyRun prepares the working state for one Apply on session.
@@ -177,9 +182,11 @@ func (t *Service) newApplyRun(session *user.SessionState) *applyRun {
 		orgID:   t.orgID,
 		logger:  t.logger,
 		session: session,
-		rights:  make(rightsByAPI),
-		tags:    make(map[tagName]bool),
-		byAPI:   make(map[apiId]appliedPartitions),
+		// Size hints: policies usually cover the APIs and tags the session
+		// already has. Only matters above 8 entries; harmless below.
+		rights: make(rightsByAPI, len(session.AccessRights)),
+		tags:   make(map[tagName]bool, len(session.Tags)),
+		byAPI:  make(map[apiId]appliedPartitions, len(session.AccessRights)),
 	}
 }
 
@@ -288,17 +295,17 @@ func (t *Service) ApplyRateLimits(session *user.SessionState, policy user.Policy
 
 // ApplyEndpointLevelLimits see applyRun.applyEndpointLevelLimits.
 func (t *Service) ApplyEndpointLevelLimits(policyEndpoints user.Endpoints, currEndpoints user.Endpoints) user.Endpoints {
-	return (&applyRun{}).applyEndpointLevelLimits(policyEndpoints, currEndpoints)
+	return t.newApplyRun(&user.SessionState{}).applyEndpointLevelLimits(policyEndpoints, currEndpoints)
 }
 
 // ApplyJSONRPCMethodLimits see applyRun.applyJSONRPCMethodLimits.
 func (t *Service) ApplyJSONRPCMethodLimits(policy, current []user.JSONRPCMethodLimit) []user.JSONRPCMethodLimit {
-	return (&applyRun{}).applyJSONRPCMethodLimits(policy, current)
+	return t.newApplyRun(&user.SessionState{}).applyJSONRPCMethodLimits(policy, current)
 }
 
 // ApplyMCPPrimitiveLimits see applyRun.applyMCPPrimitiveLimits.
 func (t *Service) ApplyMCPPrimitiveLimits(policy, current []user.MCPPrimitiveLimit) []user.MCPPrimitiveLimit {
-	return (&applyRun{}).applyMCPPrimitiveLimits(policy, current)
+	return t.newApplyRun(&user.SessionState{}).applyMCPPrimitiveLimits(policy, current)
 }
 
 // applyRateLimits will write policy limits to session and apiLimits.
@@ -708,27 +715,23 @@ func (r *applyRun) scopeKeyLevelLimits() {
 func (r *applyRun) finaliseRights() {
 	session, rights := r.session, r.rights
 
-	multipleACL := r.limitsFromMultiplePolicies()
+	r.multipleACL = r.limitsFromMultiplePolicies()
 
-	for k, v := range rights {
-		applied := r.byAPI[k]
-
-		if !applied.acl {
-			r.updateExistingAccessRightLimits(k, v, applied)
+	for k := range rights {
+		if !r.byAPI[k].acl {
+			r.updateExistingAccessRightLimits(k)
 			delete(rights, k)
 			continue
 		}
 
-		rights[k] = r.inheritUnappliedFromSessionRoot(v, applied, multipleACL)
+		rights[k] = r.inheritUnappliedFromSessionRoot(k)
 	}
 
-	counts := r.counts()
-
 	// If we have policies defining rules for one single API, update session root vars (legacy)
-	r.updateSessionRootVars(counts)
+	r.updateSessionRootVars()
 
 	// Override session ACL if at least one policy define it
-	if counts.acl > 0 {
+	if r.counts().acl > 0 {
 		session.AccessRights = rights
 	}
 }
@@ -760,8 +763,9 @@ func (r *applyRun) limitsFromMultiplePolicies() bool {
 // Versions, GraphQL/MCP restrictions) is left untouched. If the key has no
 // access right for api, nothing happens: a policy without ACL cannot grant
 // access to a new API.
-func (r *applyRun) updateExistingAccessRightLimits(api apiId, computed user.AccessDefinition, applied appliedPartitions) {
+func (r *applyRun) updateExistingAccessRightLimits(api apiId) {
 	session := r.session
+	computed, applied := r.rights[api], r.byAPI[api]
 
 	existing, ok := session.AccessRights[api]
 	if !ok {
@@ -796,8 +800,9 @@ func (r *applyRun) updateExistingAccessRightLimits(api apiId, computed user.Acce
 // session's access right for that API. When more than one policy set ACLs,
 // the AllowanceScope is pinned to the policy that set the limit so that
 // quotas and rate limits are counted per policy.
-func (r *applyRun) inheritUnappliedFromSessionRoot(ar user.AccessDefinition, applied appliedPartitions, multipleACL bool) user.AccessDefinition {
+func (r *applyRun) inheritUnappliedFromSessionRoot(api apiId) user.AccessDefinition {
 	session := r.session
+	ar, applied, multipleACL := r.rights[api], r.byAPI[api], r.multipleACL
 
 	if !applied.rateLimit {
 		ar.Limit.Rate = session.Rate
@@ -827,8 +832,9 @@ func (r *applyRun) inheritUnappliedFromSessionRoot(ar user.AccessDefinition, app
 	return ar
 }
 
-func (r *applyRun) updateSessionRootVars(c partitionCounts) {
+func (r *applyRun) updateSessionRootVars() {
 	session, rights := r.session, r.rights
+	c := r.counts()
 
 	// Only when exactly one API received all three partitions. This has been
 	// an AND since the check was introduced (2019, #2462); a rate-limit-only
