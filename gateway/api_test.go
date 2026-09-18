@@ -6421,3 +6421,83 @@ func (gw *Gateway) removePersistentPolicyById(id string) error {
 
 	return root.Remove(id + ".json")
 }
+
+func TestHandleApi_CustomApiIdValidation(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Passes sanitize.ValidatePathComponent but is not made of the allowed identifier characters.
+	const unsafeAPIID = "żuk"
+
+	apiDefRequest := func(t *testing.T, apiID string) *http.Request {
+		t.Helper()
+
+		apiDef := apidef.DummyAPI()
+		apiDef.APIID = apiID
+		body, err := json.Marshal(apiDef)
+		require.NoError(t, err)
+
+		req, err := http.NewRequest(http.MethodPost, "http://gateway", bytes.NewBuffer(body))
+		require.NoError(t, err)
+
+		return req
+	}
+
+	registerSpec := func(t *testing.T, apiID string) {
+		t.Helper()
+
+		ts.Gw.apisMu.Lock()
+		ts.Gw.apisByID[apiID] = &APISpec{APIDefinition: &apidef.APIDefinition{APIID: apiID}}
+		ts.Gw.apisMu.Unlock()
+
+		t.Cleanup(func() {
+			ts.Gw.apisMu.Lock()
+			delete(ts.Gw.apisByID, apiID)
+			ts.Gw.apisMu.Unlock()
+		})
+	}
+
+	t.Run("AllowUnsafeApiIds=false", func(t *testing.T) {
+		ts.setTestScopeConfig(t, func(cnf *config.Config) {
+			cnf.AllowUnsafeApiIds = false
+		})
+
+		t.Run("rejects create", func(t *testing.T) {
+			response, statusCode := ts.Gw.handleAddApi(apiDefRequest(t, unsafeAPIID), afero.NewMemMapFs(), false)
+
+			errorResponse, ok := response.(apiStatusMessage)
+			require.True(t, ok)
+			assert.Equal(t, identifier.ErrInvalidCustomApiId.Error(), errorResponse.Message)
+			assert.Equal(t, http.StatusBadRequest, statusCode)
+		})
+
+		t.Run("rejects update", func(t *testing.T) {
+			registerSpec(t, unsafeAPIID)
+
+			response, statusCode := ts.Gw.handleUpdateApi(unsafeAPIID, apiDefRequest(t, unsafeAPIID), afero.NewMemMapFs(), false)
+
+			errorResponse, ok := response.(apiStatusMessage)
+			require.True(t, ok)
+			assert.Equal(t, identifier.ErrInvalidCustomApiId.Error(), errorResponse.Message)
+			assert.Equal(t, http.StatusBadRequest, statusCode)
+		})
+	})
+
+	t.Run("AllowUnsafeApiIds=true", func(t *testing.T) {
+		ts.setTestScopeConfig(t, func(cnf *config.Config) {
+			cnf.AllowUnsafeApiIds = true
+		})
+
+		t.Run("accepts create", func(t *testing.T) {
+			_, statusCode := ts.Gw.handleAddApi(apiDefRequest(t, unsafeAPIID), afero.NewMemMapFs(), false)
+			assert.Equal(t, http.StatusOK, statusCode)
+		})
+
+		t.Run("accepts update", func(t *testing.T) {
+			registerSpec(t, unsafeAPIID)
+
+			_, statusCode := ts.Gw.handleUpdateApi(unsafeAPIID, apiDefRequest(t, unsafeAPIID), afero.NewMemMapFs(), false)
+			assert.Equal(t, http.StatusOK, statusCode)
+		})
+	})
+}
