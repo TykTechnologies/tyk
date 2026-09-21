@@ -102,6 +102,9 @@ Other Installations are available:
 7. [CentOS](https://tyk.io/docs/tyk-oss/ce-centos/)
 8. [Compile Tyk from Source](#compiling-tyk-gateway)
 
+### Getting started with AI Gateway for LLM and MCP
+
+If you would like to get started with Tyk AI Gateway capabilities including LLM and MCP features, please refer to the [official AI documentation](https://tyk.io/docs/ai-management/overview).
 
 ## Open Source API Gateway Features
 Use any protocol: REST, SOAP, [GraphQL](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/graphql/), [gRPC](https://tyk.io/docs/key-concepts/grpc-proxy/), [TCP](https://tyk.io/docs/key-concepts/tcp-proxy/), and [MCP](https://tyk.io/docs/ai-management/mcp-gateway/overview).
