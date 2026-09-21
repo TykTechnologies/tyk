@@ -15,12 +15,10 @@ import (
 	"github.com/TykTechnologies/tyk/internal/dnsdiscovery"
 )
 
-// Upstream DNS discovery is a third source for an API's target list, alongside
-// the static target_list and service discovery. Resolution lives in
-// internal/dnsdiscovery.
+// A third source for an API's target list, after target_list and service
+// discovery. Resolution lives in internal/dnsdiscovery.
 
-// Applied when the configured value is 0. The drain default matches the
-// Kubernetes default terminationGracePeriodSeconds.
+// Applied when the configured value is 0.
 const (
 	dnsDiscoveryDefaultInterval      int64 = 30
 	dnsDiscoveryDefaultStaleTTL      int64 = 300
@@ -34,8 +32,7 @@ type dnsRenderedTargets struct {
 	list    *apidef.HostList
 }
 
-// dnsDiscoveryPlan holds what one API resolves. Its presence on the spec turns
-// the feature on.
+// dnsDiscoveryPlan, non-nil on the spec, turns the feature on.
 type dnsDiscoveryPlan struct {
 	target *url.URL
 	host   string
@@ -92,17 +89,15 @@ func planUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) *dnsDiscovery
 		return nil
 	}
 
-	// Dialling a backend means dialling an IP literal, and Go derives SNI and
-	// verification from the URL host, so a service certificate fails on every
-	// request.
+	// Dialling a backend means dialling an IP literal, which no service
+	// certificate covers.
 	if tlsUpstreamScheme(target.Scheme) {
 		logger.WithField("scheme", target.Scheme).
 			Warning("[PROXY] [DNS DISCOVERY] DNS discovery does not support TLS upstreams; leaving this API on its configured target")
 		return nil
 	}
 
-	// h2c is the transport that pins to one backend, by holding one connection
-	// per authority.
+	// h2c pins to one backend, holding one connection per authority.
 	if !strings.EqualFold(target.Scheme, "h2c") {
 		logger.WithField("scheme", target.Scheme).
 			Warning("[PROXY] [DNS DISCOVERY] DNS discovery only supports h2c upstreams; leaving this API on its configured target")
@@ -131,9 +126,8 @@ func planUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) *dnsDiscovery
 	return plan
 }
 
-// setupUpstreamDNSDiscovery subscribes the API to its upstream hostname, or
-// unsubscribes it. A reload replaces a definition without unloading it, so an
-// API that stops wanting discovery is released here.
+// Reconciles both ways: a reload replaces a definition without unloading it,
+// so an API that stops wanting discovery is released here.
 func (gw *Gateway) setupUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) {
 	previous := spec.dnsDiscovery
 
@@ -171,8 +165,7 @@ func (gw *Gateway) setupUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry
 	spec.dnsDiscovery = plan
 	previous.retire()
 
-	// Once per spec, releasing what the spec holds at the time rather than the
-	// plan captured here.
+	// Once per spec, releasing what it holds then, not this plan.
 	if !spec.dnsDiscoveryHooked {
 		spec.dnsDiscoveryHooked = true
 		spec.AddUnloadHook(func() {
@@ -205,8 +198,7 @@ func (p *dnsDiscoveryPlan) retire() {
 	p.conns.close()
 }
 
-// onAddressSet retires what a departed address leaves behind. The target list
-// itself is rendered on the request path.
+// Retires what a departed address leaves. The list is rendered per request.
 func (p *dnsDiscoveryPlan) onAddressSet(state *dnsdiscovery.State) {
 	var addrs []string
 	if state != nil {
@@ -226,8 +218,7 @@ func (p *dnsDiscoveryPlan) onAddressSet(state *dnsdiscovery.State) {
 		p.conns.drain(net.JoinHostPort(addr, p.port), p.drain)
 	}
 
-	// An address back before its deadline keeps the connections the transport
-	// is still holding and would not re-dial.
+	// A returning address keeps the connections the transport still holds.
 	for _, addr := range dnsdiscovery.Removed(addrs, was) {
 		p.conns.cancelDrain(net.JoinHostPort(addr, p.port))
 	}
@@ -240,8 +231,7 @@ func resolveDNSDiscoveryInterval(seconds int64) time.Duration {
 	return dnsdiscovery.NormaliseInterval(time.Duration(seconds) * time.Second)
 }
 
-// A negative value means never give up on the last known good set, which the
-// scheduler spells as zero.
+// Negative means never give up, which the scheduler spells as zero.
 func resolveDNSDiscoveryStaleTTL(seconds int64) time.Duration {
 	switch {
 	case seconds < 0:
@@ -262,8 +252,7 @@ func resolveDNSDiscoveryDrainDeadline(seconds int64) time.Duration {
 	return time.Duration(seconds) * time.Second
 }
 
-// urlFromDNS returns the API's target list from the published address set. It
-// runs on the request path, so it resolves nothing and takes no lock.
+// On the request path: resolves nothing, takes no lock.
 func (gw *Gateway) urlFromDNS(spec *APISpec) (*apidef.HostList, error) {
 	plan := spec.dnsDiscovery
 	if plan == nil {
@@ -289,8 +278,7 @@ func (gw *Gateway) urlFromDNS(spec *APISpec) (*apidef.HostList, error) {
 	return list, nil
 }
 
-// splitUpstreamHostPort keeps the port because resolution answers with bare
-// addresses.
+// The port is kept because resolution answers with bare addresses.
 func splitUpstreamHostPort(target *url.URL) (host, port string) {
 	host, port = target.Hostname(), target.Port()
 	if port != "" {
@@ -310,9 +298,8 @@ func tlsUpstreamScheme(scheme string) bool {
 	}
 }
 
-// buildUpstreamTarget keeps everything the configured target carries. The
-// scheme selects the h2c transport after the Director has run, and the
-// Director takes the query from whichever entry the picker returned.
+// The scheme selects the h2c transport after the Director runs, and the
+// Director takes the query from the entry the picker returned.
 func buildUpstreamTarget(target *url.URL, addr, port string) string {
 	var entry strings.Builder
 

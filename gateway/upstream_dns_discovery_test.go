@@ -23,14 +23,8 @@ import (
 	"github.com/TykTechnologies/tyk/internal/dnsdiscovery"
 )
 
-// Tests for the upstream half of DNS discovery: which APIs qualify, how a
-// published address set becomes a target list, and when a connection to a
-// departed address is closed. Resolution itself belongs to
-// internal/dnsdiscovery and is tested there.
-
-// TestUpstreamDNSDiscovery_SkipsTLSUpstreams covers the scheme guard. Dialling
-// a backend address means dialling an IP literal, which fails verification
-// against a service certificate with no IP SAN.
+// Dialling a backend means an IP literal, which no service certificate
+// covers.
 func TestUpstreamDNSDiscovery_SkipsTLSUpstreams(t *testing.T) {
 	cases := []struct {
 		scheme  string
@@ -52,8 +46,6 @@ func TestUpstreamDNSDiscovery_SkipsTLSUpstreams(t *testing.T) {
 	}
 }
 
-// TestSplitUpstreamHostPort covers the default port, which has to be supplied
-// explicitly because resolution answers with bare addresses and no port.
 func TestSplitUpstreamHostPort(t *testing.T) {
 	cases := []struct {
 		raw        string
@@ -76,9 +68,7 @@ func TestSplitUpstreamHostPort(t *testing.T) {
 	}
 }
 
-// TestBuildUpstreamTarget covers the scheme surviving into the rendered entry.
-// An h2c:// entry rewritten to http:// would reach a cleartext HTTP/2 upstream
-// over HTTP/1.1, which a gRPC server refuses.
+// An entry rewritten to http:// would reach a gRPC server over HTTP/1.1.
 func TestBuildUpstreamTarget(t *testing.T) {
 	cases := []struct {
 		raw, addr, port, want string
@@ -101,8 +91,6 @@ func TestBuildUpstreamTarget(t *testing.T) {
 	}
 }
 
-// TestResolveDNSDiscoveryPeriods covers the defaults, the floor and the
-// sentinels. Each period spells "off" differently.
 func TestResolveDNSDiscoveryPeriods(t *testing.T) {
 	t.Run("refresh interval", func(t *testing.T) {
 		cases := map[int64]time.Duration{
@@ -147,11 +135,8 @@ func TestResolveDNSDiscoveryPeriods(t *testing.T) {
 	})
 }
 
-// TestPlanUpstreamDNSDiscovery_Declines covers the cases in which an API
-// should not have its target list sourced from DNS. Without load balancing
-// every request still reaches one backend, and with service discovery there
-// are two sources for one list. The scheme cases are scope: discovery is h2c
-// only, that being the transport which holds one connection per authority.
+// Without load balancing every request still reaches one backend; with
+// service discovery there are two sources for one list.
 func TestPlanUpstreamDNSDiscovery_Declines(t *testing.T) {
 	logger := logrus.NewEntry(logrus.New())
 
@@ -189,8 +174,6 @@ func TestPlanUpstreamDNSDiscovery_Declines(t *testing.T) {
 	}
 }
 
-// TestPlanUpstreamDNSDiscovery_Accepts is the control for the test above.
-// Without it, a plan function that declined everything would pass.
 func TestPlanUpstreamDNSDiscovery_Accepts(t *testing.T) {
 	logger := logrus.NewEntry(logrus.New())
 
@@ -216,8 +199,6 @@ func TestPlanUpstreamDNSDiscovery_Accepts(t *testing.T) {
 	}
 }
 
-// TestPlanUpstreamDNSDiscovery_DrainDisabled covers the opt-out: no registry, so
-// the API dials straight through and departed addresses idle out.
 func TestPlanUpstreamDNSDiscovery_DrainDisabled(t *testing.T) {
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 	spec.APIID = "api-1"
@@ -238,8 +219,7 @@ func TestPlanUpstreamDNSDiscovery_DrainDisabled(t *testing.T) {
 	}
 }
 
-// stubResolver answers from a mutable map, so a test can move membership without
-// touching DNS.
+// stubResolver moves membership without touching DNS.
 type stubResolver struct {
 	mu      sync.Mutex
 	answers map[string][]string
@@ -273,8 +253,7 @@ func (r *stubResolver) lookup(_ context.Context, host string) ([]string, error) 
 	return r.answers[host], nil
 }
 
-// newDiscoveryGateway wires a stub resolver into a gateway's scheduler in place,
-// since the scheduler holds a mutex and must not be copied.
+// The scheduler holds a mutex, so it is wired in place and never copied.
 func newDiscoveryGateway(t *testing.T, resolver *stubResolver) *Gateway {
 	t.Helper()
 
@@ -288,8 +267,6 @@ func newDiscoveryGateway(t *testing.T, resolver *stubResolver) *Gateway {
 	return gw
 }
 
-// testClock is a movable clock the scheduler goroutine can read while the test
-// moves it.
 type testClock struct {
 	mu sync.Mutex
 	at time.Time
@@ -309,8 +286,7 @@ func (c *testClock) advance(d time.Duration) {
 	c.at = c.at.Add(d)
 }
 
-// loadDiscoveredAPI sets an API up as the loader would, and resolves once so the
-// assertions do not race the scheduler's first pass.
+// Resolves once, so the assertions do not race the scheduler's first pass.
 func loadDiscoveredAPI(t *testing.T, gw *Gateway, apiID, target string, configure ...func(*APISpec)) *APISpec {
 	t.Helper()
 
@@ -336,9 +312,7 @@ func loadDiscoveredAPI(t *testing.T, gw *Gateway, apiID, target string, configur
 	return spec
 }
 
-// TestUrlFromDNS_RendersEachAPIsOwnTargets covers the split between the shared
-// address set and the per-API rendering of it, with its own scheme, port and
-// path.
+// The address set is shared, the rendering of it is per-API.
 func TestUrlFromDNS_RendersEachAPIsOwnTargets(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.2", "10.0.0.1")
@@ -371,9 +345,8 @@ func TestUrlFromDNS_RendersEachAPIsOwnTargets(t *testing.T) {
 	}
 }
 
-// TestUrlFromDNS_ReusesRenderedListUntilMembershipChanges covers the
-// request-path cache. Membership changes on the order of the refresh interval
-// rather than the request rate.
+// Membership changes on the order of the refresh interval, not the request
+// rate, so the rendered list is cached.
 func TestUrlFromDNS_ReusesRenderedListUntilMembershipChanges(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1")
@@ -399,10 +372,8 @@ func TestUrlFromDNS_ReusesRenderedListUntilMembershipChanges(t *testing.T) {
 	}
 }
 
-// TestUrlFromDNS_FallsBackToTheConfiguredTarget covers every case with no
-// addresses to use. They differ in the log and not on the request path, each
-// leaving the API where it would be without the feature rather than on an
-// empty list that routes to the no-healthy-upstreams sink.
+// Every case with no addresses. They differ in the log, not on the request
+// path: each leaves the API where it would be without the feature.
 func TestUrlFromDNS_FallsBackToTheConfiguredTarget(t *testing.T) {
 	cases := []struct {
 		name    string
@@ -450,9 +421,8 @@ func TestUrlFromDNS_FallsBackToTheConfiguredTarget(t *testing.T) {
 	}
 }
 
-// TestSetupUpstreamDNSDiscovery_ReleasesOnReconfigure covers a reload that turns
-// the feature off. A reload replaces a definition rather than unloading it, so
-// nothing else would release the subscription.
+// A reload replaces a definition rather than unloading it, so nothing else
+// releases the subscription.
 func TestSetupUpstreamDNSDiscovery_ReleasesOnReconfigure(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1")
@@ -473,8 +443,7 @@ func TestSetupUpstreamDNSDiscovery_ReleasesOnReconfigure(t *testing.T) {
 		t.Skip("nothing was resolved, so there is nothing to assert about release")
 	}
 
-	// A resolution now must reach no entries, which is observable as the
-	// lookup count staying put.
+	// No entries left, observable as the lookup count staying put.
 	before := gw.upstreamDNS.Lookups()
 	gw.upstreamDNS.Refresh(context.Background())
 	if after := gw.upstreamDNS.Lookups(); after != before {
@@ -482,9 +451,6 @@ func TestSetupUpstreamDNSDiscovery_ReleasesOnReconfigure(t *testing.T) {
 	}
 }
 
-// TestUpstreamConnRegistry_DrainsDepartedAddresses covers a connection to a
-// departed address closing once its deadline passes, and one to an address
-// that stays not closing.
 func TestUpstreamConnRegistry_DrainsDepartedAddresses(t *testing.T) {
 	registry := newUpstreamConnRegistry()
 
@@ -513,9 +479,8 @@ func TestUpstreamConnRegistry_DrainsDepartedAddresses(t *testing.T) {
 	}
 }
 
-// TestUpstreamConnRegistry_DrainIsDeferredNotImmediate covers the delay. A pod
-// removed from a Service keeps serving until its grace period ends, so a
-// request in flight has to be allowed to finish.
+// A pod keeps serving until its grace period ends, so a request in flight
+// has to finish.
 func TestUpstreamConnRegistry_DrainIsDeferredNotImmediate(t *testing.T) {
 	registry := newUpstreamConnRegistry()
 
@@ -530,9 +495,6 @@ func TestUpstreamConnRegistry_DrainIsDeferredNotImmediate(t *testing.T) {
 	}
 }
 
-// TestUpstreamConnRegistry_ReturningAddressCancelsItsDrain covers a rolling
-// update that removes and restores an address inside the deadline keeping its
-// connection.
 func TestUpstreamConnRegistry_ReturningAddressCancelsItsDrain(t *testing.T) {
 	registry := newUpstreamConnRegistry()
 
@@ -548,11 +510,7 @@ func TestUpstreamConnRegistry_ReturningAddressCancelsItsDrain(t *testing.T) {
 	}
 }
 
-// TestUpstreamConnRegistry_CloseRetiresWithoutSevering covers API unload.
-// Unload has already retired both transports, closing every idle connection,
-// so what the registry still holds has requests on it. Closing those would cut
-// streams mid-flight. All close has to do is stop the pending drains and stop
-// tracking.
+// Unload has already closed the idle connections, so what is left is busy.
 func TestUpstreamConnRegistry_CloseRetiresWithoutSevering(t *testing.T) {
 	registry := newUpstreamConnRegistry()
 
@@ -572,8 +530,7 @@ func TestUpstreamConnRegistry_CloseRetiresWithoutSevering(t *testing.T) {
 		t.Errorf("a closed registry still tracks %d connections", got)
 	}
 
-	// A connection dialled afterwards is not retained, so an unloaded API
-	// cannot leak through a dialler that outlives it.
+	// An unloaded API cannot leak through a dialler that outlives it.
 	late, latePeer := net.Pipe()
 	defer latePeer.Close()
 	defer late.Close()
@@ -584,11 +541,8 @@ func TestUpstreamConnRegistry_CloseRetiresWithoutSevering(t *testing.T) {
 	}
 }
 
-// TestUpstreamConnRegistry_RedialBeatsAnExpiringDrain is a race regression
-// test. time.Timer.Stop cannot take back a timer that has already fired, so a
-// drain whose deadline arrives as the address is re-dialled has a callback in
-// flight that track cannot cancel, and unguarded it closes the connection just
-// established.
+// Race regression test. Stop cannot take back a fired timer, so a drain
+// expiring as the address is re-dialled has a callback track cannot cancel.
 func TestUpstreamConnRegistry_RedialBeatsAnExpiringDrain(t *testing.T) {
 	const addr = "10.0.0.1:9002"
 
@@ -623,9 +577,6 @@ func TestUpstreamConnRegistry_RedialBeatsAnExpiringDrain(t *testing.T) {
 	}
 }
 
-// TestUpstreamConnRegistry_PoolCloseDeregisters covers a connection the
-// transport retires on its own idle timeout not staying on the registry's
-// books.
 func TestUpstreamConnRegistry_PoolCloseDeregisters(t *testing.T) {
 	registry := newUpstreamConnRegistry()
 
@@ -642,8 +593,6 @@ func TestUpstreamConnRegistry_PoolCloseDeregisters(t *testing.T) {
 	}
 }
 
-// TestPlanDrainsOnMembershipChange joins the two halves: the address set moves
-// and departed connections drain, with no request involved.
 func TestPlanDrainsOnMembershipChange(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1", "10.0.0.2")
@@ -662,7 +611,6 @@ func TestPlanDrainsOnMembershipChange(t *testing.T) {
 	trackedDeparting := plan.conns.track("10.0.0.1:9002", departing)
 	trackedStaying := plan.conns.track("10.0.0.2:9002", staying)
 
-	// A scale-down: one pod leaves the Service.
 	resolver.set("svc", "10.0.0.2")
 	gw.upstreamDNS.Refresh(context.Background())
 
@@ -674,8 +622,6 @@ func TestPlanDrainsOnMembershipChange(t *testing.T) {
 	}
 }
 
-// closedWithin reports whether conn has been closed within d, by writing to it
-// until the write fails.
 func closedWithin(t *testing.T, conn net.Conn, d time.Duration) bool {
 	t.Helper()
 
@@ -695,8 +641,6 @@ func closedWithin(t *testing.T, conn net.Conn, d time.Duration) bool {
 	}
 }
 
-// TestUpstreamDNSDiscoveryEnabled covers the guard the Director uses, which
-// everything else here assumes.
 func TestUpstreamDNSDiscoveryEnabled(t *testing.T) {
 	if upstreamDNSDiscoveryEnabled(nil) {
 		t.Error("a nil spec reported discovery enabled")
@@ -713,13 +657,9 @@ func TestUpstreamDNSDiscoveryEnabled(t *testing.T) {
 	}
 }
 
-// TestUpstreamTargetList_SourcePrecedence covers which source supplies the
-// target list, for every combination an API can be loaded with.
-//
-// The service discovery cases are a regression test. Adding DNS discovery in
-// the middle of a chain of cases that fell through to each other replaced the
-// registry list with the static one, which is a 503 per request with load
-// balancing on and a nil dereference with it off.
+// Which source wins, for every combination. The service discovery cases are a
+// regression test: adding DNS discovery to a chain of cases that fell through
+// replaced the registry list with the static one.
 func TestUpstreamTargetList_SourcePrecedence(t *testing.T) {
 	registryList := apidef.NewHostListFromList([]string{"http://registry-1:8080", "http://registry-2:8080"})
 
@@ -739,8 +679,7 @@ func TestUpstreamTargetList_SourcePrecedence(t *testing.T) {
 		return spec
 	}
 
-	// Service discovery reads from the cache when it has run, so a primed cache
-	// stands in for the registry without an HTTP endpoint.
+	// A primed cache stands in for the registry without an HTTP endpoint.
 	primeRegistry := func(gw *Gateway, spec *APISpec) {
 		gw.ServiceCache = cache.New(30, 15)
 		gw.ServiceCache.Set(spec.APIID, registryList, 30)
@@ -774,9 +713,8 @@ func TestUpstreamTargetList_SourcePrecedence(t *testing.T) {
 	t.Run("service discovery with load balancing off", func(t *testing.T) {
 		gw := newGateway()
 		spec := newSpec(t, gw, func(spec *APISpec) {
-			// StructuredTargetList is only built for APIs that enable load
-			// balancing, so this is the case where overwriting the registry
-			// list leaves a nil one behind.
+			// StructuredTargetList is only built with load balancing on, so
+			// overwriting leaves a nil list here.
 			spec.Proxy.ServiceDiscovery.UseDiscoveryService = true
 		})
 		primeRegistry(gw, spec)
@@ -845,11 +783,8 @@ func TestUpstreamTargetList_SourcePrecedence(t *testing.T) {
 	})
 }
 
-// TestH2CTransport_HealthChecksDiscoveredUpstreams covers dead-peer detection.
-// A backend that dies without closing its side leaves a connection the pool
-// still believes in, and requests multiplexed onto it hang until their own
-// timeout. Pings are enabled only for discovered upstreams, where the pool
-// holds one connection per backend.
+// Dead-peer detection. A backend that dies without closing its side leaves a
+// connection the pool believes in, and requests onto it hang.
 func TestH2CTransport_HealthChecksDiscoveredUpstreams(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1")
@@ -903,10 +838,8 @@ func TestH2CTransport_HealthChecksDiscoveredUpstreams(t *testing.T) {
 	})
 }
 
-// TestUrlFromDNS_HoldsTheLastGoodSetWhileTheResolverIsDown is the gateway half
-// of the stale TTL. An unreachable resolver says nothing about whether the
-// backends are still there, so the addresses already found stay in the target
-// list until the bound expires.
+// An unreachable resolver says nothing about whether the backends are
+// there.
 func TestUrlFromDNS_HoldsTheLastGoodSetWhileTheResolverIsDown(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1", "10.0.0.2")
@@ -933,8 +866,7 @@ func TestUrlFromDNS_HoldsTheLastGoodSetWhileTheResolverIsDown(t *testing.T) {
 		t.Fatalf("target list holds %d entries thirty seconds into a sixty second stale TTL, want the 2 already found", list.Len())
 	}
 
-	// Past the bound the addresses are withdrawn and the API falls back, which
-	// is the configured target rather than an empty list.
+	// Past the bound the API falls back to its configured target.
 	clock.advance(90 * time.Second)
 	gw.upstreamDNS.Refresh(context.Background())
 
@@ -950,13 +882,9 @@ func TestUrlFromDNS_HoldsTheLastGoodSetWhileTheResolverIsDown(t *testing.T) {
 	}
 }
 
-// TestPlanDrains_ForEveryAPIOnASharedHostname covers two APIs behind one
-// Service, the case the shared entry exists for.
-//
-// The second API subscribes to a name that is already resolved, so it hears
-// about membership only when it next changes. Without the set it joined it
-// computes that change against nothing, does not see the address as departed,
-// and never drains its own connection to a terminating pod.
+// Two APIs, one Service. The second joins an already-resolved name, so
+// without the set it joined it would compute the next change against nothing
+// and never drain its connection to a terminating pod.
 func TestPlanDrains_ForEveryAPIOnASharedHostname(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1", "10.0.0.2")
@@ -978,7 +906,6 @@ func TestPlanDrains_ForEveryAPIOnASharedHostname(t *testing.T) {
 	trackedFirst := first.dnsDiscovery.conns.track("10.0.0.1:9002", firstConn)
 	trackedSecond := second.dnsDiscovery.conns.track("10.0.0.1:9002", secondConn)
 
-	// The pod leaves the Service.
 	resolver.set("svc", "10.0.0.2")
 	gw.upstreamDNS.Refresh(context.Background())
 
@@ -991,10 +918,8 @@ func TestPlanDrains_ForEveryAPIOnASharedHostname(t *testing.T) {
 	}
 }
 
-// TestSetupUpstreamDNSDiscovery_RefusedCombinationsKeepServing covers an API
-// that loads from storage with a configuration the create endpoint would have
-// refused. A definition already stored cannot be rejected, so the API keeps
-// serving on its configured target and the reason is logged.
+// A stored definition cannot be rejected, so an API the create endpoint would
+// have refused keeps serving on its configured target, and logs why.
 func TestSetupUpstreamDNSDiscovery_RefusedCombinationsKeepServing(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -1041,10 +966,8 @@ func TestSetupUpstreamDNSDiscovery_RefusedCombinationsKeepServing(t *testing.T) 
 				t.Fatal("DNS discovery was enabled for a configuration that cannot work")
 			}
 
-			// The API is left as it would be without the feature, with no
-			// source, so the Director uses the configured target. One refused
-			// for having service discovery on keeps the source it already
-			// had.
+			// No source, so the Director uses the configured target. One
+			// refused for service discovery keeps that.
 			if !spec.Proxy.ServiceDiscovery.UseDiscoveryService {
 				if list := gw.upstreamTargetList(spec, logger); list != nil {
 					t.Errorf("a refused API produced a target list: %v", list.All())
@@ -1062,11 +985,8 @@ func TestSetupUpstreamDNSDiscovery_RefusedCombinationsKeepServing(t *testing.T) 
 	}
 }
 
-// TestDirector_SendsTheServiceNameAsTheAuthority covers the split between the
-// address dialled and the authority sent. The connection pool keys on the URL
-// host while the authority comes from req.Host, so the address varies to give
-// a connection per backend and the name stays steady. A pod reporting its own
-// address breaks anything routing on :authority.
+// The pool keys on the URL host, the authority on req.Host: one varies per
+// backend, the other stays steady.
 func TestDirector_SendsTheServiceNameAsTheAuthority(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1")
@@ -1122,10 +1042,8 @@ func TestDirector_SendsTheServiceNameAsTheAuthority(t *testing.T) {
 	})
 }
 
-// TestBuildUpstreamTarget_KeepsTheConfiguredQuery covers the query string on
-// target_url surviving into the rendered entries. The Director takes its query
-// from whichever entry the picker returned, so an entry built without one
-// drops the configured query for that request.
+// The Director takes its query from the entry the picker returned, so an
+// entry built without one drops it.
 func TestBuildUpstreamTarget_KeepsTheConfiguredQuery(t *testing.T) {
 	target, err := url.Parse("h2c://svc:9002/base?tenant=acme")
 	if err != nil {

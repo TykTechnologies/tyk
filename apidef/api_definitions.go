@@ -654,26 +654,21 @@ type DNSDiscoveryConfig struct {
 	// Enabled turns DNS discovery on for this API.
 	Enabled bool `bson:"enabled" json:"enabled"`
 
-	// RefreshInterval is how often, in seconds, the upstream hostname is
-	// re-resolved. It bounds how long a new backend waits before it receives
-	// traffic. 0 or less selects the default of 30 seconds, and values below 5
-	// are raised to 5. Where several APIs share a hostname, the shortest
-	// interval among them is the one used.
+	// RefreshInterval is how often, in seconds, the hostname is re-resolved,
+	// which bounds how long a new backend waits for traffic. Defaults to 30,
+	// with a floor of 5. Where APIs share a hostname, the shortest wins.
 	RefreshInterval int64 `bson:"refresh_interval" json:"refresh_interval"`
 
-	// StaleTTL is how long, in seconds, the last known good address set keeps
-	// being used while the resolver is unreachable. Past it the API falls back
-	// to `target_url`. An authoritative answer that the name does not exist is
-	// applied immediately instead. 0 selects the default of 300 seconds, and a
-	// negative value keeps the last known good set indefinitely.
+	// StaleTTL is how long, in seconds, the last known good addresses are used
+	// while the resolver is unreachable. Past it the API falls back to
+	// `target_url`. An authoritative answer that the name does not exist is
+	// applied immediately. Defaults to 300. Negative never gives up.
 	StaleTTL int64 `bson:"stale_ttl" json:"stale_ttl"`
 
-	// DrainDeadline is how long, in seconds, connections to an address stay
-	// open after that address has left the resolved set, so a backend that is
-	// shutting down can finish the requests it holds. 0 selects the default of
-	// 30 seconds, and a negative value leaves those connections to the
-	// connection pool's idle timeout. In Kubernetes, set it to the pod's
-	// terminationGracePeriodSeconds.
+	// DrainDeadline is how long, in seconds, connections to a departed address
+	// stay open, so a backend shutting down can finish its requests. Defaults
+	// to 30, the Kubernetes terminationGracePeriodSeconds default. Negative
+	// leaves them to the connection pool's idle timeout.
 	DrainDeadline int64 `bson:"drain_deadline" json:"drain_deadline"`
 }
 

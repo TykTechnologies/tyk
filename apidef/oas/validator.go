@@ -166,10 +166,8 @@ func ValidateOASObject(documentBody []byte, oasVersion string) error {
 	return validateUpstreamSources(documentBody)
 }
 
-// validateUpstreamSources checks how the blocks that supply an upstream's
-// target list combine. The rules live here rather than in the schema because
-// the schema declares draft-04, where if/then does not exist and a conditional
-// written there is parsed and ignored.
+// In Go rather than the schema, which declares draft-04, where if/then does
+// not exist and a conditional written there is parsed and ignored.
 func validateUpstreamSources(documentBody []byte) error {
 	enabled := func(block string) bool {
 		on, err := jsonparser.GetBoolean(documentBody, ExtensionTykAPIGateway, "upstream", block, "enabled")

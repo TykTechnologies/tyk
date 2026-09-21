@@ -74,9 +74,8 @@ func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 		var addresses []string
 
-		// Longest match wins. The map is shared process-wide, so names in a
-		// prefix relationship are easy to end up with, and map iteration
-		// order would pick between them at random.
+		// Longest match wins. The map is process-wide, so prefix-related
+		// names are easy to end up with and iteration order is random.
 		matched := ""
 		for d, ips := range d.domainsToAddresses {
 			if strings.HasPrefix(domain, d) && len(d) > len(matched) {
@@ -91,9 +90,7 @@ func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 			// [[:alnum:]]+\.	match single character in [a-zA-Z0-9] minimum one time and ending in . literally
 			reg := regexp.MustCompile(`^localhost\.([[:alnum:]]+\.)*`)
 			if matched := reg.MatchString(domain); !matched {
-				// NXDOMAIN rather than a panic. This runs on the server's
-				// goroutine, so a panic aborts the whole test binary rather
-				// than failing the one test that asked for the name.
+				// On the server's goroutine: a panic aborts the binary.
 				m := new(dns.Msg)
 				m.SetRcode(r, dns.RcodeNameError)
 				w.WriteMsg(m)
@@ -125,21 +122,15 @@ var (
 	sharedErr  error
 )
 
-// PushDomains registers domainsMap and domainsErrorMap with the mock server
-// and returns a function that restores what was registered before, so a test
-// can scope its own domains and leave the server as it found it.
-//
-// A domain already registered is replaced rather than added to. Appending
-// would make a second push of an overlapping set, which is how a scale event
-// is simulated, answer with the addresses it has in common twice over.
+// PushDomains returns a function restoring what was registered before. A
+// domain already registered is replaced rather than added to, or a second push
+// of an overlapping set, as a scale event is, would answer twice over.
 func (h *DnsMockHandle) PushDomains(domainsMap map[string][]string, domainsErrorMap map[string]int) func() {
 	handler := h.mockServer.Handler.(*dnsMockHandler)
 	handler.muDomainsToAddresses.Lock()
 	defer handler.muDomainsToAddresses.Unlock()
 
-	// Restored key by key. Swapping the whole map back would discard every
-	// registration made by anyone else while this scope was open, and the
-	// server is one per process.
+	// Key by key, or registrations made by others in this window are lost.
 	priorAddrs := make(map[string][]string, len(domainsMap))
 	addedAddrs := make(map[string]struct{}, len(domainsMap))
 	for key, ips := range domainsMap {
@@ -188,9 +179,8 @@ func (h *DnsMockHandle) PushDomains(domainsMap map[string][]string, domainsError
 // InitDNSMock returns handle, which can be used to add/remove dns query mock responses or initialization error.
 //
 // One mock server per process, since net.DefaultResolver can only point at
-// one. Every call registers into that server, so a later caller neither loses
-// its mappings nor hides an earlier caller's. Registering a domain twice
-// replaces it. Use PushDomains for a scoped, restorable override.
+// one, so every call registers into it rather than replacing it. Use
+// PushDomains for a scoped, restorable override.
 func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int) (*DnsMockHandle, error) {
 	mockOnce.Do(func() {
 		sharedMock, sharedErr = startDNSMock()
@@ -217,8 +207,7 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 	return sharedMock, nil
 }
 
-// startDNSMock brings up the single process-wide mock server and points
-// net.DefaultResolver at it.
+// startDNSMock points net.DefaultResolver at the process-wide mock server.
 func startDNSMock() (*DnsMockHandle, error) {
 	addr, _ := net.ResolveUDPAddr("udp", ":0")
 	conn, err := net.ListenUDP("udp", addr)
@@ -234,8 +223,7 @@ func startDNSMock() (*DnsMockHandle, error) {
 	mockServer := &dns.Server{PacketConn: conn, NotifyStartedFunc: started}
 	handle := &DnsMockHandle{id: time.Now().String(), mockServer: mockServer}
 
-	// Both maps stay non-nil for the life of the server, since callers and
-	// PushDomains register into them rather than replacing them.
+	// Non-nil for the life of the server: callers register into them.
 	dnsMux := &dnsMockHandler{
 		domainsToAddresses: map[string][]string{},
 		domainsToErrors:    map[string]int{},

@@ -7,29 +7,24 @@ import (
 	"strings"
 )
 
-// Outcome records what a resolution established about a name. It travels with
-// every published state, since the reasons a name yields no addresses call for
-// different handling.
+// Outcome records what a resolution established about a name.
 type Outcome uint8
 
 const (
 	// Resolved means the name answered with at least one address.
 	Resolved Outcome = iota
 
-	// Empty means the resolver answered successfully with no records, which
-	// for a Kubernetes Service means no ready endpoints.
+	// Empty means no records: a Service with no ready endpoints.
 	Empty
 
-	// NotFound means the resolver answered authoritatively that the name does
-	// not exist.
+	// NotFound means an authoritative NXDOMAIN.
 	NotFound
 
-	// Unreachable means the resolver could not be reached, and the last known
-	// good set has gone unconfirmed for longer than the stale TTL.
+	// Unreachable means the last good set is older than the stale TTL.
 	Unreachable
 )
 
-// String implements fmt.Stringer, for logs and test failures.
+// String implements fmt.Stringer.
 func (o Outcome) String() string {
 	switch o {
 	case Resolved:
@@ -45,17 +40,15 @@ func (o Outcome) String() string {
 	}
 }
 
-// State is one published address set for a name. It is swapped in by atomic
-// pointer and never mutated afterwards, so a request path reads it without a
-// lock, and Version lets a subscriber cache what it renders from Addrs.
+// State is one published address set, swapped in atomically and never mutated.
+// Version lets a subscriber cache what it renders.
 type State struct {
 	Version uint64
 	Addrs   []string
 	Outcome Outcome
 }
 
-// Usable reports whether this state carries addresses to use. When it does
-// not, Outcome carries the reason.
+// Usable reports whether this state carries addresses to use.
 func (s *State) Usable() bool {
 	return s != nil && len(s.Addrs) > 0
 }
@@ -63,9 +56,8 @@ func (s *State) Usable() bool {
 // ErrNoHost is returned by Subscribe when the configuration names no host.
 var ErrNoHost = errors.New("dnsdiscovery: Host is required")
 
-// Normalise sorts and de-duplicates an address set. CoreDNS shuffles its answers
-// by default, so without the sort every refresh would look like a membership
-// change.
+// Normalise sorts and de-duplicates. CoreDNS shuffles, so without the sort
+// every refresh looks like a membership change.
 func Normalise(addrs []string) []string {
 	if len(addrs) == 0 {
 		return nil
@@ -87,8 +79,8 @@ func Normalise(addrs []string) []string {
 	return out
 }
 
-// Resolvable reports whether a host is a DNS name whose membership can change.
-// An IP literal resolves to itself, and localhost is not a Service.
+// Resolvable excludes IP literals and localhost, whose membership cannot
+// change.
 func Resolvable(host string) bool {
 	if host == "" {
 		return false
@@ -99,8 +91,7 @@ func Resolvable(host string) bool {
 	return !strings.EqualFold(host, "localhost")
 }
 
-// Removed returns the members of was that are absent from now. Both sets must
-// be normalised.
+// Removed returns members of was absent from now. Both must be normalised.
 func Removed(was, now []string) []string {
 	if len(was) == 0 {
 		return nil
@@ -120,7 +111,6 @@ func Removed(was, now []string) []string {
 	return gone
 }
 
-// equalAddrs reports whether two normalised address sets hold the same members.
 func equalAddrs(a, b []string) bool {
 	if len(a) != len(b) {
 		return false

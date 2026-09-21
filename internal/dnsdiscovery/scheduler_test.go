@@ -10,8 +10,6 @@ import (
 	"time"
 )
 
-// stubResolver is a scheduler lookup that answers from a mutable map and counts
-// calls per hostname.
 type stubResolver struct {
 	mu      sync.Mutex
 	answers map[string][]string
@@ -40,8 +38,7 @@ func (r *stubResolver) fail(host string, err error) {
 	r.errs[host] = err
 }
 
-// failNotFound makes the host answer authoritatively that it does not exist,
-// which the scheduler treats differently from a resolver it cannot reach.
+// NXDOMAIN, which is treated differently from an unreachable resolver.
 func (r *stubResolver) failNotFound(host string) {
 	r.fail(host, &net.DNSError{Err: "no such host", Name: host, IsNotFound: true})
 }
@@ -63,8 +60,7 @@ func (r *stubResolver) lookup(_ context.Context, host string) ([]string, error) 
 	return r.answers[host], nil
 }
 
-// newTestScheduler builds a scheduler that never starts its own goroutine, so
-// tests drive refreshes explicitly and nothing races with the assertions.
+// No refresh goroutine, so tests drive refreshes explicitly.
 func newTestScheduler(resolver *stubResolver) *Scheduler {
 	s := &Scheduler{}
 	configureTestScheduler(s, resolver)
@@ -72,8 +68,7 @@ func newTestScheduler(resolver *stubResolver) *Scheduler {
 	return s
 }
 
-// configureTestScheduler prepares a scheduler in place. The scheduler holds a
-// mutex and an atomic counter, so it must never be copied by value.
+// Holds a mutex, so it is prepared in place and never copied.
 func configureTestScheduler(s *Scheduler, resolver *stubResolver) {
 	s.entries = map[string]*entry{}
 	s.subs = map[string]*Subscription{}
@@ -82,15 +77,12 @@ func configureTestScheduler(s *Scheduler, resolver *stubResolver) {
 	s.Jitter = func(d time.Duration) time.Duration { return d }
 }
 
-// subscribe is Subscribe with the error folded into the test, since a test that
-// mistypes a hostname wants to fail there rather than three assertions later.
 func subscribe(t *testing.T, s *Scheduler, key, host string, interval time.Duration) *Subscription {
 	t.Helper()
 
 	return subscribeWith(t, s, key, host, Config{Interval: interval})
 }
 
-// subscribeWith is subscribe with a full Config and no inline resolution.
 func subscribeWith(t *testing.T, s *Scheduler, key, host string, cfg Config) *Subscription {
 	t.Helper()
 
@@ -102,9 +94,7 @@ func subscribeWith(t *testing.T, s *Scheduler, key, host string, cfg Config) *Su
 	return sub
 }
 
-// subscribeAndRefresh subscribes and performs the first resolution inline. In
-// production the scheduler goroutine does it, so a test that suppresses the
-// loop has to do it here.
+// Does inline what the refresh goroutine does in production.
 func subscribeAndRefresh(t *testing.T, s *Scheduler, key, host string, cfg Config) *Subscription {
 	t.Helper()
 
@@ -113,8 +103,6 @@ func subscribeAndRefresh(t *testing.T, s *Scheduler, key, host string, cfg Confi
 	return sub
 }
 
-// refreshAndReportDelay refreshes one entry and returns how far ahead the next
-// refresh was scheduled, so a test can observe the backoff.
 func (s *Scheduler) refreshAndReportDelay(ctx context.Context, e *entry) time.Duration {
 	before := time.Now()
 	s.refresh(ctx, e)
@@ -124,9 +112,7 @@ func (s *Scheduler) refreshAndReportDelay(ctx context.Context, e *entry) time.Du
 	return e.nextDue.Sub(before)
 }
 
-// TestScheduler_OneLookupPerHostname covers the claim the shape rests on:
-// query volume follows distinct hostnames rather than subscribers. A poller
-// per subscriber would make ten lookups here where two are needed.
+// Query volume follows hostnames, not subscribers: ten here would be two.
 func TestScheduler_OneLookupPerHostname(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc-a", "10.0.0.1", "10.0.0.2")
@@ -142,7 +128,6 @@ func TestScheduler_OneLookupPerHostname(t *testing.T) {
 		subscribe(t, scheduler, fmt.Sprintf("api-b-%d", i), "svc-b", 30*time.Second)
 	}
 
-	// Ten subscriptions, and the scheduler has two hostnames to resolve.
 	scheduler.refreshAll(ctx, scheduler.dueEntries())
 
 	if got := resolver.callsFor("svc-a"); got != 1 {
@@ -152,7 +137,6 @@ func TestScheduler_OneLookupPerHostname(t *testing.T) {
 		t.Errorf("svc-b was resolved %d times for 2 subscribers, want 1", got)
 	}
 
-	// A second cycle is also one lookup per hostname.
 	for _, e := range scheduler.entries {
 		scheduler.refresh(ctx, e)
 	}
@@ -165,9 +149,6 @@ func TestScheduler_OneLookupPerHostname(t *testing.T) {
 	}
 }
 
-// TestScheduler_ReleaseDropsEntryWhenLastSubscriberLeaves covers the reference
-// counting. An entry shared by two subscribers has to survive one of them going
-// away, and disappear when the second does.
 func TestScheduler_ReleaseDropsEntryWhenLastSubscriberLeaves(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1")
@@ -187,14 +168,12 @@ func TestScheduler_ReleaseDropsEntryWhenLastSubscriberLeaves(t *testing.T) {
 		t.Fatalf("entry survived the last subscriber leaving: %d entries", len(scheduler.entries))
 	}
 
-	// Releasing twice must not underflow the count or panic.
 	second.Release()
 	scheduler.ReleaseKey("api-2")
 }
 
-// TestScheduler_ReleaseIsIgnoredOnceSuperseded covers the reload ordering. The
-// replacement subscribes under the same key before the old definition is torn
-// down, so that teardown must not drop the live subscription.
+// The replacement subscribes under the same key before the old definition is
+// torn down, so that teardown must not drop the live one.
 func TestScheduler_ReleaseIsIgnoredOnceSuperseded(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1")
@@ -214,9 +193,6 @@ func TestScheduler_ReleaseIsIgnoredOnceSuperseded(t *testing.T) {
 	}
 }
 
-// TestScheduler_RepointingASubscriberMovesItsSubscription covers a reload that
-// changes an upstream. The old hostname has to stop being refreshed when nothing
-// else points at it.
 func TestScheduler_RepointingASubscriberMovesItsSubscription(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("old", "10.0.0.1")
@@ -239,9 +215,7 @@ func TestScheduler_RepointingASubscriberMovesItsSubscription(t *testing.T) {
 	}
 }
 
-// TestScheduler_SharedHostnameTakesShortestInterval covers subscribers sharing
-// one refresh. The most eager request wins, or that subscriber quietly gets a
-// slower rate than it configured.
+// Subscribers share one refresh, so the most eager request wins.
 func TestScheduler_SharedHostnameTakesShortestInterval(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1")
@@ -255,8 +229,7 @@ func TestScheduler_SharedHostnameTakesShortestInterval(t *testing.T) {
 		t.Errorf("shared entry refreshes every %s, want the shortest requested 5s", got)
 	}
 
-	// And it goes back up when the eager subscriber leaves, rather than keeping
-	// the most eager rate ever asked for.
+	// And back up when the eager subscriber leaves.
 	scheduler.ReleaseKey("api-fast")
 	if got := scheduler.entries["svc"].interval; got != 60*time.Second {
 		t.Errorf("entry still refreshes every %s after the eager subscriber left, want 60s", got)
@@ -265,9 +238,8 @@ func TestScheduler_SharedHostnameTakesShortestInterval(t *testing.T) {
 	slow.Release()
 }
 
-// TestScheduler_RepointingRecomputesTheNameItLeft covers a departing
-// subscription coming off the books before the name it leaves recomputes, so
-// it stops dictating the rate of a name it no longer uses.
+// A departing subscription must come off the books before the name it leaves
+// recomputes, or it keeps dictating that name's rate.
 func TestScheduler_RepointingRecomputesTheNameItLeft(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("shared", "10.0.0.1")
@@ -278,7 +250,6 @@ func TestScheduler_RepointingRecomputesTheNameItLeft(t *testing.T) {
 	subscribe(t, scheduler, "api-slow", "shared", time.Minute)
 	subscribe(t, scheduler, "api-fast", "shared", 5*time.Second)
 
-	// The eager subscriber moves to another name.
 	subscribe(t, scheduler, "api-fast", "elsewhere", 5*time.Second)
 
 	if got := scheduler.entries["shared"].interval; got != time.Minute {
@@ -286,10 +257,8 @@ func TestScheduler_RepointingRecomputesTheNameItLeft(t *testing.T) {
 	}
 }
 
-// TestScheduler_FailedLookupKeepsLastGoodAndBacksOff covers a resolver that
-// cannot be reached. It says nothing about whether the backends are still
-// there, so discarding a working set would turn a resolver outage into an
-// outage of its subscribers.
+// An unreachable resolver says nothing about the backends, so discarding a
+// working set would turn its outage into theirs.
 func TestScheduler_FailedLookupKeepsLastGoodAndBacksOff(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1", "10.0.0.2")
@@ -319,7 +288,6 @@ func TestScheduler_FailedLookupKeepsLastGoodAndBacksOff(t *testing.T) {
 		t.Errorf("consecutive failures did not back off: %s then %s", firstBackoff, secondBackoff)
 	}
 
-	// Recovery clears the backoff.
 	resolver.set("svc", "10.0.0.1", "10.0.0.2", "10.0.0.3")
 	scheduler.refresh(ctx, sub.entry)
 	if sub.entry.failures != 0 {
@@ -330,9 +298,6 @@ func TestScheduler_FailedLookupKeepsLastGoodAndBacksOff(t *testing.T) {
 	}
 }
 
-// TestScheduler_EmptyAnswerIsPublishedAsSuch covers a successful answer with
-// no records, which is a fact about the name rather than a failure. The
-// addresses are withdrawn with the reason attached.
 func TestScheduler_EmptyAnswerIsPublishedAsSuch(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1", "10.0.0.2")
@@ -357,9 +322,7 @@ func TestScheduler_EmptyAnswerIsPublishedAsSuch(t *testing.T) {
 	}
 }
 
-// TestScheduler_UnchangedAnswerDoesNotBumpVersion covers the sort and compare.
-// CoreDNS shuffles its answers by default, so without them every refresh would
-// look like a membership change.
+// CoreDNS shuffles, so without sort and compare every refresh looks changed.
 func TestScheduler_UnchangedAnswerDoesNotBumpVersion(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.2", "10.0.0.1")
@@ -370,7 +333,6 @@ func TestScheduler_UnchangedAnswerDoesNotBumpVersion(t *testing.T) {
 	sub := subscribeAndRefresh(t, scheduler, "api-1", "svc", Config{Interval: 10 * time.Second})
 	first := sub.State()
 
-	// Same addresses, different order, as a shuffling resolver returns.
 	resolver.set("svc", "10.0.0.1", "10.0.0.2")
 	scheduler.refresh(ctx, sub.entry)
 
@@ -384,9 +346,6 @@ func TestScheduler_UnchangedAnswerDoesNotBumpVersion(t *testing.T) {
 	}
 }
 
-// TestScheduler_OnChangeFiresOnMembershipChangesOnly covers a subscriber
-// holding a resource per address, which needs the callback when membership
-// moves and silence when it does not.
 func TestScheduler_OnChangeFiresOnMembershipChangesOnly(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1")
@@ -424,14 +383,13 @@ func TestScheduler_OnChangeFiresOnMembershipChangesOnly(t *testing.T) {
 	}
 }
 
-// TestScheduler_DiscoversWithoutTraffic is the property resolving on demand
-// cannot provide. Nothing reads the addresses here until the assertion.
+// What resolving on demand cannot do: nothing reads the addresses until the
+// assertion.
 func TestScheduler_DiscoversWithoutTraffic(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1")
 
 	scheduler := newTestScheduler(resolver)
-	// Let the real loop run, at an interval short enough to observe.
 	scheduler.running = false
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -454,10 +412,8 @@ func TestScheduler_DiscoversWithoutTraffic(t *testing.T) {
 	t.Fatalf("the scheduler did not pick up the second address without any traffic; published %+v", sub.State())
 }
 
-// TestScheduler_ShortIntervalIsNotStarvedByLongOne covers a name refreshing on
-// its own interval whatever else is registered. Computing the sleep before the
-// refresh pass excludes the entries just refreshed, which let the longest
-// interval in the map decide how often the shortest one ran.
+// Computing the sleep before the refresh pass skips the entries just
+// refreshed, letting the longest interval pace the shortest.
 func TestScheduler_ShortIntervalIsNotStarvedByLongOne(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("fast", "10.0.0.1")
@@ -469,8 +425,7 @@ func TestScheduler_ShortIntervalIsNotStarvedByLongOne(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// The slow hostname is registered first, so its deadline is the one a naive
-	// minimum would pick up.
+	// Registered first, so a naive minimum picks up its deadline.
 	if _, err := scheduler.Subscribe(ctx, "api-slow", Config{Host: "slow", Interval: time.Hour}); err != nil {
 		t.Fatalf("subscribe slow: %v", err)
 	}
@@ -493,10 +448,8 @@ func TestScheduler_ShortIntervalIsNotStarvedByLongOne(t *testing.T) {
 		resolver.callsFor("fast")-before, 3)
 }
 
-// TestScheduler_SubscribeDoesNotResolveInline covers subscribing never waiting
-// on DNS. In the gateway it runs on the single-threaded spec loop that gates
-// the router swap, so fifty new hostnames against a sick resolver would be
-// fifty serial lookup timeouts.
+// Subscribe runs on the spec loop that gates the router swap, so fifty new
+// hostnames against a sick resolver would be fifty serial timeouts.
 func TestScheduler_SubscribeDoesNotResolveInline(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1")
@@ -511,16 +464,13 @@ func TestScheduler_SubscribeDoesNotResolveInline(t *testing.T) {
 		t.Error("Subscribe published an address set, so it must have resolved inline")
 	}
 
-	// And the entry is due at once, so the loop picks it up without waiting a
-	// whole interval.
+	// Due at once, so the loop need not wait a whole interval.
 	if len(scheduler.dueEntries()) != 1 {
 		t.Error("a newly subscribed hostname is not due, so the loop would wait an interval before resolving it")
 	}
 }
 
-// TestScheduler_NameNotFoundIsAppliedAtOnce covers NXDOMAIN, which is a fact
-// about the name rather than a failure to learn one, so the stale TTL does not
-// apply.
+// NXDOMAIN is a fact about the name, so the stale TTL does not apply.
 func TestScheduler_NameNotFoundIsAppliedAtOnce(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1", "10.0.0.2")
@@ -549,9 +499,7 @@ func TestScheduler_NameNotFoundIsAppliedAtOnce(t *testing.T) {
 	}
 }
 
-// TestScheduler_StaleTTLBoundsAnUnreachableResolver covers the bound on
-// keeping addresses. Without it a deleted upstream would receive traffic at
-// dead addresses for the life of the process.
+// Without it, a deleted upstream gets traffic at dead addresses forever.
 func TestScheduler_StaleTTLBoundsAnUnreachableResolver(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1", "10.0.0.2")
@@ -559,7 +507,6 @@ func TestScheduler_StaleTTLBoundsAnUnreachableResolver(t *testing.T) {
 	scheduler := newTestScheduler(resolver)
 	ctx := context.Background()
 
-	// Drive the clock, so the bound is tested without sleeping.
 	now := time.Now()
 	scheduler.Now = func() time.Time { return now }
 
@@ -570,14 +517,12 @@ func TestScheduler_StaleTTLBoundsAnUnreachableResolver(t *testing.T) {
 
 	resolver.fail("svc", errors.New("i/o timeout"))
 
-	// Inside the bound, the addresses are kept.
 	now = now.Add(time.Minute)
 	scheduler.refresh(ctx, sub.entry)
 	if got := sub.State(); !got.Usable() || len(got.Addrs) != 2 {
 		t.Fatalf("addresses were dropped one minute into a five minute stale TTL: %+v", got)
 	}
 
-	// Past it, they are withdrawn with the reason attached.
 	now = now.Add(6 * time.Minute)
 	scheduler.refresh(ctx, sub.entry)
 	got := sub.State()
@@ -589,8 +534,6 @@ func TestScheduler_StaleTTLBoundsAnUnreachableResolver(t *testing.T) {
 	}
 }
 
-// TestScheduler_ZeroStaleTTLNeverGivesUp covers the opt-out, for a deployment
-// that would rather keep a stale set than fall back.
 func TestScheduler_ZeroStaleTTLNeverGivesUp(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1", "10.0.0.2")
@@ -615,8 +558,6 @@ func TestScheduler_ZeroStaleTTLNeverGivesUp(t *testing.T) {
 	}
 }
 
-// TestScheduler_SubscribeRequiresAHost covers the one configuration the
-// scheduler refuses outright.
 func TestScheduler_SubscribeRequiresAHost(t *testing.T) {
 	scheduler := newTestScheduler(newStubResolver())
 
@@ -625,7 +566,6 @@ func TestScheduler_SubscribeRequiresAHost(t *testing.T) {
 	}
 }
 
-// TestNormaliseInterval pins the default and the floor.
 func TestNormaliseInterval(t *testing.T) {
 	cases := map[time.Duration]time.Duration{
 		0:                DefaultInterval,
@@ -643,8 +583,7 @@ func TestNormaliseInterval(t *testing.T) {
 	}
 }
 
-// TestNormalise covers the sort and the de-duplication together. A shuffling
-// resolver and a duplicate record produce the same false membership change.
+// A shuffling resolver and a duplicate record look alike: both false.
 func TestNormalise(t *testing.T) {
 	got := Normalise([]string{"10.0.0.3", "", "10.0.0.1", "10.0.0.3", "10.0.0.2"})
 	want := []string{"10.0.0.1", "10.0.0.2", "10.0.0.3"}
@@ -663,8 +602,6 @@ func TestNormalise(t *testing.T) {
 	}
 }
 
-// TestRemoved covers the set difference a subscriber uses to work out which
-// per-address resources to retire.
 func TestRemoved(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -691,7 +628,6 @@ func TestRemoved(t *testing.T) {
 	}
 }
 
-// TestResolvable covers which hosts are worth a subscription.
 func TestResolvable(t *testing.T) {
 	cases := map[string]bool{
 		"svc":                   true,
@@ -711,11 +647,8 @@ func TestResolvable(t *testing.T) {
 	}
 }
 
-// TestScheduler_ReloadKeepsTheEntryAndItsState covers a gateway reload, which
-// re-subscribes the same key rather than tearing it down. Detaching the old
-// subscription before attaching the new one would drop the entry whenever the
-// reloading subscriber was the only one on that name, taking the address set
-// with it.
+// A reload re-subscribes the same key. Detaching before attaching would drop
+// the entry when the reloading subscriber was the only one on that name.
 func TestScheduler_ReloadKeepsTheEntryAndItsState(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1", "10.0.0.2")
@@ -728,8 +661,7 @@ func TestScheduler_ReloadKeepsTheEntryAndItsState(t *testing.T) {
 		t.Fatal("no state after the first resolution")
 	}
 
-	// The reload. Nothing is resolved by Subscribe, so anything the new
-	// subscription reports has to have come from the entry that was kept.
+	// Subscribe resolves nothing, so this came from the entry kept.
 	before := resolver.callsFor("svc")
 	second := subscribeWith(t, scheduler, "api-1", "svc", cfg)
 
@@ -746,10 +678,9 @@ func TestScheduler_ReloadKeepsTheEntryAndItsState(t *testing.T) {
 	}
 }
 
-// TestScheduler_ReloadDuringAnOutageKeepsTheStaleSet covers a reload during a
-// resolver outage, which is when an operator is most likely to edit an API. If
-// the reload rebuilds the entry, the next failed lookup finds nothing
-// published and withdraws the addresses at once, whatever stale_ttl says.
+// An outage is when an operator is most likely to edit an API. If the reload
+// rebuilt the entry, the next failed lookup would find nothing published and
+// withdraw the addresses at once, whatever stale_ttl says.
 func TestScheduler_ReloadDuringAnOutageKeepsTheStaleSet(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1", "10.0.0.2")
@@ -770,7 +701,7 @@ func TestScheduler_ReloadDuringAnOutageKeepsTheStaleSet(t *testing.T) {
 		t.Fatal("the stale set was dropped before any reload")
 	}
 
-	// The operator edits the API while the resolver is still down.
+	// The edit lands while the resolver is still down.
 	reloaded := subscribeWith(t, scheduler, "api-1", "svc", cfg)
 	now = now.Add(time.Minute)
 	scheduler.refresh(ctx, reloaded.entry)
@@ -784,13 +715,9 @@ func TestScheduler_ReloadDuringAnOutageKeepsTheStaleSet(t *testing.T) {
 	}
 }
 
-// TestScheduler_LateSubscriberReceivesTheCurrentSet covers a subscriber
-// joining a name that is already resolved: the second API on a Service, and
-// every reload of one API among several sharing one.
-//
-// Without an initial delivery it hears nothing until membership next changes
-// and computes that change against an empty set, so an address that left is
-// not seen as having left and its per-address resources are never retired.
+// A subscriber joining a resolved name hears nothing until membership next
+// changes, and without an initial delivery would compute that change against
+// an empty set.
 func TestScheduler_LateSubscriberReceivesTheCurrentSet(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1", "10.0.0.2", "10.0.0.3")
@@ -825,8 +752,7 @@ func TestScheduler_LateSubscriberReceivesTheCurrentSet(t *testing.T) {
 		t.Fatalf("late subscriber reports %+v, want the three addresses already published", got)
 	}
 
-	// A pod leaves. The late subscriber has to see it as a departure, which it
-	// can only do against the set it was seeded with.
+	// Only a departure against the set it was seeded with.
 	resolver.set("svc", "10.0.0.1", "10.0.0.3")
 	scheduler.refresh(ctx, late.entry)
 
@@ -840,10 +766,8 @@ func TestScheduler_LateSubscriberReceivesTheCurrentSet(t *testing.T) {
 	}
 }
 
-// TestScheduler_SharedHostnameKeepsTheLongestStaleTTL is the counterpart to
-// the shortest-interval rule. Reaching the stale TTL withdraws the addresses
-// for every subscriber on the name, so the longest bound wins and a subscriber
-// asking never to give up decides the entry.
+// Reaching the stale TTL withdraws the addresses for everyone on the name, so
+// the longest bound wins and a never-give-up decides the entry.
 func TestScheduler_SharedHostnameKeepsTheLongestStaleTTL(t *testing.T) {
 	t.Run("longest bound wins", func(t *testing.T) {
 		scheduler := newTestScheduler(newStubResolver())
@@ -868,10 +792,8 @@ func TestScheduler_SharedHostnameKeepsTheLongestStaleTTL(t *testing.T) {
 	})
 }
 
-// TestScheduler_StateIsSafeAcrossAReload is a race regression test. A reload
-// re-subscribes the key while the superseded spec is still serving, so its
-// subscription is read from request goroutines at the moment the scheduler
-// supersedes it. Run under -race.
+// Race regression test, for -race. A reload re-subscribes the key while the
+// superseded spec is still serving and reading its subscription.
 func TestScheduler_StateIsSafeAcrossAReload(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1", "10.0.0.2")
@@ -891,9 +813,7 @@ func TestScheduler_StateIsSafeAcrossAReload(t *testing.T) {
 					return
 				default:
 				}
-				// The superseded subscription has to stay readable and keep
-				// reporting the last set it saw, rather than going nil under
-				// a request that is mid-flight.
+				// Must stay readable, not go nil mid-request.
 				if state := sub.State(); state != nil && !state.Usable() {
 					t.Error("a superseded subscription reported an empty set while still serving")
 					return

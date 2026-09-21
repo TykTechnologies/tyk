@@ -11,13 +11,10 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 )
 
-// The two combinations refused on create and update, through both endpoints,
-// and the one configuration that has to be accepted. The valid shape has load
-// balancing on and no static targets, which a rule that only counts targets
-// reads as every target at weight zero and refuses.
+// The valid shape has load balancing on and no static targets, which a rule
+// counting targets reads as all weights zero and refuses.
 
-// dnsDiscoveryClassicAPI builds a Tyk Classic definition sourcing its targets
-// from DNS, with the two combination flags under the test's control.
+// The two combination flags are under the test's control.
 func dnsDiscoveryClassicAPI(apiID, listenPath string, loadBalancing, serviceDiscovery bool) *apidef.APIDefinition {
 	def := apidef.DummyAPI()
 	def.APIID = apiID
@@ -66,9 +63,8 @@ func dnsDiscoveryOASAPI(name, listenPath string, loadBalancing, serviceDiscovery
 	return document
 }
 
-// TestDNSDiscovery_ClassicEndpointRefusesTheTwoCombinations covers /tyk/apis,
-// which has no schema in front of it, so its rule set is all that stands
-// between an operator and a definition that cannot work.
+// /tyk/apis has no schema, so its rule set is all that stands between an
+// operator and a definition that cannot work.
 func TestDNSDiscovery_ClassicEndpointRefusesTheTwoCombinations(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -100,8 +96,7 @@ func TestDNSDiscovery_ClassicEndpointRefusesTheTwoCombinations(t *testing.T) {
 			Code: http.StatusOK,
 		})
 
-		// The update handler looks the API up in the register, which the
-		// create only writes to storage.
+		// The update handler looks the API up in the register.
 		ts.Gw.DoReload()
 
 		// An update that breaks a rule is refused just as a create is.
@@ -114,8 +109,7 @@ func TestDNSDiscovery_ClassicEndpointRefusesTheTwoCombinations(t *testing.T) {
 	})
 }
 
-// TestDNSDiscovery_OASEndpointRefusesTheTwoCombinations covers /tyk/apis/oas,
-// where the rules are applied against the document before it is converted.
+// On /tyk/apis/oas the rules apply to the document before it is converted.
 func TestDNSDiscovery_OASEndpointRefusesTheTwoCombinations(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -138,9 +132,8 @@ func TestDNSDiscovery_OASEndpointRefusesTheTwoCombinations(t *testing.T) {
 		})
 	})
 
-	// The main regression here: the document was accepted, then the conversion
-	// dropped loadBalancing.enabled because there were no targets under it, so
-	// the API loaded with discovery switched back off.
+	// The conversion used to drop loadBalancing.enabled with no targets under
+	// it, so the API loaded with discovery switched back off.
 	t.Run("accepted, and keeps load balancing through the conversion", func(t *testing.T) {
 		document := dnsDiscoveryOASAPI("dns-oas-ok", "/dns-oas-ok/", true, false)
 

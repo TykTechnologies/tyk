@@ -17,13 +17,10 @@ import (
 	"github.com/TykTechnologies/tyk/internal/dnsdiscovery"
 )
 
-// Benchmarks for the request-path half of upstream DNS discovery. It runs on
-// every proxied request for an API with the feature on, so it must not
-// resolve, must not take a lock, and must not rebuild the target list while
-// membership is unchanged. Refresh cost is measured in internal/dnsdiscovery.
+// The request path runs per proxied request, so it must not resolve, lock, or
+// rebuild the target list while membership is unchanged.
 
-// benchGateway wires a fixed answer into a gateway's scheduler in place, since
-// the scheduler holds a mutex and must not be copied.
+// Holds a mutex, so it is wired in place and never copied.
 func benchGateway(addrsPerHost int) *Gateway {
 	addrs := benchAddrs(addrsPerHost)
 
@@ -36,8 +33,7 @@ func benchGateway(addrsPerHost int) *Gateway {
 	return gw
 }
 
-// benchSpec builds a spec subscribed to host, with its first address set already
-// published.
+// Subscribed to host, with its first address set published.
 func benchSpec(b *testing.B, gw *Gateway, apiID, target string) *APISpec {
 	b.Helper()
 
@@ -56,14 +52,12 @@ func benchSpec(b *testing.B, gw *Gateway, apiID, target string) *APISpec {
 		b.Fatalf("%s got no plan for %q", apiID, target)
 	}
 
-	// The scheduler goroutine does the first lookup in production. Resolving
-	// here keeps the measured iterations to cache hits.
+	// Keeps the measured iterations to cache hits.
 	gw.upstreamDNS.Refresh(context.Background())
 	return spec
 }
 
-// BenchmarkUpstreamDNS_RequestPath is the steady state, an atomic load and a
-// comparison, which is all but a handful of requests between refreshes.
+// The steady state: an atomic load and a comparison.
 func BenchmarkUpstreamDNS_RequestPath(b *testing.B) {
 	for _, pods := range []int{2, 10, 50} {
 		b.Run(fmt.Sprintf("pods=%d", pods), func(b *testing.B) {
@@ -87,9 +81,8 @@ func BenchmarkUpstreamDNS_RequestPath(b *testing.B) {
 	}
 }
 
-// BenchmarkUpstreamDNS_RequestPathParallel runs the same read from several
-// goroutines, since the published set is shared and the point of the atomic
-// pointer is that concurrent requests do not contend.
+// The set is shared, and the atomic pointer is there so reads do not
+// contend.
 func BenchmarkUpstreamDNS_RequestPathParallel(b *testing.B) {
 	gw := benchGateway(10)
 	spec := benchSpec(b, gw, "api-1", "h2c://svc:9002")
@@ -109,10 +102,8 @@ func BenchmarkUpstreamDNS_RequestPathParallel(b *testing.B) {
 	})
 }
 
-// BenchmarkUpstreamDNS_RequestPathRebuild is the cost when a refresh has moved
-// the address set. It is paid per membership change rather than per request,
-// but by every request in flight when the version moves: several race to
-// rebuild and the last store wins. Bounded by request concurrency.
+// The cost when a refresh moved the set, paid by every request in flight, so
+// bounded by request concurrency.
 func BenchmarkUpstreamDNS_RequestPathRebuild(b *testing.B) {
 	for _, pods := range []int{2, 10, 50} {
 		b.Run(fmt.Sprintf("pods=%d", pods), func(b *testing.B) {
@@ -133,8 +124,7 @@ func BenchmarkUpstreamDNS_RequestPathRebuild(b *testing.B) {
 	}
 }
 
-// BenchmarkUpstreamDNS_RequestPathDisabled is the control. An API without the
-// feature must not pay for it existing.
+// The control: an API without the feature must not pay for it existing.
 func BenchmarkUpstreamDNS_RequestPathDisabled(b *testing.B) {
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 	spec.APIID = "api-1"
@@ -149,8 +139,7 @@ func BenchmarkUpstreamDNS_RequestPathDisabled(b *testing.B) {
 	}
 }
 
-// BenchmarkUpstreamDNS_BuildTarget isolates rendering one address into a target
-// URL, which runs once per address on every membership change.
+// Runs once per address on every membership change.
 func BenchmarkUpstreamDNS_BuildTarget(b *testing.B) {
 	target, err := url.Parse("h2c://my-grpc-svc:9002/base")
 	if err != nil {
@@ -166,11 +155,7 @@ func BenchmarkUpstreamDNS_BuildTarget(b *testing.B) {
 	}
 }
 
-// BenchmarkUpstreamDNS_Director is the whole per-request cost rather than the
-// target list read on its own: picking a target, rendering it through
-// EnsureTransport, and setting the URL and the authority. The discovery arms
-// are read against the static one, the same Director working from a configured
-// list.
+// The whole per-request cost, read against the static arm.
 func BenchmarkUpstreamDNS_Director(b *testing.B) {
 	newDirector := func(b *testing.B, configure func(*Gateway) *APISpec) func(*http.Request) {
 		b.Helper()
@@ -243,9 +228,7 @@ func BenchmarkUpstreamDNS_Director(b *testing.B) {
 	})
 }
 
-// BenchmarkUpstreamConnRegistry_Track measures what every dial to a discovered
-// backend pays, and what every close pays to come off the books. One mutex
-// covers the whole registry, so the parallel case is the one that matters.
+// One mutex covers the registry, so the parallel case is what matters.
 func BenchmarkUpstreamConnRegistry_Track(b *testing.B) {
 	addrs := benchAddrs(10)
 
@@ -278,10 +261,8 @@ func BenchmarkUpstreamConnRegistry_Track(b *testing.B) {
 	})
 }
 
-// BenchmarkUpstreamDNS_MembershipChange measures what a refresh that moved the
-// address set costs the subscriber: two set differences and a drain or cancel
-// per address that moved. Paid per refresh interval during a rolling update,
-// once per API on the name.
+// Two set differences and a drain or cancel per moved address, once per API
+// per refresh.
 func BenchmarkUpstreamDNS_MembershipChange(b *testing.B) {
 	for _, pods := range []int{2, 10, 50} {
 		b.Run(fmt.Sprintf("pods=%d", pods), func(b *testing.B) {
@@ -293,8 +274,7 @@ func BenchmarkUpstreamDNS_MembershipChange(b *testing.B) {
 				conns: newUpstreamConnRegistry(),
 			}
 
-			// One pod leaves and comes back, as in a rolling update. Both
-			// directions of the diff are non-empty, which is the worst case.
+			// Both directions of the diff non-empty, the worst case.
 			full := &dnsdiscovery.State{Version: 1, Addrs: addrs}
 			short := &dnsdiscovery.State{Version: 2, Addrs: addrs[1:]}
 
@@ -308,7 +288,6 @@ func BenchmarkUpstreamDNS_MembershipChange(b *testing.B) {
 	}
 }
 
-// benchAddrs builds n distinct backend addresses.
 func benchAddrs(n int) []string {
 	addrs := make([]string, 0, n)
 	for i := 0; i < n; i++ {
@@ -317,8 +296,7 @@ func benchAddrs(n int) []string {
 	return addrs
 }
 
-// benchNopConn stands in for a dialled connection, so the registry benchmarks
-// measure the bookkeeping rather than the kernel.
+// Measures the bookkeeping rather than the kernel.
 type benchNopConn struct{ net.Conn }
 
 func (benchNopConn) Close() error { return nil }

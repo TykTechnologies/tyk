@@ -131,9 +131,7 @@ type Gateway struct {
 	DRLManager *drl.DRL
 	reloadMu   sync.Mutex
 
-	// upstreamDNS refreshes upstream hostnames for APIs sourcing their target
-	// list from DNS. It is keyed by hostname, so query volume follows distinct
-	// upstreams rather than APIs.
+	// Keyed by hostname, so query volume follows upstreams, not APIs.
 	upstreamDNS dnsdiscovery.Scheduler
 
 	Analytics            RedisAnalyticsHandler

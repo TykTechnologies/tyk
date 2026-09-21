@@ -11,38 +11,24 @@ import (
 )
 
 const (
-	// DefaultInterval is used when a subscription asks for no interval.
 	DefaultInterval = 30 * time.Second
+	MinInterval     = 5 * time.Second
 
-	// MinInterval is the floor NormaliseInterval applies.
-	MinInterval = 5 * time.Second
-
-	// DefaultStaleTTL bounds how long a last known good set is kept while the
-	// resolver is unreachable. Applied by callers, since zero means never.
+	// Applied by callers, since zero here means never.
 	DefaultStaleTTL = 300 * time.Second
 
-	// LookupTimeout bounds one lookup, so a resolver that hangs does not stall
-	// the cycle it is part of.
 	LookupTimeout = 5 * time.Second
+	MaxBackoff    = 5 * time.Minute
 
-	// MaxBackoff caps the interval after repeated failures, so discovery
-	// recovers soon after DNS does.
-	MaxBackoff = 5 * time.Minute
-
-	// JitterFraction is the proportion of the interval added at random to each
-	// cycle, so gateways started together do not resolve in lockstep.
+	// Added at random per cycle, so gateways do not resolve in lockstep.
 	JitterFraction = 0.1
 
-	// idleWait is how long the loop sleeps with no name registered. A
-	// subscription wakes it, so this only bounds a missed wake.
+	// Bounds a missed wake, with no name registered.
 	idleWait = time.Minute
 
-	// minWait floors the sleep between cycles, so a pathological interval
-	// cannot turn the loop into a busy wait.
+	// Keeps a pathological interval from busy-waiting.
 	minWait = 10 * time.Millisecond
 
-	// maxConcurrentLookups bounds how many names resolve at once. Resolving
-	// serially would put a few unreachable names in front of healthy ones.
 	maxConcurrentLookups = 8
 )
 
@@ -54,29 +40,23 @@ type Config struct {
 	// Host is the DNS name to resolve, without a port.
 	Host string
 
-	// Interval is how often Host is re-resolved. Zero means DefaultInterval.
-	// No floor is applied; a caller exposing this as configuration passes it
-	// through NormaliseInterval first.
+	// Zero means DefaultInterval. No floor here; see NormaliseInterval.
 	Interval time.Duration
 
-	// StaleTTL bounds how long the last known good set is kept while the
-	// resolver is unreachable. Zero means never give up on it.
+	// Bounds the last known good set. Zero means never give up.
 	StaleTTL time.Duration
 
-	// OnChange is called with the current state on Subscribe and with each
-	// newly published one after that. It runs with no lock held, must not
-	// block for long, and is skipped when a resolution changes nothing.
+	// Runs unlocked, must not block, and is skipped when nothing changed.
 	OnChange func(*State)
 }
 
 // Scheduler refreshes names in the background, one entry per distinct name.
-// The zero value is ready to use. Its goroutine starts with the first
-// subscription and stops when that subscription's context is cancelled.
+// The zero value is ready to use, and its goroutine runs from the first
+// subscription until that subscription's context is cancelled.
 type Scheduler struct {
 	mu sync.Mutex
 
-	// entries is keyed by hostname, subs by subscriber key, so a reload can
-	// move a subscriber from one name to another or drop it.
+	// Keyed by hostname, and by subscriber key.
 	entries map[string]*entry
 	subs    map[string]*Subscription
 
@@ -85,8 +65,8 @@ type Scheduler struct {
 	wake    chan struct{}
 	runCtx  context.Context
 
-	// Injectable for tests; nil means the real implementation. The refresh
-	// goroutine reads these, so set them before the first Subscribe.
+	// Injectable for tests, read by the refresh goroutine: set before the
+	// first Subscribe.
 	Lookup LookupFunc
 	Now    func() time.Time
 	Jitter func(time.Duration) time.Duration
@@ -94,16 +74,14 @@ type Scheduler struct {
 	lookups atomic.Int64
 }
 
-// entry is the state for one name, shared by every subscriber pointing at it.
-// All fields but published are guarded by the scheduler's mutex.
+// Shared by every subscriber on one name. All fields but published are
+// guarded by the scheduler's mutex.
 type entry struct {
 	host string
 
-	// refreshMu serialises refresh for this name, so Refresh and the loop
-	// cannot publish out of order. Always taken before the scheduler mutex.
+	// Stops Refresh and the loop publishing out of order. Taken before mu.
 	refreshMu sync.Mutex
 
-	// published is read by subscribers and written only by the scheduler.
 	published atomic.Pointer[State]
 
 	interval    time.Duration
@@ -122,18 +100,16 @@ type Subscription struct {
 	staleTTL time.Duration
 	onChange func(*State)
 
-	// entry is set once and never cleared, so a superseded subscription goes
-	// on reporting the last set it saw, which the spec it belongs to still
-	// needs while it is serving.
+	// Set once, so a superseded subscription goes on reporting the last set
+	// it saw while its spec is still serving.
 	entry *entry
 	sched *Scheduler
 
-	// detached is guarded by the scheduler mutex.
 	detached bool
 }
 
-// State returns the currently published address set, or nil before the first
-// resolution has completed. The returned pointer is never mutated.
+// State returns the published address set, or nil before the first
+// resolution. The returned pointer is never mutated.
 func (s *Subscription) State() *State {
 	if s == nil || s.entry == nil {
 		return nil
@@ -149,9 +125,9 @@ func (s *Subscription) Host() string {
 	return s.host
 }
 
-// Release drops this subscription, and the shared entry with it when nothing
-// else wants that name. A subscription already superseded under its key is
-// ignored, so a late teardown hook cannot drop the live one.
+// Release drops this subscription, and the entry when nothing else wants that
+// name. One already superseded is ignored, so a late teardown hook cannot
+// drop the live one.
 func (s *Subscription) Release() {
 	if s == nil || s.sched == nil {
 		return
@@ -159,8 +135,7 @@ func (s *Subscription) Release() {
 	s.sched.release(s)
 }
 
-// NormaliseInterval applies the default and the floor. Callers that expose the
-// interval as configuration pass what they were given through this.
+// NormaliseInterval applies the default and the floor.
 func NormaliseInterval(interval time.Duration) time.Duration {
 	if interval <= 0 {
 		return DefaultInterval
@@ -171,12 +146,9 @@ func NormaliseInterval(interval time.Duration) time.Duration {
 	return interval
 }
 
-// Subscribe points key at cfg.Host, creating the shared entry if it is new. A
-// key already subscribed is moved, so a reload supersedes rather than
-// duplicates. ctx bounds the refresh goroutine.
-//
-// Nothing is resolved here, since an inline lookup would put DNS on whatever
-// path loads a subscriber. A name already resolved delivers its state at once.
+// Subscribe points key at cfg.Host, moving a key already subscribed so that a
+// reload supersedes rather than duplicates. Nothing is resolved here, since an
+// inline lookup would put DNS on whatever path loads a subscriber.
 func (s *Scheduler) Subscribe(ctx context.Context, key string, cfg Config) (*Subscription, error) {
 	if cfg.Host == "" {
 		return nil, ErrNoHost
@@ -216,9 +188,8 @@ func (s *Scheduler) Subscribe(ctx context.Context, key string, cfg Config) (*Sub
 	sub.entry = e
 	e.subs[sub] = struct{}{}
 
-	// Attached before the subscription it supersedes is released, so a reload
-	// of a name's only subscriber keeps the entry rather than rebuilding an
-	// empty one and discarding the last known good set with it.
+	// Attached before the one it supersedes is released, so a reload of a
+	// name's only subscriber keeps the entry and its last good set.
 	if previous, ok := s.subs[key]; ok {
 		delete(s.subs, key)
 		s.detachLocked(previous)
@@ -227,15 +198,13 @@ func (s *Scheduler) Subscribe(ctx context.Context, key string, cfg Config) (*Sub
 	s.subs[key] = sub
 	s.recomputeLocked(e)
 
-	// Read under the lock, delivered off it.
 	current := e.published.Load()
 
 	s.ensureRunningLocked(ctx)
 	s.mu.Unlock()
 
-	// A subscriber joining an already-resolved name would otherwise compute
-	// its first membership change against an empty set, and never retire the
-	// resources it holds for a departed address.
+	// Or a subscriber joining a resolved name computes its first membership
+	// change against an empty set.
 	if current != nil && sub.onChange != nil {
 		sub.onChange(current)
 	}
@@ -243,8 +212,7 @@ func (s *Scheduler) Subscribe(ctx context.Context, key string, cfg Config) (*Sub
 	return sub, nil
 }
 
-// ReleaseKey drops whatever subscription key holds, for subscribers that are
-// reconciled rather than torn down.
+// ReleaseKey is for subscribers reconciled rather than torn down.
 func (s *Scheduler) ReleaseKey(key string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -257,7 +225,7 @@ func (s *Scheduler) ReleaseKey(key string) {
 	s.detachLocked(sub)
 }
 
-// Refresh resolves every registered name now, on the calling goroutine.
+// Refresh resolves every registered name on the calling goroutine.
 func (s *Scheduler) Refresh(ctx context.Context) {
 	s.mu.Lock()
 	all := make([]*entry, 0, len(s.entries))
@@ -269,7 +237,7 @@ func (s *Scheduler) Refresh(ctx context.Context) {
 	s.refreshAll(ctx, all)
 }
 
-// Lookups is the number of lookups completed since the scheduler started.
+// Lookups counts the lookups completed since the scheduler started.
 func (s *Scheduler) Lookups() int64 {
 	return s.lookups.Load()
 }
@@ -284,8 +252,7 @@ func (s *Scheduler) timeNow() time.Time {
 func (s *Scheduler) resolve(ctx context.Context, host string) ([]string, error) {
 	s.lookups.Add(1)
 
-	// Applied to an injected resolver too, so a stub that hangs cannot wedge
-	// the cycle it is part of.
+	// Wraps an injected resolver too, so a hanging stub cannot wedge a cycle.
 	ctx, cancel := context.WithTimeout(ctx, LookupTimeout)
 	defer cancel()
 
@@ -307,7 +274,6 @@ func (s *Scheduler) nextInterval(base time.Duration) time.Duration {
 	return base + time.Duration(rand.Int63n(span))
 }
 
-// release drops sub, unless it has already been superseded under its key.
 func (s *Scheduler) release(sub *Subscription) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -319,7 +285,6 @@ func (s *Scheduler) release(sub *Subscription) {
 	s.detachLocked(sub)
 }
 
-// detachLocked removes sub, dropping the entry when nothing else wants it.
 func (s *Scheduler) detachLocked(sub *Subscription) {
 	e := sub.entry
 	if e == nil || sub.detached {
@@ -335,13 +300,10 @@ func (s *Scheduler) detachLocked(sub *Subscription) {
 	s.recomputeLocked(e)
 }
 
-// recomputeLocked derives an entry's interval and stale TTL from its
-// subscribers.
 func (s *Scheduler) recomputeLocked(e *entry) {
-	// One refresh serves every subscriber, so the shortest interval wins.
-	// Stale TTL goes the other way: reaching it discards the addresses for
-	// all of them, so the longest wins and a zero, meaning never give up,
-	// decides the entry outright.
+	// One refresh serves everyone, so the shortest interval wins. Reaching
+	// the stale TTL discards the addresses for everyone, so the longest wins
+	// and a zero decides the entry.
 	interval, staleTTL := time.Duration(0), time.Duration(0)
 	unbounded := false
 	for sub := range e.subs {
@@ -373,8 +335,8 @@ func (s *Scheduler) recomputeLocked(e *entry) {
 
 func (s *Scheduler) ensureRunningLocked(ctx context.Context) {
 	// A goroutine whose context is done may not have cleared running yet, and
-	// waking it would leave the entries with nothing refreshing them. A nil
-	// runCtx means the loop was suppressed deliberately, as tests do.
+	// waking it leaves the entries with nothing refreshing them. A nil runCtx
+	// means the loop was suppressed, as tests do.
 	if s.running && (s.runCtx == nil || s.runCtx.Err() == nil) {
 		select {
 		case s.wake <- struct{}{}:
@@ -389,8 +351,8 @@ func (s *Scheduler) ensureRunningLocked(ctx context.Context) {
 	go s.run(ctx, s.wake)
 }
 
-// run is the single refresh goroutine. It takes its own wake channel, so a
-// replaced goroutine cannot clear the flag its replacement set.
+// Takes its own wake channel, so a replaced goroutine cannot clear the flag
+// its replacement set.
 func (s *Scheduler) run(ctx context.Context, wake chan struct{}) {
 	defer func() {
 		s.mu.Lock()
@@ -415,7 +377,6 @@ func (s *Scheduler) run(ctx context.Context, wake chan struct{}) {
 	}
 }
 
-// refreshAll resolves a set of names, maxConcurrentLookups at a time.
 func (s *Scheduler) refreshAll(ctx context.Context, due []*entry) {
 	if len(due) <= 1 {
 		if len(due) == 1 {
@@ -438,8 +399,7 @@ func (s *Scheduler) refreshAll(ctx context.Context, due []*entry) {
 	wg.Wait()
 }
 
-// nextWait is how long to sleep before the earliest refresh falls due. It is
-// computed after the refresh pass, because an entry just refreshed holds the
+// Computed after the refresh pass, because an entry just refreshed holds the
 // nearest deadline.
 func (s *Scheduler) nextWait() time.Duration {
 	s.mu.Lock()
@@ -467,7 +427,6 @@ func (s *Scheduler) nextWait() time.Duration {
 	return wait
 }
 
-// dueEntries returns the entries whose next refresh has arrived.
 func (s *Scheduler) dueEntries() []*entry {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -482,15 +441,11 @@ func (s *Scheduler) dueEntries() []*entry {
 	return due
 }
 
-// refresh resolves one name and publishes what it established.
-//
-// A successful answer, with records or without, is applied as it stands, and so
-// is an authoritative NXDOMAIN. All three are facts about the name. A resolver
-// that could not be reached is not, so the addresses are kept and the entry
-// backs off, bounded by the stale TTL.
+// A successful answer, with records or without, and an NXDOMAIN are applied
+// as they stand. An unreachable resolver is not a fact about the name, so the
+// addresses are kept and the entry backs off, bounded by the stale TTL.
 func (s *Scheduler) refresh(ctx context.Context, e *entry) {
-	// One resolution of a name at a time. Concurrent refreshes publish out of
-	// order, leaving a subscriber tracking a set already superseded.
+	// One at a time, or refreshes publish out of order.
 	e.refreshMu.Lock()
 	defer e.refreshMu.Unlock()
 
@@ -527,7 +482,7 @@ func (s *Scheduler) refresh(ctx context.Context, e *entry) {
 		case isNameNotFound(err):
 			published, notify = s.publishLocked(e, nil, NotFound)
 
-		// Nothing published yet, so there is no stale set to bound.
+		// Nothing published yet, so no stale set to bound.
 		case e.published.Load() == nil:
 			published, notify = s.publishLocked(e, nil, Unreachable)
 
@@ -539,14 +494,12 @@ func (s *Scheduler) refresh(ctx context.Context, e *entry) {
 
 	s.mu.Unlock()
 
-	// Off the lock, so a slow subscriber cannot delay every other name.
+	// Off the lock, so a slow subscriber cannot delay other names.
 	for _, onChange := range notify {
 		onChange(published)
 	}
 }
 
-// publishLocked swaps in a new state unless it matches the current one, and
-// returns the callbacks owed a notification.
 func (s *Scheduler) publishLocked(e *entry, addrs []string, outcome Outcome) (*State, []func(*State)) {
 	if current := e.published.Load(); current != nil &&
 		current.Outcome == outcome && equalAddrs(current.Addrs, addrs) {
@@ -566,7 +519,6 @@ func (s *Scheduler) publishLocked(e *entry, addrs []string, outcome Outcome) (*S
 	return state, notify
 }
 
-// backoffLocked doubles the interval on consecutive failures, up to MaxBackoff.
 func (s *Scheduler) backoffLocked(base time.Duration, failures int) time.Duration {
 	interval := base
 	for i := 1; i < failures && interval < MaxBackoff; i++ {
@@ -578,7 +530,6 @@ func (s *Scheduler) backoffLocked(base time.Duration, failures int) time.Duratio
 	return s.nextInterval(interval)
 }
 
-// isNameNotFound distinguishes an authoritative NXDOMAIN from no answer.
 func isNameNotFound(err error) bool {
 	var dnsErr *net.DNSError
 	return errors.As(err, &dnsErr) && dnsErr.IsNotFound

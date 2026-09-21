@@ -293,8 +293,7 @@ func (r *RuleLoadBalancingTargets) Validate(apiDef *APIDefinition, validationRes
 		return
 	}
 
-	// With DNS discovery on the list is resolved at runtime, so an empty
-	// Proxy.Targets is expected here.
+	// The list is resolved at runtime, so an empty one is expected here.
 	if apiDef.Proxy.DNSDiscovery.Enabled {
 		return
 	}
@@ -308,8 +307,7 @@ func (r *RuleLoadBalancingTargets) Validate(apiDef *APIDefinition, validationRes
 }
 
 // RuleDNSDiscovery validates how proxy.dns_discovery combines with the other
-// sources of an API's target list. Tyk OAS documents are checked against the
-// same two rules before they are converted.
+// sources of a target list. OAS documents are checked before conversion.
 type RuleDNSDiscovery struct{}
 
 // Validate validates api definition DNS discovery configuration.

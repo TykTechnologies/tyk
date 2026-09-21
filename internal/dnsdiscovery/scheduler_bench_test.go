@@ -8,12 +8,10 @@ import (
 	"time"
 )
 
-// Benchmarks for the claim the shape rests on: refresh cost follows distinct
-// hostnames rather than subscribers, which is what makes a background refresh
-// affordable at gateway scale.
+// Refresh cost follows hostnames, not subscribers, which is what makes a
+// background refresh affordable at gateway scale.
 
-// benchScheduler builds a scheduler with a fixed answer per hostname and no
-// background goroutine, so a benchmark measures only what it calls.
+// No background goroutine: a benchmark measures only what it calls.
 func benchScheduler(addrsPerHost int) *Scheduler {
 	addrs := make([]string, 0, addrsPerHost)
 	for i := 0; i < addrsPerHost; i++ {
@@ -32,10 +30,8 @@ func benchScheduler(addrsPerHost int) *Scheduler {
 	}
 }
 
-// BenchmarkRefreshCycle holds subscribers at 1000 and varies how many distinct
-// hostnames they point at, as a deployment does with many APIs and far fewer
-// Services. The time should track hosts and stay flat in subscribers. A poller
-// per subscriber would cost 1000 lookups in every case here.
+// Subscribers held at 1000 while hostnames vary, as a deployment has many
+// APIs and few Services. Time should track hosts, flat in subscribers.
 func BenchmarkRefreshCycle(b *testing.B) {
 	const subscribers = 1000
 
@@ -61,15 +57,13 @@ func BenchmarkRefreshCycle(b *testing.B) {
 			}
 			b.StopTimer()
 
-			// Report the lookups a cycle costs, which is the claim being
-			// made: hostnames, not subscribers.
+			// Hostnames, not subscribers.
 			b.ReportMetric(float64(hosts), "lookups/cycle")
 		})
 	}
 }
 
-// BenchmarkDueEntries measures the scan done on each wake to find what is due.
-// Once per wake, but it grows with the number of distinct hostnames.
+// Once per wake, growing with the number of distinct hostnames.
 func BenchmarkDueEntries(b *testing.B) {
 	for _, hosts := range []int{10, 100, 1000} {
 		b.Run(fmt.Sprintf("hosts=%d", hosts), func(b *testing.B) {
@@ -98,8 +92,7 @@ func BenchmarkDueEntries(b *testing.B) {
 	}
 }
 
-// BenchmarkSubscribe measures load rather than the request path. Every gateway
-// reload runs it for every API.
+// Every gateway reload runs Subscribe for every API.
 func BenchmarkSubscribe(b *testing.B) {
 	b.Run("new hostname", func(b *testing.B) {
 		scheduler := benchScheduler(4)
@@ -117,14 +110,9 @@ func BenchmarkSubscribe(b *testing.B) {
 		}
 	})
 
-	// Superseding a key on a name others already hold, which is what a reload
-	// does, scaled by how many APIs share the name. Subscribe derives the
-	// entry's interval and stale TTL by walking its subscribers, so this is
-	// O(APIs on that hostname) and a reload of them all is O(n²).
-	//
-	// It re-subscribes existing keys rather than adding new ones, so each
-	// measurement is one Subscribe against a fixed population rather than the
-	// average of a set growing under the timer.
+	// Subscribe walks the entry's subscribers, so this is O(APIs on that
+	// hostname) and reloading them all is O(n²). Existing keys are
+	// re-subscribed, so each measurement runs against a fixed population.
 	b.Run("shared hostname", func(b *testing.B) {
 		for _, existing := range []int{1, 10, 100, 1000} {
 			b.Run(fmt.Sprintf("existing=%d", existing), func(b *testing.B) {
@@ -155,10 +143,8 @@ func BenchmarkSubscribe(b *testing.B) {
 	})
 }
 
-// BenchmarkPublishToSubscribers measures a refresh that moved the address set
-// on a name several APIs share. One resolution serves them all and the
-// notification is per subscriber, so this is where subscriber count shows up
-// in the cost of a membership change.
+// One resolution serves every API on the name, but notification is per
+// subscriber, so subscriber count shows up here.
 func BenchmarkPublishToSubscribers(b *testing.B) {
 	for _, subscribers := range []int{1, 10, 100} {
 		b.Run(fmt.Sprintf("subscribers=%d", subscribers), func(b *testing.B) {
@@ -195,10 +181,7 @@ func BenchmarkPublishToSubscribers(b *testing.B) {
 	}
 }
 
-// BenchmarkSubscribeChurn measures a reload storm: every API re-subscribes
-// under its existing key while others are being released. Subscribe and
-// ReleaseKey both take the one scheduler mutex, so this is what a reload costs
-// a gateway with many APIs on few Services.
+// A reload storm. Subscribe and ReleaseKey both take the one scheduler mutex.
 func BenchmarkSubscribeChurn(b *testing.B) {
 	const hosts = 20
 
