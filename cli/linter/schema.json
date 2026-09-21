@@ -646,6 +646,10 @@
         "grpc_round_robin_load_balancing": {
           "type": "boolean"
         },
+        "grpc_dns_refresh_interval": {
+          "type": "integer",
+          "minimum": -1
+        },
         "enable_coprocess": {
           "type": "boolean"
         },

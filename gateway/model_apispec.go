@@ -65,6 +65,13 @@ type APISpec struct {
 	OrgHasNoSession          bool
 	AnalyticsPluginConfig    *GoAnalyticsPlugin
 
+	// dnsDiscovery is what this API resolves when DNS is its target-list
+	// source: the upstream name, its port, and how long a resolved set is
+	// reused. Non-nil only when dns_discovery is on and the API's target is a
+	// resolvable name; it is set during load and read-only thereafter, and its
+	// presence is what turns the feature on for this API.
+	dnsDiscovery *dnsDiscoveryPlan
+
 	unloadHooks []func()
 
 	network analytics.NetworkStats
