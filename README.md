@@ -106,7 +106,9 @@ Other Installations are available:
 ## Open Source API Gateway Features
 Use any protocol: REST, SOAP, [GraphQL](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/graphql/), [gRPC](https://tyk.io/docs/key-concepts/grpc-proxy/), [TCP](https://tyk.io/docs/key-concepts/tcp-proxy/), and [MCP](https://tyk.io/docs/ai-management/mcp-gateway/overview).
 
-[MCP Gateway](https://tyk.io/docs/ai-management/mcp-gateway/overview) - Put the gateway in front of remote [Model Context Protocol](https://modelcontextprotocol.io) servers so AI agent traffic is authenticated, rate limited and auditable. Tyk parses JSON-RPC 2.0 and applies policy per tool, resource and prompt rather than treating MCP as opaque HTTP.
+[MCP Gateway](https://tyk.io/docs/ai-management/mcp-gateway/overview): Put the gateway in front of remote [Model Context Protocol](https://modelcontextprotocol.io) servers so AI agent traffic is authenticated, rate limited and auditable. Tyk parses JSON-RPC 2.0 and applies policy per tool, resource and prompt rather than treating MCP as opaque HTTP.
+
+[API to MCP](https://tyk.io/docs/ai-management/mcps/api-to-mcp): Generate an MCP proxy directly from a REST API in Tyk Gateway, without building or hosting a separate MCP server.
 
 Industry Standard Authentication: [OIDC](https://tyk.io/docs/advanced-configuration/integrate/api-auth-mode/open-id-connect/#setting-up-oidc), [JWT,](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/jwt/) [bearer Tokens](https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/bearer-tokens/), [Basic Auth](https://tyk.io/docs/tyk-apis/tyk-dashboard-api/basic-authentication/), Client Certificates and more.
 
