@@ -906,7 +906,7 @@ func TestRecordAccessLog_OriginalPath(t *testing.T) {
 func TestGateway_isDisabledForMCP(t *testing.T) {
 	gw := &Gateway{}
 
-	t.Run("RedisCacheMiddleware disabled for MCP APIs", func(t *testing.T) {
+	t.Run("RedisCacheMiddleware enabled for MCP APIs with request-level safety", func(t *testing.T) {
 		mcpSpec := BuildAPI(func(spec *APISpec) {
 			spec.APIID = "mcp-test"
 			spec.MarkAsMCP()
@@ -919,7 +919,7 @@ func TestGateway_isDisabledForMCP(t *testing.T) {
 		}
 
 		result := gw.isDisabledForMCP(cacheMW)
-		assert.True(t, result, "RedisCacheMiddleware should be disabled for MCP APIs")
+		assert.False(t, result, "MCP cache safety is evaluated per request")
 	})
 
 	t.Run("RedisCacheMiddleware enabled for non-MCP APIs", func(t *testing.T) {
@@ -955,7 +955,7 @@ func TestGateway_isDisabledForMCP(t *testing.T) {
 func TestGateway_mwAppendEnabled_MCP(t *testing.T) {
 	gw := &Gateway{}
 
-	t.Run("does not append cache middleware for MCP APIs", func(t *testing.T) {
+	t.Run("appends cache middleware for MCP APIs", func(t *testing.T) {
 		mcpSpec := BuildAPI(func(spec *APISpec) {
 			spec.APIID = "mcp-test"
 			spec.CacheOptions.EnableCache = true // Even if enabled in config
@@ -971,8 +971,8 @@ func TestGateway_mwAppendEnabled_MCP(t *testing.T) {
 		var chain []alice.Constructor
 		result := gw.mwAppendEnabled(&chain, cacheMW)
 
-		assert.False(t, result, "mwAppendEnabled should return false for restricted MCP middleware")
-		assert.Empty(t, chain, "Chain should be empty - cache middleware should not be added for MCP")
+		assert.True(t, result, "cache middleware should evaluate MCP safety per request")
+		assert.Len(t, chain, 1)
 	})
 
 	t.Run("appends cache middleware for non-MCP APIs", func(t *testing.T) {
