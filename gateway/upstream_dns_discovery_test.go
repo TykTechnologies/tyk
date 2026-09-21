@@ -3,27 +3,34 @@ package gateway
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
+	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/dnscache"
+	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/dnsdiscovery"
 )
 
-// TestUpstreamDNSDiscovery_SkipsTLSUpstreams pins the scheme guard.
-//
-// Sending a request to a pod address makes the transport dial an IP literal,
-// and Go derives SNI and certificate verification from the URL host whenever
-// tls.Config.ServerName is unset, which it always is here. A service
-// certificate issued for the service name, with no IP SAN, then fails to
-// verify, so every request to that API breaks. Verified out of band: dialling
-// one listener by name verifies and by IP fails with "cannot validate
-// certificate for <ip> because it doesn't contain any IP SANs".
+// Tests for the upstream half of DNS discovery: which APIs qualify, how a
+// published address set becomes a target list, and when a connection to a
+// departed address is closed. Resolution itself belongs to
+// internal/dnsdiscovery and is tested there.
+
+// TestUpstreamDNSDiscovery_SkipsTLSUpstreams pins the scheme guard: dialling a
+// backend address means dialling an IP literal, which fails certificate
+// verification against a service certificate with no IP SAN.
 func TestUpstreamDNSDiscovery_SkipsTLSUpstreams(t *testing.T) {
 	cases := []struct {
 		scheme  string
@@ -45,7 +52,7 @@ func TestUpstreamDNSDiscovery_SkipsTLSUpstreams(t *testing.T) {
 	}
 }
 
-// TestSplitUpstreamHostPort covers the default ports, which have to be supplied
+// TestSplitUpstreamHostPort covers the default port, which has to be supplied
 // explicitly because resolution answers with bare addresses and no port.
 func TestSplitUpstreamHostPort(t *testing.T) {
 	cases := []struct {
@@ -54,9 +61,7 @@ func TestSplitUpstreamHostPort(t *testing.T) {
 	}{
 		{"h2c://svc:9002", "svc", "9002"},
 		{"h2c://svc", "svc", "80"},
-		{"http://svc", "svc", "80"},
-		{"https://svc", "svc", "443"},
-		{"http://svc:8080/base", "svc", "8080"},
+		{"h2c://svc:9002/base", "svc", "9002"},
 	}
 
 	for _, tc := range cases {
@@ -66,45 +71,23 @@ func TestSplitUpstreamHostPort(t *testing.T) {
 		}
 		host, port := splitUpstreamHostPort(u)
 		if host != tc.host || port != tc.port {
-			t.Errorf("splitUpstreamHostPort(%q) = (%q, %q), want (%q, %q)",
-				tc.raw, host, port, tc.host, tc.port)
+			t.Errorf("splitUpstreamHostPort(%q) = %q, %q; want %q, %q", tc.raw, host, port, tc.host, tc.port)
 		}
 	}
 }
 
-// TestResolvableHost checks what is worth resolving. An IP literal resolves to
-// itself forever, and localhost is not a Service.
-func TestResolvableHost(t *testing.T) {
-	cases := map[string]bool{
-		"upstream":                 true,
-		"svc.ns.svc.cluster.local": true,
-		"10.0.0.1":                 false,
-		"::1":                      false,
-		"localhost":                false,
-		"LOCALHOST":                false,
-		"":                         false,
-	}
-
-	for host, want := range cases {
-		if got := resolvableHost(host); got != want {
-			t.Errorf("resolvableHost(%q) = %v, want %v", host, got, want)
-		}
-	}
-}
-
-// TestBuildUpstreamTarget checks that the scheme survives.
-//
-// This is the point of the EnsureTransport change: the h2c transport is chosen
-// from the request scheme after the Director has run, so an entry written as
-// http:// here would reach a gRPC upstream over HTTP/1.1.
+// TestBuildUpstreamTarget pins that the scheme survives: an h2c:// entry
+// rewritten to http:// would reach a cleartext HTTP/2 upstream over HTTP/1.1,
+// which a gRPC server refuses.
 func TestBuildUpstreamTarget(t *testing.T) {
 	cases := []struct {
 		raw, addr, port, want string
 	}{
 		{"h2c://svc:9002", "10.0.0.1", "9002", "h2c://10.0.0.1:9002"},
-		{"http://svc:8080", "10.0.0.2", "8080", "http://10.0.0.2:8080"},
-		{"h2c://svc:9002/base", "10.0.0.3", "9002", "h2c://10.0.0.3:9002/base"},
-		{"h2c://svc:9002/", "10.0.0.4", "9002", "h2c://10.0.0.4:9002"},
+		{"http://svc:8080", "10.0.0.1", "8080", "http://10.0.0.1:8080"},
+		{"h2c://svc:9002/base", "10.0.0.1", "9002", "h2c://10.0.0.1:9002/base"},
+		{"h2c://svc:9002/", "10.0.0.1", "9002", "h2c://10.0.0.1:9002"},
+		{"h2c://svc:9002", "fd00::1", "9002", "h2c://[fd00::1]:9002"},
 	}
 
 	for _, tc := range cases {
@@ -118,47 +101,78 @@ func TestBuildUpstreamTarget(t *testing.T) {
 	}
 }
 
-// TestResolveDNSDiscoveryInterval pins the default and the floor.
-func TestResolveDNSDiscoveryInterval(t *testing.T) {
-	cases := map[int64]time.Duration{
-		0:  time.Duration(dnsDiscoveryDefaultInterval) * time.Second,
-		-1: time.Duration(dnsDiscoveryDefaultInterval) * time.Second,
-		1:  time.Duration(dnsDiscoveryMinInterval) * time.Second,
-		4:  time.Duration(dnsDiscoveryMinInterval) * time.Second,
-		5:  5 * time.Second,
-		60: 60 * time.Second,
-	}
-
-	for in, want := range cases {
-		if got := resolveDNSDiscoveryInterval(in); got != want {
-			t.Errorf("resolveDNSDiscoveryInterval(%d) = %s, want %s", in, got, want)
+// TestResolveDNSDiscoveryPeriods pins the defaults, the floor and the sentinels.
+// Each period spells "off" differently, so they are worth reading together.
+func TestResolveDNSDiscoveryPeriods(t *testing.T) {
+	t.Run("refresh interval", func(t *testing.T) {
+		cases := map[int64]time.Duration{
+			0:  time.Duration(dnsDiscoveryDefaultInterval) * time.Second,
+			-1: time.Duration(dnsDiscoveryDefaultInterval) * time.Second,
+			1:  dnsdiscovery.MinInterval,
+			4:  dnsdiscovery.MinInterval,
+			5:  5 * time.Second,
+			60: 60 * time.Second,
 		}
-	}
+
+		for in, want := range cases {
+			got := resolveDNSDiscoveryInterval(in)
+			if got != want {
+				t.Errorf("refresh interval for %d = %s, want %s", in, got, want)
+			}
+		}
+	})
+
+	t.Run("stale TTL", func(t *testing.T) {
+		if got := resolveDNSDiscoveryStaleTTL(-1); got != 0 {
+			t.Errorf("resolveDNSDiscoveryStaleTTL(-1) = %s, want 0 meaning never give up", got)
+		}
+		if got, want := resolveDNSDiscoveryStaleTTL(0), time.Duration(dnsDiscoveryDefaultStaleTTL)*time.Second; got != want {
+			t.Errorf("resolveDNSDiscoveryStaleTTL(0) = %s, want the default %s", got, want)
+		}
+		if got := resolveDNSDiscoveryStaleTTL(30); got != 30*time.Second {
+			t.Errorf("resolveDNSDiscoveryStaleTTL(30) = %s, want 30s", got)
+		}
+	})
+
+	t.Run("drain deadline", func(t *testing.T) {
+		if got := resolveDNSDiscoveryDrainDeadline(-1); got != dnsDiscoveryDrainDisabled {
+			t.Errorf("resolveDNSDiscoveryDrainDeadline(-1) = %s, want the disabled sentinel", got)
+		}
+		if got, want := resolveDNSDiscoveryDrainDeadline(0), time.Duration(dnsDiscoveryDefaultDrainDeadline)*time.Second; got != want {
+			t.Errorf("resolveDNSDiscoveryDrainDeadline(0) = %s, want the default %s", got, want)
+		}
+		if got := resolveDNSDiscoveryDrainDeadline(60); got != time.Minute {
+			t.Errorf("resolveDNSDiscoveryDrainDeadline(60) = %s, want 1m", got)
+		}
+	})
 }
 
 // TestPlanUpstreamDNSDiscovery_Declines pins the cases in which an API should
-// not have its target list sourced from DNS.
-//
-// The load balancing case is the one worth arguing about. DNS discovery is a
-// source, and enable_load_balancing is the policy that distributes what a
-// source produces, so with the policy off every request would still reach one
-// address and enabling discovery would change nothing a customer can observe.
-// Refusing it says so rather than appearing to work.
+// not have its target list sourced from DNS. The two judgement calls: without
+// load balancing every request still reaches one backend, and with service
+// discovery there are two authoritative sources for one list. The scheme cases
+// are scope: discovery is h2c only, that being the transport which holds one
+// connection per authority, and it carries gRPC, gRPC-Web and plain HTTP/2
+// alike.
 func TestPlanUpstreamDNSDiscovery_Declines(t *testing.T) {
 	logger := logrus.NewEntry(logrus.New())
 
 	cases := []struct {
-		name        string
-		targetURL   string
-		enabled     bool
-		loadBalance bool
+		name             string
+		targetURL        string
+		enabled          bool
+		loadBalance      bool
+		serviceDiscovery bool
 	}{
-		{"setting disabled", "h2c://svc:9002", false, true},
-		{"load balancing off", "h2c://svc:9002", true, false},
-		{"tls upstream", "https://svc:9002", true, true},
-		{"ip literal upstream", "h2c://10.0.0.5:9002", true, true},
-		{"localhost upstream", "h2c://localhost:9002", true, true},
-		{"empty target", "", true, true},
+		{name: "setting disabled", targetURL: "h2c://svc:9002", enabled: false, loadBalance: true},
+		{name: "load balancing off", targetURL: "h2c://svc:9002", enabled: true, loadBalance: false},
+		{name: "service discovery also on", targetURL: "h2c://svc:9002", enabled: true, loadBalance: true, serviceDiscovery: true},
+		{name: "tls upstream", targetURL: "https://svc:9002", enabled: true, loadBalance: true},
+		{name: "plain http upstream", targetURL: "http://svc:8080", enabled: true, loadBalance: true},
+		{name: "websocket upstream", targetURL: "ws://svc:8080", enabled: true, loadBalance: true},
+		{name: "ip literal upstream", targetURL: "h2c://10.0.0.5:9002", enabled: true, loadBalance: true},
+		{name: "localhost upstream", targetURL: "h2c://localhost:9002", enabled: true, loadBalance: true},
+		{name: "empty target", targetURL: "", enabled: true, loadBalance: true},
 	}
 
 	for _, tc := range cases {
@@ -168,6 +182,7 @@ func TestPlanUpstreamDNSDiscovery_Declines(t *testing.T) {
 			spec.Proxy.TargetURL = tc.targetURL
 			spec.Proxy.EnableLoadBalancing = tc.loadBalance
 			spec.Proxy.DNSDiscovery.Enabled = tc.enabled
+			spec.Proxy.ServiceDiscovery.UseDiscoveryService = tc.serviceDiscovery
 
 			if plan := planUpstreamDNSDiscovery(spec, logger); plan != nil {
 				t.Fatalf("planned DNS discovery for %q, expected none", tc.targetURL)
@@ -198,23 +213,43 @@ func TestPlanUpstreamDNSDiscovery_Accepts(t *testing.T) {
 	if plan.interval != 10*time.Second {
 		t.Fatalf("plan interval is %s, want 10s", plan.interval)
 	}
+	if plan.conns == nil {
+		t.Fatal("no connection registry, so a departed address would never be drained")
+	}
 }
 
-// stubResolver is a scheduler lookup that answers from a mutable map and counts
-// calls per hostname.
+// TestPlanUpstreamDNSDiscovery_DrainDisabled covers the opt-out: no registry, so
+// the API dials straight through and departed addresses idle out.
+func TestPlanUpstreamDNSDiscovery_DrainDisabled(t *testing.T) {
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	spec.APIID = "api-1"
+	spec.Proxy.TargetURL = "h2c://svc:9002"
+	spec.Proxy.EnableLoadBalancing = true
+	spec.Proxy.DNSDiscovery.Enabled = true
+	spec.Proxy.DNSDiscovery.DrainDeadline = -1
+
+	plan := planUpstreamDNSDiscovery(spec, logrus.NewEntry(logrus.New()))
+	if plan == nil {
+		t.Fatal("declined an API that only disabled draining")
+	}
+	if plan.conns != nil {
+		t.Error("built a connection registry for an API that disabled draining")
+	}
+	if upstreamDrainRegistry(&APISpec{APIDefinition: &apidef.APIDefinition{}}) != nil {
+		t.Error("an API with no plan reported a registry")
+	}
+}
+
+// stubResolver answers from a mutable map, so a test can move membership without
+// touching DNS.
 type stubResolver struct {
 	mu      sync.Mutex
 	answers map[string][]string
 	errs    map[string]error
-	calls   map[string]int
 }
 
 func newStubResolver() *stubResolver {
-	return &stubResolver{
-		answers: map[string][]string{},
-		errs:    map[string]error{},
-		calls:   map[string]int{},
-	}
+	return &stubResolver{answers: map[string][]string{}, errs: map[string]error{}}
 }
 
 func (r *stubResolver) set(host string, addrs ...string) {
@@ -230,292 +265,55 @@ func (r *stubResolver) fail(host string, err error) {
 	r.errs[host] = err
 }
 
-// failNotFound makes the host answer authoritatively that it does not exist,
-// which the scheduler treats differently from a resolver it cannot reach.
-func (r *stubResolver) failNotFound(host string) {
-	r.fail(host, &net.DNSError{Err: "no such host", Name: host, IsNotFound: true})
-}
-
-func (r *stubResolver) callsFor(host string) int {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	return r.calls[host]
-}
-
 func (r *stubResolver) lookup(_ context.Context, host string) ([]string, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	r.calls[host]++
 	if err, ok := r.errs[host]; ok {
 		return nil, err
 	}
 	return r.answers[host], nil
 }
 
-// subscribeAndRefresh subscribes and performs the first resolution inline.
-//
-// Production leaves that first lookup to the scheduler goroutine, so that a
-// slow resolver cannot delay API load. A test that suppresses the loop has to
-// do it itself.
-func subscribeAndRefresh(s *upstreamDNSScheduler, ctx context.Context, apiID string, plan *dnsDiscoveryPlan) *dnsDiscoveryEntry {
-	entry := s.subscribe(ctx, apiID, plan)
-	s.refresh(ctx, entry)
-	return entry
+// newDiscoveryGateway wires a stub resolver into a gateway's scheduler in place,
+// since the scheduler holds a mutex and must not be copied.
+func newDiscoveryGateway(t *testing.T, resolver *stubResolver) *Gateway {
+	t.Helper()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	t.Cleanup(cancel)
+
+	gw := &Gateway{}
+	gw.ctx = ctx
+	gw.upstreamDNS.Lookup = resolver.lookup
+	gw.upstreamDNS.Jitter = func(d time.Duration) time.Duration { return d }
+	return gw
 }
 
-// newTestScheduler builds a scheduler that never starts its own goroutine, so
-// tests drive refreshes explicitly and nothing races with the assertions.
-func newTestScheduler(resolver *stubResolver) *upstreamDNSScheduler {
-	s := &upstreamDNSScheduler{}
-	configureTestScheduler(s, resolver)
-	s.running = true // suppress the background loop
-	return s
+// testClock is a movable clock the scheduler goroutine can read while the test
+// moves it.
+type testClock struct {
+	mu sync.Mutex
+	at time.Time
 }
 
-// configureTestScheduler prepares a scheduler in place. The scheduler holds a
-// mutex and an atomic counter, so it must never be copied by value.
-func configureTestScheduler(s *upstreamDNSScheduler, resolver *stubResolver) {
-	s.entries = map[string]*dnsDiscoveryEntry{}
-	s.subscriptions = map[string]*dnsSubscription{}
-	s.wake = make(chan struct{}, 1)
-	s.lookup = resolver.lookup
-	s.jitter = func(d time.Duration) time.Duration { return d }
+func newTestClock() *testClock { return &testClock{at: time.Now()} }
+
+func (c *testClock) now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.at
 }
 
-// refreshAndReportDelay refreshes one entry and returns how far ahead the next
-// refresh was scheduled, so a test can observe the backoff.
-func (s *upstreamDNSScheduler) refreshAndReportDelay(ctx context.Context, entry *dnsDiscoveryEntry) time.Duration {
-	before := time.Now()
-	s.refresh(ctx, entry)
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return entry.nextDue.Sub(before)
+func (c *testClock) advance(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.at = c.at.Add(d)
 }
 
-// TestScheduler_OneLookupPerHostname is the claim the whole shape rests on:
-// query volume follows the number of distinct upstream hostnames, not the
-// number of APIs.
-//
-// This is what the systems in the same category all do. A poller per API would
-// make ten lookups here where two are needed.
-func TestScheduler_OneLookupPerHostname(t *testing.T) {
-	resolver := newStubResolver()
-	resolver.set("svc-a", "10.0.0.1", "10.0.0.2")
-	resolver.set("svc-b", "10.0.1.1")
-
-	scheduler := newTestScheduler(resolver)
-	ctx := context.Background()
-
-	for i := 0; i < 8; i++ {
-		scheduler.subscribe(ctx, fmt.Sprintf("api-a-%d", i), planFor(t, "h2c://svc-a:9002", 30*time.Second))
-	}
-	for i := 0; i < 2; i++ {
-		scheduler.subscribe(ctx, fmt.Sprintf("api-b-%d", i), planFor(t, "h2c://svc-b:9002", 30*time.Second))
-	}
-
-	// Ten subscriptions, and the scheduler has two hostnames to resolve.
-	for _, entry := range scheduler.entries {
-		scheduler.refresh(ctx, entry)
-	}
-
-	if got := resolver.callsFor("svc-a"); got != 1 {
-		t.Errorf("svc-a was resolved %d times for 8 subscribing APIs, want 1", got)
-	}
-	if got := resolver.callsFor("svc-b"); got != 1 {
-		t.Errorf("svc-b was resolved %d times for 2 subscribing APIs, want 1", got)
-	}
-
-	// A second cycle is also one lookup per hostname.
-	for _, entry := range scheduler.entries {
-		scheduler.refresh(ctx, entry)
-	}
-	if got := resolver.callsFor("svc-a"); got != 2 {
-		t.Errorf("svc-a was resolved %d times after two cycles, want 2", got)
-	}
-
-	if len(scheduler.entries) != 2 {
-		t.Errorf("scheduler holds %d entries for 10 APIs on 2 hostnames, want 2", len(scheduler.entries))
-	}
-}
-
-// TestScheduler_ReleaseDropsEntryWhenLastAPILeaves covers the reference
-// counting. An entry shared by two APIs has to survive one of them going away,
-// and disappear when the second does.
-func TestScheduler_ReleaseDropsEntryWhenLastAPILeaves(t *testing.T) {
-	resolver := newStubResolver()
-	resolver.set("svc", "10.0.0.1")
-
-	scheduler := newTestScheduler(resolver)
-	ctx := context.Background()
-
-	scheduler.subscribe(ctx, "api-1", planFor(t, "h2c://svc:9002", 30*time.Second))
-	scheduler.subscribe(ctx, "api-2", planFor(t, "h2c://svc:9002", 30*time.Second))
-
-	scheduler.releaseAPI("api-1")
-	if len(scheduler.entries) != 1 {
-		t.Fatalf("entry dropped while api-2 still wants it")
-	}
-
-	scheduler.releaseAPI("api-2")
-	if len(scheduler.entries) != 0 {
-		t.Fatalf("entry survived the last API leaving: %d entries", len(scheduler.entries))
-	}
-
-	// Releasing twice must not underflow the count or panic.
-	scheduler.releaseAPI("api-2")
-}
-
-// TestScheduler_RepointingAnAPIMovesItsSubscription covers a reload that
-// changes an API's upstream. The old hostname has to stop being refreshed when
-// nothing else points at it.
-func TestScheduler_RepointingAnAPIMovesItsSubscription(t *testing.T) {
-	resolver := newStubResolver()
-	resolver.set("old", "10.0.0.1")
-	resolver.set("new", "10.0.1.1")
-
-	scheduler := newTestScheduler(resolver)
-	ctx := context.Background()
-
-	scheduler.subscribe(ctx, "api-1", planFor(t, "h2c://old:9002", 30*time.Second))
-	scheduler.subscribe(ctx, "api-1", planFor(t, "h2c://new:9002", 30*time.Second))
-
-	if _, ok := scheduler.entries["old"]; ok {
-		t.Error("the previous hostname is still being refreshed after the API was repointed")
-	}
-	entry, ok := scheduler.entries["new"]
-	if !ok {
-		t.Fatal("the new hostname was not subscribed")
-	}
-	if entry.refs != 1 {
-		t.Errorf("new entry has %d references, want 1", entry.refs)
-	}
-}
-
-// TestScheduler_SharedHostnameTakesShortestInterval pins what happens when two
-// APIs share an upstream but ask for different refresh rates. They share one
-// refresh, so the most eager request has to win or that API silently gets a
-// slower one than it configured.
-func TestScheduler_SharedHostnameTakesShortestInterval(t *testing.T) {
-	resolver := newStubResolver()
-	resolver.set("svc", "10.0.0.1")
-
-	scheduler := newTestScheduler(resolver)
-	ctx := context.Background()
-
-	scheduler.subscribe(ctx, "api-slow", planFor(t, "h2c://svc:9002", 60*time.Second))
-	scheduler.subscribe(ctx, "api-fast", planFor(t, "h2c://svc:9002", 5*time.Second))
-
-	if got := scheduler.entries["svc"].interval; got != 5*time.Second {
-		t.Errorf("shared entry refreshes every %s, want the shortest requested 5s", got)
-	}
-}
-
-// TestScheduler_FailedLookupKeepsLastGoodAndBacksOff covers the first of the
-// two absence cases, and it is the one every comparable system agrees on. DNS
-// being unreachable says nothing about whether the pods are still there, so
-// discarding a working address set would turn a resolver outage into an API
-// outage.
-func TestScheduler_FailedLookupKeepsLastGoodAndBacksOff(t *testing.T) {
-	resolver := newStubResolver()
-	resolver.set("svc", "10.0.0.1", "10.0.0.2")
-
-	scheduler := newTestScheduler(resolver)
-	ctx := context.Background()
-
-	entry := subscribeAndRefresh(scheduler, ctx, "api-1", planFor(t, "h2c://svc:9002", 10*time.Second))
-	before := entry.addresses()
-	if before == nil || len(before.addrs) != 2 {
-		t.Fatalf("first resolution did not publish two addresses: %+v", before)
-	}
-
-	resolver.fail("svc", errors.New("servfail"))
-
-	firstBackoff := scheduler.refreshAndReportDelay(ctx, entry)
-	after := entry.addresses()
-	if after == nil || len(after.addrs) != 2 {
-		t.Fatalf("a failed lookup discarded the last good set: %+v", after)
-	}
-	if after.version != before.version {
-		t.Error("a failed lookup bumped the published version, which makes every API rebuild for nothing")
-	}
-
-	secondBackoff := scheduler.refreshAndReportDelay(ctx, entry)
-	if secondBackoff <= firstBackoff {
-		t.Errorf("consecutive failures did not back off: %s then %s", firstBackoff, secondBackoff)
-	}
-
-	// Recovery clears the backoff.
-	resolver.set("svc", "10.0.0.1", "10.0.0.2", "10.0.0.3")
-	scheduler.refresh(ctx, entry)
-	if entry.failures != 0 {
-		t.Errorf("failure count is %d after a successful lookup, want 0", entry.failures)
-	}
-	if got := entry.addresses(); got == nil || len(got.addrs) != 3 {
-		t.Fatalf("recovery did not publish the new set: %+v", got)
-	}
-}
-
-// TestScheduler_EmptyAnswerPublishesConfiguredName covers the second absence
-// case, which is deliberately not treated like the first.
-//
-// A successful answer with no records is information: the Service has no ready
-// endpoints. Envoy's STRICT_DNS drops the hosts outright there. Publishing the
-// configured hostname instead keeps the API on the behaviour it would have had
-// without the feature, rather than an empty target list that routes every
-// request to the no-healthy-upstreams sink.
-func TestScheduler_EmptyAnswerPublishesConfiguredName(t *testing.T) {
-	resolver := newStubResolver()
-	resolver.set("svc", "10.0.0.1", "10.0.0.2")
-
-	scheduler := newTestScheduler(resolver)
-	ctx := context.Background()
-
-	entry := subscribeAndRefresh(scheduler, ctx, "api-1", planFor(t, "h2c://svc:9002", 10*time.Second))
-
-	resolver.set("svc") // resolves, to nothing
-	scheduler.refresh(ctx, entry)
-
-	got := entry.addresses()
-	if got == nil {
-		t.Fatal("nothing published after an empty answer")
-	}
-	if len(got.addrs) != 1 || got.addrs[0] != "svc" {
-		t.Fatalf("published %v after an empty answer, want the configured name [svc]", got.addrs)
-	}
-}
-
-// TestScheduler_UnchangedAnswerDoesNotBumpVersion is what keeps the request
-// path cheap. CoreDNS shuffles its answers by default, so without sorting and
-// comparing, every refresh would look like a membership change and every API
-// would rebuild its target list.
-func TestScheduler_UnchangedAnswerDoesNotBumpVersion(t *testing.T) {
-	resolver := newStubResolver()
-	resolver.set("svc", "10.0.0.2", "10.0.0.1")
-
-	scheduler := newTestScheduler(resolver)
-	ctx := context.Background()
-
-	entry := subscribeAndRefresh(scheduler, ctx, "api-1", planFor(t, "h2c://svc:9002", 10*time.Second))
-	first := entry.addresses()
-
-	// Same addresses, different order, as a shuffling resolver returns.
-	resolver.set("svc", "10.0.0.1", "10.0.0.2")
-	scheduler.refresh(ctx, entry)
-
-	second := entry.addresses()
-	if second.version != first.version {
-		t.Errorf("a reordered but unchanged answer bumped the version from %d to %d",
-			first.version, second.version)
-	}
-	if second.addrs[0] != "10.0.0.1" {
-		t.Errorf("published set is not sorted: %v", second.addrs)
-	}
-}
-
-// newPlannedSpec builds a spec subscribed to host on the given scheduler.
-func newPlannedSpec(t *testing.T, scheduler *upstreamDNSScheduler, apiID, target string) *APISpec {
+// loadDiscoveredAPI sets an API up as the loader would, and resolves once so the
+// assertions do not race the scheduler's first pass.
+func loadDiscoveredAPI(t *testing.T, gw *Gateway, apiID, target string, configure ...func(*APISpec)) *APISpec {
 	t.Helper()
 
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
@@ -523,13 +321,20 @@ func newPlannedSpec(t *testing.T, scheduler *upstreamDNSScheduler, apiID, target
 	spec.Proxy.TargetURL = target
 	spec.Proxy.EnableLoadBalancing = true
 	spec.Proxy.DNSDiscovery.Enabled = true
-
-	plan := planUpstreamDNSDiscovery(spec, logrus.NewEntry(logrus.New()))
-	if plan == nil {
-		t.Fatalf("%s did not get a plan for %q", apiID, target)
+	spec.Proxy.DNSDiscovery.RefreshInterval = 3600
+	for _, fn := range configure {
+		fn(spec)
 	}
-	plan.entry = scheduler.subscribe(context.Background(), apiID, plan)
-	spec.dnsDiscovery = plan
+
+	logger := logrus.NewEntry(logrus.New())
+	logger.Logger.SetLevel(logrus.PanicLevel)
+
+	gw.setupUpstreamDNSDiscovery(spec, logger)
+	if spec.dnsDiscovery == nil {
+		t.Fatalf("%s was not subscribed to %q", apiID, target)
+	}
+
+	gw.upstreamDNS.Refresh(context.Background())
 	return spec
 }
 
@@ -540,16 +345,10 @@ func TestUrlFromDNS_RendersEachAPIsOwnTargets(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.2", "10.0.0.1")
 
-	gw := &Gateway{}
-	scheduler := &gw.upstreamDNS
-	configureTestScheduler(scheduler, resolver)
-	scheduler.running = true
+	gw := newDiscoveryGateway(t, resolver)
 
-	first := newPlannedSpec(t, scheduler, "api-1", "h2c://svc:9002")
-	second := newPlannedSpec(t, scheduler, "api-2", "h2c://svc:9002/v2")
-
-	// Two APIs, one hostname, one refresh between them.
-	scheduler.refresh(context.Background(), first.dnsDiscovery.entry)
+	first := loadDiscoveredAPI(t, gw, "api-1", "h2c://svc:9002")
+	second := loadDiscoveredAPI(t, gw, "api-2", "h2c://svc:9002/v2")
 
 	firstList, err := gw.urlFromDNS(first)
 	if err != nil {
@@ -572,27 +371,17 @@ func TestUrlFromDNS_RendersEachAPIsOwnTargets(t *testing.T) {
 	if want := "h2c://10.0.0.1:9002/v2"; secondEntry != want {
 		t.Errorf("second target is %q, want %q (each API renders its own path)", secondEntry, want)
 	}
-
-	if got := resolver.callsFor("svc"); got != 1 {
-		t.Errorf("svc was resolved %d times for two APIs, want 1", got)
-	}
 }
 
 // TestUrlFromDNS_ReusesRenderedListUntilMembershipChanges pins the request-path
-// cache. Rebuilding a target list per request would allocate on every proxied
-// request for no reason, since membership changes on the order of the refresh
-// interval rather than the request rate.
+// cache: membership changes on the order of the refresh interval, not the
+// request rate, so rebuilding per request would allocate for nothing.
 func TestUrlFromDNS_ReusesRenderedListUntilMembershipChanges(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1")
 
-	gw := &Gateway{}
-	scheduler := &gw.upstreamDNS
-	configureTestScheduler(scheduler, resolver)
-	scheduler.running = true
-
-	spec := newPlannedSpec(t, scheduler, "api-1", "h2c://svc:9002")
-	scheduler.refresh(context.Background(), spec.dnsDiscovery.entry)
+	gw := newDiscoveryGateway(t, resolver)
+	spec := loadDiscoveredAPI(t, gw, "api-1", "h2c://svc:9002")
 
 	first, _ := gw.urlFromDNS(spec)
 	second, _ := gw.urlFromDNS(spec)
@@ -601,7 +390,7 @@ func TestUrlFromDNS_ReusesRenderedListUntilMembershipChanges(t *testing.T) {
 	}
 
 	resolver.set("svc", "10.0.0.1", "10.0.0.2")
-	scheduler.refresh(context.Background(), spec.dnsDiscovery.entry)
+	gw.upstreamDNS.Refresh(context.Background())
 
 	third, _ := gw.urlFromDNS(spec)
 	if third == second {
@@ -612,250 +401,752 @@ func TestUrlFromDNS_ReusesRenderedListUntilMembershipChanges(t *testing.T) {
 	}
 }
 
-// TestUrlFromDNS_FallsBackBeforeFirstResolution covers the window between an
-// API loading and its first answer arriving. It should behave as it does today
-// rather than having no targets.
-func TestUrlFromDNS_FallsBackBeforeFirstResolution(t *testing.T) {
-	gw := &Gateway{}
-	configureTestScheduler(&gw.upstreamDNS, newStubResolver())
-	gw.upstreamDNS.running = true
+// TestUrlFromDNS_FallsBackToTheConfiguredTarget covers every case with no
+// addresses to use. They differ in the log and not on the request path: each
+// leaves the API as it would have been without the feature, rather than with an
+// empty list that routes to the no-healthy-upstreams sink.
+func TestUrlFromDNS_FallsBackToTheConfiguredTarget(t *testing.T) {
+	cases := []struct {
+		name    string
+		prepare func(*stubResolver)
+	}{
+		{"nothing resolved yet", nil},
+		{"the name answered with no addresses", func(r *stubResolver) { r.set("svc") }},
+		{"the name does not exist", func(r *stubResolver) {
+			r.fail("svc", &net.DNSError{Err: "no such host", Name: "svc", IsNotFound: true})
+		}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			resolver := newStubResolver()
+			gw := newDiscoveryGateway(t, resolver)
+
+			spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+			spec.APIID = "api-1"
+			spec.Proxy.TargetURL = "h2c://svc:9002"
+			spec.Proxy.EnableLoadBalancing = true
+			spec.Proxy.DNSDiscovery.Enabled = true
+
+			logger := logrus.NewEntry(logrus.New())
+			logger.Logger.SetLevel(logrus.PanicLevel)
+			gw.setupUpstreamDNSDiscovery(spec, logger)
+
+			if tc.prepare != nil {
+				tc.prepare(resolver)
+				gw.upstreamDNS.Refresh(context.Background())
+			}
+
+			list, err := gw.urlFromDNS(spec)
+			if err != nil {
+				t.Fatalf("urlFromDNS: %v", err)
+			}
+			if list.Len() != 1 {
+				t.Fatalf("list holds %d entries, want the configured target only", list.Len())
+			}
+			entry, _ := list.GetIndex(0)
+			if entry != "h2c://svc:9002" {
+				t.Errorf("fell back to %q, want the configured target", entry)
+			}
+		})
+	}
+}
+
+// TestSetupUpstreamDNSDiscovery_ReleasesOnReconfigure covers a reload that turns
+// the feature off. A reload replaces a definition rather than unloading it, so
+// nothing else would release the subscription.
+func TestSetupUpstreamDNSDiscovery_ReleasesOnReconfigure(t *testing.T) {
+	resolver := newStubResolver()
+	resolver.set("svc", "10.0.0.1")
+
+	gw := newDiscoveryGateway(t, resolver)
+	spec := loadDiscoveredAPI(t, gw, "api-1", "h2c://svc:9002")
+
+	logger := logrus.NewEntry(logrus.New())
+	logger.Logger.SetLevel(logrus.PanicLevel)
+
+	spec.Proxy.DNSDiscovery.Enabled = false
+	gw.setupUpstreamDNSDiscovery(spec, logger)
+
+	if spec.dnsDiscovery != nil {
+		t.Fatal("the API kept its plan after discovery was switched off")
+	}
+	if got := gw.upstreamDNS.Lookups(); got == 0 {
+		t.Skip("nothing was resolved, so there is nothing to assert about release")
+	}
+
+	// A resolution now must reach no entries, which is observable as the
+	// lookup count staying put.
+	before := gw.upstreamDNS.Lookups()
+	gw.upstreamDNS.Refresh(context.Background())
+	if after := gw.upstreamDNS.Lookups(); after != before {
+		t.Errorf("the hostname is still being resolved after the API stopped wanting it: %d lookups", after-before)
+	}
+}
+
+// TestUpstreamConnRegistry_DrainsDepartedAddresses: a connection to a departed
+// address is closed once its deadline passes, one to an address that stays is
+// not.
+func TestUpstreamConnRegistry_DrainsDepartedAddresses(t *testing.T) {
+	registry := newUpstreamConnRegistry()
+
+	departing, departingPeer := net.Pipe()
+	staying, stayingPeer := net.Pipe()
+	defer departingPeer.Close()
+	defer stayingPeer.Close()
+
+	trackedDeparting := registry.track("10.0.0.1:9002", departing)
+	trackedStaying := registry.track("10.0.0.2:9002", staying)
+
+	if got := registry.countFor("10.0.0.1:9002"); got != 1 {
+		t.Fatalf("registry holds %d connections for the dialled address, want 1", got)
+	}
+
+	registry.drain("10.0.0.1:9002", time.Millisecond)
+
+	if !closedWithin(t, trackedDeparting, time.Second) {
+		t.Fatal("the connection to a departed address was not closed after its drain deadline")
+	}
+	if closedWithin(t, trackedStaying, 50*time.Millisecond) {
+		t.Fatal("draining one address closed a connection to another")
+	}
+	if got := registry.countFor("10.0.0.1:9002"); got != 0 {
+		t.Errorf("registry still holds %d connections for a drained address", got)
+	}
+}
+
+// TestUpstreamConnRegistry_DrainIsDeferredNotImmediate: a pod removed from a
+// Service keeps serving until its grace period ends, so a request in flight has
+// to be allowed to finish.
+func TestUpstreamConnRegistry_DrainIsDeferredNotImmediate(t *testing.T) {
+	registry := newUpstreamConnRegistry()
+
+	conn, peer := net.Pipe()
+	defer peer.Close()
+
+	tracked := registry.track("10.0.0.1:9002", conn)
+	registry.drain("10.0.0.1:9002", time.Hour)
+
+	if closedWithin(t, tracked, 50*time.Millisecond) {
+		t.Fatal("the connection was closed immediately, so an in-flight request would be cut")
+	}
+}
+
+// TestUpstreamConnRegistry_ReturningAddressCancelsItsDrain: a rolling update
+// that removes and restores an address inside the deadline keeps its
+// connection.
+func TestUpstreamConnRegistry_ReturningAddressCancelsItsDrain(t *testing.T) {
+	registry := newUpstreamConnRegistry()
+
+	conn, peer := net.Pipe()
+	defer peer.Close()
+
+	tracked := registry.track("10.0.0.1:9002", conn)
+	registry.drain("10.0.0.1:9002", 30*time.Millisecond)
+	registry.cancelDrain("10.0.0.1:9002")
+
+	if closedWithin(t, tracked, 200*time.Millisecond) {
+		t.Fatal("a cancelled drain still closed the connection")
+	}
+}
+
+// TestUpstreamConnRegistry_CloseRetiresWithoutSevering covers API unload.
+//
+// Unload has already retired both connection pools, which closes every idle
+// connection, so what the registry still holds is the set with requests on
+// them. Closing those would cut streams mid-flight, which is what the drain
+// deadline exists to avoid, and they close themselves once their last stream
+// ends. What close must do is stop the pending drains and stop tracking.
+func TestUpstreamConnRegistry_CloseRetiresWithoutSevering(t *testing.T) {
+	registry := newUpstreamConnRegistry()
+
+	inFlight, inFlightPeer := net.Pipe()
+	defer inFlightPeer.Close()
+	defer inFlight.Close()
+
+	tracked := registry.track("10.0.0.1:9002", inFlight)
+	registry.drain("10.0.0.2:9002", 10*time.Millisecond)
+
+	registry.close()
+
+	if closedWithin(t, tracked, 200*time.Millisecond) {
+		t.Error("unloading the API severed a connection that still had a request on it")
+	}
+	if got := registry.countFor("10.0.0.1:9002"); got != 0 {
+		t.Errorf("a closed registry still tracks %d connections", got)
+	}
+
+	// A connection dialled afterwards is not retained, so an unloaded API
+	// cannot leak through a dialler that outlives it.
+	late, latePeer := net.Pipe()
+	defer latePeer.Close()
+	defer late.Close()
+
+	registry.track("10.0.0.3:9002", late)
+	if got := registry.countFor("10.0.0.3:9002"); got != 0 {
+		t.Errorf("a closed registry tracked %d new connections", got)
+	}
+}
+
+// TestUpstreamConnRegistry_RedialBeatsAnExpiringDrain is a race regression
+// test.
+//
+// time.Timer.Stop cannot take back a timer that has already fired, so a drain
+// whose deadline arrives at the moment the address is re-dialled has a callback
+// in flight that track cannot cancel. Left unguarded it closes the connection
+// that was just established, which is the opposite of what the deadline is for.
+func TestUpstreamConnRegistry_RedialBeatsAnExpiringDrain(t *testing.T) {
+	const addr = "10.0.0.1:9002"
+
+	closedFresh := 0
+	const attempts = 200
+
+	for i := 0; i < attempts; i++ {
+		registry := newUpstreamConnRegistry()
+
+		departing, departingPeer := net.Pipe()
+		registry.track(addr, departing)
+		registry.drain(addr, 2*time.Millisecond)
+
+		// Re-dial as the deadline arrives, as a returning address does.
+		time.Sleep(2 * time.Millisecond)
+		fresh, freshPeer := net.Pipe()
+		tracked := registry.track(addr, fresh)
+
+		time.Sleep(10 * time.Millisecond)
+		if closedWithin(t, tracked, 5*time.Millisecond) {
+			closedFresh++
+		}
+
+		departingPeer.Close()
+		freshPeer.Close()
+		registry.close()
+	}
+
+	if closedFresh > 0 {
+		t.Errorf("%d of %d connections re-dialled as the drain expired were closed by the drain that "+
+			"track was supposed to have cancelled", closedFresh, attempts)
+	}
+}
+
+// TestUpstreamConnRegistry_PoolCloseDeregisters: a connection the pool retires
+// on its own idle timeout must not stay on the registry's books.
+func TestUpstreamConnRegistry_PoolCloseDeregisters(t *testing.T) {
+	registry := newUpstreamConnRegistry()
+
+	conn, peer := net.Pipe()
+	defer peer.Close()
+
+	tracked := registry.track("10.0.0.1:9002", conn)
+	if err := tracked.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+
+	if got := registry.countFor("10.0.0.1:9002"); got != 0 {
+		t.Errorf("registry holds %d connections after the pool closed one", got)
+	}
+}
+
+// TestPlanDrainsOnMembershipChange joins the two halves: the address set moves
+// and departed connections drain, with no request involved.
+func TestPlanDrainsOnMembershipChange(t *testing.T) {
+	resolver := newStubResolver()
+	resolver.set("svc", "10.0.0.1", "10.0.0.2")
+
+	gw := newDiscoveryGateway(t, resolver)
+	spec := loadDiscoveredAPI(t, gw, "api-1", "h2c://svc:9002", func(spec *APISpec) {
+		spec.Proxy.DNSDiscovery.DrainDeadline = 1
+	})
+
+	plan := spec.dnsDiscovery
+	departing, departingPeer := net.Pipe()
+	staying, stayingPeer := net.Pipe()
+	defer departingPeer.Close()
+	defer stayingPeer.Close()
+
+	trackedDeparting := plan.conns.track("10.0.0.1:9002", departing)
+	trackedStaying := plan.conns.track("10.0.0.2:9002", staying)
+
+	// A scale-down: one pod leaves the Service.
+	resolver.set("svc", "10.0.0.2")
+	gw.upstreamDNS.Refresh(context.Background())
+
+	if !closedWithin(t, trackedDeparting, 5*time.Second) {
+		t.Fatal("the connection to the departed pod was never closed")
+	}
+	if closedWithin(t, trackedStaying, 100*time.Millisecond) {
+		t.Fatal("the connection to the remaining pod was closed too")
+	}
+}
+
+// closedWithin reports whether conn has been closed within d, by writing to it
+// until the write fails.
+func closedWithin(t *testing.T, conn net.Conn, d time.Duration) bool {
+	t.Helper()
+
+	deadline := time.Now().Add(d)
+	for {
+		if err := conn.SetWriteDeadline(time.Now().Add(time.Millisecond)); err != nil {
+			return true
+		}
+		_, err := conn.Write([]byte{0})
+		if err != nil && !errors.Is(err, os.ErrDeadlineExceeded) {
+			return true
+		}
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// TestUpstreamDNSDiscoveryEnabled covers the guard the Director uses, which
+// everything else here assumes.
+func TestUpstreamDNSDiscoveryEnabled(t *testing.T) {
+	if upstreamDNSDiscoveryEnabled(nil) {
+		t.Error("a nil spec reported discovery enabled")
+	}
 
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
-	spec.APIID = "api-1"
-	spec.Proxy.TargetURL = "h2c://svc:9002"
-	spec.Proxy.EnableLoadBalancing = true
-	spec.Proxy.DNSDiscovery.Enabled = true
-	spec.dnsDiscovery = planUpstreamDNSDiscovery(spec, logrus.NewEntry(logrus.New()))
-	spec.dnsDiscovery.entry = &dnsDiscoveryEntry{host: "svc"} // nothing published
+	if upstreamDNSDiscoveryEnabled(spec) {
+		t.Error("an API with no plan reported discovery enabled")
+	}
+
+	spec.dnsDiscovery = &dnsDiscoveryPlan{}
+	if !upstreamDNSDiscoveryEnabled(spec) {
+		t.Error("an API with a plan reported discovery disabled")
+	}
+}
+
+// TestUpstreamTargetList_SourcePrecedence pins which source supplies the target
+// list, for every combination an API can be loaded with.
+//
+// The service discovery cases are a regression test: adding DNS discovery in the
+// middle of a chain of cases that fell through to each other silently replaced
+// the registry list with the static one, which is a 503 per request with load
+// balancing on and a nil dereference with it off.
+func TestUpstreamTargetList_SourcePrecedence(t *testing.T) {
+	registryList := apidef.NewHostListFromList([]string{"http://registry-1:8080", "http://registry-2:8080"})
+
+	newGateway := func() *Gateway {
+		gw := &Gateway{}
+		gw.SetConfig(config.Config{}, true)
+		return gw
+	}
+
+	newSpec := func(t *testing.T, gw *Gateway, configure func(*APISpec)) *APISpec {
+		t.Helper()
+
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+		spec.APIID = "api-1"
+		spec.Proxy.TargetURL = "http://svc:8080"
+		configure(spec)
+		return spec
+	}
+
+	// Service discovery reads from the cache when it has run, so a primed cache
+	// stands in for the registry without an HTTP endpoint.
+	primeRegistry := func(gw *Gateway, spec *APISpec) {
+		gw.ServiceCache = cache.New(30, 15)
+		gw.ServiceCache.Set(spec.APIID, registryList, 30)
+		spec.HasRun = true
+		spec.LastGoodHostList = registryList
+	}
+
+	logger := logrus.NewEntry(logrus.New())
+	logger.Logger.SetLevel(logrus.PanicLevel)
+
+	t.Run("service discovery supersedes a static list", func(t *testing.T) {
+		gw := newGateway()
+		spec := newSpec(t, gw, func(spec *APISpec) {
+			spec.Proxy.EnableLoadBalancing = true
+			spec.Proxy.Targets = []string{"http://static:8080"}
+			spec.Proxy.StructuredTargetList = apidef.NewHostListFromList(spec.Proxy.Targets)
+			spec.Proxy.ServiceDiscovery.UseDiscoveryService = true
+		})
+		primeRegistry(gw, spec)
+
+		list := gw.upstreamTargetList(spec, logger)
+		if list == nil {
+			t.Fatal("service discovery produced no target list")
+		}
+		got, _ := list.GetIndex(0)
+		if got != "http://registry-1:8080" {
+			t.Fatalf("first target is %q, want the registry's first entry", got)
+		}
+	})
+
+	t.Run("service discovery with load balancing off", func(t *testing.T) {
+		gw := newGateway()
+		spec := newSpec(t, gw, func(spec *APISpec) {
+			// StructuredTargetList is only built for APIs that enable load
+			// balancing, so this is the case where clobbering the registry list
+			// leaves a nil one behind.
+			spec.Proxy.ServiceDiscovery.UseDiscoveryService = true
+		})
+		primeRegistry(gw, spec)
+
+		list := gw.upstreamTargetList(spec, logger)
+		if list == nil {
+			t.Fatal("service discovery produced no target list with load balancing off")
+		}
+		if list.Len() != 2 {
+			t.Fatalf("target list holds %d entries, want the registry's 2", list.Len())
+		}
+	})
+
+	t.Run("an unreachable registry falls back to the configured target", func(t *testing.T) {
+		gw := newGateway()
+		spec := newSpec(t, gw, func(spec *APISpec) {
+			spec.Proxy.EnableLoadBalancing = true
+			spec.Proxy.ServiceDiscovery.UseDiscoveryService = true
+			spec.Proxy.ServiceDiscovery.QueryEndpoint = "http://127.0.0.1:1/nothing-here"
+		})
+		gw.ServiceCache = cache.New(30, 15)
+
+		if list := gw.upstreamTargetList(spec, logger); list != nil {
+			t.Fatalf("a failed registry lookup produced a target list: %v", list.All())
+		}
+	})
+
+	t.Run("DNS discovery when no registry is configured", func(t *testing.T) {
+		resolver := newStubResolver()
+		resolver.set("svc", "10.0.0.1")
+
+		gw := newDiscoveryGateway(t, resolver)
+		spec := loadDiscoveredAPI(t, gw, "api-1", "h2c://svc:9002")
+
+		list := gw.upstreamTargetList(spec, logger)
+		if list == nil {
+			t.Fatal("DNS discovery produced no target list")
+		}
+		got, _ := list.GetIndex(0)
+		if got != "h2c://10.0.0.1:9002" {
+			t.Fatalf("first target is %q, want the resolved pod address", got)
+		}
+	})
+
+	t.Run("a static list when nothing else is configured", func(t *testing.T) {
+		gw := newGateway()
+		spec := newSpec(t, gw, func(spec *APISpec) {
+			spec.Proxy.EnableLoadBalancing = true
+			spec.Proxy.Targets = []string{"http://static:8080"}
+			spec.Proxy.StructuredTargetList = apidef.NewHostListFromList(spec.Proxy.Targets)
+		})
+
+		list := gw.upstreamTargetList(spec, logger)
+		if list == nil || list.Len() != 1 {
+			t.Fatalf("static target list was not returned: %v", list)
+		}
+	})
+
+	t.Run("no source at all", func(t *testing.T) {
+		gw := newGateway()
+		spec := newSpec(t, gw, func(spec *APISpec) {})
+
+		if list := gw.upstreamTargetList(spec, logger); list != nil {
+			t.Fatalf("an API with no source produced a target list: %v", list.All())
+		}
+	})
+}
+
+// TestH2CTransport_HealthChecksDiscoveredUpstreams covers dead-peer detection. A
+// backend that dies without closing its side leaves a connection the pool still
+// believes in, and requests multiplexed onto it hang until their own timeout;
+// with a connection per backend that is a share of the traffic. Pings are
+// enabled only for discovered upstreams, which is where the pool holds one
+// connection per backend.
+func TestH2CTransport_HealthChecksDiscoveredUpstreams(t *testing.T) {
+	resolver := newStubResolver()
+	resolver.set("svc", "10.0.0.1")
+
+	newTransport := func(t *testing.T, gw *Gateway, spec *APISpec) *TykRoundTripper {
+		t.Helper()
+
+		gw.SetConfig(config.Config{}, true)
+		gw.dnsCacheManager = dnscache.NewDnsCacheManager(gw.GetConfig().DnsCache.MultipleIPsHandleStrategy)
+
+		proxy := &ReverseProxy{TykAPISpec: spec, Gw: gw, logger: logrus.NewEntry(logrus.New())}
+		proxy.logger.Logger.SetLevel(logrus.PanicLevel)
+
+		req := httptest.NewRequest(http.MethodPost, "http://svc:9002/greet", nil)
+		outReq := req.Clone(req.Context())
+		outReq.URL.Scheme = "h2c"
+
+		rt := proxy.httpTransport(30, httptest.NewRecorder(), req, outReq)
+		if rt.h2ctransport == nil {
+			t.Fatal("no h2c transport was built for an h2c request")
+		}
+		return rt
+	}
+
+	t.Run("discovered upstream", func(t *testing.T) {
+		gw := newDiscoveryGateway(t, resolver)
+		spec := loadDiscoveredAPI(t, gw, "api-1", "h2c://svc:9002")
+
+		rt := newTransport(t, gw, spec)
+		if rt.h2ctransport.ReadIdleTimeout != defaultH2CReadIdleTimeout {
+			t.Errorf("ReadIdleTimeout is %s, want %s: a dead backend would go unnoticed",
+				rt.h2ctransport.ReadIdleTimeout, defaultH2CReadIdleTimeout)
+		}
+		if rt.h2ctransport.IdleConnTimeout != defaultH2CIdleConnTimeout {
+			t.Errorf("IdleConnTimeout is %s, want %s", rt.h2ctransport.IdleConnTimeout, defaultH2CIdleConnTimeout)
+		}
+	})
+
+	t.Run("ordinary h2c upstream is unchanged", func(t *testing.T) {
+		gw := &Gateway{}
+
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+		spec.APIID = "api-2"
+		spec.Proxy.TargetURL = "h2c://svc:9002"
+
+		rt := newTransport(t, gw, spec)
+		if rt.h2ctransport.ReadIdleTimeout != 0 {
+			t.Errorf("ReadIdleTimeout is %s for an API that did not opt into discovery, want 0",
+				rt.h2ctransport.ReadIdleTimeout)
+		}
+	})
+}
+
+// TestUrlFromDNS_HoldsTheLastGoodSetWhileTheResolverIsDown is the gateway half
+// of the stale TTL: an unreachable resolver says nothing about whether the
+// backends are still there, so the addresses already found stay in the target
+// list until the bound expires.
+func TestUrlFromDNS_HoldsTheLastGoodSetWhileTheResolverIsDown(t *testing.T) {
+	resolver := newStubResolver()
+	resolver.set("svc", "10.0.0.1", "10.0.0.2")
+
+	gw := newDiscoveryGateway(t, resolver)
+
+	clock := newTestClock()
+	gw.upstreamDNS.Now = clock.now
+
+	spec := loadDiscoveredAPI(t, gw, "api-1", "h2c://svc:9002", func(spec *APISpec) {
+		spec.Proxy.DNSDiscovery.StaleTTL = 60
+	})
+
+	resolver.fail("svc", errors.New("i/o timeout"))
+
+	clock.advance(30 * time.Second)
+	gw.upstreamDNS.Refresh(context.Background())
 
 	list, err := gw.urlFromDNS(spec)
 	if err != nil {
 		t.Fatalf("urlFromDNS: %v", err)
 	}
-	if list.Len() != 1 {
-		t.Fatalf("list holds %d entries before the first resolution, want 1", list.Len())
+	if list.Len() != 2 {
+		t.Fatalf("target list holds %d entries thirty seconds into a sixty second stale TTL, want the 2 already found", list.Len())
 	}
-	entry, _ := list.GetIndex(0)
-	if entry != "h2c://svc:9002" {
+
+	// Past the bound the addresses are withdrawn and the API falls back, which
+	// is the configured target rather than an empty list.
+	clock.advance(90 * time.Second)
+	gw.upstreamDNS.Refresh(context.Background())
+
+	list, err = gw.urlFromDNS(spec)
+	if err != nil {
+		t.Fatalf("urlFromDNS: %v", err)
+	}
+	if list.Len() != 1 {
+		t.Fatalf("target list holds %d entries past the stale TTL, want the configured target only", list.Len())
+	}
+	if entry, _ := list.GetIndex(0); entry != "h2c://svc:9002" {
 		t.Errorf("fell back to %q, want the configured target", entry)
 	}
 }
 
-// TestScheduler_DiscoversWithoutTraffic is the property that resolving on
-// request cannot provide, and the reason the design moved back to a background
-// refresh. No request is made here at all.
-func TestScheduler_DiscoversWithoutTraffic(t *testing.T) {
+// TestPlanDrains_ForEveryAPIOnASharedHostname covers two APIs behind one
+// Service, which is the case the shared entry exists for.
+//
+// The second API subscribes to a name that is already resolved, so it is only
+// told about membership when it next changes. Without the set it joined, it
+// computes that change against nothing and does not recognise the address as
+// having departed — so its own connection to a terminating pod is never
+// drained, however the deadline is set.
+func TestPlanDrains_ForEveryAPIOnASharedHostname(t *testing.T) {
+	resolver := newStubResolver()
+	resolver.set("svc", "10.0.0.1", "10.0.0.2")
+
+	gw := newDiscoveryGateway(t, resolver)
+
+	first := loadDiscoveredAPI(t, gw, "api-1", "h2c://svc:9002", func(spec *APISpec) {
+		spec.Proxy.DNSDiscovery.DrainDeadline = 1
+	})
+	second := loadDiscoveredAPI(t, gw, "api-2", "h2c://svc:9002", func(spec *APISpec) {
+		spec.Proxy.DNSDiscovery.DrainDeadline = 1
+	})
+
+	firstConn, firstPeer := net.Pipe()
+	secondConn, secondPeer := net.Pipe()
+	defer firstPeer.Close()
+	defer secondPeer.Close()
+
+	trackedFirst := first.dnsDiscovery.conns.track("10.0.0.1:9002", firstConn)
+	trackedSecond := second.dnsDiscovery.conns.track("10.0.0.1:9002", secondConn)
+
+	// The pod leaves the Service.
+	resolver.set("svc", "10.0.0.2")
+	gw.upstreamDNS.Refresh(context.Background())
+
+	if !closedWithin(t, trackedFirst, 5*time.Second) {
+		t.Error("the first API never closed its connection to the departed pod")
+	}
+	if !closedWithin(t, trackedSecond, 5*time.Second) {
+		t.Error("the second API never closed its connection to the departed pod; " +
+			"it joined a hostname that was already resolved, so it had no set to compare against")
+	}
+}
+
+// TestSetupUpstreamDNSDiscovery_RefusedCombinationsKeepServing covers an API
+// that loads from storage with a configuration the create endpoint would have
+// refused. A definition already stored cannot be rejected, so the API keeps
+// serving on its configured target and the reason is logged.
+func TestSetupUpstreamDNSDiscovery_RefusedCombinationsKeepServing(t *testing.T) {
+	cases := []struct {
+		name      string
+		configure func(*APISpec)
+		wantLog   string
+	}{
+		{
+			name:      "without load balancing",
+			configure: func(spec *APISpec) { spec.Proxy.EnableLoadBalancing = false },
+			wantLog:   "requires enable_load_balancing",
+		},
+		{
+			name: "alongside service discovery",
+			configure: func(spec *APISpec) {
+				spec.Proxy.ServiceDiscovery.UseDiscoveryService = true
+			},
+			wantLog: "cannot be enabled together",
+		},
+		{
+			name:      "a non-h2c upstream",
+			configure: func(spec *APISpec) { spec.Proxy.TargetURL = "http://svc:8080" },
+			wantLog:   "only supports h2c upstreams",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			resolver := newStubResolver()
+			resolver.set("svc", "10.0.0.1", "10.0.0.2")
+			gw := newDiscoveryGateway(t, resolver)
+
+			spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+			spec.APIID = "api-1"
+			spec.Proxy.TargetURL = "h2c://svc:9002"
+			spec.Proxy.EnableLoadBalancing = true
+			spec.Proxy.DNSDiscovery.Enabled = true
+			tc.configure(spec)
+
+			log, hook := logrustest.NewNullLogger()
+			logger := logrus.NewEntry(log)
+			gw.setupUpstreamDNSDiscovery(spec, logger)
+
+			if spec.dnsDiscovery != nil {
+				t.Fatal("DNS discovery was enabled for a configuration that cannot work")
+			}
+
+			// The API is left exactly as it would be without the feature: no
+			// source, so the Director uses the configured target. An API that
+			// was refused for having service discovery on is the exception —
+			// it keeps the source it already had, which is the point of
+			// leaving that one running.
+			if !spec.Proxy.ServiceDiscovery.UseDiscoveryService {
+				if list := gw.upstreamTargetList(spec, logger); list != nil {
+					t.Errorf("a refused API produced a target list: %v", list.All())
+				}
+			}
+
+			var logged bool
+			for _, entry := range hook.AllEntries() {
+				logged = logged || strings.Contains(entry.Message, tc.wantLog)
+			}
+			if !logged {
+				t.Errorf("no log line naming the reason; wanted one containing %q", tc.wantLog)
+			}
+		})
+	}
+}
+
+// TestDirector_SendsTheServiceNameAsTheAuthority covers the split between what
+// is dialled and what is claimed.
+//
+// The pool keys on req.URL.Host while the authority comes from req.Host, so the
+// address varies to give a connection per backend and the name is held steady
+// so each backend sees the authority it expects. A pod reporting its own
+// address breaks anything routing on :authority or checking a certificate
+// against it.
+func TestDirector_SendsTheServiceNameAsTheAuthority(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1")
 
-	scheduler := newTestScheduler(resolver)
-	// Let the real loop run, at an interval short enough to observe.
-	scheduler.running = false
+	newProxy := func(t *testing.T, configure ...func(*APISpec)) *ReverseProxy {
+		t.Helper()
 
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+		gw := newDiscoveryGateway(t, resolver)
+		gw.SetConfig(config.Config{}, true)
 
-	entry := scheduler.subscribe(ctx, "api-1", planFor(t, "h2c://svc:9002", 20*time.Millisecond))
-	resolver.set("svc", "10.0.0.1", "10.0.0.2")
+		spec := loadDiscoveredAPI(t, gw, "api-1", "h2c://svc:9002", configure...)
 
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		if set := entry.addresses(); set != nil && len(set.addrs) == 2 {
-			return
+		target, err := url.Parse(spec.Proxy.TargetURL)
+		if err != nil {
+			t.Fatalf("parse target: %v", err)
 		}
-		time.Sleep(10 * time.Millisecond)
+
+		logger := logrus.NewEntry(logrus.New())
+		logger.Logger.SetLevel(logrus.PanicLevel)
+		return gw.TykNewSingleHostReverseProxy(target, spec, logger)
 	}
 
-	t.Fatalf("the scheduler did not pick up the second address without any traffic; published %+v",
-		entry.addresses())
+	t.Run("the address is dialled and the service name is claimed", func(t *testing.T) {
+		proxy := newProxy(t)
+
+		req := httptest.NewRequest(http.MethodPost, "http://gateway/greet", nil)
+		proxy.Director(req)
+
+		if req.URL.Host != "10.0.0.1:9002" {
+			t.Errorf("dialling %q, want the resolved pod address", req.URL.Host)
+		}
+		if req.Host != "svc:9002" {
+			t.Errorf("authority is %q, want the configured service name", req.Host)
+		}
+		if req.URL.Scheme != "h2c" {
+			t.Errorf("scheme is %q, want h2c: rewriting it sends a gRPC upstream HTTP/1.1", req.URL.Scheme)
+		}
+	})
+
+	t.Run("preserve_host_header still wins", func(t *testing.T) {
+		proxy := newProxy(t, func(spec *APISpec) { spec.Proxy.PreserveHostHeader = true })
+
+		req := httptest.NewRequest(http.MethodPost, "http://caller.example.com/greet", nil)
+		req.Host = "caller.example.com"
+		proxy.Director(req)
+
+		if req.Host != "caller.example.com" {
+			t.Errorf("authority is %q; preserve_host_header asked for the client's own Host", req.Host)
+		}
+		if req.URL.Host != "10.0.0.1:9002" {
+			t.Errorf("dialling %q, want the resolved pod address", req.URL.Host)
+		}
+	})
 }
 
-// TestScheduler_ShortIntervalIsNotStarvedByLongOne pins the scheduling rule
-// that a hostname is refreshed on its own interval regardless of what else is
-// registered.
+// TestBuildUpstreamTarget_KeepsTheConfiguredQuery pins that the query string on
+// target_url survives into the rendered entries.
 //
-// The first implementation computed how long to sleep before performing the
-// refreshes that were due, so the entries it had just refreshed did not
-// contribute their new deadlines. With one hostname on 5 seconds and another on
-// 300, the sleep was taken from the 300 and the eager hostname was refreshed
-// once every 300 seconds instead. A single-entry test cannot see it.
-func TestScheduler_ShortIntervalIsNotStarvedByLongOne(t *testing.T) {
-	resolver := newStubResolver()
-	resolver.set("fast", "10.0.0.1")
-	resolver.set("slow", "10.0.1.1")
-
-	scheduler := newTestScheduler(resolver)
-	scheduler.running = false
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	// The slow hostname is registered first, so its deadline is the one a
-	// naive minimum would pick up.
-	scheduler.subscribe(ctx, "api-slow", planFor(t, "h2c://slow:9002", time.Hour))
-	scheduler.subscribe(ctx, "api-fast", planFor(t, "h2c://fast:9002", 20*time.Millisecond))
-
-	// One lookup each from the synchronous first resolution.
-	before := resolver.callsFor("fast")
-
-	deadline := time.Now().Add(5 * time.Second)
-	for time.Now().Before(deadline) {
-		if resolver.callsFor("fast") >= before+3 {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-
-	t.Fatalf("the 20ms hostname was refreshed %d times in 5s (want at least %d); "+
-		"an hour-long interval on an unrelated hostname is deciding how often it runs",
-		resolver.callsFor("fast")-before, 3)
-}
-
-// newPlan builds a plan for target with an explicit interval, bypassing the
-// configured floor so a test can use a short one. Usable from benchmarks too,
-// which is why it takes no testing handle.
-func newPlan(target string, interval time.Duration) *dnsDiscoveryPlan {
-	u, err := url.Parse(target)
+// The Director takes its query from whichever entry the picker returned, so an
+// entry built without one drops the configured query for the request that
+// picked it.
+func TestBuildUpstreamTarget_KeepsTheConfiguredQuery(t *testing.T) {
+	target, err := url.Parse("h2c://svc:9002/base?tenant=acme")
 	if err != nil {
-		panic("newPlan: " + err.Error())
-	}
-	host, port := splitUpstreamHostPort(u)
-	return &dnsDiscoveryPlan{
-		target:   u,
-		host:     host,
-		port:     port,
-		interval: interval,
-		fallback: apidef.NewHostListFromList([]string{target}),
-	}
-}
-
-// planFor is newPlan with a test handle, for readability at call sites.
-func planFor(t *testing.T, target string, interval time.Duration) *dnsDiscoveryPlan {
-	t.Helper()
-	return newPlan(target, interval)
-}
-
-// TestScheduler_SubscribeDoesNotResolveInline pins that API load never waits on
-// DNS.
-//
-// The first implementation resolved synchronously inside subscribe, which runs
-// on the single-threaded spec loop that gates the router swap, so a resolver
-// that timed out delayed every API behind it by the lookup timeout in turn.
-// Fifty new hostnames against a sick resolver was fifty serial timeouts.
-func TestScheduler_SubscribeDoesNotResolveInline(t *testing.T) {
-	resolver := newStubResolver()
-	resolver.set("svc", "10.0.0.1")
-
-	scheduler := newTestScheduler(resolver) // loop suppressed
-	entry := scheduler.subscribe(context.Background(), "api-1", planFor(t, "h2c://svc:9002", time.Minute))
-
-	if got := resolver.callsFor("svc"); got != 0 {
-		t.Errorf("subscribe performed %d lookups; the scheduler goroutine owns the first one", got)
-	}
-	if entry.addresses() != nil {
-		t.Error("subscribe published an address set, so it must have resolved inline")
+		t.Fatalf("parse: %v", err)
 	}
 
-	// And the entry is due at once, so the loop picks it up without waiting a
-	// whole interval.
-	if len(scheduler.dueEntries()) != 1 {
-		t.Error("a newly subscribed hostname is not due, so the loop would wait an interval before resolving it")
-	}
-}
-
-// TestScheduler_NameNotFoundIsAppliedAtOnce covers the authoritative case. A
-// name that does not exist is a fact, not a failure to learn one, so there is
-// nothing stale worth preserving and the stale TTL does not apply.
-func TestScheduler_NameNotFoundIsAppliedAtOnce(t *testing.T) {
-	resolver := newStubResolver()
-	resolver.set("svc", "10.0.0.1", "10.0.0.2")
-
-	scheduler := newTestScheduler(resolver)
-	ctx := context.Background()
-
-	plan := planFor(t, "h2c://svc:9002", 10*time.Second)
-	plan.staleTTL = time.Hour // long enough that a stale bound cannot explain the result
-	entry := subscribeAndRefresh(scheduler, ctx, "api-1", plan)
-
-	if got := entry.addresses(); got == nil || len(got.addrs) != 2 {
-		t.Fatalf("first resolution published %+v, want two addresses", got)
-	}
-
-	resolver.failNotFound("svc")
-	scheduler.refresh(ctx, entry)
-
-	got := entry.addresses()
-	if got == nil || len(got.addrs) != 1 || got.addrs[0] != "svc" {
-		t.Fatalf("published %+v after the name stopped existing, want the configured name [svc]", got)
-	}
-}
-
-// TestScheduler_StaleTTLBoundsAnUnreachableResolver covers the other half. A
-// resolver that cannot be reached says nothing about the pods, so the addresses
-// are kept, but not forever: without a bound a deleted upstream would receive
-// traffic at dead addresses for the life of the process.
-func TestScheduler_StaleTTLBoundsAnUnreachableResolver(t *testing.T) {
-	resolver := newStubResolver()
-	resolver.set("svc", "10.0.0.1", "10.0.0.2")
-
-	scheduler := newTestScheduler(resolver)
-	ctx := context.Background()
-
-	// Drive the clock, so the bound is tested without sleeping.
-	now := time.Now()
-	scheduler.now = func() time.Time { return now }
-
-	plan := planFor(t, "h2c://svc:9002", 10*time.Second)
-	plan.staleTTL = 5 * time.Minute
-	entry := subscribeAndRefresh(scheduler, ctx, "api-1", plan)
-
-	resolver.fail("svc", errors.New("i/o timeout"))
-
-	// Inside the bound, the addresses are kept.
-	now = now.Add(time.Minute)
-	scheduler.refresh(ctx, entry)
-	if got := entry.addresses(); got == nil || len(got.addrs) != 2 {
-		t.Fatalf("addresses were dropped one minute into a five minute stale TTL: %+v", got)
-	}
-
-	// Past it, the API falls back to its configured target and resolution
-	// returns to the dial path.
-	now = now.Add(6 * time.Minute)
-	scheduler.refresh(ctx, entry)
-	got := entry.addresses()
-	if got == nil || len(got.addrs) != 1 || got.addrs[0] != "svc" {
-		t.Fatalf("published %+v past the stale TTL, want the configured name [svc]", got)
-	}
-}
-
-// TestScheduler_NegativeStaleTTLNeverGivesUp is the escape hatch for a
-// deployment that would rather keep a stale set than fall back.
-func TestScheduler_NegativeStaleTTLNeverGivesUp(t *testing.T) {
-	if got := resolveDNSDiscoveryStaleTTL(-1); got != 0 {
-		t.Fatalf("resolveDNSDiscoveryStaleTTL(-1) = %s, want 0 meaning never", got)
-	}
-	if got := resolveDNSDiscoveryStaleTTL(0); got != time.Duration(dnsDiscoveryDefaultStaleTTL)*time.Second {
-		t.Fatalf("resolveDNSDiscoveryStaleTTL(0) = %s, want the default", got)
-	}
-
-	resolver := newStubResolver()
-	resolver.set("svc", "10.0.0.1", "10.0.0.2")
-
-	scheduler := newTestScheduler(resolver)
-	ctx := context.Background()
-
-	now := time.Now()
-	scheduler.now = func() time.Time { return now }
-
-	plan := planFor(t, "h2c://svc:9002", 10*time.Second)
-	plan.staleTTL = 0 // never
-	entry := subscribeAndRefresh(scheduler, ctx, "api-1", plan)
-
-	resolver.fail("svc", errors.New("i/o timeout"))
-	now = now.Add(48 * time.Hour)
-	scheduler.refresh(ctx, entry)
-
-	if got := entry.addresses(); got == nil || len(got.addrs) != 2 {
-		t.Fatalf("addresses were dropped after two days with the bound disabled: %+v", got)
+	got := buildUpstreamTarget(target, "10.0.0.1", "9002")
+	if want := "h2c://10.0.0.1:9002/base?tenant=acme"; got != want {
+		t.Errorf("buildUpstreamTarget = %q, want %q", got, want)
 	}
 }

@@ -241,8 +241,11 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 
 	u.Authentication.ExtractTo(api)
 
-	u.loadBalancingExtractTo(api)
+	// Before load balancing, which reads api.Proxy.DNSDiscovery.Enabled to
+	// decide whether an empty target list is a disabled API or one whose
+	// targets arrive from the resolver.
 	u.dnsDiscoveryExtractTo(api)
+	u.loadBalancingExtractTo(api)
 
 	if u.TLSTransport == nil {
 		u.TLSTransport = &TLSTransport{}
@@ -319,27 +322,20 @@ func (u *Upstream) loadBalancingExtractTo(api *apidef.APIDefinition) {
 // DNSDiscovery sources this upstream's target list from DNS: the hostname in
 // `url` is resolved and every address it returns becomes a target.
 //
-// It is a source rather than a balancing policy. It sits alongside
-// `serviceDiscovery`, which sources targets from a key/value store, and the
-// static `loadBalancing.targets` written by hand. Whether the resulting list is
-// distributed across is still `loadBalancing.enabled`, so both have to be on
-// for requests to reach more than one address.
-//
-// Resolution runs in the background, on one scheduler for the gateway keyed by
-// hostname, so a backend added after the API was loaded starts receiving
-// traffic within `refreshInterval` of becoming ready whether or not the API is
-// currently receiving requests.
-//
-// Only useful against a name that resolves to one address per backend, such as
-// a headless Kubernetes Service. A ClusterIP resolves to a single virtual IP,
-// so there is nothing to distribute over.
+// A source rather than a balancing policy, so `loadBalancing.enabled` still
+// decides whether the list is distributed across, and `serviceDiscovery`
+// cannot be enabled at the same time. Resolution runs in the background, so a
+// backend added later starts receiving traffic within `refreshInterval`
+// whether or not the API is taking requests. Only useful against a name that
+// resolves to one address per backend, such as a headless Service.
 //
 // Example:
 //
 //	{
 //	    "enabled": true,
 //	    "refreshInterval": 10,
-//	    "staleTTL": 300
+//	    "staleTTL": 300,
+//	    "drainDeadline": 30
 //	}
 type DNSDiscovery struct {
 	// Enabled sources this upstream's target list from DNS.
@@ -348,7 +344,7 @@ type DNSDiscovery struct {
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 
 	// RefreshInterval is how often, in seconds, the upstream hostname is
-	// re-resolved in the background. It bounds how long a backend added by an
+	// re-resolved in the background, which bounds how long a backend added by an
 	// autoscaling event waits before receiving traffic.
 	//
 	// 0 selects the default of 30 seconds; values below 5 are raised to 5.
@@ -358,14 +354,24 @@ type DNSDiscovery struct {
 
 	// StaleTTL is how long, in seconds, the last known good address set keeps
 	// being used while the resolver is unreachable. Past it the upstream falls
-	// back to its configured url. An authoritative answer that the name does
-	// not exist is applied at once instead, since nothing stale is worth
-	// preserving.
+	// back to its configured url. An authoritative answer that the name does not
+	// exist is applied at once instead.
 	//
 	// 0 selects the default of 300 seconds; a negative value never gives up.
 	//
 	// Tyk classic API definition: `proxy.dns_discovery.stale_ttl`
 	StaleTTL int64 `bson:"staleTTL,omitempty" json:"staleTTL,omitempty"`
+
+	// DrainDeadline is how long, in seconds, connections to an address are kept
+	// open after that address has left the resolved set. Past it they are
+	// closed, whatever is still on them. In Kubernetes, set it to the pod's
+	// terminationGracePeriodSeconds.
+	//
+	// 0 selects the default of 30 seconds; a negative value never force-closes,
+	// leaving departed addresses to the connection pool's idle timeout.
+	//
+	// Tyk classic API definition: `proxy.dns_discovery.drain_deadline`
+	DrainDeadline int64 `bson:"drainDeadline,omitempty" json:"drainDeadline,omitempty"`
 }
 
 // Fill populates the DNSDiscovery structure from the classic API definition.
@@ -373,6 +379,7 @@ func (d *DNSDiscovery) Fill(api apidef.APIDefinition) {
 	d.Enabled = api.Proxy.DNSDiscovery.Enabled
 	d.RefreshInterval = api.Proxy.DNSDiscovery.RefreshInterval
 	d.StaleTTL = api.Proxy.DNSDiscovery.StaleTTL
+	d.DrainDeadline = api.Proxy.DNSDiscovery.DrainDeadline
 }
 
 // ExtractTo copies the DNSDiscovery structure into the classic API definition.
@@ -380,6 +387,7 @@ func (d *DNSDiscovery) ExtractTo(api *apidef.APIDefinition) {
 	api.Proxy.DNSDiscovery.Enabled = d.Enabled
 	api.Proxy.DNSDiscovery.RefreshInterval = d.RefreshInterval
 	api.Proxy.DNSDiscovery.StaleTTL = d.StaleTTL
+	api.Proxy.DNSDiscovery.DrainDeadline = d.DrainDeadline
 }
 
 func (u *Upstream) fillDNSDiscovery(api apidef.APIDefinition) {
@@ -1448,9 +1456,19 @@ type LoadBalancingTarget struct {
 // Fill populates the LoadBalancing structure based on the provided APIDefinition, including targets and their weights.
 func (l *LoadBalancing) Fill(api apidef.APIDefinition) {
 	if len(api.Proxy.Targets) == 0 {
-		api.Proxy.EnableLoadBalancing = false
-		api.Proxy.CheckHostAgainstUptimeTests = false
-		api.Proxy.Targets = nil
+		// An empty target list used to mean the block was leftover state,
+		// because the list was the only source there was. DNS discovery is a
+		// second source and supplies the list at runtime, so for those APIs
+		// `targets` is empty by design and `enabled` still has to survive the
+		// conversion — without it the round trip produces a document the
+		// upstream-source validation rejects, and a gateway that reads load
+		// balancing as off and switches discovery back off.
+		if !api.Proxy.DNSDiscovery.Enabled {
+			return
+		}
+
+		l.Enabled = api.Proxy.EnableLoadBalancing
+		l.SkipUnavailableHosts = api.Proxy.CheckHostAgainstUptimeTests
 		return
 	}
 
@@ -1501,6 +1519,17 @@ func (l *LoadBalancing) Fill(api apidef.APIDefinition) {
 // ExtractTo populates an APIDefinition's proxy load balancing configuration with data from the LoadBalancing instance.
 func (l *LoadBalancing) ExtractTo(api *apidef.APIDefinition) {
 	if len(l.Targets) == 0 {
+		// See Fill: an API sourcing its targets from DNS has none to write
+		// here, and must keep enable_load_balancing all the same.
+		// Upstream.ExtractTo runs dnsDiscoveryExtractTo first so that flag is
+		// already populated by the time this reads it.
+		if api.Proxy.DNSDiscovery.Enabled {
+			api.Proxy.EnableLoadBalancing = l.Enabled
+			api.Proxy.CheckHostAgainstUptimeTests = l.SkipUnavailableHosts
+			api.Proxy.Targets = nil
+			return
+		}
+
 		api.Proxy.EnableLoadBalancing = false
 		api.Proxy.CheckHostAgainstUptimeTests = false
 		api.Proxy.Targets = nil

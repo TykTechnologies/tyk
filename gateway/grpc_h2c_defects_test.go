@@ -1,17 +1,24 @@
 package gateway
 
-// Reproduction tests for three defects in the h2c (plaintext HTTP/2, i.e. gRPC)
-// upstream path. All three were found while investigating why gRPC upstreams do
-// not load-balance or discover autoscaled pods.
+// Regression tests for four defects in the h2c (plaintext HTTP/2, i.e. gRPC)
+// upstream path, all found while investigating why gRPC upstreams do not
+// load-balance or discover autoscaled pods.
 //
-// THESE TESTS FAIL ON MASTER BY DESIGN. Each asserts the behaviour the gateway
-// should have; each currently demonstrates the defect instead. They are written
-// to be the regression gate for the fixes, not to be green today.
+// Each one failed on master and passes with the fixes in this branch, so each
+// is the gate that keeps its defect fixed:
 //
-//	TestH2C_LoadBalancing_UsesHTTP2          — h2c + enable_load_balancing sends HTTP/1.1
-//	TestH2C_DNSCache_IsApplied               — dns_cache silently does not apply to h2c
-//	TestH2C_TransportRebuild_ClosesOldConns  — max_conn_time leaks an h2c connection per rebuild
-//	TestH2C_Upstream_RoundRobin_Distributes  — gRPC upstreams never load-balance at all
+//	TestH2C_LoadBalancing_UsesHTTP2          — h2c + enable_load_balancing sent HTTP/1.1
+//	TestH2C_DNSCache_IsApplied               — dns_cache did not apply to h2c
+//	TestH2C_TransportRebuild_ClosesOldConns  — max_conn_time leaked an h2c connection per rebuild
+//	TestH2C_Upstream_RoundRobin_Distributes  — gRPC upstreams never load-balanced at all
+//
+// A fifth case, whether max_conn_time can stand in for load balancing, is not
+// here: it cannot, and the reason is a property of the operator's resolver
+// rather than of Tyk. net.Dial walks the resolved address list in order and
+// only moves past an address that fails to connect, so a rebuild re-pins to the
+// same backend against a fixed-order resolver and spreads only by chance
+// against a shuffling one. Either way it re-rolls one connection rather than
+// distributing requests. There is no behaviour there for a test to hold.
 //
 // Run with:
 //	go test ./gateway/ -run 'TestH2C_' -v
@@ -331,89 +338,6 @@ func TestH2C_TransportRebuild_ClosesOldConns(t *testing.T) {
 		t.Errorf("after %d rebuilds (%d connections accepted) the h2c upstream still has %d live "+
 			"connections, want <= 2.\nSuperseded h2c transports are never closed, so max_conn_time "+
 			"leaks a connection and its goroutines on every rebuild.", rebuilds, accepted, live)
-	}
-}
-
-// TestH2C_Upstream_MaxConnTime_Rebalances tests the mitigation, not the defect.
-//
-// max_conn_time is the only knob that currently causes an h2c upstream to be
-// re-dialled, and it is therefore the workaround a customer would be told to
-// set while waiting for real load balancing. This asks whether that workaround
-// actually redistributes traffic across a headless Service's pods.
-//
-// It does not balance. The h2c transport dials with a bare net.Dial
-// (gateway/reverse_proxy.go:840-842), and net.Dial walks the resolved address
-// list in order, only falling through to the next address when one fails to
-// connect — so it always takes whatever the resolver put first.
-//
-// This test uses a fixed-order DNS mock, so "first" is the same pod every time
-// and the re-pin is total. Note what that does and does not prove: against a
-// resolver that randomises record order (CoreDNS's loadbalance plugin, in the
-// default kubeadm Corefile, and Docker's embedded DNS) each rebuild becomes an
-// independent draw and traffic spreads statistically. The invariant that holds
-// in BOTH cases is the one that matters: max_conn_time re-rolls a connection, it
-// never distributes requests, so the granularity is the connection and the
-// outcome depends on the operator's resolver rather than on Tyk. Combined with
-// D-1 — each superseded transport leaks its connection — it is a weak,
-// environment-dependent mitigation with a guaranteed leak attached.
-func TestH2C_Upstream_MaxConnTime_Rebalances(t *testing.T) {
-	const upstreamHost = "grpc-upstream-churn.test"
-
-	pods, port := startH2CPodSet(t, 2)
-
-	ips := make([]string, 0, len(pods))
-	for _, p := range pods {
-		ips = append(ips, p.ip)
-	}
-
-	mockDomain(t, upstreamHost, ips)
-
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	// Rebuild the transport between every request.
-	globalConf := ts.Gw.GetConfig()
-	globalConf.MaxConnTime = 1
-	ts.Gw.SetConfig(globalConf)
-	ts.Gw.DoReload()
-
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/h2c-churn/"
-		spec.UseKeylessAccess = true
-		spec.Proxy.TargetURL = fmt.Sprintf("h2c://%s:%s", upstreamHost, port)
-	})
-
-	const rebuilds = 6
-	for i := 0; i < rebuilds; i++ {
-		_, _ = ts.Run(t, test.TestCase{Path: "/h2c-churn/", Code: http.StatusOK})
-		time.Sleep(1100 * time.Millisecond)
-	}
-
-	var totalConns int64
-	for _, p := range pods {
-		hits := atomic.LoadInt64(&p.hits)
-		conns := atomic.LoadInt64(&p.conns.accepted)
-		totalConns += conns
-		t.Logf("  %s (%s:%s): %d requests, %d TCP connection(s) accepted", p.id, p.ip, port, hits, conns)
-	}
-
-	// Guard against a vacuous pass: without real churn there is nothing to spread.
-	if totalConns < 2 {
-		t.Fatalf("only %d connection(s) dialled across %d rebuild windows — max_conn_time "+
-			"did not churn the transport, so this test is not exercising the mitigation", totalConns, rebuilds)
-	}
-
-	for _, p := range pods {
-		if atomic.LoadInt64(&p.conns.accepted) == 0 {
-			t.Errorf("after %d transport rebuilds (%d connections dialled in total), pod %s (%s) was "+
-				"never dialled even once.\nmax_conn_time re-dials, but net.Dial walks the resolved "+
-				"address list in order and only advances past an address that fails to connect, so with "+
-				"this fixed-order resolver every rebuild re-pins to the same pod. Against a shuffling "+
-				"resolver it would spread only by chance. Either way it re-rolls a connection rather than "+
-				"distributing requests, and combined with D-1 (each superseded h2c transport leaks its "+
-				"connection) it is not a usable load-balancing workaround for h2c APIs.",
-				rebuilds, totalConns, p.id, p.ip)
-		}
 	}
 }
 

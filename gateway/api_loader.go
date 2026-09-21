@@ -238,10 +238,11 @@ func (gw *Gateway) processSpec(
 		spec.Proxy.StructuredTargetList = sl
 	}
 
-	// DNS discovery is a third source for that same list, supplying addresses
-	// resolved from the upstream name instead of read from configuration. This
-	// subscribes the API to its upstream hostname on the gateway's scheduler,
-	// or releases it when the API no longer wants discovery.
+	warnOnMixedUpstreamSchemes(spec, logger)
+
+	// A third source for that same list, resolved from the upstream name rather
+	// than read from configuration. Reconciles both ways: a reload that turns
+	// the feature off releases the subscription here.
 	gw.setupUpstreamDNSDiscovery(spec, logger)
 
 	// Initialise the auth and session managers (use Redis for now)

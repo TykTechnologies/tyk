@@ -159,7 +159,42 @@ func ValidateOASObject(documentBody []byte, oasVersion string) error {
 		return err
 	}
 
-	return validateJSON(oasSchema, documentBody)
+	if err := validateJSON(oasSchema, documentBody); err != nil {
+		return err
+	}
+
+	return validateUpstreamSources(documentBody)
+}
+
+// validateUpstreamSources checks how the blocks that supply an upstream's target
+// list combine.
+//
+// In Go rather than in the schema because the schema declares draft-04, where
+// if/then does not exist, so a conditional written there is parsed and ignored —
+// which is what happened to the rule that load balancing requires targets.
+func validateUpstreamSources(documentBody []byte) error {
+	enabled := func(block string) bool {
+		on, err := jsonparser.GetBoolean(documentBody, ExtensionTykAPIGateway, "upstream", block, "enabled")
+		return err == nil && on
+	}
+
+	if !enabled("dnsDiscovery") {
+		return nil
+	}
+
+	var errs []error
+
+	if enabled("serviceDiscovery") {
+		errs = append(errs, errors.New(
+			"upstream.dnsDiscovery and upstream.serviceDiscovery both supply the target list and cannot be enabled together"))
+	}
+
+	if !enabled("loadBalancing") {
+		errs = append(errs, errors.New(
+			"upstream.dnsDiscovery supplies the target list but does not distribute across it; upstream.loadBalancing must be enabled too"))
+	}
+
+	return errors.Join(errs...)
 }
 
 // ValidateOASTemplate checks a Tyk OAS API template for necessary fields,

@@ -198,7 +198,7 @@ func (s *APISpec) Unload() {
 	}
 
 	if s.HTTPTransport != nil {
-		// Retire both pools: an h2c API's connections live on the separate
+		// Both pools: an h2c API's connections live on the separate
 		// http2.Transport, which closing the HTTP/1 one leaves untouched.
 		s.HTTPTransport.Retire()
 		s.HTTPTransport = nil

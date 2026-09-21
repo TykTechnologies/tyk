@@ -2910,10 +2910,12 @@
           "type": "boolean"
         },
         "refreshInterval": {
-          "type": "integer",
-          "minimum": 0
+          "type": "integer"
         },
         "staleTTL": {
+          "type": "integer"
+        },
+        "drainDeadline": {
           "type": "integer"
         }
       },

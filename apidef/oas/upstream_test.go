@@ -8,6 +8,7 @@ import (
 	"sort"
 	"testing"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -1567,6 +1568,17 @@ func TestDNSDiscovery(t *testing.T) {
 				title: "interval set while disabled",
 				input: apidef.DNSDiscoveryConfig{RefreshInterval: 30},
 			},
+			{
+				title: "every period set",
+				input: apidef.DNSDiscoveryConfig{Enabled: true, RefreshInterval: 10, StaleTTL: 120, DrainDeadline: 45},
+			},
+			{
+				// Each period spells "off" with a negative value, and each one
+				// turns off something different, so none of them may be
+				// normalised away during conversion.
+				title: "the negative sentinels",
+				input: apidef.DNSDiscoveryConfig{Enabled: true, StaleTTL: -1, DrainDeadline: -1},
+			},
 		}
 
 		for _, tc := range testcases {
@@ -1601,11 +1613,152 @@ func TestDNSDiscovery(t *testing.T) {
 		api.Proxy.DNSDiscovery = apidef.DNSDiscoveryConfig{
 			Enabled:         true,
 			RefreshInterval: 15,
+			StaleTTL:        120,
+			DrainDeadline:   45,
 		}
 
 		var upstream Upstream
 		upstream.Fill(api)
 
-		assert.Equal(t, &DNSDiscovery{Enabled: true, RefreshInterval: 15}, upstream.DNSDiscovery)
+		assert.Equal(t, &DNSDiscovery{
+			Enabled:         true,
+			RefreshInterval: 15,
+			StaleTTL:        120,
+			DrainDeadline:   45,
+		}, upstream.DNSDiscovery)
 	})
+}
+
+// TestDNSDiscovery_RoundTripsWithLoadBalancing covers the two blocks together,
+// which is the only shape the feature is ever used in.
+//
+// A DNS-discovery API has load balancing on and no targets: the list is
+// resolved from the upstream hostname at runtime. Converting either way used to
+// read the empty target list as "load balancing is leftover state" and drop
+// `enabled`, so the OAS form loaded with discovery switched back off and the
+// classic form converted to a document the upstream-source rules reject.
+func TestDNSDiscovery_RoundTripsWithLoadBalancing(t *testing.T) {
+	t.Parallel()
+
+	t.Run("OAS to classic keeps load balancing on", func(t *testing.T) {
+		t.Parallel()
+
+		upstream := Upstream{
+			URL:           "h2c://my-grpc-svc:9002",
+			LoadBalancing: &LoadBalancing{Enabled: true},
+			DNSDiscovery:  &DNSDiscovery{Enabled: true, RefreshInterval: 10},
+		}
+
+		var api apidef.APIDefinition
+		api.SetDisabledFlags()
+		upstream.ExtractTo(&api)
+
+		assert.True(t, api.Proxy.EnableLoadBalancing,
+			"enable_load_balancing was dropped, so the gateway would refuse to source the target list from DNS")
+		assert.True(t, api.Proxy.DNSDiscovery.Enabled)
+		assert.Empty(t, api.Proxy.Targets, "DNS discovery supplies the targets at runtime")
+	})
+
+	t.Run("classic to OAS keeps load balancing on", func(t *testing.T) {
+		t.Parallel()
+
+		var api apidef.APIDefinition
+		api.Proxy.TargetURL = "h2c://my-grpc-svc:9002"
+		api.Proxy.EnableLoadBalancing = true
+		api.Proxy.DNSDiscovery = apidef.DNSDiscoveryConfig{Enabled: true, RefreshInterval: 10}
+
+		var upstream Upstream
+		upstream.Fill(api)
+
+		require.NotNil(t, upstream.LoadBalancing,
+			"the loadBalancing block was omitted, so the document would fail the upstream-source rules")
+		assert.True(t, upstream.LoadBalancing.Enabled)
+		assert.Empty(t, upstream.LoadBalancing.Targets)
+		require.NotNil(t, upstream.DNSDiscovery)
+		assert.True(t, upstream.DNSDiscovery.Enabled)
+	})
+
+	t.Run("full round trip preserves both blocks", func(t *testing.T) {
+		t.Parallel()
+
+		var api apidef.APIDefinition
+		api.Proxy.TargetURL = "h2c://my-grpc-svc:9002"
+		api.Proxy.EnableLoadBalancing = true
+		api.Proxy.CheckHostAgainstUptimeTests = true
+		api.Proxy.DNSDiscovery = apidef.DNSDiscoveryConfig{
+			Enabled: true, RefreshInterval: 10, StaleTTL: 120, DrainDeadline: 45,
+		}
+
+		var upstream Upstream
+		upstream.Fill(api)
+
+		var converted apidef.APIDefinition
+		converted.SetDisabledFlags()
+		upstream.ExtractTo(&converted)
+
+		assert.Equal(t, api.Proxy.EnableLoadBalancing, converted.Proxy.EnableLoadBalancing)
+		assert.Equal(t, api.Proxy.CheckHostAgainstUptimeTests, converted.Proxy.CheckHostAgainstUptimeTests)
+		assert.Equal(t, api.Proxy.DNSDiscovery, converted.Proxy.DNSDiscovery)
+	})
+
+	t.Run("an empty target list without DNS discovery still disables load balancing", func(t *testing.T) {
+		t.Parallel()
+
+		var api apidef.APIDefinition
+		api.Proxy.EnableLoadBalancing = true
+
+		var upstream Upstream
+		upstream.Fill(api)
+		assert.Nil(t, upstream.LoadBalancing)
+
+		withEnabled := Upstream{LoadBalancing: &LoadBalancing{Enabled: true}}
+		var converted apidef.APIDefinition
+		converted.SetDisabledFlags()
+		withEnabled.ExtractTo(&converted)
+		assert.False(t, converted.Proxy.EnableLoadBalancing)
+	})
+}
+
+// TestDNSDiscovery_DocumentedExampleIsAccepted runs the block exactly as the
+// documentation writes it through schema validation and conversion, since that
+// example is what an operator copies.
+func TestDNSDiscovery_DocumentedExampleIsAccepted(t *testing.T) {
+	t.Parallel()
+
+	oasObject := OAS{
+		openapi3.T{
+			OpenAPI: "3.0.3",
+			Info:    &openapi3.Info{Title: "dns-discovery", Version: "1"},
+			Paths:   openapi3.NewPaths(),
+		},
+	}
+	oasObject.SetTykExtension(&XTykAPIGateway{
+		Info:   Info{Name: "dns-discovery", State: State{Active: true}},
+		Server: Server{ListenPath: ListenPath{Value: "/dns-discovery/"}},
+		Upstream: Upstream{
+			URL:           "h2c://my-grpc-svc:9002",
+			LoadBalancing: &LoadBalancing{Enabled: true},
+			DNSDiscovery: &DNSDiscovery{
+				Enabled: true, RefreshInterval: 10, StaleTTL: 300, DrainDeadline: 30,
+			},
+		},
+	})
+
+	definition, err := oasObject.MarshalJSON()
+	require.NoError(t, err)
+	require.NoError(t, ValidateOASObject(definition, "3.0.3"))
+
+	var api apidef.APIDefinition
+	api.SetDisabledFlags()
+	oasObject.ExtractTo(&api)
+
+	assert.True(t, api.Proxy.EnableLoadBalancing)
+	assert.Equal(t, apidef.DNSDiscoveryConfig{
+		Enabled: true, RefreshInterval: 10, StaleTTL: 300, DrainDeadline: 30,
+	}, api.Proxy.DNSDiscovery)
+
+	// And the rule set the create and update endpoints run against the
+	// converted definition has to accept it too.
+	result := apidef.Validate(&api, apidef.DefaultValidationRuleSet)
+	assert.True(t, result.IsValid, "converted definition was refused: %v", result.ErrorStrings())
 }

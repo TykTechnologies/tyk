@@ -60,6 +60,7 @@ var DefaultValidationRuleSet = ValidationRuleSet{
 	&RuleValidateEnforceTimeout{},
 	&RuleUpstreamAuth{},
 	&RuleLoadBalancingTargets{},
+	&RuleDNSDiscovery{},
 }
 
 func Validate(definition *APIDefinition, ruleSet ValidationRuleSet) ValidationResult {
@@ -230,6 +231,10 @@ var (
 	ErrInvalidUpstreamOAuthClientAuthMethod = errors.New("invalid upstream OAuth client authentication method, valid values are: client_secret_basic, client_secret_post")
 	// ErrAllLoadBalancingTargetsZeroWeight is the error to return when all load balancing targets have weight 0.
 	ErrAllLoadBalancingTargetsZeroWeight = errors.New("all load balancing targets have weight 0, at least one target must have weight > 0")
+	// ErrDNSDiscoveryRequiresLoadBalancing is the error to return when proxy.dns_discovery is enabled without proxy.enable_load_balancing.
+	ErrDNSDiscoveryRequiresLoadBalancing = errors.New("proxy.dns_discovery supplies the target list but does not distribute across it; proxy.enable_load_balancing must be enabled too")
+	// ErrDNSDiscoveryWithServiceDiscovery is the error to return when proxy.dns_discovery and proxy.service_discovery are both enabled.
+	ErrDNSDiscoveryWithServiceDiscovery = errors.New("proxy.dns_discovery and proxy.service_discovery both supply the target list and cannot be enabled together")
 )
 
 // RuleUpstreamAuth implements validations for upstream authentication configurations.
@@ -288,10 +293,49 @@ func (r *RuleLoadBalancingTargets) Validate(apiDef *APIDefinition, validationRes
 		return
 	}
 
+	// DNS discovery supplies the target list at runtime by resolving the
+	// upstream hostname, so an empty Proxy.Targets is the expected shape rather
+	// than a list whose weights all came to nothing.
+	if apiDef.Proxy.DNSDiscovery.Enabled {
+		return
+	}
+
 	// In Tyk's internal representation, targets with weight N are repeated N times in Proxy.Targets
 	// If all weights are 0, the targets list will be empty, which is invalid for load balancing
 	if len(apiDef.Proxy.Targets) == 0 {
 		validationResult.IsValid = false
 		validationResult.AppendError(ErrAllLoadBalancingTargetsZeroWeight)
+	}
+}
+
+// RuleDNSDiscovery implements validations for how proxy.dns_discovery combines
+// with the other sources of an API's target list.
+//
+// Both combinations it refuses are permanently invalid rather than unsupported
+// for now, which is why they are refused at the edge rather than logged at
+// load. The Tyk OAS endpoint applies the same two rules against the OAS
+// document in apidef/oas.ValidateOASObject, before a request reaches here.
+type RuleDNSDiscovery struct{}
+
+// Validate validates api definition DNS discovery configuration.
+func (r *RuleDNSDiscovery) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
+	if !apiDef.Proxy.DNSDiscovery.Enabled {
+		return
+	}
+
+	// DNS discovery is a source; enable_load_balancing is the policy that
+	// distributes across what a source produces. With the policy off every
+	// request still lands on one backend, so the setting would appear to be on
+	// and do nothing.
+	if !apiDef.Proxy.EnableLoadBalancing {
+		validationResult.IsValid = false
+		validationResult.AppendError(ErrDNSDiscoveryRequiresLoadBalancing)
+	}
+
+	// Two sources for one list, each authoritative, with no way for an operator
+	// to say which should win.
+	if apiDef.Proxy.ServiceDiscovery.UseDiscoveryService {
+		validationResult.IsValid = false
+		validationResult.AppendError(ErrDNSDiscoveryWithServiceDiscovery)
 	}
 }

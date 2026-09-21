@@ -704,3 +704,166 @@ func TestRuleLoadBalancingTargets_Validate(t *testing.T) {
 		t.Run(tc.name, runValidationTest(tc.apiDef, ruleSet, tc.result))
 	}
 }
+
+// TestRuleLoadBalancingTargets_DNSDiscoveryExemption covers the shape a valid
+// DNS-discovery API has: load balancing on, and no static targets at all,
+// because the list is resolved from the upstream hostname at runtime.
+//
+// Without the exemption the create and update endpoints refuse the one
+// configuration the feature exists to support.
+func TestRuleLoadBalancingTargets_DNSDiscoveryExemption(t *testing.T) {
+	ruleSet := ValidationRuleSet{
+		&RuleLoadBalancingTargets{},
+	}
+
+	testCases := []struct {
+		name   string
+		apiDef *APIDefinition
+		result ValidationResult
+	}{
+		{
+			name: "dns discovery supplies the targets",
+			apiDef: &APIDefinition{
+				Proxy: ProxyConfig{
+					TargetURL:           "h2c://my-grpc-svc:9002",
+					EnableLoadBalancing: true,
+					DNSDiscovery:        DNSDiscoveryConfig{Enabled: true, RefreshInterval: 10},
+				},
+			},
+			result: ValidationResult{
+				IsValid: true,
+				Errors:  nil,
+			},
+		},
+		{
+			// The exemption is keyed on the block being on, so an API that
+			// carries it switched off is still held to the original rule.
+			name: "dns discovery configured but disabled",
+			apiDef: &APIDefinition{
+				Proxy: ProxyConfig{
+					TargetURL:           "h2c://my-grpc-svc:9002",
+					EnableLoadBalancing: true,
+					DNSDiscovery:        DNSDiscoveryConfig{RefreshInterval: 10},
+				},
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors: []error{
+					ErrAllLoadBalancingTargetsZeroWeight,
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, runValidationTest(tc.apiDef, ruleSet, tc.result))
+	}
+}
+
+// TestRuleDNSDiscovery_Validate covers the two combinations that are refused on
+// create and update.
+//
+// Neither will ever become valid — DNS discovery supplies a target list without
+// distributing across it, and two sources for one list have no tie-break — so
+// they are refused at the edge rather than logged at load.
+func TestRuleDNSDiscovery_Validate(t *testing.T) {
+	ruleSet := ValidationRuleSet{
+		&RuleDNSDiscovery{},
+	}
+
+	testCases := []struct {
+		name   string
+		apiDef *APIDefinition
+		result ValidationResult
+	}{
+		{
+			name: "dns discovery disabled",
+			apiDef: &APIDefinition{
+				Proxy: ProxyConfig{TargetURL: "h2c://my-grpc-svc:9002"},
+			},
+			result: ValidationResult{IsValid: true, Errors: nil},
+		},
+		{
+			name: "dns discovery with load balancing",
+			apiDef: &APIDefinition{
+				Proxy: ProxyConfig{
+					TargetURL:           "h2c://my-grpc-svc:9002",
+					EnableLoadBalancing: true,
+					DNSDiscovery:        DNSDiscoveryConfig{Enabled: true},
+				},
+			},
+			result: ValidationResult{IsValid: true, Errors: nil},
+		},
+		{
+			name: "dns discovery without load balancing",
+			apiDef: &APIDefinition{
+				Proxy: ProxyConfig{
+					TargetURL:    "h2c://my-grpc-svc:9002",
+					DNSDiscovery: DNSDiscoveryConfig{Enabled: true},
+				},
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrDNSDiscoveryRequiresLoadBalancing},
+			},
+		},
+		{
+			name: "dns discovery alongside service discovery",
+			apiDef: &APIDefinition{
+				Proxy: ProxyConfig{
+					TargetURL:           "h2c://my-grpc-svc:9002",
+					EnableLoadBalancing: true,
+					DNSDiscovery:        DNSDiscoveryConfig{Enabled: true},
+					ServiceDiscovery:    ServiceDiscoveryConfiguration{UseDiscoveryService: true},
+				},
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrDNSDiscoveryWithServiceDiscovery},
+			},
+		},
+		{
+			name: "both rules broken at once",
+			apiDef: &APIDefinition{
+				Proxy: ProxyConfig{
+					TargetURL:        "h2c://my-grpc-svc:9002",
+					DNSDiscovery:     DNSDiscoveryConfig{Enabled: true},
+					ServiceDiscovery: ServiceDiscoveryConfiguration{UseDiscoveryService: true},
+				},
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors: []error{
+					ErrDNSDiscoveryRequiresLoadBalancing,
+					ErrDNSDiscoveryWithServiceDiscovery,
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, runValidationTest(tc.apiDef, ruleSet, tc.result))
+	}
+}
+
+// TestDefaultValidationRuleSet_AcceptsDNSDiscovery is the end-to-end check on
+// the rule set the create and update endpoints actually run: the valid shape
+// has to survive every rule in it, not just the one written for it.
+func TestDefaultValidationRuleSet_AcceptsDNSDiscovery(t *testing.T) {
+	apiDef := &APIDefinition{
+		Proxy: ProxyConfig{
+			TargetURL:           "h2c://my-grpc-svc:9002",
+			EnableLoadBalancing: true,
+			DNSDiscovery: DNSDiscoveryConfig{
+				Enabled:         true,
+				RefreshInterval: 10,
+				StaleTTL:        300,
+				DrainDeadline:   30,
+			},
+		},
+	}
+
+	if result := Validate(apiDef, DefaultValidationRuleSet); !result.IsValid {
+		t.Fatalf("the documented DNS discovery configuration was refused: %v", result.ErrorStrings())
+	}
+}

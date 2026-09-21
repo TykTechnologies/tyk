@@ -57,6 +57,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/compression"
 	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/dnsdiscovery"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/mcp/pairing"
@@ -131,10 +132,9 @@ type Gateway struct {
 	reloadMu   sync.Mutex
 
 	// upstreamDNS refreshes upstream hostnames for APIs sourcing their target
-	// list from DNS. One scheduler for the gateway, keyed by hostname, so the
-	// query volume follows the number of distinct upstreams rather than the
-	// number of APIs.
-	upstreamDNS upstreamDNSScheduler
+	// list from DNS. One scheduler keyed by hostname, so query volume follows
+	// distinct upstreams rather than APIs.
+	upstreamDNS dnsdiscovery.Scheduler
 
 	Analytics            RedisAnalyticsHandler
 	GlobalEventsJSVM     JSVM

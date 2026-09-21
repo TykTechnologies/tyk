@@ -641,67 +641,42 @@ type ResponseProcessor struct {
 	Options interface{} `bson:"options" json:"options"`
 }
 
-// DNSDiscoveryConfig configures DNS as a source for an API's target list: the
-// hostname in `target_url` is resolved and every address it returns becomes a
-// target.
+// DNSDiscoveryConfig sources an API's target list from DNS: the hostname in
+// `target_url` is resolved and every address it returns becomes a target.
 //
-// This is a source, not a balancing policy. It answers "where does the list of
-// addresses come from", the same question `service_discovery` answers from a
-// registry and `target_list` answers from hand-written configuration. Whether
-// the list is distributed across is still `enable_load_balancing`, so both have
-// to be on for requests to reach more than one address. That split is
-// deliberate: it is the model the gateway already has, and it keeps DNS from
-// becoming a second, competing balancing switch.
-//
-// It is per-API rather than gateway-level because the thing it describes is a
-// property of one upstream. Resolution itself is not per-API: one scheduler for
-// the gateway refreshes each distinct hostname once, however many APIs point at
-// it, which is how Envoy, NGINX, HAProxy and Kong all key this work.
-//
-// Only useful against a headless Kubernetes Service, or any other name that
-// resolves to one address per backend. A ClusterIP resolves to a single virtual
-// IP, so there is nothing to distribute over and the cluster dataplane binds
-// each connection to one backend regardless.
+// A source, not a balancing policy, so `enable_load_balancing` still decides
+// whether the list is distributed across, and it cannot be combined with
+// `service_discovery`. Only useful against a name that resolves to one address
+// per backend, such as a headless Service. Resolution is shared: one refresh
+// per distinct hostname, however many APIs point at it.
 type DNSDiscoveryConfig struct {
 	// Enabled sources the API's target list from DNS.
 	Enabled bool `bson:"enabled" json:"enabled"`
 
 	// RefreshInterval is how often, in seconds, the upstream hostname is
-	// re-resolved in the background. It bounds how long a pod created by an
-	// autoscaling event waits before receiving traffic.
+	// re-resolved in the background, which bounds how long a new backend waits
+	// before receiving traffic. 0 selects the default of 30 seconds; values
+	// below 5 are raised to 5.
 	//
-	// 0 selects the default of 30 seconds; values below 5 are raised to 5. A
-	// small random amount is added to each cycle so that gateways started
-	// together do not resolve in lockstep.
-	//
-	// Refreshing is deliberately on a fixed interval rather than driven by the
-	// record's own TTL. A caching resolver hands one answer to every gateway
-	// behind it, so TTL-aligned refreshes arrive together and raising the TTL
-	// lowers average query load without lowering the peak. HAProxy ignores the
-	// record TTL for the same reason, and Envoy only honours it on request.
-	//
-	// Where several APIs share an upstream hostname, the shortest interval any
-	// of them asks for is the one used, since they share one refresh.
+	// Where several APIs share a hostname they share one refresh, so the
+	// shortest interval any of them asks for is the one used.
 	RefreshInterval int64 `bson:"refresh_interval" json:"refresh_interval"`
 
 	// StaleTTL is how long, in seconds, the last known good address set keeps
 	// being used while the resolver is unreachable. Past it the API falls back
-	// to its configured target, which is the behaviour it would have had
-	// without this setting, so resolution returns to the dial path.
+	// to its configured target. An authoritative NXDOMAIN applies at once.
 	//
-	// This covers resolver failures such as timeouts, not a name that has gone
-	// away: an authoritative answer that the name does not exist is applied at
-	// once, because there is nothing stale to preserve.
-	//
-	// 0 selects the default of 300 seconds. A negative value never gives up,
-	// keeping the last known good set for as long as the process runs. The
-	// default is deliberately far shorter than the equivalent in Kong, which
-	// defaults to an hour and drew reports of deleted Kubernetes endpoints
-	// still receiving traffic.
-	//
-	// Where several APIs share an upstream hostname, the shortest value any of
-	// them asks for is the one used, as with the refresh interval.
+	// 0 selects the default of 300 seconds; a negative value never gives up.
 	StaleTTL int64 `bson:"stale_ttl" json:"stale_ttl"`
+
+	// DrainDeadline is how long, in seconds, connections to an address stay
+	// open after it has left the resolved set. The delay is the point: a
+	// backend removed from a Service keeps serving until its shutdown
+	// completes. In Kubernetes, set it to terminationGracePeriodSeconds.
+	//
+	// 0 selects the default of 30 seconds; a negative value never force-closes,
+	// leaving departed addresses to the pool's idle timeout.
+	DrainDeadline int64 `bson:"drain_deadline" json:"drain_deadline"`
 }
 
 type ServiceDiscoveryConfiguration struct {
