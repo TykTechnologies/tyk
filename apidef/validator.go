@@ -293,9 +293,8 @@ func (r *RuleLoadBalancingTargets) Validate(apiDef *APIDefinition, validationRes
 		return
 	}
 
-	// DNS discovery supplies the target list at runtime by resolving the
-	// upstream hostname, so an empty Proxy.Targets is the expected shape rather
-	// than a list whose weights all came to nothing.
+	// With DNS discovery on the list is resolved at runtime, so an empty
+	// Proxy.Targets is expected here.
 	if apiDef.Proxy.DNSDiscovery.Enabled {
 		return
 	}
@@ -308,13 +307,9 @@ func (r *RuleLoadBalancingTargets) Validate(apiDef *APIDefinition, validationRes
 	}
 }
 
-// RuleDNSDiscovery implements validations for how proxy.dns_discovery combines
-// with the other sources of an API's target list.
-//
-// Both combinations it refuses are permanently invalid rather than unsupported
-// for now, which is why they are refused at the edge rather than logged at
-// load. The Tyk OAS endpoint applies the same two rules against the OAS
-// document in apidef/oas.ValidateOASObject, before a request reaches here.
+// RuleDNSDiscovery validates how proxy.dns_discovery combines with the other
+// sources of an API's target list. Tyk OAS documents are checked against the
+// same two rules before they are converted.
 type RuleDNSDiscovery struct{}
 
 // Validate validates api definition DNS discovery configuration.
@@ -323,17 +318,11 @@ func (r *RuleDNSDiscovery) Validate(apiDef *APIDefinition, validationResult *Val
 		return
 	}
 
-	// DNS discovery is a source; enable_load_balancing is the policy that
-	// distributes across what a source produces. With the policy off every
-	// request still lands on one backend, so the setting would appear to be on
-	// and do nothing.
 	if !apiDef.Proxy.EnableLoadBalancing {
 		validationResult.IsValid = false
 		validationResult.AppendError(ErrDNSDiscoveryRequiresLoadBalancing)
 	}
 
-	// Two sources for one list, each authoritative, with no way for an operator
-	// to say which should win.
 	if apiDef.Proxy.ServiceDiscovery.UseDiscoveryService {
 		validationResult.IsValid = false
 		validationResult.AppendError(ErrDNSDiscoveryWithServiceDiscovery)

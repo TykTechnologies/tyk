@@ -12,11 +12,9 @@ import (
 )
 
 // The two combinations refused on create and update, through both endpoints,
-// and the one configuration that has to be accepted.
-//
-// The acceptance cases matter as much as the refusals: the valid shape has load
+// and the one configuration that has to be accepted. The valid shape has load
 // balancing on and no static targets, which a rule that only counts targets
-// reads as "every target at weight zero" and refuses.
+// reads as every target at weight zero and refuses.
 
 // dnsDiscoveryClassicAPI builds a Tyk Classic definition sourcing its targets
 // from DNS, with the two combination flags under the test's control.
@@ -69,8 +67,8 @@ func dnsDiscoveryOASAPI(name, listenPath string, loadBalancing, serviceDiscovery
 }
 
 // TestDNSDiscovery_ClassicEndpointRefusesTheTwoCombinations covers /tyk/apis,
-// which has no schema in front of it, so its rule set is the only thing between
-// an operator and a definition that cannot work.
+// which has no schema in front of it, so its rule set is all that stands
+// between an operator and a definition that cannot work.
 func TestDNSDiscovery_ClassicEndpointRefusesTheTwoCombinations(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -96,7 +94,7 @@ func TestDNSDiscovery_ClassicEndpointRefusesTheTwoCombinations(t *testing.T) {
 	t.Run("accepted, then refused on update", func(t *testing.T) {
 		def := dnsDiscoveryClassicAPI("dns-classic-ok", "/dns-classic-ok/", true, false)
 
-		// No targets at all, which the weight rule reads as "all zero".
+		// No targets at all, which the weight rule reads as all zero.
 		_, _ = ts.Run(t, test.TestCase{
 			AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis", Data: def,
 			Code: http.StatusOK,
@@ -140,9 +138,9 @@ func TestDNSDiscovery_OASEndpointRefusesTheTwoCombinations(t *testing.T) {
 		})
 	})
 
-	// The regression that matters most: the document was accepted, then the
-	// conversion dropped loadBalancing.enabled because there were no targets
-	// under it, so the API loaded with discovery switched back off.
+	// The main regression here: the document was accepted, then the conversion
+	// dropped loadBalancing.enabled because there were no targets under it, so
+	// the API loaded with discovery switched back off.
 	t.Run("accepted, and keeps load balancing through the conversion", func(t *testing.T) {
 		document := dnsDiscoveryOASAPI("dns-oas-ok", "/dns-oas-ok/", true, false)
 

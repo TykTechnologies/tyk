@@ -641,41 +641,39 @@ type ResponseProcessor struct {
 	Options interface{} `bson:"options" json:"options"`
 }
 
-// DNSDiscoveryConfig sources an API's target list from DNS: the hostname in
-// `target_url` is resolved and every address it returns becomes a target.
+// DNSDiscoveryConfig sources an API's target list from DNS. The hostname in
+// `target_url` is resolved in the background and every address it returns
+// becomes a target.
 //
-// A source, not a balancing policy, so `enable_load_balancing` still decides
-// whether the list is distributed across, and it cannot be combined with
-// `service_discovery`. Only useful against a name that resolves to one address
-// per backend, such as a headless Service. Resolution is shared: one refresh
-// per distinct hostname, however many APIs point at it.
+// DNS discovery supplies the list and does not distribute across it, so
+// `enable_load_balancing` must be on as well, and it cannot be combined with
+// `service_discovery`, which supplies the same list. It is only useful against
+// a name that resolves to one address per backend, such as a headless
+// Kubernetes Service. APIs pointing at the same hostname share one refresh.
 type DNSDiscoveryConfig struct {
-	// Enabled sources the API's target list from DNS.
+	// Enabled turns DNS discovery on for this API.
 	Enabled bool `bson:"enabled" json:"enabled"`
 
 	// RefreshInterval is how often, in seconds, the upstream hostname is
-	// re-resolved in the background, which bounds how long a new backend waits
-	// before receiving traffic. 0 selects the default of 30 seconds; values
-	// below 5 are raised to 5.
-	//
-	// Where several APIs share a hostname they share one refresh, so the
-	// shortest interval any of them asks for is the one used.
+	// re-resolved. It bounds how long a new backend waits before it receives
+	// traffic. 0 or less selects the default of 30 seconds, and values below 5
+	// are raised to 5. Where several APIs share a hostname, the shortest
+	// interval among them is the one used.
 	RefreshInterval int64 `bson:"refresh_interval" json:"refresh_interval"`
 
 	// StaleTTL is how long, in seconds, the last known good address set keeps
 	// being used while the resolver is unreachable. Past it the API falls back
-	// to its configured target. An authoritative NXDOMAIN applies at once.
-	//
-	// 0 selects the default of 300 seconds; a negative value never gives up.
+	// to `target_url`. An authoritative answer that the name does not exist is
+	// applied immediately instead. 0 selects the default of 300 seconds, and a
+	// negative value keeps the last known good set indefinitely.
 	StaleTTL int64 `bson:"stale_ttl" json:"stale_ttl"`
 
 	// DrainDeadline is how long, in seconds, connections to an address stay
-	// open after it has left the resolved set. The delay is the point: a
-	// backend removed from a Service keeps serving until its shutdown
-	// completes. In Kubernetes, set it to terminationGracePeriodSeconds.
-	//
-	// 0 selects the default of 30 seconds; a negative value never force-closes,
-	// leaving departed addresses to the pool's idle timeout.
+	// open after that address has left the resolved set, so a backend that is
+	// shutting down can finish the requests it holds. 0 selects the default of
+	// 30 seconds, and a negative value leaves those connections to the
+	// connection pool's idle timeout. In Kubernetes, set it to the pod's
+	// terminationGracePeriodSeconds.
 	DrainDeadline int64 `bson:"drain_deadline" json:"drain_deadline"`
 }
 

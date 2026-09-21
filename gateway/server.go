@@ -132,8 +132,8 @@ type Gateway struct {
 	reloadMu   sync.Mutex
 
 	// upstreamDNS refreshes upstream hostnames for APIs sourcing their target
-	// list from DNS. One scheduler keyed by hostname, so query volume follows
-	// distinct upstreams rather than APIs.
+	// list from DNS. It is keyed by hostname, so query volume follows distinct
+	// upstreams rather than APIs.
 	upstreamDNS dnsdiscovery.Scheduler
 
 	Analytics            RedisAnalyticsHandler

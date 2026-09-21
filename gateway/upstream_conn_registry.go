@@ -8,10 +8,8 @@ import (
 
 // upstreamConnRegistry tracks the connections an API holds per upstream
 // address, so connections to a departed address can be closed rather than
-// waited out.
-//
-// It goes through the dialler because neither pool can evict one destination:
-// both expose only CloseIdleConnections, which closes everything.
+// waited out. Tracking happens in the dialler because neither transport can
+// evict one destination: both expose only CloseIdleConnections.
 type upstreamConnRegistry struct {
 	mu     sync.Mutex
 	conns  map[string]map[*trackedConn]struct{}
@@ -21,8 +19,7 @@ type upstreamConnRegistry struct {
 
 // pendingDrain is one scheduled close for an address. Stop cannot take back a
 // timer that has already fired, so a callback waiting on the mutex checks
-// cancelled before closing anything — otherwise it closes the connection its
-// replacement was protecting.
+// cancelled before it closes anything.
 type pendingDrain struct {
 	timer     *time.Timer
 	cancelled bool
@@ -63,10 +60,8 @@ func (r *upstreamConnRegistry) track(addr string, conn net.Conn) net.Conn {
 }
 
 // drain closes the connections to addr once after has elapsed, replacing any
-// pending drain. Zero or less closes at once.
-//
-// The delay is the point: a backend removed from a Service keeps serving until
-// its shutdown completes, so closing now would cut requests that would finish.
+// pending drain. Zero or less closes at once. The delay lets a backend that is
+// shutting down finish the requests it is holding.
 func (r *upstreamConnRegistry) drain(addr string, after time.Duration) {
 	if r == nil {
 		return
@@ -98,8 +93,8 @@ func (r *upstreamConnRegistry) drain(addr string, after time.Duration) {
 		}
 
 		// Deciding to close and taking the connections must be one critical
-		// section: a gap lets a re-dial register a connection this callback
-		// has already committed to closing.
+		// section, or a re-dial registers a connection this callback has
+		// already committed to closing.
 		delete(r.drains, addr)
 		tracked := r.takeAddrLocked(addr)
 		r.mu.Unlock()
@@ -135,7 +130,6 @@ func (r *upstreamConnRegistry) cancelDrainLocked(addr string) {
 	delete(r.drains, addr)
 }
 
-// closeAddr closes every connection held to addr.
 func (r *upstreamConnRegistry) closeAddr(addr string) {
 	if r == nil {
 		return
@@ -156,20 +150,18 @@ func (r *upstreamConnRegistry) takeAddrLocked(addr string) map[*trackedConn]stru
 	return tracked
 }
 
-// closeTracked closes connections the registry has already let go of.
 func closeTracked(tracked map[*trackedConn]struct{}) {
 	for conn := range tracked {
 		conn.closeUnderlying()
 	}
 }
 
-// close retires the registry on API unload: drains cancelled, nothing further
-// tracked.
+// close retires the registry on API unload, cancelling pending drains and
+// tracking nothing further.
 //
 // The connections are left alone. Unload has already called Retire, which
-// closes the idle ones, so what remains has requests on it. Severing those
-// would cut streams mid-flight; they close themselves once their last stream
-// ends, via the pool's idle timeout.
+// closes the idle ones, so what remains has requests on it and would be cut
+// mid-stream. Those close themselves through the transport's idle timeout.
 func (r *upstreamConnRegistry) close() {
 	if r == nil {
 		return
@@ -203,7 +195,6 @@ func (r *upstreamConnRegistry) countFor(addr string) int {
 	return len(r.conns[addr])
 }
 
-// forget removes conn, however it came to be closed.
 func (r *upstreamConnRegistry) forget(conn *trackedConn) {
 	if r == nil {
 		return
@@ -229,8 +220,8 @@ type trackedConn struct {
 	once     sync.Once
 }
 
-// Close deregisters first, so a connection the pool retires does not stay on
-// the books.
+// Close deregisters first, so a connection the transport retires does not stay
+// on the books.
 func (c *trackedConn) Close() error {
 	c.registry.forget(c)
 

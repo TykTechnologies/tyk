@@ -15,36 +15,30 @@ import (
 	"github.com/TykTechnologies/tyk/internal/dnsdiscovery"
 )
 
-// Upstream DNS discovery: a third source for an API's target list, alongside
-// the static target_list and service discovery. Resolution lives in
-// internal/dnsdiscovery; what stays here is specific to being an upstream.
-//
-// Nothing here is gRPC-specific. Only useful where a name resolves to one
-// address per backend, such as a headless Service.
+// Upstream DNS discovery is a third source for an API's target list, alongside
+// the static target_list and service discovery. Resolution itself lives in
+// internal/dnsdiscovery. Nothing here is gRPC-specific, and it is only useful
+// where a name resolves to one address per backend, such as a headless Service.
 
+// Defaults for the periods, applied when the configured value is 0. The drain
+// default matches the Kubernetes default terminationGracePeriodSeconds.
 const (
-	// dnsDiscoveryDefaultInterval is used when RefreshInterval is 0.
-	dnsDiscoveryDefaultInterval int64 = 30
-
-	// dnsDiscoveryDefaultStaleTTL is used when StaleTTL is 0.
-	dnsDiscoveryDefaultStaleTTL int64 = 300
-
-	// dnsDiscoveryDefaultDrainDeadline is used when DrainDeadline is 0. It
-	// matches the Kubernetes default terminationGracePeriodSeconds.
+	dnsDiscoveryDefaultInterval      int64 = 30
+	dnsDiscoveryDefaultStaleTTL      int64 = 300
 	dnsDiscoveryDefaultDrainDeadline int64 = 30
 
 	// dnsDiscoveryDrainDisabled is the sentinel for a negative DrainDeadline.
 	dnsDiscoveryDrainDisabled = time.Duration(-1)
 )
 
-// dnsRenderedTargets is one API's target list, built from a published address
-// set and reusable until that set changes.
+// dnsRenderedTargets caches the target list built from one published address
+// set.
 type dnsRenderedTargets struct {
 	version uint64
 	list    *apidef.HostList
 }
 
-// dnsDiscoveryPlan is what one API resolves, computed at load so the request
+// dnsDiscoveryPlan holds what one API resolves, computed at load so the request
 // path parses no URLs. Its presence on the spec turns the feature on.
 type dnsDiscoveryPlan struct {
 	target *url.URL
@@ -58,16 +52,13 @@ type dnsDiscoveryPlan struct {
 	// sub is this API's handle on the shared address set for its upstream name.
 	sub *dnsdiscovery.Subscription
 
-	// fallback is the configured target as a one-entry list, built once and
-	// held verbatim so a window with no addresses leaves the API exactly where
-	// it would be without the feature.
+	// fallback is the configured target as a one-entry list, used whenever the
+	// resolved set is unusable.
 	fallback *apidef.HostList
 
-	// rendered caches the target list built from the current address set.
 	rendered atomic.Pointer[dnsRenderedTargets]
 
-	// conns holds this API's connections to discovered addresses. Nil when
-	// draining is disabled.
+	// conns is nil when draining is disabled.
 	conns *upstreamConnRegistry
 
 	// mu guards lastAddrs, which is only touched on a membership change.
@@ -81,8 +72,8 @@ func upstreamDNSDiscoveryEnabled(spec *APISpec) bool {
 	return spec != nil && spec.dnsDiscovery != nil
 }
 
-// upstreamDrainRegistry returns the connection registry the API's transports
-// should dial through, or nil when there is nothing to track.
+// upstreamDrainRegistry returns the registry the API's transports dial
+// through, or nil when there is nothing to track.
 func upstreamDrainRegistry(spec *APISpec) *upstreamConnRegistry {
 	if spec == nil || spec.dnsDiscovery == nil {
 		return nil
@@ -90,25 +81,22 @@ func upstreamDrainRegistry(spec *APISpec) *upstreamConnRegistry {
 	return spec.dnsDiscovery.conns
 }
 
-// planUpstreamDNSDiscovery works out whether spec should resolve its upstream
-// and what it should resolve, returning nil when the API wants none or when what
-// it asks for would not work.
+// planUpstreamDNSDiscovery works out what spec should resolve, returning nil
+// when the API wants nothing resolved or asks for something unsupported.
 func planUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) *dnsDiscoveryPlan {
 	conf := spec.Proxy.DNSDiscovery
 	if !conf.Enabled {
 		return nil
 	}
 
-	// A source without the policy that distributes across it: every request
-	// would still land on one backend.
 	if !spec.Proxy.EnableLoadBalancing {
 		logger.Error("[PROXY] [DNS DISCOVERY] dns_discovery requires enable_load_balancing; " +
 			"it supplies the target list but does not distribute across it. Leaving this API on its configured target")
 		return nil
 	}
 
-	// Two authoritative sources for one list, with no tie-break. Service
-	// discovery is left running: an existing API may be relying on it.
+	// Two sources for one list, with no tie-break. Service discovery is left
+	// running, since an existing API may be relying on it.
 	if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
 		logger.Error("[PROXY] [DNS DISCOVERY] dns_discovery and service_discovery both supply the target list " +
 			"and cannot be enabled together. Leaving this API on service discovery")
@@ -121,19 +109,18 @@ func planUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) *dnsDiscovery
 		return nil
 	}
 
-	// Scoped to cleartext HTTP/2, the transport that holds one connection per
-	// authority and so pins to one backend.
-	//
 	// TLS is called out separately because it is the case people ask about.
 	// Dialling a backend means dialling an IP literal, and Go derives SNI and
 	// verification from the URL host, so a service certificate with no IP SAN
-	// fails on every request. Supporting it is tracked separately.
+	// fails on every request.
 	if tlsUpstreamScheme(target.Scheme) {
 		logger.WithField("scheme", target.Scheme).
 			Warning("[PROXY] [DNS DISCOVERY] DNS discovery does not support TLS upstreams; leaving this API on its configured target")
 		return nil
 	}
 
+	// Scoped to cleartext HTTP/2, the transport that pins to one backend by
+	// holding one connection per authority.
 	if !strings.EqualFold(target.Scheme, "h2c") {
 		logger.WithField("scheme", target.Scheme).
 			Warning("[PROXY] [DNS DISCOVERY] DNS discovery only supports h2c upstreams; leaving this API on its configured target")
@@ -164,8 +151,8 @@ func planUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) *dnsDiscovery
 }
 
 // setupUpstreamDNSDiscovery subscribes the API to its upstream hostname, or
-// unsubscribes it. Reconciles both ways: a reload replaces a definition without
-// unloading it, so an API that stops wanting discovery is released here.
+// unsubscribes it. A reload replaces a definition without unloading it, so an
+// API that stops wanting discovery is released here.
 func (gw *Gateway) setupUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) {
 	previous := spec.dnsDiscovery
 
@@ -203,9 +190,8 @@ func (gw *Gateway) setupUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry
 	spec.dnsDiscovery = plan
 	previous.retire()
 
-	// An unloaded API would otherwise leave its subscription behind. Once per
-	// spec, releasing whatever the spec holds at the time rather than a plan
-	// captured here, which a later reconcile may have replaced.
+	// Registered once per spec, and releasing what the spec holds at the time
+	// rather than the plan captured here.
 	if !spec.dnsDiscoveryHooked {
 		spec.dnsDiscoveryHooked = true
 		spec.AddUnloadHook(func() {
@@ -240,9 +226,9 @@ func (p *dnsDiscoveryPlan) retire() {
 }
 
 // onAddressSet runs when the address set for this API's upstream changes. The
-// target list is not rebuilt here — the request path renders its own — but
-// retirement is: a departed address stops being selected immediately, so
-// nothing else would ever close its connections.
+// target list is rendered on the request path, so what happens here is
+// retirement: a departed address stops being selected at once, and nothing
+// else would close its connections.
 func (p *dnsDiscoveryPlan) onAddressSet(state *dnsdiscovery.State) {
 	var addrs []string
 	if state != nil {
@@ -301,13 +287,10 @@ func resolveDNSDiscoveryDrainDeadline(seconds int64) time.Duration {
 	return time.Duration(seconds) * time.Second
 }
 
-// urlFromDNS returns the API's target list from the published address set. On
-// the request path, so it resolves nothing and takes no lock: an atomic read, a
-// version comparison, and the list it built last time.
-//
-// The fallback covers nothing resolved yet, an empty answer, and a resolver
-// unreachable past the stale TTL — each leaving the API where it would be
-// without the feature, rather than on an empty list that 503s.
+// urlFromDNS returns the API's target list from the published address set. It
+// runs on the request path, so it resolves nothing and takes no lock. The
+// fallback covers nothing resolved yet, an empty answer, and a resolver
+// unreachable past the stale TTL.
 func (gw *Gateway) urlFromDNS(spec *APISpec) (*apidef.HostList, error) {
 	plan := spec.dnsDiscovery
 	if plan == nil {
@@ -334,7 +317,7 @@ func (gw *Gateway) urlFromDNS(spec *APISpec) (*apidef.HostList, error) {
 }
 
 // splitUpstreamHostPort separates host from port, supplying a default when the
-// URL carries none. Carried explicitly because resolution answers with bare
+// URL carries none. The port is kept because resolution answers with bare
 // addresses.
 func splitUpstreamHostPort(target *url.URL) (host, port string) {
 	host, port = target.Hostname(), target.Port()
@@ -346,8 +329,8 @@ func splitUpstreamHostPort(target *url.URL) (host, port string) {
 	return host, "80"
 }
 
-// tlsUpstreamScheme reports whether proxying to this scheme negotiates TLS with
-// the upstream, and therefore verifies a certificate against the dialled host.
+// tlsUpstreamScheme reports whether proxying to this scheme negotiates TLS,
+// and so verifies a certificate against the dialled host.
 func tlsUpstreamScheme(scheme string) bool {
 	switch strings.ToLower(scheme) {
 	case "https", "wss", "tls":
@@ -358,12 +341,9 @@ func tlsUpstreamScheme(scheme string) bool {
 }
 
 // buildUpstreamTarget renders one resolved address as a target list entry,
-// preserving everything the configured target carries.
-//
-// The scheme matters most: it selects the h2c transport after the Director has
-// run, so an entry written as http:// would reach a cleartext HTTP/2 upstream
-// over HTTP/1.1. The query matters because the Director takes it from whichever
-// entry the picker returned.
+// preserving everything the configured target carries. The scheme selects the
+// h2c transport after the Director has run, and the Director takes the query
+// from whichever entry the picker returned.
 func buildUpstreamTarget(target *url.URL, addr, port string) string {
 	var entry strings.Builder
 

@@ -713,11 +713,9 @@ func TestKVAwareFormatChecker_URIBase(t *testing.T) {
 	}
 }
 
-// TestValidateOASObject_DNSDiscovery covers the rules about where an API's target
-// list comes from.
-//
-// They are checked in Go rather than by the schema because the schema declares
-// draft-04, which has no if/then, so a conditional written there is ignored.
+// TestValidateOASObject_DNSDiscovery covers the rules about where an API's
+// target list comes from. They are checked in Go rather than by the schema,
+// which declares draft-04 and has no if/then.
 func TestValidateOASObject_DNSDiscovery(t *testing.T) {
 	t.Parallel()
 

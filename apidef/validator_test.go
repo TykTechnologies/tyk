@@ -706,11 +706,10 @@ func TestRuleLoadBalancingTargets_Validate(t *testing.T) {
 }
 
 // TestRuleLoadBalancingTargets_DNSDiscoveryExemption covers the shape a valid
-// DNS-discovery API has: load balancing on, and no static targets at all,
-// because the list is resolved from the upstream hostname at runtime.
-//
-// Without the exemption the create and update endpoints refuse the one
-// configuration the feature exists to support.
+// DNS discovery API has: load balancing on and no static targets, with the
+// list resolved from the upstream hostname at runtime. Without the exemption
+// the create and update endpoints refuse the one configuration the feature
+// exists to support.
 func TestRuleLoadBalancingTargets_DNSDiscoveryExemption(t *testing.T) {
 	ruleSet := ValidationRuleSet{
 		&RuleLoadBalancingTargets{},
@@ -760,12 +759,9 @@ func TestRuleLoadBalancingTargets_DNSDiscoveryExemption(t *testing.T) {
 	}
 }
 
-// TestRuleDNSDiscovery_Validate covers the two combinations that are refused on
-// create and update.
-//
-// Neither will ever become valid — DNS discovery supplies a target list without
-// distributing across it, and two sources for one list have no tie-break — so
-// they are refused at the edge rather than logged at load.
+// TestRuleDNSDiscovery_Validate covers the two combinations refused on create
+// and update. DNS discovery supplies a target list without distributing across
+// it, and two sources for one list have no tie-break.
 func TestRuleDNSDiscovery_Validate(t *testing.T) {
 	ruleSet := ValidationRuleSet{
 		&RuleDNSDiscovery{},
@@ -846,9 +842,9 @@ func TestRuleDNSDiscovery_Validate(t *testing.T) {
 	}
 }
 
-// TestDefaultValidationRuleSet_AcceptsDNSDiscovery is the end-to-end check on
-// the rule set the create and update endpoints actually run: the valid shape
-// has to survive every rule in it, not just the one written for it.
+// TestDefaultValidationRuleSet_AcceptsDNSDiscovery checks the whole rule set
+// the create and update endpoints run, since the valid shape has to survive
+// every rule in it rather than the one written for it.
 func TestDefaultValidationRuleSet_AcceptsDNSDiscovery(t *testing.T) {
 	apiDef := &APIDefinition{
 		Proxy: ProxyConfig{

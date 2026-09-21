@@ -1562,9 +1562,9 @@ func TestDNSDiscovery(t *testing.T) {
 				input: apidef.DNSDiscoveryConfig{Enabled: true, RefreshInterval: 1},
 			},
 			{
-				// Not a useful configuration, but it must not be silently
-				// rewritten: an interval set while disabled is preserved so an
-				// operator toggling `enabled` gets the interval they left.
+				// Not a useful configuration, but it must not be rewritten.
+				// An interval set while disabled is preserved, so an operator
+				// toggling `enabled` gets the interval they left.
 				title: "interval set while disabled",
 				input: apidef.DNSDiscoveryConfig{RefreshInterval: 30},
 			},
@@ -1630,13 +1630,13 @@ func TestDNSDiscovery(t *testing.T) {
 }
 
 // TestDNSDiscovery_RoundTripsWithLoadBalancing covers the two blocks together,
-// which is the only shape the feature is ever used in.
+// which is the only shape the feature is used in: load balancing on and no
+// targets, with the list resolved at runtime.
 //
-// A DNS-discovery API has load balancing on and no targets: the list is
-// resolved from the upstream hostname at runtime. Converting either way used to
-// read the empty target list as "load balancing is leftover state" and drop
-// `enabled`, so the OAS form loaded with discovery switched back off and the
-// classic form converted to a document the upstream-source rules reject.
+// Converting either way used to read the empty target list as leftover state
+// and drop `enabled`, so the OAS form loaded with discovery switched back off
+// and the classic form converted to a document the upstream source rules
+// reject.
 func TestDNSDiscovery_RoundTripsWithLoadBalancing(t *testing.T) {
 	t.Parallel()
 

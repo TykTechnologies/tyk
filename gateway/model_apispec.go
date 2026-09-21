@@ -65,14 +65,14 @@ type APISpec struct {
 	OrgHasNoSession          bool
 	AnalyticsPluginConfig    *GoAnalyticsPlugin
 
-	// dnsDiscovery is what this API resolves when DNS is its target-list
+	// dnsDiscovery is what this API resolves when DNS is its target list
 	// source. Set during load, read-only thereafter, and non-nil only when the
 	// feature is on for this API.
 	dnsDiscovery *dnsDiscoveryPlan
 
 	// dnsDiscoveryHooked records that the unload hook for dnsDiscovery is
-	// already registered, so reconciling a spec twice does not stack hooks that
-	// would each retire a plan the spec no longer owns.
+	// registered, so reconciling a spec twice does not stack hooks that each
+	// retire a plan the spec no longer owns.
 	dnsDiscoveryHooked bool
 
 	unloadHooks []func()

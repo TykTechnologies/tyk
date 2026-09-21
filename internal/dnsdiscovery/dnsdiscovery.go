@@ -7,17 +7,17 @@ import (
 	"strings"
 )
 
-// Outcome is what a resolution established about a name. It travels with every
-// published state, because the reasons a name yields no addresses are not
-// interchangeable.
+// Outcome records what a resolution established about a name. It travels with
+// every published state, since the reasons a name yields no addresses call for
+// different handling.
 type Outcome uint8
 
 const (
 	// Resolved means the name answered with at least one address.
 	Resolved Outcome = iota
 
-	// Empty means the resolver answered successfully with no records. For a
-	// Kubernetes Service that is information: it has no ready endpoints.
+	// Empty means the resolver answered successfully with no records, which
+	// for a Kubernetes Service means no ready endpoints.
 	Empty
 
 	// NotFound means the resolver answered authoritatively that the name does
@@ -45,17 +45,17 @@ func (o Outcome) String() string {
 	}
 }
 
-// State is one published address set for a name. Published by atomic pointer
-// swap and never mutated afterwards, so a request path reads it without a lock,
-// and Version lets a subscriber cache what it renders from Addrs.
+// State is one published address set for a name. It is swapped in by atomic
+// pointer and never mutated afterwards, so a request path reads it without a
+// lock, and Version lets a subscriber cache what it renders from Addrs.
 type State struct {
 	Version uint64
 	Addrs   []string
 	Outcome Outcome
 }
 
-// Usable reports whether this state carries addresses to use. A state that is
-// not usable carries the reason in Outcome.
+// Usable reports whether this state carries addresses to use. When it does
+// not, Outcome carries the reason.
 func (s *State) Usable() bool {
 	return s != nil && len(s.Addrs) > 0
 }
@@ -88,7 +88,7 @@ func Normalise(addrs []string) []string {
 }
 
 // Resolvable reports whether a host is a DNS name whose membership can change.
-// An IP literal resolves to itself and localhost is not a Service.
+// An IP literal resolves to itself, and localhost is not a Service.
 func Resolvable(host string) bool {
 	if host == "" {
 		return false
@@ -99,9 +99,8 @@ func Resolvable(host string) bool {
 	return !strings.EqualFold(host, "localhost")
 }
 
-// Removed returns the members of was that are absent from now. Both sets must be
-// normalised. Subscribers holding a resource per address use it to work out what
-// to retire.
+// Removed returns the members of was that are absent from now. Both sets must
+// be normalised.
 func Removed(was, now []string) []string {
 	if len(was) == 0 {
 		return nil

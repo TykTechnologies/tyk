@@ -141,10 +141,10 @@ func EnsureTransport(host, protocol string) string {
 		protocol = "http"
 	}
 
-	// Amend a host with no protocol from the API's listen protocol, coalescing
-	// h2c to http only when inherited that way. An explicit h2c:// target must
-	// survive: the h2c transport is chosen from outReq.URL.Scheme after the
-	// Director runs, so rewriting it sends a gRPC upstream HTTP/1.1.
+	// A host with no protocol takes the API's listen protocol, and h2c is
+	// coalesced to http only when inherited that way. An explicit h2c://
+	// target has to survive, since the h2c transport is chosen from the scheme
+	// on the outgoing request after the Director has run.
 	if !strings.Contains(host, "://") {
 		host = protocol + "://" + host
 		host = strings.Replace(host, "h2c://", "http://", 1)
@@ -159,8 +159,9 @@ func EnsureTransport(host, protocol string) string {
 
 // warnOnMixedUpstreamSchemes warns when a target list mixes h2c with anything
 // else. The transport is built from the first request's scheme and cached, so
-// such a list gets whichever the picker drew first. Not a refusal: the list was
-// valid while EnsureTransport still coalesced h2c to http.
+// such a list gets whichever scheme the picker drew first. It is a warning
+// rather than a refusal, because the list was valid while EnsureTransport
+// still coalesced h2c to http.
 func warnOnMixedUpstreamSchemes(spec *APISpec, logger *logrus.Entry) {
 	if len(spec.Proxy.Targets) < 2 {
 		return
@@ -227,11 +228,8 @@ func (gw *Gateway) nextTarget(targetData *apidef.HostList, spec *APISpec) (strin
 }
 
 // upstreamTargetList returns the targets to distribute across, or nil when the
-// API has no source and should use its configured target.
-//
-// The sources are mutually exclusive, so this is one switch with one result
-// rather than cases falling through: a fallthrough enters the next body without
-// evaluating its condition, silently replacing the list just fetched.
+// API has no source and should use its configured target. The sources are
+// mutually exclusive.
 func (gw *Gateway) upstreamTargetList(spec *APISpec, logger *logrus.Entry) *apidef.HostList {
 	switch {
 	case spec.Proxy.ServiceDiscovery.UseDiscoveryService:
@@ -243,7 +241,6 @@ func (gw *Gateway) upstreamTargetList(spec *APISpec, logger *logrus.Entry) *apid
 		return list
 
 	case upstreamDNSDiscoveryEnabled(spec):
-		// Resolved in the background, so this reads a published set.
 		list, err := gw.urlFromDNS(spec)
 		if err != nil {
 			logger.Error("[PROXY] [DNS DISCOVERY] Failed target lookup: ", err)
@@ -302,19 +299,19 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		target := target
 		gw := gw
 
-		// Shadowed like target: the load balancing block reassigns it, and a
-		// shared copy would let one request's target clobber every later
-		// request's query string.
+		// Shadowed like target, since the load balancing block reassigns it
+		// and a shared copy would let one request's target overwrite the query
+		// string of every later request.
 		targetQuery := targetQuery
 
 		// authorityHost, when set, is the Host header to send instead of the
-		// address being dialled. See the load balancing block below.
+		// address being dialled.
 		authorityHost := ""
 
 		hostList := gw.upstreamTargetList(spec, logger)
 
-		// Service discovery implies load balancing: it has always been
-		// distributed across whether or not the flag is on.
+		// Service discovery implies load balancing, which it has always done
+		// whether or not the flag is on.
 		if hostList != nil && (spec.Proxy.EnableLoadBalancing || spec.Proxy.ServiceDiscovery.UseDiscoveryService) {
 			host, err := gw.nextTarget(hostList, spec)
 			if err != nil {
@@ -326,10 +323,12 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 			if err != nil {
 				logger.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", err)
 			} else {
-				// A DNS-sourced list holds backend addresses: right to dial,
-				// wrong to claim. The pool keys on req.URL.Host and the
-				// authority comes from req.Host, so varying the first gives a
-				// connection per backend while the second stays the name.
+				// A DNS-sourced list holds backend addresses, which are
+				// right to dial and wrong to send as the authority. The
+				// connection pool keys on the URL host and the authority
+				// comes from req.Host, so varying the first gives a
+				// connection per backend while the second stays the
+				// configured service name.
 				if upstreamDNSDiscoveryEnabled(spec) {
 					authorityHost = target.Host
 				}
@@ -907,16 +906,16 @@ func (p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, re
 
 	if outReq.URL.Scheme == "h2c" {
 		p.logger.Info("Enabling h2c mode")
-		// Discovered APIs dial through a registry so a departed address's
-		// connections can be closed on its drain deadline. Only the h2c pool
-		// needs it: discovery is scoped to h2c upstreams.
+		// Discovered APIs dial through a registry, so the connections to a
+		// departed address can be closed on its drain deadline. Only the h2c
+		// transport needs it, since discovery is scoped to h2c upstreams.
 		drainRegistry := upstreamDrainRegistry(p.TykAPISpec)
 
 		h2t := &http2.Transport{
 			// Kind of a hack, but for plaintext/H2C requests, pretend to dial
-			// TLS. Through the HTTP/1 transport's dialler, so h2c gets the
-			// dial timeout, dns_cache and any injected dialler — a bare
-			// net.Dial opted out of all three.
+			// TLS. It goes through the HTTP/1 transport's dialler so that h2c
+			// gets the dial timeout, dns_cache and any injected dialler, all
+			// of which a bare net.Dial opted out of.
 			DialTLSContext: func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
 				conn, err := transport.DialContext(ctx, network, addr)
 				if err != nil {
@@ -925,16 +924,16 @@ func (p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, re
 				return drainRegistry.track(addr, conn), nil
 			},
 			AllowHTTP: true,
-			// Without this, ClientConns never self-close and the readLoop
-			// keeps each reachable from GC, so the pool grows for the life of
-			// the process.
+			// Without this, ClientConns never self-close and each readLoop
+			// keeps its connection reachable from GC, so the pool grows for
+			// the life of the process.
 			IdleConnTimeout: defaultH2CIdleConnTimeout,
 		}
 
 		// Ping idle connections rather than trusting them. A backend that dies
-		// without closing its side leaves one the pool believes in, and
-		// requests multiplexed onto it hang. Discovered upstreams only, where
-		// one connection serves a whole backend.
+		// without closing its side leaves a connection the pool still believes
+		// in, and requests multiplexed onto it hang. Discovered upstreams
+		// only, where one connection serves a whole backend.
 		if upstreamDNSDiscoveryEnabled(p.TykAPISpec) {
 			h2t.ReadIdleTimeout = defaultH2CReadIdleTimeout
 		}
@@ -1011,9 +1010,9 @@ const (
 	defaultH2CReadIdleTimeout = 30 * time.Second
 )
 
-// Retire releases the connections of a round tripper being superseded. Both
-// transports: closing only rt.transport leaves every h2c connection open, with
-// the readLoop goroutine keeping it alive.
+// Retire releases the connections of a round tripper being superseded. It
+// covers both transports, since closing only rt.transport leaves every h2c
+// connection open and its readLoop goroutine running.
 func (rt *TykRoundTripper) Retire() {
 	if rt == nil {
 		return

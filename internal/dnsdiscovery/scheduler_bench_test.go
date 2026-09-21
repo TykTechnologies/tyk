@@ -33,9 +33,9 @@ func benchScheduler(addrsPerHost int) *Scheduler {
 }
 
 // BenchmarkRefreshCycle holds subscribers at 1000 and varies how many distinct
-// hostnames they point at, as a real deployment does: many APIs, far fewer
-// Services. The time should track hosts and be flat in subscribers; a poller per
-// subscriber would cost 1000 lookups in every case here.
+// hostnames they point at, as a deployment does with many APIs and far fewer
+// Services. The time should track hosts and stay flat in subscribers. A poller
+// per subscriber would cost 1000 lookups in every case here.
 func BenchmarkRefreshCycle(b *testing.B) {
 	const subscribers = 1000
 
@@ -61,8 +61,8 @@ func BenchmarkRefreshCycle(b *testing.B) {
 			}
 			b.StopTimer()
 
-			// Report the lookups a cycle actually costs, which is the claim
-			// being made: hostnames, not subscribers.
+			// Report the lookups a cycle costs, which is the claim being
+			// made: hostnames, not subscribers.
 			b.ReportMetric(float64(hosts), "lookups/cycle")
 		})
 	}
@@ -98,7 +98,7 @@ func BenchmarkDueEntries(b *testing.B) {
 	}
 }
 
-// BenchmarkSubscribe measures load rather than the request path: every gateway
+// BenchmarkSubscribe measures load rather than the request path. Every gateway
 // reload runs it for every API.
 func BenchmarkSubscribe(b *testing.B) {
 	b.Run("new hostname", func(b *testing.B) {
@@ -117,27 +117,48 @@ func BenchmarkSubscribe(b *testing.B) {
 		}
 	})
 
+	// Superseding a key on a name others already hold, which is what a reload
+	// does, scaled by how many APIs share the name. Subscribe derives the
+	// entry's interval and stale TTL by walking its subscribers, so this is
+	// O(APIs on that hostname) and a reload of them all is O(n²).
+	//
+	// It re-subscribes existing keys rather than adding new ones, so each
+	// measurement is one Subscribe against a fixed population rather than the
+	// average of a set growing under the timer.
 	b.Run("shared hostname", func(b *testing.B) {
-		scheduler := benchScheduler(4)
-		ctx := context.Background()
-		if _, err := scheduler.Subscribe(ctx, "api-seed", Config{Host: "svc", Interval: 30 * time.Second}); err != nil {
-			b.Fatal(err)
-		}
+		for _, existing := range []int{1, 10, 100, 1000} {
+			b.Run(fmt.Sprintf("existing=%d", existing), func(b *testing.B) {
+				scheduler := benchScheduler(4)
+				ctx := context.Background()
 
-		b.ReportAllocs()
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			if _, err := scheduler.Subscribe(ctx, fmt.Sprintf("api-%d", i), Config{Host: "svc", Interval: 30 * time.Second}); err != nil {
-				b.Fatal(err)
-			}
+				for i := 0; i < existing; i++ {
+					if _, err := scheduler.Subscribe(ctx, fmt.Sprintf("api-%d", i), Config{
+						Host:     "svc",
+						Interval: 30 * time.Second,
+					}); err != nil {
+						b.Fatal(err)
+					}
+				}
+
+				b.ReportAllocs()
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					if _, err := scheduler.Subscribe(ctx, fmt.Sprintf("api-%d", i%existing), Config{
+						Host:     "svc",
+						Interval: 30 * time.Second,
+					}); err != nil {
+						b.Fatal(err)
+					}
+				}
+			})
 		}
 	})
 }
 
 // BenchmarkPublishToSubscribers measures a refresh that moved the address set
-// on a name several APIs share. One resolution serves them all, but the
-// notification is per subscriber, so this is where subscriber count shows up in
-// the cost of a membership change.
+// on a name several APIs share. One resolution serves them all and the
+// notification is per subscriber, so this is where subscriber count shows up
+// in the cost of a membership change.
 func BenchmarkPublishToSubscribers(b *testing.B) {
 	for _, subscribers := range []int{1, 10, 100} {
 		b.Run(fmt.Sprintf("subscribers=%d", subscribers), func(b *testing.B) {
