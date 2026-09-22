@@ -131,8 +131,7 @@ type Gateway struct {
 	DRLManager *drl.DRL
 	reloadMu   sync.Mutex
 
-	// Keyed by hostname, so query volume scales with the number of upstreams
-	// rather than the number of APIs.
+	// Keyed by hostname, so query volume scales with upstreams, not APIs.
 	upstreamDNS dnsdiscovery.Scheduler
 
 	Analytics            RedisAnalyticsHandler

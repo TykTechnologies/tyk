@@ -74,8 +74,7 @@ func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 		var addresses []string
 
-		// Longest match wins. The map is process-wide, so prefix-related
-		// names are easy to end up with and iteration order is random.
+		// Longest match wins: the map is process-wide and iteration order is random.
 		matched := ""
 		for d, ips := range d.domainsToAddresses {
 			if strings.HasPrefix(domain, d) && len(d) > len(matched) {
@@ -122,9 +121,8 @@ var (
 	sharedErr  error
 )
 
-// PushDomains returns a function restoring what was registered before. A
-// domain already registered is replaced rather than added to, or a second push
-// of an overlapping set, as a scale event is, would answer twice over.
+// PushDomains returns a function restoring what was registered before. An
+// already registered domain is replaced rather than added to.
 func (h *DnsMockHandle) PushDomains(domainsMap map[string][]string, domainsErrorMap map[string]int) func() {
 	handler := h.mockServer.Handler.(*dnsMockHandler)
 	handler.muDomainsToAddresses.Lock()
@@ -178,9 +176,8 @@ func (h *DnsMockHandle) PushDomains(domainsMap map[string][]string, domainsError
 // to route all dns queries within tests to this server.
 // InitDNSMock returns handle, which can be used to add/remove dns query mock responses or initialization error.
 //
-// One mock server per process, since net.DefaultResolver can only point at
-// one, so every call registers into it rather than replacing it. Use
-// PushDomains for a scoped, restorable override.
+// One mock server per process, since net.DefaultResolver can only point at one.
+// Use PushDomains for a scoped, restorable override.
 func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int) (*DnsMockHandle, error) {
 	mockOnce.Do(func() {
 		sharedMock, sharedErr = startDNSMock()

@@ -8,8 +8,8 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// upstreamConnRegistry tracks connections per upstream address, in the
-// dialler, because neither transport can evict a single destination.
+// upstreamConnRegistry tracks connections per upstream address, in the dialler,
+// because neither transport can evict a single destination.
 type upstreamConnRegistry struct {
 	mu     sync.Mutex
 	conns  map[string]map[*trackedConn]struct{}
@@ -18,7 +18,7 @@ type upstreamConnRegistry struct {
 	logger *logrus.Entry
 }
 
-// Stop cannot take back a fired timer, so the callback re-checks cancelled.
+// pendingDrain carries cancelled because Stop cannot take back a fired timer.
 type pendingDrain struct {
 	timer     *time.Timer
 	cancelled bool
@@ -57,8 +57,8 @@ func (r *upstreamConnRegistry) track(addr string, conn net.Conn) net.Conn {
 	return tracked
 }
 
-// drain closes every connection to addr after the deadline, which lets a
-// backend that is shutting down finish its requests.
+// drain closes every connection to addr after the deadline, letting a backend
+// that is shutting down finish its requests.
 func (r *upstreamConnRegistry) drain(addr string, after time.Duration) {
 	if r == nil {
 		return
@@ -88,15 +88,12 @@ func (r *upstreamConnRegistry) drain(addr string, after time.Duration) {
 			return
 		}
 
-		// One critical section, or a re-dial slips a connection into the set
-		// this callback has committed to closing.
+		// One critical section, or a re-dial joins the set already committed to closing.
 		delete(r.drains, addr)
 		tracked := r.takeAddrLocked(addr)
 		r.mu.Unlock()
 
-		// The close is abrupt: a stream still running is cut rather than
-		// given a GOAWAY, so the count is what an operator tunes
-		// drain_deadline against.
+		// The close is abrupt: a running stream is cut rather than given a GOAWAY.
 		if len(tracked) > 0 && r.logger != nil {
 			r.logger.WithFields(logrus.Fields{
 				"address":     addr,
@@ -121,8 +118,7 @@ func (r *upstreamConnRegistry) cancelDrain(addr string) {
 	r.cancelDrainLocked(addr)
 }
 
-// cancelDrainLocked flags as well as stops, to turn back a callback already
-// fired and waiting on the mutex.
+// cancelDrainLocked flags as well as stops, to turn back an already fired callback.
 func (r *upstreamConnRegistry) cancelDrainLocked(addr string) {
 	pending, ok := r.drains[addr]
 	if !ok {
@@ -158,8 +154,7 @@ func closeTracked(tracked map[*trackedConn]struct{}) {
 	}
 }
 
-// close retires the registry. Unload has already closed the idle connections,
-// so what remains has requests on it and is left alone.
+// close retires the registry. Unload has already closed the idle connections.
 func (r *upstreamConnRegistry) close() {
 	if r == nil {
 		return
@@ -217,8 +212,7 @@ type trackedConn struct {
 	once     sync.Once
 }
 
-// Close deregisters first, so a connection the transport retires leaves the
-// books.
+// Close deregisters first, so a connection the transport retires leaves the books.
 func (c *trackedConn) Close() error {
 	c.registry.forget(c)
 

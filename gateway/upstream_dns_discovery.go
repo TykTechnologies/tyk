@@ -15,16 +15,12 @@ import (
 	"github.com/TykTechnologies/tyk/internal/dnsdiscovery"
 )
 
-// A third source for an API's target list, after target_list and service
-// discovery. Resolution itself lives in internal/dnsdiscovery.
-
 // Defaults applied when the configured value is 0.
 const (
 	dnsDiscoveryDefaultInterval      int64 = 30
 	dnsDiscoveryDefaultStaleTTL      int64 = 300
 	dnsDiscoveryDefaultDrainDeadline int64 = 30
 
-	// The configured stale_ttl that never gives up on the last good set.
 	dnsDiscoveryStaleTTLUnlimited int64 = -1
 
 	dnsDiscoveryDrainDisabled = time.Duration(-1)
@@ -35,7 +31,7 @@ type dnsRenderedTargets struct {
 	list    *apidef.HostList
 }
 
-// A non-nil plan on the spec turns the feature on.
+// dnsDiscoveryPlan is non-nil on a spec exactly when discovery is on.
 type dnsDiscoveryPlan struct {
 	target *url.URL
 	host   string
@@ -91,8 +87,7 @@ func planUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) *dnsDiscovery
 		return nil
 	}
 
-	// Dialling a backend means dialling an IP literal, which no service
-	// certificate covers.
+	// A resolved backend is an IP literal, which no service certificate covers.
 	if tlsUpstreamScheme(target.Scheme) {
 		logger.WithField("scheme", target.Scheme).
 			Warning("[PROXY] [DNS DISCOVERY] DNS discovery does not support TLS upstreams; leaving this API on its configured target")
@@ -127,8 +122,8 @@ func planUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) *dnsDiscovery
 	return plan
 }
 
-// Reconciles both ways: a reload can replace a definition without unloading
-// it, so an API that stops asking for discovery is released here.
+// setupUpstreamDNSDiscovery reconciles both ways, so an API that stops asking
+// for discovery is released here.
 func (gw *Gateway) setupUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) {
 	previous := spec.dnsDiscovery
 
@@ -166,8 +161,7 @@ func (gw *Gateway) setupUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry
 	spec.dnsDiscovery = plan
 	previous.retire()
 
-	// Once per spec. The hook releases whatever plan the spec holds when it
-	// fires, which may not be this one.
+	// Once per spec; the hook releases whatever plan the spec holds when it fires.
 	if !spec.dnsDiscoveryHooked {
 		spec.dnsDiscoveryHooked = true
 		spec.AddUnloadHook(func() {
@@ -201,8 +195,7 @@ func (p *dnsDiscoveryPlan) retire() {
 }
 
 // onAddressSet retires what a departed address leaves. The diff and the drains
-// it implies are one critical section, or two deliveries interleave and arm a
-// drain the other's cancel has already passed.
+// it implies are one critical section.
 func (p *dnsDiscoveryPlan) onAddressSet(state *dnsdiscovery.State) {
 	var addrs []string
 	if state != nil {
@@ -228,10 +221,6 @@ func (p *dnsDiscoveryPlan) onAddressSet(state *dnsdiscovery.State) {
 		p.conns.cancelDrain(net.JoinHostPort(addr, p.port))
 	}
 }
-
-// Zero means "use the default" throughout, as it does for every other duration
-// in an API definition. StaleTTL also takes -1 for "never give up".
-// apidef.RuleDNSDiscovery rejects the rest.
 
 func resolveDNSDiscoveryInterval(conf apidef.DNSDiscoveryConfig) time.Duration {
 	seconds := conf.RefreshInterval
@@ -261,7 +250,7 @@ func resolveDNSDiscoveryDrainDeadline(conf apidef.DNSDiscoveryConfig) time.Durat
 	return time.Duration(conf.DrainDeadline) * time.Second
 }
 
-// On the request path: resolves nothing, takes no lock.
+// urlFromDNS runs on the request path: it resolves nothing and takes no lock.
 func (gw *Gateway) urlFromDNS(spec *APISpec) (*apidef.HostList, error) {
 	plan := spec.dnsDiscovery
 	if plan == nil {
@@ -287,7 +276,7 @@ func (gw *Gateway) urlFromDNS(spec *APISpec) (*apidef.HostList, error) {
 	return list, nil
 }
 
-// The port is kept because resolution answers with bare addresses.
+// splitUpstreamHostPort keeps the port, since resolution answers with bare addresses.
 func splitUpstreamHostPort(target *url.URL) (host, port string) {
 	host, port = target.Hostname(), target.Port()
 	if port != "" {

@@ -61,8 +61,7 @@ type ProcessSpecOptions struct {
 	quotaKey string
 
 	// skipUpstreamDNSDiscovery leaves the scheduler untouched. Subscriptions
-	// are keyed on APIID, so a spec built outside the load path would
-	// otherwise reach into the live API's subscription.
+	// are keyed on APIID.
 	skipUpstreamDNSDiscovery bool
 }
 
@@ -243,8 +242,6 @@ func (gw *Gateway) processSpec(
 		spec.Proxy.StructuredTargetList = sl
 	}
 
-	// A third source for that list, resolved rather than configured. It
-	// reconciles both ways, so a reload that turns it off releases here.
 	if !options.skipUpstreamDNSDiscovery {
 		gw.setupUpstreamDNSDiscovery(spec, logger)
 	}
@@ -1599,10 +1596,8 @@ func WithQuotaKey(key string) option.Option[ProcessSpecOptions] {
 }
 
 // WithoutUpstreamDNSDiscovery builds the chain without touching the DNS
-// discovery scheduler. It is for callers that assemble a throwaway spec, such
-// as the request tracer: those specs carry a live APIID, and subscriptions are
-// keyed on it, so reconciling from one would release or supersede the running
-// API's subscription and leave it resolving nothing.
+// discovery scheduler, for callers assembling a throwaway spec that carries a
+// live APIID.
 func WithoutUpstreamDNSDiscovery() option.Option[ProcessSpecOptions] {
 	return func(p *ProcessSpecOptions) {
 		p.skipUpstreamDNSDiscovery = true

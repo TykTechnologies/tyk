@@ -641,41 +641,31 @@ type ResponseProcessor struct {
 	Options interface{} `bson:"options" json:"options"`
 }
 
-// DNSDiscoveryConfig sources an API's target list from DNS. The hostname in
+// DNSDiscoveryConfig sources an API's target list from DNS: the hostname in
 // `target_url` is resolved in the background and every address it returns
-// becomes a target.
-//
-// DNS discovery supplies the list and does not distribute across it, so
-// `enable_load_balancing` must be on as well, and it cannot be combined with
-// `service_discovery`, which supplies the same list. It is only useful against
-// a name that resolves to one address per backend, such as a headless
-// Kubernetes Service. APIs pointing at the same hostname share one refresh.
+// becomes a target. Requires `enable_load_balancing`, and cannot be combined
+// with `service_discovery`.
 type DNSDiscoveryConfig struct {
 	// Enabled turns DNS discovery on for this API.
 	Enabled bool `bson:"enabled" json:"enabled"`
 
-	// RefreshInterval is how often, in seconds, the hostname is re-resolved,
-	// which bounds how long a new backend waits for traffic. Zero applies the
-	// default of 30, and values below the floor of 5 are raised to it. Where
-	// APIs share a hostname, the shortest wins. Must not be negative.
+	// RefreshInterval is how often, in seconds, the hostname is re-resolved.
+	// Zero applies the default of 30, with a floor of 5. The hostname is
+	// resolved as `target_url` spells it; an absolute name, with a trailing
+	// dot, costs four times fewer queries per refresh in Kubernetes.
 	RefreshInterval int64 `bson:"refresh_interval" json:"refresh_interval"`
 
 	// StaleTTL is how long, in seconds, the last known good addresses are used
-	// while the resolver is unreachable. Past it the API falls back to
-	// `target_url`. An authoritative answer that the name does not exist is
-	// applied immediately. Zero applies the default of 300, and -1 never gives
-	// up on them. No other negative value is valid.
+	// while the resolver is unreachable. Zero applies the default of 300, and
+	// -1 never gives up on them.
 	StaleTTL int64 `bson:"stale_ttl" json:"stale_ttl"`
 
 	// DrainDeadline is how long, in seconds, connections to a departed address
-	// stay open, so a backend shutting down can finish its requests. Zero
-	// applies the default of 30, the Kubernetes terminationGracePeriodSeconds
-	// default. Must not be negative; see DrainDisabled.
+	// stay open. Zero applies the default of 30.
 	DrainDeadline int64 `bson:"drain_deadline" json:"drain_deadline"`
 
-	// DrainDisabled stops the gateway closing connections to a departed
-	// address, leaving them to the connection pool's idle timeout and to h2c's
-	// own keepalive. Connections are then not tracked at all.
+	// DrainDisabled leaves connections to a departed address to the connection
+	// pool's idle timeout instead of closing them.
 	DrainDisabled bool `bson:"drain_disabled" json:"drain_disabled"`
 }
 

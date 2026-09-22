@@ -167,15 +167,14 @@ func ValidateOASObject(documentBody []byte, oasVersion string) error {
 	return validateTykExtension(documentBody)
 }
 
-// ValidationRule checks one invariant spanning more than one field. These live
-// in Go because the schema is draft-04, where if/then does not exist and a
-// conditional written there is parsed and ignored.
-type ValidationRule interface {
+// Validator checks one invariant spanning more than one field. These live in
+// Go because the draft-04 schema has no if/then.
+type Validator interface {
 	Validate(x *XTykAPIGateway) error
 }
 
 // DefaultValidationRuleSet is applied to every Tyk OAS document.
-var DefaultValidationRuleSet = []ValidationRule{
+var DefaultValidationRuleSet = []Validator{
 	&RuleUpstreamSources{},
 }
 
@@ -191,12 +190,11 @@ var (
 		"upstream.dnsDiscovery supplies the target list but does not distribute across it; upstream.loadBalancing must be enabled too")
 )
 
-// validateTykExtension applies DefaultValidationRuleSet to the document's Tyk
-// extension.
+// validateTykExtension applies DefaultValidationRuleSet to the Tyk extension.
 func validateTykExtension(documentBody []byte) error {
 	raw, dataType, _, err := jsonparser.Get(documentBody, ExtensionTykAPIGateway)
 	if err != nil || dataType != jsonparser.Object {
-		return nil
+		return nil //nolint:nilerr // absent or malformed extension: schema validation reports it
 	}
 
 	var x XTykAPIGateway
@@ -216,11 +214,10 @@ func validateTykExtension(documentBody []byte) error {
 	return combinedErr.ErrorOrNil()
 }
 
-// RuleUpstreamSources validates how the sources of an upstream target list
-// combine. It is the OAS counterpart of apidef.RuleDNSDiscovery.
+// RuleUpstreamSources is the OAS counterpart of apidef.RuleDNSDiscovery.
 type RuleUpstreamSources struct{}
 
-// Validate implements ValidationRule.
+// Validate implements Validator.
 func (r *RuleUpstreamSources) Validate(x *XTykAPIGateway) error {
 	upstream := x.Upstream
 

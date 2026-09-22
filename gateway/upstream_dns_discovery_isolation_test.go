@@ -86,7 +86,11 @@ func TestRetireStopsNewH2CConnections(t *testing.T) {
 			w.WriteHeader(http.StatusOK)
 		}), &http2.Server{}),
 	}
-	go func() { _ = backend.Serve(ln) }()
+	go func() {
+		if err := backend.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			t.Errorf("backend serve: %v", err)
+		}
+	}()
 	defer backend.Close()
 
 	transport := &http.Transport{
@@ -101,7 +105,11 @@ func TestRetireStopsNewH2CConnections(t *testing.T) {
 	rt := newH2CRoundTripper(spec, transport, logrus.NewEntry(logrus.New()), &Gateway{})
 
 	do := func() error {
-		req, _ := http.NewRequest(http.MethodGet, "http://"+ln.Addr().String()+"/", nil)
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://"+ln.Addr().String()+"/", nil)
+		if err != nil {
+			return err
+		}
+
 		resp, err := rt.h2ctransport.RoundTrip(req)
 		if err != nil {
 			return err

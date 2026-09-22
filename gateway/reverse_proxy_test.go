@@ -267,7 +267,11 @@ func TestReverseProxyDnsCache(t *testing.T) {
 	// flakySetupTestReverseProxyDnsCache pushes etcHostsMap below and pulls it
 	// again on teardown. Registering here as well would append each address to
 	// itself, so every lookup would answer with the list twice over.
-	ts.MockHandle, _ = test.InitDNSMock(map[string][]string{}, nil)
+	var mockErr error
+	ts.MockHandle, mockErr = test.InitDNSMock(map[string][]string{}, nil)
+	if mockErr != nil {
+		t.Fatalf("init dns mock: %v", mockErr)
+	}
 	defer ts.Close()
 	defer func() {
 		_ = ts.MockHandle.ShutdownDnsMock()

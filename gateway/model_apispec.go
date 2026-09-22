@@ -68,8 +68,7 @@ type APISpec struct {
 	// Set during load, read-only after, non-nil only with the feature on.
 	dnsDiscovery *dnsDiscoveryPlan
 
-	// So reconciling a spec twice does not stack unload hooks, each retiring
-	// a plan the spec no longer owns.
+	// So reconciling a spec twice does not stack unload hooks.
 	dnsDiscoveryHooked bool
 
 	unloadHooks []func()

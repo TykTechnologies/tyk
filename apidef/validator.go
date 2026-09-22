@@ -312,8 +312,7 @@ func (r *RuleLoadBalancingTargets) Validate(apiDef *APIDefinition, validationRes
 	}
 }
 
-// RuleDNSDiscovery validates how proxy.dns_discovery combines with the other
-// sources of a target list. OAS documents are checked before conversion.
+// RuleDNSDiscovery validates how proxy.dns_discovery combines with the other sources of a target list.
 type RuleDNSDiscovery struct{}
 
 // Validate validates api definition DNS discovery configuration.
@@ -332,10 +331,7 @@ func (r *RuleDNSDiscovery) Validate(apiDef *APIDefinition, validationResult *Val
 		validationResult.AppendError(ErrDNSDiscoveryWithServiceDiscovery)
 	}
 
-	// Zero means "use the default" throughout, so a negative is a mistake
-	// rather than a shorthand. stale_ttl is the exception: -1 spells an
-	// unbounded value, as session lifetimes do. Anything below it is a typo
-	// that would otherwise collapse silently into the same behaviour.
+	// Zero means "use the default" throughout; stale_ttl also takes -1 for unbounded.
 	for _, check := range []struct {
 		seconds int64
 		floor   int64

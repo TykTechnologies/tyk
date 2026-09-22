@@ -200,7 +200,7 @@ func BenchmarkUpstreamDNS_Director(b *testing.B) {
 	}
 
 	b.Run("static target list/pods=10", func(b *testing.B) {
-		director := newDirector(b, func(gw *Gateway) *APISpec {
+		director := newDirector(b, func(_ *Gateway) *APISpec {
 			targets := make([]string, 0, 10)
 			for _, addr := range benchAddrs(10) {
 				targets = append(targets, "h2c://"+addr+":9002")
@@ -218,7 +218,7 @@ func BenchmarkUpstreamDNS_Director(b *testing.B) {
 	})
 
 	b.Run("no target list at all", func(b *testing.B) {
-		director := newDirector(b, func(gw *Gateway) *APISpec {
+		director := newDirector(b, func(_ *Gateway) *APISpec {
 			spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 			spec.APIID = "api-1"
 			spec.Proxy.TargetURL = "http://svc:8080"
@@ -304,80 +304,88 @@ func (benchNopConn) Close() error { return nil }
 // The transport is chosen per request, so the choice sits on the hot path of
 // every API in the gateway. Lookup cost follows context depth, and a gateway
 // request carries a middleware chain, a session and a trace span.
-func BenchmarkUpstreamSchemeSelection(b *testing.B) {
-	deepRequest := func(depth int) *http.Request {
-		req := httptest.NewRequest(http.MethodGet, "http://gateway/greet", nil)
-		ctx := req.Context()
-		for i := 0; i < depth; i++ {
-			ctx = context.WithValue(ctx, ctxKey(i), i)
-		}
-		return req.WithContext(ctx)
+// benchContextDepths reads the mark's cost against how deep the request context is.
+var benchContextDepths = []int{0, 8, 24}
+
+// deepContextRequest builds a request whose context carries depth values.
+func deepContextRequest(depth int) *http.Request {
+	req := httptest.NewRequest(http.MethodGet, "http://gateway/greet", nil)
+	ctx := req.Context()
+	for i := 0; i < depth; i++ {
+		ctx = context.WithValue(ctx, ctxKey(i), i)
 	}
+	return req.WithContext(ctx)
+}
 
-	b.Run("mark", func(b *testing.B) {
-		for _, depth := range []int{0, 8, 24} {
-			b.Run(fmt.Sprintf("depth=%d", depth), func(b *testing.B) {
-				req := deepRequest(depth)
+func benchSchemeMark(b *testing.B) {
+	for _, depth := range benchContextDepths {
+		b.Run(fmt.Sprintf("depth=%d", depth), func(b *testing.B) {
+			req := deepContextRequest(depth)
 
-				b.ReportAllocs()
-				b.ResetTimer()
-				for i := 0; i < b.N; i++ {
-					markUpstreamScheme(req, true)
-				}
-			})
-		}
-	})
-
-	b.Run("read", func(b *testing.B) {
-		for _, depth := range []int{0, 8, 24} {
-			b.Run(fmt.Sprintf("depth=%d/marked", depth), func(b *testing.B) {
-				req := deepRequest(depth)
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
 				markUpstreamScheme(req, true)
+			}
+		})
+	}
+}
 
-				b.ReportAllocs()
-				b.ResetTimer()
-				for i := 0; i < b.N; i++ {
-					if _, marked := upstreamSchemeMark(req); !marked {
-						b.Fatal("mark not found")
-					}
+func benchSchemeRead(b *testing.B) {
+	for _, depth := range benchContextDepths {
+		b.Run(fmt.Sprintf("depth=%d/marked", depth), func(b *testing.B) {
+			req := deepContextRequest(depth)
+			markUpstreamScheme(req, true)
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if _, marked := upstreamSchemeMark(req); !marked {
+					b.Fatal("mark not found")
 				}
-			})
+			}
+		})
 
-			b.Run(fmt.Sprintf("depth=%d/absent", depth), func(b *testing.B) {
-				req := deepRequest(depth)
+		b.Run(fmt.Sprintf("depth=%d/absent", depth), func(b *testing.B) {
+			req := deepContextRequest(depth)
 
-				b.ReportAllocs()
-				b.ResetTimer()
-				for i := 0; i < b.N; i++ {
-					if _, marked := upstreamSchemeMark(req); marked {
-						b.Fatal("unexpected mark")
-					}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if _, marked := upstreamSchemeMark(req); marked {
+					b.Fatal("unexpected mark")
 				}
-			})
-		}
-	})
+			}
+		})
+	}
+}
 
-	b.Run("classify targets", func(b *testing.B) {
-		for _, targets := range []int{1, 10, 50} {
-			b.Run(fmt.Sprintf("targets=%d", targets), func(b *testing.B) {
-				list := make([]string, 0, targets)
-				for i := 0; i < targets; i++ {
-					list = append(list, fmt.Sprintf("h2c://10.0.0.%d:9002", i+1))
-				}
+func benchSchemeClassify(b *testing.B) {
+	for _, targets := range []int{1, 10, 50} {
+		b.Run(fmt.Sprintf("targets=%d", targets), func(b *testing.B) {
+			list := make([]string, 0, targets)
+			for i := 0; i < targets; i++ {
+				list = append(list, fmt.Sprintf("h2c://10.0.0.%d:9002", i+1))
+			}
 
-				spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
-				spec.Proxy.TargetURL = "h2c://svc:9002"
-				spec.Proxy.EnableLoadBalancing = true
-				spec.Proxy.Targets = list
+			spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+			spec.Proxy.TargetURL = "h2c://svc:9002"
+			spec.Proxy.EnableLoadBalancing = true
+			spec.Proxy.Targets = list
 
-				b.ReportAllocs()
-				b.ResetTimer()
-				for i := 0; i < b.N; i++ {
-					upstreamSchemes(spec)
-				}
-			})
-		}
-	})
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				upstreamSchemes(spec)
+			}
+		})
+	}
+}
+
+func BenchmarkUpstreamSchemeSelection(b *testing.B) {
+	b.Run("mark", benchSchemeMark)
+	b.Run("read", benchSchemeRead)
+	b.Run("classify targets", benchSchemeClassify)
 }
 
 type ctxKey int

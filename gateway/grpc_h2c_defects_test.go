@@ -62,7 +62,7 @@ func newH2CUpstream(t *testing.T, onRequest func(r *http.Request)) *httptest.Ser
 				onRequest(r)
 			}
 			w.WriteHeader(http.StatusOK)
-			_, _ = io.WriteString(w, "ok")
+			writeBody(t, w, "ok")
 		}), &http2.Server{}),
 	)
 	srv.Start()
@@ -225,7 +225,7 @@ func TestH2C_TransportRebuild_ClosesOldConns(t *testing.T) {
 	upstream := httptest.NewUnstartedServer(
 		h2c.NewHandler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			_, _ = io.WriteString(w, "ok")
+			writeBody(t, w, "ok")
 		}), &http2.Server{}),
 	)
 	counter := &connCounter{Listener: upstream.Listener}
@@ -387,7 +387,7 @@ func startH2CPodSet(t *testing.T, n int) ([]*h2cPod, string) {
 				pod.mu.Unlock()
 				w.Header().Set("X-Upstream-Pod", pod.id)
 				w.WriteHeader(http.StatusOK)
-				_, _ = io.WriteString(w, pod.id)
+				writeBody(t, w, pod.id)
 			}), &http2.Server{}),
 		)
 		srv.Listener = counter
@@ -404,6 +404,102 @@ func startH2CPodSet(t *testing.T, n int) ([]*h2cPod, string) {
 // Distribution alone is not enough: the target list is where the h2c scheme
 // is read from, so entries written http:// would send HTTP/1.1 to a gRPC
 // server. The disabled arm is the control, and pins to one pod.
+// resetH2CPods clears what the pods recorded for the previous subtest.
+func resetH2CPods(pods []*h2cPod) {
+	for _, p := range pods {
+		atomic.StoreInt64(&p.hits, 0)
+		p.mu.Lock()
+		p.protos = map[string]int{}
+		p.authoritys = map[string]int{}
+		p.mu.Unlock()
+	}
+}
+
+// tallyH2CPods reports how many requests the pods served between them, and
+// which of them served none.
+func tallyH2CPods(t *testing.T, pods []*h2cPod, port string, requests int) (int64, []string) {
+	t.Helper()
+
+	var served int64
+	var idle []string
+	for _, p := range pods {
+		hits := atomic.LoadInt64(&p.hits)
+		served += hits
+		if hits == 0 {
+			idle = append(idle, fmt.Sprintf("%s (%s)", p.id, p.ip))
+		}
+		t.Logf("  %s (%s:%s): %3d/%d requests, %d TCP connection(s) accepted, protocols %v",
+			p.id, p.ip, port, hits, requests, atomic.LoadInt64(&p.conns.accepted), p.protocols())
+	}
+	return served, idle
+}
+
+// assertPinnedToOnePod is the control arm: with discovery off the h2c transport
+// has no resolver and its pool is keyed on the authority, so traffic pins.
+func assertPinnedToOnePod(t *testing.T, pods []*h2cPod, idle []string) {
+	t.Helper()
+
+	if len(idle) != len(pods)-1 {
+		t.Errorf("control: with dns_discovery disabled, %d of %d pods were idle, "+
+			"want %d. Traffic is expected to pin to a single pod, because the h2c transport "+
+			"has no resolver and its connection pool is keyed on the authority. If it spreads "+
+			"here, the enabled arm is not measuring the new option.",
+			len(idle), len(pods), len(pods)-1)
+	}
+}
+
+// assertEvenSplit checks the split across pods. Round robin over a stable set is
+// exact, so an uneven split means the targets came from another list.
+func assertEvenSplit(t *testing.T, pods []*h2cPod, requests int) {
+	t.Helper()
+
+	want := int64(requests) / int64(len(pods))
+	tolerance := want / 5 // 20%, absorbing where the run starts in the rotation
+	for _, p := range pods {
+		hits := atomic.LoadInt64(&p.hits)
+		diff := hits - want
+		if diff > tolerance || diff < -tolerance {
+			t.Errorf("%s (%s) served %d of %d requests, want %d ± %d — the requests reached every "+
+				"pod but are not evenly distributed across them",
+				p.id, p.ip, hits, requests, want, tolerance)
+		}
+	}
+}
+
+// assertAllHTTP2 checks every pod was reached over HTTP/2. EnsureTransport used
+// to downgrade exactly this case.
+func assertAllHTTP2(t *testing.T, pods []*h2cPod) {
+	t.Helper()
+
+	for _, p := range pods {
+		for proto, n := range p.protocols() {
+			if proto == "HTTP/2.0" {
+				continue
+			}
+			t.Errorf("%s (%s) was reached %d time(s) over %q, want HTTP/2.0.\n"+
+				"Load-balanced h2c targets must keep their scheme, or the gateway speaks "+
+				"HTTP/1.1 to a gRPC server.", p.id, p.ip, n, proto)
+		}
+	}
+}
+
+// assertAuthority checks the pods were addressed by name. Dialled by address,
+// addressed by name: a pod IP here breaks anything routing on :authority.
+func assertAuthority(t *testing.T, pods []*h2cPod, want string) {
+	t.Helper()
+
+	for _, p := range pods {
+		for authority, n := range p.authorities() {
+			if authority == want {
+				continue
+			}
+			t.Errorf("%s (%s) was addressed %d time(s) with :authority %q, want %q.\n"+
+				"The pod address belongs in the dialled URL, not in the Host header.",
+				p.id, p.ip, n, authority, want)
+		}
+	}
+}
+
 func TestH2C_Upstream_RoundRobin_Distributes(t *testing.T) {
 	const (
 		upstreamHost = "grpc-upstream-lb.test"
@@ -420,20 +516,17 @@ func TestH2C_Upstream_RoundRobin_Distributes(t *testing.T) {
 	mockDomain(t, upstreamHost, ips)
 	t.Logf("%s resolves to %v (a %d-pod headless Service)", upstreamHost, ips, len(ips))
 
-	for _, enabled := range []bool{true, false} {
-		name := "upstream_dns_lb_disabled"
-		if enabled {
-			name = "upstream_dns_lb_enabled"
-		}
+	cases := []struct {
+		name    string
+		enabled bool
+	}{
+		{"upstream_dns_lb_enabled", true},
+		{"upstream_dns_lb_disabled", false},
+	}
 
-		t.Run(name, func(t *testing.T) {
-			for _, p := range pods {
-				atomic.StoreInt64(&p.hits, 0)
-				p.mu.Lock()
-				p.protos = map[string]int{}
-				p.authoritys = map[string]int{}
-				p.mu.Unlock()
-			}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			resetH2CPods(pods)
 
 			ts := StartTest(nil)
 			defer ts.Close()
@@ -443,8 +536,8 @@ func TestH2C_Upstream_RoundRobin_Distributes(t *testing.T) {
 				spec.UseKeylessAccess = true
 				spec.Proxy.TargetURL = fmt.Sprintf("h2c://%s:%s", upstreamHost, port)
 				// Discovery supplies the list, load balancing spreads it.
-				spec.Proxy.EnableLoadBalancing = enabled
-				spec.Proxy.DNSDiscovery.Enabled = enabled
+				spec.Proxy.EnableLoadBalancing = tc.enabled
+				spec.Proxy.DNSDiscovery.Enabled = tc.enabled
 				spec.Proxy.DNSDiscovery.RefreshInterval = 10
 			})
 
@@ -452,33 +545,15 @@ func TestH2C_Upstream_RoundRobin_Distributes(t *testing.T) {
 				_, _ = ts.Run(t, test.TestCase{Path: "/h2c-upstream-lb/", Code: http.StatusOK})
 			}
 
-			var served int64
-			var idle []string
-			for _, p := range pods {
-				hits := atomic.LoadInt64(&p.hits)
-				served += hits
-				if hits == 0 {
-					idle = append(idle, fmt.Sprintf("%s (%s)", p.id, p.ip))
-				}
-				t.Logf("  %s (%s:%s): %3d/%d requests, %d TCP connection(s) accepted, protocols %v",
-					p.id, p.ip, port, hits, requests, atomic.LoadInt64(&p.conns.accepted), p.protocols())
-			}
-
+			served, idle := tallyH2CPods(t, pods, port, requests)
 			if served != requests {
 				t.Fatalf("pods served %d requests in total, want %d — the traffic did not "+
 					"reach the h2c upstreams and nothing below is meaningful", served, requests)
 			}
 
-			if !enabled {
-				// Nothing discovers pod 2, so all of it goes down one
-				// connection.
-				if len(idle) != len(pods)-1 {
-					t.Errorf("control: with dns_discovery disabled, %d of %d pods were idle, "+
-						"want %d. Traffic is expected to pin to a single pod, because the h2c transport "+
-						"has no resolver and its connection pool is keyed on the authority. If it spreads "+
-						"here, the enabled arm is not measuring the new option.",
-						len(idle), len(pods), len(pods)-1)
-				}
+			// Nothing discovers pod 2, so all of it goes down one connection.
+			if !tc.enabled {
+				assertPinnedToOnePod(t, pods, idle)
 				return
 			}
 
@@ -488,42 +563,9 @@ func TestH2C_Upstream_RoundRobin_Distributes(t *testing.T) {
 					"share of the requests.", len(idle), len(pods), strings.Join(idle, ", "))
 			}
 
-			// Round-robin over a stable set is exact, so an uneven split
-			// means the targets came from another list.
-			want := int64(requests) / int64(len(pods))
-			tolerance := want / 5 // 20%, absorbing where the run starts in the rotation
-			for _, p := range pods {
-				hits := atomic.LoadInt64(&p.hits)
-				if diff := hits - want; diff > tolerance || diff < -tolerance {
-					t.Errorf("%s (%s) served %d of %d requests, want %d ± %d — the requests reached every "+
-						"pod but are not evenly distributed across them",
-						p.id, p.ip, hits, requests, want, tolerance)
-				}
-			}
-
-			// EnsureTransport used to downgrade exactly this case.
-			for _, p := range pods {
-				for proto, n := range p.protocols() {
-					if proto != "HTTP/2.0" {
-						t.Errorf("%s (%s) was reached %d time(s) over %q, want HTTP/2.0.\n"+
-							"Load-balanced h2c targets must keep their scheme, or the gateway speaks "+
-							"HTTP/1.1 to a gRPC server.", p.id, p.ip, n, proto)
-					}
-				}
-			}
-
-			// Dialled by address, addressed by name. A pod IP here breaks
-			// anything routing on :authority.
-			wantAuthority := fmt.Sprintf("%s:%s", upstreamHost, port)
-			for _, p := range pods {
-				for authority, n := range p.authorities() {
-					if authority != wantAuthority {
-						t.Errorf("%s (%s) was addressed %d time(s) with :authority %q, want %q.\n"+
-							"The pod address belongs in the dialled URL, not in the Host header.",
-							p.id, p.ip, n, authority, wantAuthority)
-					}
-				}
-			}
+			assertEvenSplit(t, pods, requests)
+			assertAllHTTP2(t, pods)
+			assertAuthority(t, pods, fmt.Sprintf("%s:%s", upstreamHost, port))
 		})
 	}
 }
@@ -533,23 +575,57 @@ func TestH2C_Upstream_RoundRobin_Distributes(t *testing.T) {
 // every target over whichever protocol the first request drew. Before the
 // feature both entries went through one http.Transport, which picks TLS per
 // request, so mixed lists worked with the h2c entry downgraded to HTTP/1.1.
-func TestH2C_MixedSchemeTargetList(t *testing.T) {
-	newOther := func(t *testing.T, tls bool, record func(*http.Request)) *httptest.Server {
-		t.Helper()
-		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			record(r)
-			w.WriteHeader(http.StatusOK)
-			_, _ = io.WriteString(w, "ok")
-		})
+// newPlainUpstream starts the non-h2c half of a mixed target list.
+func newPlainUpstream(t *testing.T, tls bool, record func(*http.Request)) *httptest.Server {
+	t.Helper()
 
-		srv := httptest.NewServer(handler)
-		if tls {
-			srv = httptest.NewTLSServer(handler)
-		}
-		t.Cleanup(srv.Close)
-		return srv
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		record(r)
+		w.WriteHeader(http.StatusOK)
+		writeBody(t, w, "ok")
+	})
+
+	srv := httptest.NewServer(handler)
+	if tls {
+		srv = httptest.NewTLSServer(handler)
 	}
+	t.Cleanup(srv.Close)
+	return srv
+}
 
+// sendMixedSchemeRequests drives the mixed target list, failing on anything but 200.
+func sendMixedSchemeRequests(t *testing.T, ts *Test, n int) {
+	t.Helper()
+
+	for i := 0; i < n; i++ {
+		res, err := ts.Run(t, test.TestCase{Path: "/mixed/"})
+		if err != nil {
+			t.Fatalf("request %d: %v", i, err)
+		}
+
+		body, readErr := io.ReadAll(res.Body)
+		_ = res.Body.Close()
+		if readErr != nil {
+			t.Fatalf("request %d: %v", i, readErr)
+		}
+		if res.StatusCode != http.StatusOK {
+			t.Errorf("request %d returned %d: %s", i, res.StatusCode, strings.TrimSpace(string(body)))
+		}
+	}
+}
+
+// assertProtocol checks every request one target saw arrived over want.
+func assertProtocol(t *testing.T, label string, got []string, want string) {
+	t.Helper()
+
+	for i, proto := range got {
+		if proto != want {
+			t.Errorf("%s request %d arrived over %q, want %s", label, i, proto, want)
+		}
+	}
+}
+
+func TestH2C_MixedSchemeTargetList(t *testing.T) {
 	for _, tc := range []struct {
 		name string
 		tls  bool
@@ -571,7 +647,7 @@ func TestH2C_MixedSchemeTargetList(t *testing.T) {
 
 			upstream := newH2CUpstream(t, record("h2c"))
 			h2cURL := strings.Replace(upstream.URL, "http://", "h2c://", 1)
-			other := newOther(t, tc.tls, record("other"))
+			other := newPlainUpstream(t, tc.tls, record("other"))
 
 			conf := func(globalConf *config.Config) {
 				globalConf.ProxySSLInsecureSkipVerify = true
@@ -587,20 +663,7 @@ func TestH2C_MixedSchemeTargetList(t *testing.T) {
 				spec.Proxy.Targets = []string{h2cURL, other.URL}
 			})
 
-			for i := 0; i < 6; i++ {
-				res, err := ts.Run(t, test.TestCase{Path: "/mixed/"})
-				if err != nil {
-					t.Fatalf("request %d: %v", i, err)
-				}
-				body, readErr := io.ReadAll(res.Body)
-				_ = res.Body.Close()
-				if readErr != nil {
-					t.Fatalf("request %d: %v", i, readErr)
-				}
-				if res.StatusCode != http.StatusOK {
-					t.Errorf("request %d returned %d: %s", i, res.StatusCode, strings.TrimSpace(string(body)))
-				}
-			}
+			sendMixedSchemeRequests(t, ts, 6)
 
 			mu.Lock()
 			defer mu.Unlock()
@@ -612,16 +675,9 @@ func TestH2C_MixedSchemeTargetList(t *testing.T) {
 				t.Error("no request reached the other target; the cached transport " +
 					"sent it over the wrong protocol")
 			}
-			for i, got := range protos["h2c"] {
-				if got != "HTTP/2.0" {
-					t.Errorf("h2c request %d arrived over %q, want HTTP/2.0", i, got)
-				}
-			}
-			for i, got := range protos["other"] {
-				if got != "HTTP/1.1" {
-					t.Errorf("non-h2c request %d arrived over %q, want HTTP/1.1", i, got)
-				}
-			}
+
+			assertProtocol(t, "h2c", protos["h2c"], "HTTP/2.0")
+			assertProtocol(t, "non-h2c", protos["other"], "HTTP/1.1")
 		})
 	}
 }

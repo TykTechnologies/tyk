@@ -8,8 +8,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -37,13 +35,11 @@ const (
 	minConcurrentLookups = 8
 	maxConcurrentLookups = 256
 
-	// EmptyAnswerThreshold is how many consecutive empty or NXDOMAIN answers
-	// drop the address set. One is often a resolver blip.
+	// EmptyAnswerThreshold is how many consecutive empty or NXDOMAIN answers drop the address set.
 	EmptyAnswerThreshold = 2
 )
 
-// lookupConcurrency sizes a batch so names that time out still clear within one
-// refresh interval: DefaultInterval/LookupTimeout batches fit in an interval.
+// lookupConcurrency sizes a batch so timed-out names still clear within one refresh interval.
 func lookupConcurrency(due int) int {
 	batches := int(DefaultInterval / LookupTimeout)
 	limit := (due + batches - 1) / batches
@@ -74,8 +70,7 @@ type Config struct {
 	OnChange func(*State)
 }
 
-// Scheduler refreshes names in the background, one entry per distinct name.
-// The zero value is ready to use.
+// Scheduler refreshes names in the background, one entry per distinct name. The zero value is ready to use.
 type Scheduler struct {
 	mu sync.Mutex
 
@@ -86,8 +81,6 @@ type Scheduler struct {
 	running bool
 	wake    chan struct{}
 
-	// The running loop's cancellation signal. Nil where no loop was started,
-	// or where its context cannot be cancelled.
 	runDone <-chan struct{}
 
 	// Set before the first Subscribe; the refresh goroutine reads them.
@@ -98,10 +91,8 @@ type Scheduler struct {
 	lookups atomic.Int64
 }
 
-// aggregates folds the subscribers of one name into the values refresh reads:
-// shortest interval, since one refresh serves everyone, and longest stale TTL,
-// since it discards addresses for everyone. The counters say how many sit at
-// the current extreme, so a departure only rescans when the last one leaves.
+// aggregates folds one name's subscribers into the shortest interval and the
+// longest stale TTL. The counters keep a departure from rescanning.
 type aggregates struct {
 	interval      time.Duration
 	maxStaleTTL   time.Duration
@@ -128,8 +119,7 @@ func (a *aggregates) fold(sub *Subscription) {
 	}
 }
 
-// entry is shared by every subscriber on one name. All fields except
-// published are guarded by Scheduler.mu.
+// entry is shared by every subscriber on one name. Scheduler.mu guards all but published.
 type entry struct {
 	host string
 
@@ -155,20 +145,17 @@ type Subscription struct {
 	staleTTL time.Duration
 	onChange func(*State)
 
-	// Set once, so a superseded subscription goes on reporting its last set.
 	entry *entry
 	sched *Scheduler
 
 	detached bool
 
-	// Subscribe delivers after releasing Scheduler.mu, so a refresh can
-	// overtake it. These keep the subscriber's view monotonic.
+	// Keep the subscriber's view monotonic: a refresh can overtake Subscribe.
 	notifyMu    sync.Mutex
 	lastVersion uint64
 }
 
-// State returns the published address set, or nil before the first
-// resolution. It is never mutated.
+// State returns the published address set, or nil before the first resolution.
 func (s *Subscription) State() *State {
 	if s == nil || s.entry == nil {
 		return nil
@@ -184,8 +171,7 @@ func (s *Subscription) Host() string {
 	return s.host
 }
 
-// Release drops this subscription, and the entry with it when nothing else
-// wants that name. An already superseded subscription is ignored.
+// Release drops this subscription, and the entry with it when nothing else wants that name.
 func (s *Subscription) Release() {
 	if s == nil || s.sched == nil {
 		return
@@ -221,8 +207,7 @@ func NormaliseInterval(interval time.Duration) time.Duration {
 	return interval
 }
 
-// Subscribe points key at cfg.Host, superseding any existing subscription for
-// that key. Nothing is resolved here.
+// Subscribe points key at cfg.Host, superseding any existing subscription for that key.
 func (s *Scheduler) Subscribe(ctx context.Context, key string, cfg Config) (*Subscription, error) {
 	if cfg.Host == "" {
 		return nil, ErrNoHost
@@ -263,8 +248,7 @@ func (s *Scheduler) Subscribe(ctx context.Context, key string, cfg Config) (*Sub
 	e.subs[sub] = struct{}{}
 	s.addSubLocked(e, sub)
 
-	// Attached before the one it supersedes is released, so a reload of a
-	// name's only subscriber keeps the entry.
+	// Attach before releasing what it supersedes, or a reload drops the entry.
 	if previous, ok := s.subs[key]; ok {
 		delete(s.subs, key)
 		s.detachLocked(previous)
@@ -402,8 +386,7 @@ func (s *Scheduler) addSubLocked(e *entry, sub *Subscription) {
 	s.pullNextDueLocked(e, previous)
 }
 
-// removeSubLocked is constant time unless the departing subscriber held an
-// extreme alone.
+// removeSubLocked is constant time unless the departing subscriber held an extreme alone.
 func (s *Scheduler) removeSubLocked(e *entry, sub *Subscription) {
 	rescan := false
 
@@ -449,8 +432,7 @@ func (e *entry) applyStaleTTL() {
 	e.staleTTL = e.maxStaleTTL
 }
 
-// pullNextDueLocked brings the next refresh forward when a new subscriber
-// shortened the entry's interval.
+// pullNextDueLocked brings the next refresh forward when a subscriber shortens the interval.
 func (s *Scheduler) pullNextDueLocked(e *entry, previous time.Duration) {
 	if previous == 0 || e.interval == 0 || e.interval >= previous {
 		return
@@ -462,8 +444,7 @@ func (s *Scheduler) pullNextDueLocked(e *entry, previous time.Duration) {
 }
 
 func (s *Scheduler) ensureRunningLocked(ctx context.Context) {
-	// A goroutine whose context is done may not have cleared running yet, and
-	// waking it would leave the entries with nothing refreshing them.
+	// A goroutine whose context is done may not have cleared running yet.
 	if s.running && !signalled(s.runDone) {
 		select {
 		case s.wake <- struct{}{}:
@@ -488,8 +469,7 @@ func signalled(done <-chan struct{}) bool {
 	}
 }
 
-// run takes its own wake channel, so a replaced goroutine cannot clear the
-// flag its replacement set.
+// run takes its own wake channel, so a replaced goroutine cannot clear the flag its replacement set.
 func (s *Scheduler) run(ctx context.Context, wake chan struct{}) {
 	defer func() {
 		s.mu.Lock()
@@ -523,15 +503,18 @@ func (s *Scheduler) refreshAll(ctx context.Context, due []*entry) {
 		return
 	}
 
-	group := new(errgroup.Group)
-	group.SetLimit(lookupConcurrency(len(due)))
+	var wg sync.WaitGroup
+	slots := make(chan struct{}, lookupConcurrency(len(due)))
 	for _, e := range due {
-		group.Go(func() error {
+		wg.Add(1)
+		slots <- struct{}{}
+		go func() {
+			defer wg.Done()
+			defer func() { <-slots }()
 			s.refresh(ctx, e)
-			return nil
-		})
+		}()
 	}
-	_ = group.Wait()
+	wg.Wait()
 }
 
 func (s *Scheduler) nextWait() time.Duration {
@@ -576,8 +559,7 @@ func (s *Scheduler) dueEntries() []*entry {
 
 // refresh resolves one name and publishes the result.
 func (s *Scheduler) refresh(ctx context.Context, e *entry) {
-	// Skipped rather than queued, or a name already in flight holds a slot
-	// while the cycle that owns it finishes.
+	// Skipped rather than queued: a name in flight must not hold a slot.
 	if !e.refreshMu.TryLock() {
 		return
 	}
@@ -600,8 +582,7 @@ func (s *Scheduler) refresh(ctx context.Context, e *entry) {
 	}
 	s.mu.Unlock()
 
-	// Released before the callbacks, so a slow subscriber cannot hold up the
-	// next lookup.
+	// Released before the callbacks: a slow subscriber must not hold up the next lookup.
 	e.refreshMu.Unlock()
 
 	for _, sub := range notify {
@@ -626,8 +607,7 @@ func (s *Scheduler) applyAnswerLocked(e *entry, base time.Duration, addrs []stri
 	return nil, nil
 }
 
-// applyFailureLocked backs off. An authoritative NXDOMAIN is applied as it
-// stands; anything else keeps the addresses until the stale TTL runs out.
+// applyFailureLocked backs off, keeping the addresses until the stale TTL runs out.
 func (s *Scheduler) applyFailureLocked(e *entry, base time.Duration, err error) (*State, []*Subscription) {
 	now := s.timeNow()
 	e.failures++
@@ -649,8 +629,7 @@ func (s *Scheduler) applyFailureLocked(e *entry, base time.Duration, err error) 
 	return nil, nil
 }
 
-// confirmEmpty reports whether an empty answer should be published. Nothing
-// published yet means there is no address set worth protecting.
+// confirmEmpty reports whether an empty answer should be published.
 func (e *entry) confirmEmpty() bool {
 	if e.emptyAnswers < EmptyAnswerThreshold {
 		e.emptyAnswers++

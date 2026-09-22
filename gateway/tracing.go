@@ -223,8 +223,7 @@ func (gw *Gateway) traceHandler(w http.ResponseWriter, r *http.Request) {
 		&gs,
 		logrus.NewEntry(logger),
 		WithQuotaKey(spec.Checksum),
-		// This spec is a throwaway that carries a live APIID, and MakeSpec
-		// hands back the live *APISpec outright when the checksum matches.
+		// A throwaway spec that carries a live APIID.
 		WithoutUpstreamDNSDiscovery(),
 	)
 	gw.generateSubRoutes(spec, mux.NewRouter())

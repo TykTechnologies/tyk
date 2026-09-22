@@ -320,22 +320,30 @@ func (u *Upstream) loadBalancingExtractTo(api *apidef.APIDefinition) {
 // DNSDiscovery sources this upstream's target list from DNS, by resolving the
 // hostname in `url`. It requires `loadBalancing.enabled` and cannot be
 // combined with `serviceDiscovery`.
+//
 // Tyk classic API definition: `proxy.dns_discovery`.
 type DNSDiscovery struct {
 	// Enabled determines if DNS discovery is active.
+	// Tyk classic API definition: `proxy.dns_discovery.enabled`.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 	// RefreshInterval is how often, in seconds, the hostname is re-resolved.
-	// Zero applies the default of 30, with a floor of 5.
+	// Zero applies the default of 30, with a floor of 5. The hostname is
+	// resolved as `url` spells it; an absolute name, with a trailing dot,
+	// costs four times fewer queries per refresh in Kubernetes.
+	// Tyk classic API definition: `proxy.dns_discovery.refresh_interval`.
 	RefreshInterval int64 `bson:"refreshInterval,omitempty" json:"refreshInterval,omitempty"`
 	// StaleTTL is how long, in seconds, the last known good addresses are used
 	// while the resolver is unreachable. Zero applies the default of 300, and
 	// -1 never gives up on them.
+	// Tyk classic API definition: `proxy.dns_discovery.stale_ttl`.
 	StaleTTL int64 `bson:"staleTTL,omitempty" json:"staleTTL,omitempty"`
 	// DrainDeadline is how long, in seconds, connections to a departed address
 	// stay open. Zero applies the default of 30.
+	// Tyk classic API definition: `proxy.dns_discovery.drain_deadline`.
 	DrainDeadline int64 `bson:"drainDeadline,omitempty" json:"drainDeadline,omitempty"`
 	// DrainDisabled leaves connections to a departed address to the connection
 	// pool's idle timeout instead of closing them.
+	// Tyk classic API definition: `proxy.dns_discovery.drain_disabled`.
 	DrainDisabled bool `bson:"drainDisabled,omitempty" json:"drainDisabled,omitempty"`
 }
 
@@ -1423,8 +1431,7 @@ type LoadBalancingTarget struct {
 // Fill populates the LoadBalancing structure based on the provided APIDefinition, including targets and their weights.
 func (l *LoadBalancing) Fill(api apidef.APIDefinition) {
 	if len(api.Proxy.Targets) == 0 {
-		// An API sourcing its targets from DNS has an empty list by design,
-		// so `enabled` has to survive the conversion.
+		// A DNS-sourced API has an empty list by design, so `enabled` must survive.
 		if !api.Proxy.DNSDiscovery.Enabled {
 			return
 		}
@@ -1436,53 +1443,44 @@ func (l *LoadBalancing) Fill(api apidef.APIDefinition) {
 
 	l.Enabled = api.Proxy.EnableLoadBalancing
 	l.SkipUnavailableHosts = api.Proxy.CheckHostAgainstUptimeTests
+	l.Targets = l.weighTargets(api.Proxy.Targets)
+}
 
-	targetCounter := make(map[string]*LoadBalancingTarget)
-	for _, target := range api.Proxy.Targets {
-		if _, ok := targetCounter[target]; !ok {
-			targetCounter[target] = &LoadBalancingTarget{
-				URL:    target,
-				Weight: 0,
-			}
+// weighTargets counts each target's repeats as its weight, keeping any weight=0
+// target already on the structure that the active list no longer names.
+func (l *LoadBalancing) weighTargets(active []string) []LoadBalancingTarget {
+	counter := make(map[string]*LoadBalancingTarget, len(active))
+	for _, target := range active {
+		if _, ok := counter[target]; !ok {
+			counter[target] = &LoadBalancingTarget{URL: target}
 		}
-		targetCounter[target].Weight++
+		counter[target].Weight++
 	}
 
-	// Preserve weight=0 targets from existing OAS structure that aren't in active targets
-	if l.Targets != nil {
-		for _, existingTarget := range l.Targets {
-			if existingTarget.Weight == 0 {
-				// Only preserve if it's not already in targetCounter (not an active target)
-				if _, exists := targetCounter[existingTarget.URL]; !exists {
-					targetCounter[existingTarget.URL] = &LoadBalancingTarget{
-						URL:    existingTarget.URL,
-						Weight: 0,
-					}
-				}
-			}
+	for _, existing := range l.Targets {
+		if existing.Weight != 0 {
+			continue
+		}
+		if _, ok := counter[existing.URL]; !ok {
+			counter[existing.URL] = &LoadBalancingTarget{URL: existing.URL}
 		}
 	}
 
-	targets := make([]LoadBalancingTarget, len(targetCounter))
-	i := 0
-	for _, target := range targetCounter {
-		targets[i] = *target
-		i++
+	targets := make([]LoadBalancingTarget, 0, len(counter))
+	for _, target := range counter {
+		targets = append(targets, *target)
 	}
 
-	targetsSorter := func(i, j int) bool {
+	sort.Slice(targets, func(i, j int) bool {
 		return targets[i].URL < targets[j].URL
-	}
-
-	sort.Slice(targets, targetsSorter)
-	l.Targets = targets
+	})
+	return targets
 }
 
 // ExtractTo populates an APIDefinition's proxy load balancing configuration with data from the LoadBalancing instance.
 func (l *LoadBalancing) ExtractTo(api *apidef.APIDefinition) {
 	if len(l.Targets) == 0 {
-		// See Fill. ExtractTo populates DNS discovery first, so the flag is
-		// set by the time this reads it.
+		// See Fill. ExtractTo populates DNS discovery first.
 		if api.Proxy.DNSDiscovery.Enabled {
 			api.Proxy.EnableLoadBalancing = l.Enabled
 			api.Proxy.CheckHostAgainstUptimeTests = l.SkipUnavailableHosts

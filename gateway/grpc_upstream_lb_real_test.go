@@ -13,10 +13,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	pbexample "google.golang.org/grpc/examples/helloworld/helloworld"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
-
-	pbexample "google.golang.org/grpc/examples/helloworld/helloworld"
 )
 
 // A real gRPC server and client either side of the gateway, rather than
@@ -55,7 +54,7 @@ type podGreeter struct {
 	pod *grpcPod
 }
 
-func (g *podGreeter) SayHello(ctx context.Context, in *pbexample.HelloRequest) (*pbexample.HelloReply, error) {
+func (g *podGreeter) SayHello(ctx context.Context, _ *pbexample.HelloRequest) (*pbexample.HelloReply, error) {
 	atomic.AddInt64(&g.pod.hits, 1)
 
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
@@ -234,18 +233,82 @@ func evenness(served map[string]int, pods int) float64 {
 		return 0
 	}
 
-	total, max := 0, 0
+	total, highest := 0, 0
 	for _, n := range served {
 		total += n
-		if n > max {
-			max = n
+		if n > highest {
+			highest = n
 		}
 	}
 	mean := float64(total) / float64(pods)
 	if mean == 0 {
 		return 0
 	}
-	return float64(max) / mean
+	return float64(highest) / mean
+}
+
+// totalServed sums the calls the pods answered between them.
+func totalServed(served map[string]int) int {
+	total := 0
+	for _, n := range served {
+		total += n
+	}
+	return total
+}
+
+// logGRPCPods records what each pod saw, for reading a failure after the fact.
+func logGRPCPods(t *testing.T, pods []*grpcPod) {
+	t.Helper()
+
+	for _, p := range pods {
+		t.Logf("  %s (%s): %d calls served, authorities %v",
+			p.id, p.bareTarget(), atomic.LoadInt64(&p.hits), p.authorityList())
+	}
+}
+
+// idleGRPCPods names the pods that answered nothing.
+func idleGRPCPods(pods []*grpcPod) []string {
+	var idle []string
+	for _, p := range pods {
+		if atomic.LoadInt64(&p.hits) == 0 {
+			idle = append(idle, fmt.Sprintf("%s (%s)", p.id, p.bareTarget()))
+		}
+	}
+	return idle
+}
+
+// assertDowngradedArmFails checks the control arm still fails outright, which is
+// what makes the passing arm evidence of anything.
+func assertDowngradedArmFails(t *testing.T, reason string, total, requests int, callErr error) {
+	t.Helper()
+
+	if callErr == nil && total == requests {
+		t.Fatalf("every call succeeded, but this arm is expected to fail: %s.\n"+
+			"If the gateway now reaches a gRPC upstream over a load-balanced entry "+
+			"written without a scheme, the coalescing described above has changed and "+
+			"the service discovery limitation recorded in TT-18059 no longer holds.",
+			reason)
+	}
+	if total > 0 {
+		t.Errorf("%d of %d calls were answered on an arm expected to fail outright; "+
+			"the downgrade is expected to break every call, not some of them", total, requests)
+	}
+}
+
+// assertAllCallsAnswered checks a real gRPC conversation completed over every call.
+func assertAllCallsAnswered(t *testing.T, total, requests int, callErr error) {
+	t.Helper()
+
+	if callErr != nil {
+		t.Fatalf("%d/%d calls answered, first error %v.\n"+
+			"Load balancing over explicit h2c:// targets must reach a real gRPC server. "+
+			"An error here means the target list is being rewritten to http:// again and "+
+			"the gateway is offering HTTP/1.1 to an HTTP/2-only server.", total, requests, callErr)
+	}
+	if total != requests {
+		t.Fatalf("%d of %d calls answered and no error was returned, which should not happen",
+			total, requests)
+	}
 }
 
 // The arms differ only in how the target list spells its entries, which is the
@@ -299,50 +362,19 @@ func TestGRPCUpstream_StaticLB_RealGRPC(t *testing.T) {
 			waitForGRPCGateway(t, gatewayAddr, pods)
 
 			served, callErr := callGreeter(t, gatewayAddr, requests)
+			total := totalServed(served)
 
-			total := 0
-			for _, n := range served {
-				total += n
-			}
-			for _, p := range pods {
-				t.Logf("  %s (%s): %d calls served, authorities %v",
-					p.id, p.bareTarget(), atomic.LoadInt64(&p.hits), p.authorityList())
-			}
+			logGRPCPods(t, pods)
 			t.Logf("  %d/%d calls answered, first error: %v", total, requests, callErr)
 
 			if !arm.wantCalls {
-				if callErr == nil && total == requests {
-					t.Fatalf("every call succeeded, but this arm is expected to fail: %s.\n"+
-						"If the gateway now reaches a gRPC upstream over a load-balanced entry "+
-						"written without a scheme, the coalescing described above has changed and "+
-						"the service discovery limitation recorded in TT-18059 no longer holds.",
-						arm.wantReason)
-				}
-				if total > 0 {
-					t.Errorf("%d of %d calls were answered on an arm expected to fail outright; "+
-						"the downgrade is expected to break every call, not some of them", total, requests)
-				}
+				assertDowngradedArmFails(t, arm.wantReason, total, requests, callErr)
 				return
 			}
 
-			if callErr != nil {
-				t.Fatalf("%d/%d calls answered, first error %v.\n"+
-					"Load balancing over explicit h2c:// targets must reach a real gRPC server. "+
-					"An error here means the target list is being rewritten to http:// again and "+
-					"the gateway is offering HTTP/1.1 to an HTTP/2-only server.", total, requests, callErr)
-			}
-			if total != requests {
-				t.Fatalf("%d of %d calls answered and no error was returned, which should not happen",
-					total, requests)
-			}
+			assertAllCallsAnswered(t, total, requests, callErr)
 
-			var idle []string
-			for _, p := range pods {
-				if atomic.LoadInt64(&p.hits) == 0 {
-					idle = append(idle, fmt.Sprintf("%s (%s)", p.id, p.bareTarget()))
-				}
-			}
-			if len(idle) > 0 {
+			if idle := idleGRPCPods(pods); len(idle) > 0 {
 				t.Fatalf("load balancing is enabled over %d targets but %v received no calls; "+
 					"requests are not being distributed", len(arm.targets), idle)
 			}
@@ -358,6 +390,35 @@ func TestGRPCUpstream_StaticLB_RealGRPC(t *testing.T) {
 // calls only succeed if the resolved addresses enter the target list, keep the
 // h2c scheme, and keep the service name as their authority, so all three are
 // asserted together. The disabled arm is the control, and pins to one pod.
+// assertPodAuthority checks every pod was told the configured authority. A gRPC
+// server doing virtual hosting rejects anything else.
+func assertPodAuthority(t *testing.T, pods []*grpcPod, want string) {
+	t.Helper()
+
+	for _, p := range pods {
+		auths := p.authorityList()
+		if auths[want] == 0 {
+			t.Errorf("%s saw authorities %v, none of them %q. Dialling the pod address "+
+				"must not change the authority the upstream is told.",
+				p.id, auths, want)
+		}
+	}
+}
+
+// assertPinnedToOneGRPCPod is the control arm: without discovery the cleartext
+// HTTP/2 client has no resolver and pools by the host in the request URL.
+func assertPinnedToOneGRPCPod(t *testing.T, pods []*grpcPod, idle []string) {
+	t.Helper()
+
+	if len(idle) != len(pods)-1 {
+		t.Errorf("control: with DNS discovery off, %d of %d pods were idle, want %d. "+
+			"Traffic is expected to pin to one pod, because the cleartext HTTP/2 client "+
+			"has no resolver and pools by the host in the request URL. If it spreads "+
+			"here, the enabled arm is not measuring the setting.",
+			len(idle), len(pods), len(pods)-1)
+	}
+}
+
 func TestGRPCUpstream_DNSDiscovery_RealGRPC(t *testing.T) {
 	const (
 		upstreamHost    = "grpc-real-lb.test"
@@ -377,25 +438,28 @@ func TestGRPCUpstream_DNSDiscovery_RealGRPC(t *testing.T) {
 
 	wantAuthority := net.JoinHostPort(upstreamHost, port)
 
-	for _, enabled := range []bool{true, false} {
-		name := "dns_discovery_disabled"
-		if enabled {
-			name = "dns_discovery_enabled"
-		}
+	cases := []struct {
+		name    string
+		enabled bool
+	}{
+		{"dns_discovery_enabled", true},
+		{"dns_discovery_disabled", false},
+	}
 
-		t.Run(name, func(t *testing.T) {
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
 			resetPods(pods)
 
 			ts := StartTest(nil)
 			defer ts.Close()
 
 			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-				spec.Name = "grpc-dns-lb-" + name
+				spec.Name = "grpc-dns-lb-" + tc.name
 				spec.Proxy.ListenPath = "/"
 				spec.UseKeylessAccess = true
 				spec.Proxy.TargetURL = fmt.Sprintf("h2c://%s:%s", upstreamHost, port)
-				spec.Proxy.EnableLoadBalancing = enabled
-				spec.Proxy.DNSDiscovery.Enabled = enabled
+				spec.Proxy.EnableLoadBalancing = tc.enabled
+				spec.Proxy.DNSDiscovery.Enabled = tc.enabled
 				spec.Proxy.DNSDiscovery.RefreshInterval = dnsCacheTimeout
 			})
 
@@ -403,19 +467,9 @@ func TestGRPCUpstream_DNSDiscovery_RealGRPC(t *testing.T) {
 			waitForGRPCGateway(t, gatewayAddr, pods)
 
 			served, callErr := callGreeter(t, gatewayAddr, requests)
-
-			total := 0
-			for _, n := range served {
-				total += n
-			}
-			var idle []string
-			for _, p := range pods {
-				if atomic.LoadInt64(&p.hits) == 0 {
-					idle = append(idle, fmt.Sprintf("%s (%s)", p.id, p.bareTarget()))
-				}
-				t.Logf("  %s (%s:%s): %d calls served, authorities %v",
-					p.id, p.ip, port, atomic.LoadInt64(&p.hits), p.authorityList())
-			}
+			total := totalServed(served)
+			idle := idleGRPCPods(pods)
+			logGRPCPods(t, pods)
 
 			if callErr != nil {
 				t.Fatalf("%d/%d calls answered, first error %v.\n"+
@@ -428,14 +482,8 @@ func TestGRPCUpstream_DNSDiscovery_RealGRPC(t *testing.T) {
 				t.Fatalf("pods answered %d of %d calls with no error returned", total, requests)
 			}
 
-			if !enabled {
-				if len(idle) != len(pods)-1 {
-					t.Errorf("control: with DNS discovery off, %d of %d pods were idle, want %d. "+
-						"Traffic is expected to pin to one pod, because the cleartext HTTP/2 client "+
-						"has no resolver and pools by the host in the request URL. If it spreads "+
-						"here, the enabled arm is not measuring the setting.",
-						len(idle), len(pods), len(pods)-1)
-				}
+			if !tc.enabled {
+				assertPinnedToOneGRPCPod(t, pods, idle)
 				return
 			}
 
@@ -448,15 +496,7 @@ func TestGRPCUpstream_DNSDiscovery_RealGRPC(t *testing.T) {
 				t.Errorf("distribution evenness %.2f exceeds the 1.5 bar, counts %v", got, served)
 			}
 
-			// A gRPC server doing virtual hosting rejects anything else.
-			for _, p := range pods {
-				auths := p.authorityList()
-				if n := auths[wantAuthority]; n == 0 {
-					t.Errorf("%s saw authorities %v, none of them %q. Dialling the pod address "+
-						"must not change the authority the upstream is told.",
-						p.id, auths, wantAuthority)
-				}
-			}
+			assertPodAuthority(t, pods, wantAuthority)
 		})
 	}
 }
