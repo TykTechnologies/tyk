@@ -4,6 +4,8 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 // upstreamConnRegistry tracks connections per upstream address, in the
@@ -13,6 +15,7 @@ type upstreamConnRegistry struct {
 	conns  map[string]map[*trackedConn]struct{}
 	drains map[string]*pendingDrain
 	closed bool
+	logger *logrus.Entry
 }
 
 // Stop cannot take back a fired timer, so the callback re-checks cancelled.
@@ -21,10 +24,11 @@ type pendingDrain struct {
 	cancelled bool
 }
 
-func newUpstreamConnRegistry() *upstreamConnRegistry {
+func newUpstreamConnRegistry(logger *logrus.Entry) *upstreamConnRegistry {
 	return &upstreamConnRegistry{
 		conns:  map[string]map[*trackedConn]struct{}{},
 		drains: map[string]*pendingDrain{},
+		logger: logger,
 	}
 }
 
@@ -90,6 +94,17 @@ func (r *upstreamConnRegistry) drain(addr string, after time.Duration) {
 		tracked := r.takeAddrLocked(addr)
 		r.mu.Unlock()
 
+		// The close is abrupt: a stream still running is cut rather than
+		// given a GOAWAY, so the count is what an operator tunes
+		// drain_deadline against.
+		if len(tracked) > 0 && r.logger != nil {
+			r.logger.WithFields(logrus.Fields{
+				"address":     addr,
+				"connections": len(tracked),
+				"deadline":    after.String(),
+			}).Info("[PROXY] [DNS DISCOVERY] Drain deadline reached, closing connections to a departed upstream")
+		}
+
 		closeTracked(tracked)
 	})
 	r.drains[addr] = pending
@@ -106,7 +121,8 @@ func (r *upstreamConnRegistry) cancelDrain(addr string) {
 	r.cancelDrainLocked(addr)
 }
 
-// The flag is what stops a callback already fired and waiting on the mutex.
+// cancelDrainLocked flags as well as stops, to turn back a callback already
+// fired and waiting on the mutex.
 func (r *upstreamConnRegistry) cancelDrainLocked(addr string) {
 	pending, ok := r.drains[addr]
 	if !ok {

@@ -16,7 +16,7 @@ import (
 )
 
 // A third source for an API's target list, after target_list and service
-// discovery. Resolution lives in internal/dnsdiscovery.
+// discovery. Resolution itself lives in internal/dnsdiscovery.
 
 // Defaults applied when the configured value is 0.
 const (
@@ -79,7 +79,6 @@ func planUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) *dnsDiscovery
 		return nil
 	}
 
-	// Left on service discovery, which an existing API may be relying on.
 	if spec.Proxy.ServiceDiscovery.UseDiscoveryService {
 		logger.Error("[PROXY] [DNS DISCOVERY] dns_discovery and service_discovery both supply the target list " +
 			"and cannot be enabled together. Leaving this API on service discovery")
@@ -100,7 +99,6 @@ func planUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) *dnsDiscovery
 		return nil
 	}
 
-	// h2c pins to one backend, holding one connection per authority.
 	if !strings.EqualFold(target.Scheme, "h2c") {
 		logger.WithField("scheme", target.Scheme).
 			Warning("[PROXY] [DNS DISCOVERY] DNS discovery only supports h2c upstreams; leaving this API on its configured target")
@@ -123,7 +121,7 @@ func planUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) *dnsDiscovery
 	}
 
 	if plan.drain >= 0 {
-		plan.conns = newUpstreamConnRegistry()
+		plan.conns = newUpstreamConnRegistry(logger)
 	}
 
 	return plan
@@ -232,8 +230,8 @@ func (p *dnsDiscoveryPlan) onAddressSet(state *dnsdiscovery.State) {
 }
 
 // Zero means "use the default" throughout, as it does for every other duration
-// in an API definition. StaleTTL also takes -1 for "never give up", the
-// spelling session lifetimes use. apidef.RuleDNSDiscovery rejects the rest.
+// in an API definition. StaleTTL also takes -1 for "never give up".
+// apidef.RuleDNSDiscovery rejects the rest.
 
 func resolveDNSDiscoveryInterval(conf apidef.DNSDiscoveryConfig) time.Duration {
 	seconds := conf.RefreshInterval
@@ -309,8 +307,6 @@ func tlsUpstreamScheme(scheme string) bool {
 	}
 }
 
-// The scheme selects the h2c transport after the Director runs, and the
-// Director takes the query from the entry the picker returned.
 func buildUpstreamTarget(target *url.URL, addr, port string) string {
 	var entry strings.Builder
 

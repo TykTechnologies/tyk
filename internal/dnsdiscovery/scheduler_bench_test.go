@@ -110,9 +110,9 @@ func BenchmarkSubscribe(b *testing.B) {
 		}
 	})
 
-	// Subscribe walks the entry's subscribers, so this is O(APIs on that
-	// hostname) and reloading them all is O(n²). Existing keys are
-	// re-subscribed, so each measurement runs against a fixed population.
+	// Aggregates are folded in rather than rescanned, so this should not grow
+	// with the population. Existing keys are re-subscribed, so each
+	// measurement runs against a fixed one.
 	b.Run("shared hostname", func(b *testing.B) {
 		for _, existing := range []int{1, 10, 100, 1000} {
 			b.Run(fmt.Sprintf("existing=%d", existing), func(b *testing.B) {
@@ -213,4 +213,96 @@ func BenchmarkSubscribeChurn(b *testing.B) {
 			i++
 		}
 	})
+}
+
+// BenchmarkRescanOnExtremeDeparture is the case the aggregates cannot fold: the
+// sole holder of a hostname's shortest interval leaves. The arrival is measured
+// with the departure, since timing them apart costs a ReadMemStats per
+// iteration; the fold is constant time and the rescan is what grows.
+func BenchmarkRescanOnExtremeDeparture(b *testing.B) {
+	for _, existing := range []int{100, 1000, 10000} {
+		b.Run(fmt.Sprintf("existing=%d", existing), func(b *testing.B) {
+			scheduler := benchScheduler(4)
+			ctx := context.Background()
+
+			for i := 0; i < existing; i++ {
+				if _, err := scheduler.Subscribe(ctx, fmt.Sprintf("api-%d", i), Config{
+					Host:     "svc",
+					Interval: 30 * time.Second,
+				}); err != nil {
+					b.Fatal(err)
+				}
+			}
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if _, err := scheduler.Subscribe(ctx, "shortest", Config{
+					Host:     "svc",
+					Interval: MinInterval,
+				}); err != nil {
+					b.Fatal(err)
+				}
+
+				scheduler.ReleaseKey("shortest")
+			}
+		})
+	}
+}
+
+// BenchmarkLoopScan is what one iteration of the scheduler loop holds the lock
+// for. Both scans walk the same map, so replacing either alone halves nothing.
+func BenchmarkLoopScan(b *testing.B) {
+	for _, hosts := range []int{1000, 10000, 100000} {
+		b.Run(fmt.Sprintf("hosts=%d", hosts), func(b *testing.B) {
+			scheduler := benchScheduler(4)
+			ctx := context.Background()
+
+			for i := 0; i < hosts; i++ {
+				if _, err := scheduler.Subscribe(ctx, fmt.Sprintf("api-%d", i), Config{
+					Host:     fmt.Sprintf("svc-%d", i),
+					Interval: time.Hour,
+				}); err != nil {
+					b.Fatal(err)
+				}
+			}
+			// Take them out of the due state, which they start in.
+			scheduler.Refresh(ctx)
+
+			b.Run("dueEntries", func(b *testing.B) {
+				b.ReportAllocs()
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					scheduler.dueEntries()
+				}
+			})
+
+			b.Run("nextWait", func(b *testing.B) {
+				b.ReportAllocs()
+				b.ResetTimer()
+				for i := 0; i < b.N; i++ {
+					scheduler.nextWait()
+				}
+			})
+		})
+	}
+}
+
+// BenchmarkNormalise runs once per lookup. DNS over TCP caps an answer at the
+// two byte length prefix, so 65535 bytes, around 4000 A records.
+func BenchmarkNormalise(b *testing.B) {
+	for _, records := range []int{4, 50, 500, 4000} {
+		b.Run(fmt.Sprintf("records=%d", records), func(b *testing.B) {
+			addrs := make([]string, 0, records)
+			for i := records; i > 0; i-- {
+				addrs = append(addrs, fmt.Sprintf("10.%d.%d.%d", i/65025, i/255%255, i%255))
+			}
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				Normalise(addrs)
+			}
+		})
+	}
 }

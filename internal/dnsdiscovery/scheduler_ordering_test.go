@@ -155,24 +155,19 @@ func TestEntryAggregatesMatchFullRescan(t *testing.T) {
 	}
 }
 
-// aggregates is the comparable part of an entry: everything addSubLocked and
+// entryState is the comparable part of an entry: everything addSubLocked and
 // removeSubLocked maintain without rescanning.
-type aggregates struct {
-	Interval      time.Duration
-	StaleTTL      time.Duration
-	MaxStaleTTL   time.Duration
-	AtMinInterval int
-	AtMaxStale    int
-	UnboundedRefs int
+type entryState struct {
+	aggregates
+	StaleTTL time.Duration
 }
 
-func aggregatesOf(e *entry) aggregates {
-	return aggregates{e.interval, e.staleTTL, e.maxStaleTTL, e.atMinInterval, e.atMaxStale, e.unboundedRefs}
+func aggregatesOf(e *entry) entryState {
+	return entryState{e.aggregates, e.staleTTL}
 }
 
-func applyAggregates(e *entry, a aggregates) {
-	e.interval, e.staleTTL, e.maxStaleTTL = a.Interval, a.StaleTTL, a.MaxStaleTTL
-	e.atMinInterval, e.atMaxStale, e.unboundedRefs = a.AtMinInterval, a.AtMaxStale, a.UnboundedRefs
+func applyAggregates(e *entry, a entryState) {
+	e.aggregates, e.staleTTL = a.aggregates, a.StaleTTL
 }
 
 func TestLookupConcurrency(t *testing.T) {

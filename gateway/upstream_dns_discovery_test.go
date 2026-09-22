@@ -453,7 +453,7 @@ func TestSetupUpstreamDNSDiscovery_ReleasesOnReconfigure(t *testing.T) {
 }
 
 func TestUpstreamConnRegistry_DrainsDepartedAddresses(t *testing.T) {
-	registry := newUpstreamConnRegistry()
+	registry := newUpstreamConnRegistry(nil)
 
 	departing, departingPeer := net.Pipe()
 	staying, stayingPeer := net.Pipe()
@@ -483,7 +483,7 @@ func TestUpstreamConnRegistry_DrainsDepartedAddresses(t *testing.T) {
 // A pod keeps serving until its grace period ends, so a request in flight
 // has to finish.
 func TestUpstreamConnRegistry_DrainIsDeferredNotImmediate(t *testing.T) {
-	registry := newUpstreamConnRegistry()
+	registry := newUpstreamConnRegistry(nil)
 
 	conn, peer := net.Pipe()
 	defer peer.Close()
@@ -497,7 +497,7 @@ func TestUpstreamConnRegistry_DrainIsDeferredNotImmediate(t *testing.T) {
 }
 
 func TestUpstreamConnRegistry_ReturningAddressCancelsItsDrain(t *testing.T) {
-	registry := newUpstreamConnRegistry()
+	registry := newUpstreamConnRegistry(nil)
 
 	conn, peer := net.Pipe()
 	defer peer.Close()
@@ -513,7 +513,7 @@ func TestUpstreamConnRegistry_ReturningAddressCancelsItsDrain(t *testing.T) {
 
 // Unload has already closed the idle connections, so what is left is busy.
 func TestUpstreamConnRegistry_CloseRetiresWithoutSevering(t *testing.T) {
-	registry := newUpstreamConnRegistry()
+	registry := newUpstreamConnRegistry(nil)
 
 	inFlight, inFlightPeer := net.Pipe()
 	defer inFlightPeer.Close()
@@ -551,7 +551,7 @@ func TestUpstreamConnRegistry_RedialBeatsAnExpiringDrain(t *testing.T) {
 	const attempts = 200
 
 	for i := 0; i < attempts; i++ {
-		registry := newUpstreamConnRegistry()
+		registry := newUpstreamConnRegistry(nil)
 
 		departing, departingPeer := net.Pipe()
 		registry.track(addr, departing)
@@ -579,7 +579,7 @@ func TestUpstreamConnRegistry_RedialBeatsAnExpiringDrain(t *testing.T) {
 }
 
 func TestUpstreamConnRegistry_PoolCloseDeregisters(t *testing.T) {
-	registry := newUpstreamConnRegistry()
+	registry := newUpstreamConnRegistry(nil)
 
 	conn, peer := net.Pipe()
 	defer peer.Close()

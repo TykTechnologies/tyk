@@ -1,7 +1,7 @@
 package gateway
 
-// Regression tests for four defects in the h2c (plaintext HTTP/2, so gRPC)
-// upstream path. Each one failed on master.
+// Regression tests for defects in the h2c (plaintext HTTP/2, so gRPC) upstream
+// path. Each one failed on master.
 
 import (
 	"context"
@@ -19,6 +19,7 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 )
@@ -524,5 +525,144 @@ func TestH2C_Upstream_RoundRobin_Distributes(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// h2c:// in a target_list survives EnsureTransport, so the transport can no
+// longer be chosen once and reused: a list mixing h2c with another scheme sent
+// every target over whichever protocol the first request drew. Before the
+// feature both entries went through one http.Transport, which picks TLS per
+// request, so mixed lists worked with the h2c entry downgraded to HTTP/1.1.
+func TestH2C_MixedSchemeTargetList(t *testing.T) {
+	newOther := func(t *testing.T, tls bool, record func(*http.Request)) *httptest.Server {
+		t.Helper()
+		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			record(r)
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, "ok")
+		})
+
+		srv := httptest.NewServer(handler)
+		if tls {
+			srv = httptest.NewTLSServer(handler)
+		}
+		t.Cleanup(srv.Close)
+		return srv
+	}
+
+	for _, tc := range []struct {
+		name string
+		tls  bool
+	}{
+		{name: "h2c and http"},
+		{name: "h2c and https", tls: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var mu sync.Mutex
+			protos := map[string][]string{}
+
+			record := func(name string) func(*http.Request) {
+				return func(r *http.Request) {
+					mu.Lock()
+					protos[name] = append(protos[name], r.Proto)
+					mu.Unlock()
+				}
+			}
+
+			upstream := newH2CUpstream(t, record("h2c"))
+			h2cURL := strings.Replace(upstream.URL, "http://", "h2c://", 1)
+			other := newOther(t, tc.tls, record("other"))
+
+			conf := func(globalConf *config.Config) {
+				globalConf.ProxySSLInsecureSkipVerify = true
+			}
+			ts := StartTest(conf)
+			defer ts.Close()
+
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/mixed/"
+				spec.UseKeylessAccess = true
+				spec.Proxy.TargetURL = h2cURL
+				spec.Proxy.EnableLoadBalancing = true
+				spec.Proxy.Targets = []string{h2cURL, other.URL}
+			})
+
+			for i := 0; i < 6; i++ {
+				res, err := ts.Run(t, test.TestCase{Path: "/mixed/"})
+				if err != nil {
+					t.Fatalf("request %d: %v", i, err)
+				}
+				body, readErr := io.ReadAll(res.Body)
+				_ = res.Body.Close()
+				if readErr != nil {
+					t.Fatalf("request %d: %v", i, readErr)
+				}
+				if res.StatusCode != http.StatusOK {
+					t.Errorf("request %d returned %d: %s", i, res.StatusCode, strings.TrimSpace(string(body)))
+				}
+			}
+
+			mu.Lock()
+			defer mu.Unlock()
+
+			if len(protos["h2c"]) == 0 {
+				t.Error("no request reached the h2c:// target")
+			}
+			if len(protos["other"]) == 0 {
+				t.Error("no request reached the other target; the cached transport " +
+					"sent it over the wrong protocol")
+			}
+			for i, got := range protos["h2c"] {
+				if got != "HTTP/2.0" {
+					t.Errorf("h2c request %d arrived over %q, want HTTP/2.0", i, got)
+				}
+			}
+			for i, got := range protos["other"] {
+				if got != "HTTP/1.1" {
+					t.Errorf("non-h2c request %d arrived over %q, want HTTP/1.1", i, got)
+				}
+			}
+		})
+	}
+}
+
+func TestUpstreamSchemes(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		targetURL string
+		lb        bool
+		targets   []string
+		wantH2C   bool
+		wantOther bool
+	}{
+		{name: "plain http", targetURL: "http://a", wantOther: true},
+		{name: "single h2c", targetURL: "h2c://a", wantH2C: true},
+		{name: "uppercase h2c", targetURL: "H2C://a", wantH2C: true},
+		{name: "all h2c", targetURL: "h2c://a", lb: true,
+			targets: []string{"h2c://a", "h2c://b"}, wantH2C: true},
+		{name: "mixed with http", targetURL: "h2c://a", lb: true,
+			targets: []string{"h2c://a", "http://b"}, wantH2C: true, wantOther: true},
+		{name: "mixed with https", targetURL: "h2c://a", lb: true,
+			targets: []string{"h2c://a", "https://b"}, wantH2C: true, wantOther: true},
+		{name: "targets ignored without load balancing", targetURL: "http://a",
+			targets: []string{"h2c://b"}, wantOther: true},
+		{name: "dns discovery renders from target_url", targetURL: "h2c://svc", lb: true, wantH2C: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+			spec.Proxy.TargetURL = tc.targetURL
+			spec.Proxy.EnableLoadBalancing = tc.lb
+			spec.Proxy.Targets = tc.targets
+
+			hasH2C, hasOther := upstreamSchemes(spec)
+			if hasH2C != tc.wantH2C || hasOther != tc.wantOther {
+				t.Errorf("upstreamSchemes() = (h2c=%v, other=%v), want (h2c=%v, other=%v)",
+					hasH2C, hasOther, tc.wantH2C, tc.wantOther)
+			}
+		})
+	}
+
+	if hasH2C, hasOther := upstreamSchemes(nil); hasH2C || hasOther {
+		t.Errorf("upstreamSchemes(nil) = (%v, %v), want (false, false)", hasH2C, hasOther)
 	}
 }

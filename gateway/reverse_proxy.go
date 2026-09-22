@@ -142,10 +142,8 @@ func EnsureTransport(host, protocol string) string {
 		protocol = "http"
 	}
 
-	// A host with no protocol takes the API's listen protocol, and only an
-	// h2c inherited that way is coalesced to http. An explicit h2c:// target
-	// survives: enabling load balancing must not silently downgrade an h2c
-	// upstream to HTTP/1.1.
+	// Only an h2c inherited from the listen protocol is coalesced to http. An
+	// explicit h2c:// target survives, or load balancing would downgrade it.
 	if !strings.Contains(host, "://") {
 		host = protocol + "://" + host
 		host = strings.Replace(host, "h2c://", "http://", 1)
@@ -158,27 +156,35 @@ func EnsureTransport(host, protocol string) string {
 	return u.String()
 }
 
-// The transport is built from the first request's scheme and cached, so a
-// mixed list gets whichever the picker drew first.
-func warnOnMixedUpstreamSchemes(spec *APISpec, logger *logrus.Entry) {
-	if len(spec.Proxy.Targets) < 2 {
-		return
+func isH2CTarget(target string) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(target)), "h2c://")
+}
+
+// upstreamSchemes reports what schemes this API's upstreams are declared with.
+// The round tripper is built once, so this cannot come off the first request.
+func upstreamSchemes(spec *APISpec) (hasH2C, hasOther bool) {
+	if spec == nil {
+		return false, false
 	}
 
-	var h2c, other bool
-	for _, target := range spec.Proxy.Targets {
-		if strings.HasPrefix(strings.ToLower(strings.TrimSpace(target)), "h2c://") {
-			h2c = true
-			continue
+	classify := func(target string) {
+		switch {
+		case target == "":
+		case isH2CTarget(target):
+			hasH2C = true
+		default:
+			hasOther = true
 		}
-		other = true
 	}
 
-	if h2c && other {
-		logger.Warning("[PROXY] target_list mixes h2c:// with other schemes. The upstream transport is " +
-			"chosen once, from the scheme of the first request, so requests to the other scheme's targets " +
-			"will be sent over the wrong protocol. Split these into separate APIs")
+	classify(spec.Proxy.TargetURL)
+	if spec.Proxy.EnableLoadBalancing {
+		for _, target := range spec.Proxy.Targets {
+			classify(target)
+		}
 	}
+
+	return hasH2C, hasOther
 }
 
 func (gw *Gateway) nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
@@ -250,10 +256,10 @@ func (gw *Gateway) upstreamTargetList(spec *APISpec, logger *logrus.Entry) *apid
 	}
 }
 
-// resolveUpstreamTarget picks the target for one request from whichever
-// source supplies the list, and the authority to send as the Host header when
-// that target is a backend address rather than the name clients asked for. It
-// returns the inputs unchanged when the API has no list to distribute across.
+// resolveUpstreamTarget picks one request's target from whichever source
+// supplies the list, and the authority to send as the Host header when that
+// target is a backend address. The inputs come back unchanged when there is no
+// list to distribute across.
 func (gw *Gateway) resolveUpstreamTarget(
 	req *http.Request,
 	spec *APISpec,
@@ -343,8 +349,7 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		// later request's query string.
 		targetQuery := targetQuery
 
-		// authorityHost is the Host header to send instead of the address
-		// being dialled.
+		// The Host header to send instead of the address being dialled.
 		var authorityHost string
 		target, targetQuery, authorityHost = gw.resolveUpstreamTarget(req, spec, logger, target, targetQuery)
 
@@ -391,8 +396,8 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 
 		if !spec.Proxy.PreserveHostHeader {
 			req.Host = targetToUse.Host
-			// A URL rewrite that retained the host outranks the service
-			// name.
+
+			// A URL rewrite that retained the host outranks the service name.
 			if authorityHost != "" && targetToUse == target {
 				req.Host = authorityHost
 			}
@@ -914,9 +919,13 @@ func (p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, re
 
 	p.logger.Debug("Out request url: ", outReq.URL.String())
 
-	if outReq.URL.Scheme == "h2c" {
+	hasH2C, hasOther := upstreamSchemes(p.TykAPISpec)
+	if outReq.URL.Scheme == "h2c" || hasH2C {
 		p.logger.Info("Enabling h2c mode")
-		return newH2CRoundTripper(p.TykAPISpec, transport, p.logger, p.Gw)
+		rt := newH2CRoundTripper(p.TykAPISpec, transport, p.logger, p.Gw)
+
+		rt.h2cOnly = hasH2C && !hasOther
+		return rt
 	}
 
 	return &TykRoundTripper{transport: transport, logger: p.logger, Gw: p.Gw}
@@ -977,6 +986,11 @@ type TykRoundTripper struct {
 	logger       *logrus.Entry
 	Gw           *Gateway `json:"-"`
 
+	// h2cOnly covers requests that reach RoundTrip unmarked, which the GraphQL
+	// v1 data sources produce: they rebuild the upstream request with
+	// http.NewRequest and drop the execution context.
+	h2cOnly bool
+
 	// retired stops the h2c dialler. http2.Transport has no DisableKeepAlives
 	// of its own: it reads the one on a linked *http.Transport, and a
 	// standalone h2c transport has no such link, so CloseIdleConnections is
@@ -993,9 +1007,6 @@ const (
 	defaultH2CReadIdleTimeout = 30 * time.Second
 )
 
-// errTransportRetired is returned to a request that reaches a retired
-// transport's dialler, rather than letting it open a connection nothing will
-// close.
 var errTransportRetired = errors.New("upstream transport retired")
 
 // newH2CRoundTripper builds the round tripper for cleartext HTTP/2 upstreams.
@@ -1016,9 +1027,8 @@ func newH2CRoundTripper(spec *APISpec, transport *http.Transport, logger *logrus
 				return nil, err
 			}
 
-			// Looked up per dial rather than captured, so a reload that
-			// replaces the plan hands new connections to the live registry
-			// instead of the one it just closed.
+			// Looked up per dial, so a reload that replaces the plan hands
+			// new connections to the live registry, not the closed one.
 			return upstreamDrainRegistry(spec).track(addr, conn), nil
 		},
 		AllowHTTP: true,
@@ -1048,13 +1058,27 @@ func (rt *TykRoundTripper) Retire() {
 	rt.retired.Store(true)
 
 	if rt.transport != nil {
-		// Prevent new idle connections from being generated.
 		rt.transport.DisableKeepAlives = true
 		rt.transport.CloseIdleConnections()
 	}
 	if rt.h2ctransport != nil {
 		rt.h2ctransport.CloseIdleConnections()
 	}
+}
+
+// h2cUpstreamKey carries the transport choice past the scheme rewrite, which
+// WrappedServeHTTP has to do because x/net/http2 rejects anything but http
+// and https.
+type h2cUpstreamKey struct{}
+
+func markUpstreamScheme(r *http.Request, isH2C bool) {
+	core.SetContext(r, context.WithValue(r.Context(), h2cUpstreamKey{}, isH2C))
+}
+
+// upstreamSchemeMark reports the recorded decision and whether one was made.
+func upstreamSchemeMark(r *http.Request) (isH2C, marked bool) {
+	isH2C, marked = r.Context().Value(h2cUpstreamKey{}).(bool)
+	return isH2C, marked
 }
 
 func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -1077,16 +1101,25 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 		return handleInMemoryLoop(handler, r)
 	}
 
+	// Per request, so a target_list mixing h2c with another scheme keeps each
+	// target on the protocol it was declared with. An API with no h2c
+	// transport never reaches the lookup.
+	useH2C := false
+	if rt.h2ctransport != nil {
+		isH2C, marked := upstreamSchemeMark(r)
+		useH2C = isH2C || (!marked && rt.h2cOnly)
+	}
+
 	if rt.Gw.GetConfig().OpenTelemetry.TracesEnabled() {
 		var baseRoundTripper http.RoundTripper = rt.transport
-		if rt.h2ctransport != nil {
+		if useH2C {
 			baseRoundTripper = rt.h2ctransport
 		}
 
 		tr := otel.HTTPRoundTripper(baseRoundTripper)
 		return tr.RoundTrip(r)
 	}
-	if rt.h2ctransport != nil {
+	if useH2C {
 		return rt.h2ctransport.RoundTrip(r)
 	}
 
@@ -1474,8 +1507,14 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 	p.TykAPISpec.Unlock()
 
-	if outreq.URL.Scheme == "h2c" {
+	// The last point where an h2c target is still distinguishable. Everything
+	// downstream sees http; RoundTrip reads the mark.
+	isH2CUpstream := outreq.URL.Scheme == "h2c"
+	if isH2CUpstream {
 		outreq.URL.Scheme = "http"
+	}
+	if roundTripper.h2ctransport != nil {
+		markUpstreamScheme(outreq, isH2CUpstream)
 	}
 
 	if p.TykAPISpec.Proxy.Transport.SSLForceCommonNameCheck || p.Gw.GetConfig().SSLForceCommonNameCheck {

@@ -167,11 +167,9 @@ func ValidateOASObject(documentBody []byte, oasVersion string) error {
 	return validateTykExtension(documentBody)
 }
 
-// Cross-field rules live in Go rather than in the schema, which declares
-// draft-04, where if/then does not exist and a conditional written there is
-// parsed and ignored. They mirror apidef's rule set, on the OAS field names.
-//
-// ValidationRule checks one invariant that spans more than one field.
+// ValidationRule checks one invariant spanning more than one field. These live
+// in Go because the schema is draft-04, where if/then does not exist and a
+// conditional written there is parsed and ignored.
 type ValidationRule interface {
 	Validate(x *XTykAPIGateway) error
 }
@@ -194,8 +192,7 @@ var (
 )
 
 // validateTykExtension applies DefaultValidationRuleSet to the document's Tyk
-// extension. Only the extension is decoded, so a document without one costs
-// nothing.
+// extension.
 func validateTykExtension(documentBody []byte) error {
 	raw, dataType, _, err := jsonparser.Get(documentBody, ExtensionTykAPIGateway)
 	if err != nil || dataType != jsonparser.Object {
@@ -219,8 +216,8 @@ func validateTykExtension(documentBody []byte) error {
 	return combinedErr.ErrorOrNil()
 }
 
-// RuleUpstreamSources validates how the three sources of an upstream target
-// list combine. It is the OAS counterpart of apidef.RuleDNSDiscovery.
+// RuleUpstreamSources validates how the sources of an upstream target list
+// combine. It is the OAS counterpart of apidef.RuleDNSDiscovery.
 type RuleUpstreamSources struct{}
 
 // Validate implements ValidationRule.

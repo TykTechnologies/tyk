@@ -243,8 +243,6 @@ func (gw *Gateway) processSpec(
 		spec.Proxy.StructuredTargetList = sl
 	}
 
-	warnOnMixedUpstreamSchemes(spec, logger)
-
 	// A third source for that list, resolved rather than configured. It
 	// reconciles both ways, so a reload that turns it off releases here.
 	if !options.skipUpstreamDNSDiscovery {
