@@ -401,10 +401,6 @@ func startH2CPodSet(t *testing.T, n int) ([]*h2cPod, string) {
 	return pods, port
 }
 
-// Distribution alone is not enough: the target list is where the h2c scheme
-// is read from, so entries written http:// would send HTTP/1.1 to a gRPC
-// server. The disabled arm is the control, and pins to one pod.
-// resetH2CPods clears what the pods recorded for the previous subtest.
 func resetH2CPods(pods []*h2cPod) {
 	for _, p := range pods {
 		atomic.StoreInt64(&p.hits, 0)
@@ -500,6 +496,9 @@ func assertAuthority(t *testing.T, pods []*h2cPod, want string) {
 	}
 }
 
+// Distribution alone is not enough: the target list is where the h2c scheme
+// is read from, so entries written http:// would send HTTP/1.1 to a gRPC
+// server. The disabled arm is the control, and pins to one pod.
 func TestH2C_Upstream_RoundRobin_Distributes(t *testing.T) {
 	const (
 		upstreamHost = "grpc-upstream-lb.test"
@@ -570,11 +569,6 @@ func TestH2C_Upstream_RoundRobin_Distributes(t *testing.T) {
 	}
 }
 
-// h2c:// in a target_list survives EnsureTransport, so the transport can no
-// longer be chosen once and reused: a list mixing h2c with another scheme sent
-// every target over whichever protocol the first request drew. Before the
-// feature both entries went through one http.Transport, which picks TLS per
-// request, so mixed lists worked with the h2c entry downgraded to HTTP/1.1.
 // newPlainUpstream starts the non-h2c half of a mixed target list.
 func newPlainUpstream(t *testing.T, tls bool, record func(*http.Request)) *httptest.Server {
 	t.Helper()
@@ -593,7 +587,6 @@ func newPlainUpstream(t *testing.T, tls bool, record func(*http.Request)) *httpt
 	return srv
 }
 
-// sendMixedSchemeRequests drives the mixed target list, failing on anything but 200.
 func sendMixedSchemeRequests(t *testing.T, ts *Test, n int) {
 	t.Helper()
 
@@ -614,7 +607,6 @@ func sendMixedSchemeRequests(t *testing.T, ts *Test, n int) {
 	}
 }
 
-// assertProtocol checks every request one target saw arrived over want.
 func assertProtocol(t *testing.T, label string, got []string, want string) {
 	t.Helper()
 
@@ -625,6 +617,11 @@ func assertProtocol(t *testing.T, label string, got []string, want string) {
 	}
 }
 
+// h2c:// in a target_list survives EnsureTransport, so the transport can no
+// longer be chosen once and reused: a list mixing h2c with another scheme sent
+// every target over whichever protocol the first request drew. Before the
+// feature both entries went through one http.Transport, which picks TLS per
+// request, so mixed lists worked with the h2c entry downgraded to HTTP/1.1.
 func TestH2C_MixedSchemeTargetList(t *testing.T) {
 	for _, tc := range []struct {
 		name string

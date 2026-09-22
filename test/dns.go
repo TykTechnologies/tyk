@@ -121,8 +121,7 @@ var (
 	sharedErr  error
 )
 
-// PushDomains returns a function restoring what was registered before. An
-// already registered domain is replaced rather than added to.
+// PushDomains returns a function restoring what was registered before.
 func (h *DnsMockHandle) PushDomains(domainsMap map[string][]string, domainsErrorMap map[string]int) func() {
 	handler := h.mockServer.Handler.(*dnsMockHandler)
 	handler.muDomainsToAddresses.Lock()
@@ -176,8 +175,7 @@ func (h *DnsMockHandle) PushDomains(domainsMap map[string][]string, domainsError
 // to route all dns queries within tests to this server.
 // InitDNSMock returns handle, which can be used to add/remove dns query mock responses or initialization error.
 //
-// One mock server per process, since net.DefaultResolver can only point at one.
-// Use PushDomains for a scoped, restorable override.
+// One mock server per process; use PushDomains for a scoped override.
 func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int) (*DnsMockHandle, error) {
 	mockOnce.Do(func() {
 		sharedMock, sharedErr = startDNSMock()

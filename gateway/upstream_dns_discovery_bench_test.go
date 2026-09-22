@@ -301,13 +301,8 @@ type benchNopConn struct{ net.Conn }
 
 func (benchNopConn) Close() error { return nil }
 
-// The transport is chosen per request, so the choice sits on the hot path of
-// every API in the gateway. Lookup cost follows context depth, and a gateway
-// request carries a middleware chain, a session and a trace span.
-// benchContextDepths reads the mark's cost against how deep the request context is.
 var benchContextDepths = []int{0, 8, 24}
 
-// deepContextRequest builds a request whose context carries depth values.
 func deepContextRequest(depth int) *http.Request {
 	req := httptest.NewRequest(http.MethodGet, "http://gateway/greet", nil)
 	ctx := req.Context()
@@ -382,6 +377,9 @@ func benchSchemeClassify(b *testing.B) {
 	}
 }
 
+// The transport is chosen per request, so the choice sits on the hot path of
+// every API in the gateway. Lookup cost follows context depth, and a gateway
+// request carries a middleware chain, a session and a trace span.
 func BenchmarkUpstreamSchemeSelection(b *testing.B) {
 	b.Run("mark", benchSchemeMark)
 	b.Run("read", benchSchemeRead)

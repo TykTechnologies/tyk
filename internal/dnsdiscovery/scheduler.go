@@ -91,8 +91,7 @@ type Scheduler struct {
 	lookups atomic.Int64
 }
 
-// aggregates folds one name's subscribers into the shortest interval and the
-// longest stale TTL. The counters keep a departure from rescanning.
+// aggregates folds one name's subscribers into the shortest interval and longest stale TTL.
 type aggregates struct {
 	interval      time.Duration
 	maxStaleTTL   time.Duration
@@ -179,7 +178,6 @@ func (s *Subscription) Release() {
 	s.sched.release(s)
 }
 
-// deliver drops any state older than one already delivered.
 func (s *Subscription) deliver(state *State) {
 	if s == nil || s.onChange == nil || state == nil {
 		return
@@ -328,7 +326,6 @@ func (s *Scheduler) nextRefresh(base time.Duration) time.Duration {
 	return base + time.Duration(rand.Int64N(span))
 }
 
-// nextBackoff doubles from base, spreads the result, and clamps to MinInterval.
 func (s *Scheduler) nextBackoff(base time.Duration, failures int) time.Duration {
 	interval := base
 	for i := 1; i < failures && interval < MaxBackoff; i++ {
@@ -378,7 +375,6 @@ func (s *Scheduler) detachLocked(sub *Subscription) {
 	s.removeSubLocked(e, sub)
 }
 
-// addSubLocked folds one arrival into the aggregates in constant time.
 func (s *Scheduler) addSubLocked(e *entry, sub *Subscription) {
 	previous := e.interval
 	e.fold(sub)
@@ -386,7 +382,6 @@ func (s *Scheduler) addSubLocked(e *entry, sub *Subscription) {
 	s.pullNextDueLocked(e, previous)
 }
 
-// removeSubLocked is constant time unless the departing subscriber held an extreme alone.
 func (s *Scheduler) removeSubLocked(e *entry, sub *Subscription) {
 	rescan := false
 
@@ -410,7 +405,6 @@ func (s *Scheduler) removeSubLocked(e *entry, sub *Subscription) {
 	e.applyStaleTTL()
 }
 
-// recomputeLocked rebuilds the aggregates in O(subscribers).
 func (s *Scheduler) recomputeLocked(e *entry) {
 	previous := e.interval
 
@@ -423,7 +417,6 @@ func (s *Scheduler) recomputeLocked(e *entry) {
 	s.pullNextDueLocked(e, previous)
 }
 
-// applyStaleTTL resolves the aggregate into the value refresh reads.
 func (e *entry) applyStaleTTL() {
 	if e.unboundedRefs > 0 {
 		e.staleTTL = StaleTTLUnlimited
@@ -432,7 +425,6 @@ func (e *entry) applyStaleTTL() {
 	e.staleTTL = e.maxStaleTTL
 }
 
-// pullNextDueLocked brings the next refresh forward when a subscriber shortens the interval.
 func (s *Scheduler) pullNextDueLocked(e *entry, previous time.Duration) {
 	if previous == 0 || e.interval == 0 || e.interval >= previous {
 		return
@@ -557,7 +549,6 @@ func (s *Scheduler) dueEntries() []*entry {
 	return due
 }
 
-// refresh resolves one name and publishes the result.
 func (s *Scheduler) refresh(ctx context.Context, e *entry) {
 	// Skipped rather than queued: a name in flight must not hold a slot.
 	if !e.refreshMu.TryLock() {
@@ -590,7 +581,6 @@ func (s *Scheduler) refresh(ctx context.Context, e *entry) {
 	}
 }
 
-// applyAnswerLocked takes a successful lookup as it stands.
 func (s *Scheduler) applyAnswerLocked(e *entry, base time.Duration, addrs []string) (*State, []*Subscription) {
 	e.failures = 0
 	e.lastSuccess = s.timeNow()
@@ -629,7 +619,6 @@ func (s *Scheduler) applyFailureLocked(e *entry, base time.Duration, err error) 
 	return nil, nil
 }
 
-// confirmEmpty reports whether an empty answer should be published.
 func (e *entry) confirmEmpty() bool {
 	if e.emptyAnswers < EmptyAnswerThreshold {
 		e.emptyAnswers++

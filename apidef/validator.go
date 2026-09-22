@@ -218,6 +218,7 @@ func (r *RuleValidateEnforceTimeout) Validate(apiDef *APIDefinition, validationR
 	}
 }
 
+// Validation errors returned by the rules in this package.
 var (
 	// ErrMultipleUpstreamAuthEnabled is the error to be returned when multiple upstream authentication modes are configured.
 	ErrMultipleUpstreamAuthEnabled = errors.New("multiple upstream authentication modes not allowed")
@@ -230,17 +231,12 @@ var (
 	// ErrInvalidUpstreamOAuthClientAuthMethod is the error to return when the configured upstream OAuth client authentication method is invalid.
 	ErrInvalidUpstreamOAuthClientAuthMethod = errors.New("invalid upstream OAuth client authentication method, valid values are: client_secret_basic, client_secret_post")
 	// ErrAllLoadBalancingTargetsZeroWeight is the error to return when all load balancing targets have weight 0.
-	ErrAllLoadBalancingTargetsZeroWeight = errors.New("all load balancing targets have weight 0, at least one target must have weight > 0")
-	// ErrDNSDiscoveryRequiresLoadBalancing is the error to return when proxy.dns_discovery is enabled without proxy.enable_load_balancing.
-	ErrDNSDiscoveryRequiresLoadBalancing = errors.New("proxy.dns_discovery supplies the target list but does not distribute across it; proxy.enable_load_balancing must be enabled too")
-	// ErrDNSDiscoveryWithServiceDiscovery is the error to return when proxy.dns_discovery and proxy.service_discovery are both enabled.
-	ErrDNSDiscoveryWithServiceDiscovery = errors.New("proxy.dns_discovery and proxy.service_discovery both supply the target list and cannot be enabled together")
-	// ErrDNSDiscoveryNegativeRefreshInterval is the error to return when proxy.dns_discovery.refresh_interval is negative.
+	ErrAllLoadBalancingTargetsZeroWeight   = errors.New("all load balancing targets have weight 0, at least one target must have weight > 0")
+	ErrDNSDiscoveryRequiresLoadBalancing   = errors.New("proxy.dns_discovery supplies the target list but does not distribute across it; proxy.enable_load_balancing must be enabled too")
+	ErrDNSDiscoveryWithServiceDiscovery    = errors.New("proxy.dns_discovery and proxy.service_discovery both supply the target list and cannot be enabled together")
 	ErrDNSDiscoveryNegativeRefreshInterval = errors.New("proxy.dns_discovery.refresh_interval must not be negative; 0 applies the default")
-	// ErrDNSDiscoveryInvalidStaleTTL is the error to return when proxy.dns_discovery.stale_ttl is below -1.
-	ErrDNSDiscoveryInvalidStaleTTL = errors.New("proxy.dns_discovery.stale_ttl must be -1 or greater; 0 applies the default and -1 never gives up")
-	// ErrDNSDiscoveryNegativeDrainDeadline is the error to return when proxy.dns_discovery.drain_deadline is negative.
-	ErrDNSDiscoveryNegativeDrainDeadline = errors.New("proxy.dns_discovery.drain_deadline must not be negative; 0 applies the default, and drain_disabled turns draining off")
+	ErrDNSDiscoveryInvalidStaleTTL         = errors.New("proxy.dns_discovery.stale_ttl must be -1 or greater; 0 applies the default and -1 never gives up")
+	ErrDNSDiscoveryNegativeDrainDeadline   = errors.New("proxy.dns_discovery.drain_deadline must not be negative; 0 applies the default, and drain_disabled turns draining off")
 )
 
 // RuleUpstreamAuth implements validations for upstream authentication configurations.

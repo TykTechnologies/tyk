@@ -167,30 +167,22 @@ func ValidateOASObject(documentBody []byte, oasVersion string) error {
 	return validateTykExtension(documentBody)
 }
 
-// Validator checks one invariant spanning more than one field. These live in
-// Go because the draft-04 schema has no if/then.
-type Validator interface {
+type validator interface {
 	Validate(x *XTykAPIGateway) error
 }
 
-// DefaultValidationRuleSet is applied to every Tyk OAS document.
-var DefaultValidationRuleSet = []Validator{
-	&RuleUpstreamSources{},
+var validationRules = []validator{
+	&ruleUpstreamSources{},
 }
 
 var (
-	// ErrDNSDiscoveryWithServiceDiscovery is returned when upstream.dnsDiscovery
-	// and upstream.serviceDiscovery are both enabled.
-	ErrDNSDiscoveryWithServiceDiscovery = errors.New(
+	errDNSDiscoveryWithServiceDiscovery = errors.New(
 		"upstream.dnsDiscovery and upstream.serviceDiscovery both supply the target list and cannot be enabled together")
 
-	// ErrDNSDiscoveryRequiresLoadBalancing is returned when upstream.dnsDiscovery
-	// is enabled without upstream.loadBalancing.
-	ErrDNSDiscoveryRequiresLoadBalancing = errors.New(
+	errDNSDiscoveryRequiresLoadBalancing = errors.New(
 		"upstream.dnsDiscovery supplies the target list but does not distribute across it; upstream.loadBalancing must be enabled too")
 )
 
-// validateTykExtension applies DefaultValidationRuleSet to the Tyk extension.
 func validateTykExtension(documentBody []byte) error {
 	raw, dataType, _, err := jsonparser.Get(documentBody, ExtensionTykAPIGateway)
 	if err != nil || dataType != jsonparser.Object {
@@ -205,7 +197,7 @@ func validateTykExtension(documentBody []byte) error {
 	combinedErr := &multierror.Error{}
 	combinedErr.ErrorFormat = tykerrors.Formatter
 
-	for _, rule := range DefaultValidationRuleSet {
+	for _, rule := range validationRules {
 		if ruleErr := rule.Validate(&x); ruleErr != nil {
 			combinedErr = multierror.Append(combinedErr, ruleErr)
 		}
@@ -214,11 +206,10 @@ func validateTykExtension(documentBody []byte) error {
 	return combinedErr.ErrorOrNil()
 }
 
-// RuleUpstreamSources is the OAS counterpart of apidef.RuleDNSDiscovery.
-type RuleUpstreamSources struct{}
+// ruleUpstreamSources is the OAS counterpart of apidef.RuleDNSDiscovery.
+type ruleUpstreamSources struct{}
 
-// Validate implements Validator.
-func (r *RuleUpstreamSources) Validate(x *XTykAPIGateway) error {
+func (r *ruleUpstreamSources) Validate(x *XTykAPIGateway) error {
 	upstream := x.Upstream
 
 	if upstream.DNSDiscovery == nil || !upstream.DNSDiscovery.Enabled {
@@ -229,11 +220,11 @@ func (r *RuleUpstreamSources) Validate(x *XTykAPIGateway) error {
 	combinedErr.ErrorFormat = tykerrors.Formatter
 
 	if upstream.ServiceDiscovery != nil && upstream.ServiceDiscovery.Enabled {
-		combinedErr = multierror.Append(combinedErr, ErrDNSDiscoveryWithServiceDiscovery)
+		combinedErr = multierror.Append(combinedErr, errDNSDiscoveryWithServiceDiscovery)
 	}
 
 	if upstream.LoadBalancing == nil || !upstream.LoadBalancing.Enabled {
-		combinedErr = multierror.Append(combinedErr, ErrDNSDiscoveryRequiresLoadBalancing)
+		combinedErr = multierror.Append(combinedErr, errDNSDiscoveryRequiresLoadBalancing)
 	}
 
 	return combinedErr.ErrorOrNil()

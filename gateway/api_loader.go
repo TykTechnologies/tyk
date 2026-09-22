@@ -60,8 +60,7 @@ type ChainObject struct {
 type ProcessSpecOptions struct {
 	quotaKey string
 
-	// skipUpstreamDNSDiscovery leaves the scheduler untouched. Subscriptions
-	// are keyed on APIID.
+	// skipUpstreamDNSDiscovery leaves the scheduler untouched; subscriptions are keyed on APIID.
 	skipUpstreamDNSDiscovery bool
 }
 
@@ -1595,9 +1594,7 @@ func WithQuotaKey(key string) option.Option[ProcessSpecOptions] {
 	}
 }
 
-// WithoutUpstreamDNSDiscovery builds the chain without touching the DNS
-// discovery scheduler, for callers assembling a throwaway spec that carries a
-// live APIID.
+// WithoutUpstreamDNSDiscovery is for callers assembling a throwaway spec with a live APIID.
 func WithoutUpstreamDNSDiscovery() option.Option[ProcessSpecOptions] {
 	return func(p *ProcessSpecOptions) {
 		p.skipUpstreamDNSDiscovery = true

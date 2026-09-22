@@ -641,12 +641,10 @@ type ResponseProcessor struct {
 	Options interface{} `bson:"options" json:"options"`
 }
 
-// DNSDiscoveryConfig sources an API's target list from DNS: the hostname in
-// `target_url` is resolved in the background and every address it returns
-// becomes a target. Requires `enable_load_balancing`, and cannot be combined
-// with `service_discovery`.
+// DNSDiscoveryConfig sources an API's target list by resolving the hostname in
+// `target_url`. Requires `enable_load_balancing`, and cannot be combined with
+// `service_discovery`.
 type DNSDiscoveryConfig struct {
-	// Enabled turns DNS discovery on for this API.
 	Enabled bool `bson:"enabled" json:"enabled"`
 
 	// RefreshInterval is how often, in seconds, the hostname is re-resolved.

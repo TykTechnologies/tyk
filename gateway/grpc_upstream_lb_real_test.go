@@ -247,7 +247,6 @@ func evenness(served map[string]int, pods int) float64 {
 	return float64(highest) / mean
 }
 
-// totalServed sums the calls the pods answered between them.
 func totalServed(served map[string]int) int {
 	total := 0
 	for _, n := range served {
@@ -256,7 +255,6 @@ func totalServed(served map[string]int) int {
 	return total
 }
 
-// logGRPCPods records what each pod saw, for reading a failure after the fact.
 func logGRPCPods(t *testing.T, pods []*grpcPod) {
 	t.Helper()
 
@@ -266,7 +264,6 @@ func logGRPCPods(t *testing.T, pods []*grpcPod) {
 	}
 }
 
-// idleGRPCPods names the pods that answered nothing.
 func idleGRPCPods(pods []*grpcPod) []string {
 	var idle []string
 	for _, p := range pods {
@@ -295,7 +292,6 @@ func assertDowngradedArmFails(t *testing.T, reason string, total, requests int, 
 	}
 }
 
-// assertAllCallsAnswered checks a real gRPC conversation completed over every call.
 func assertAllCallsAnswered(t *testing.T, total, requests int, callErr error) {
 	t.Helper()
 
@@ -386,10 +382,6 @@ func TestGRPCUpstream_StaticLB_RealGRPC(t *testing.T) {
 	}
 }
 
-// Configured as the reported case is: one upstream name, no target list. The
-// calls only succeed if the resolved addresses enter the target list, keep the
-// h2c scheme, and keep the service name as their authority, so all three are
-// asserted together. The disabled arm is the control, and pins to one pod.
 // assertPodAuthority checks every pod was told the configured authority. A gRPC
 // server doing virtual hosting rejects anything else.
 func assertPodAuthority(t *testing.T, pods []*grpcPod, want string) {
@@ -419,6 +411,10 @@ func assertPinnedToOneGRPCPod(t *testing.T, pods []*grpcPod, idle []string) {
 	}
 }
 
+// Configured as the reported case is: one upstream name, no target list. The
+// calls only succeed if the resolved addresses enter the target list, keep the
+// h2c scheme, and keep the service name as their authority, so all three are
+// asserted together. The disabled arm is the control, and pins to one pod.
 func TestGRPCUpstream_DNSDiscovery_RealGRPC(t *testing.T) {
 	const (
 		upstreamHost    = "grpc-real-lb.test"

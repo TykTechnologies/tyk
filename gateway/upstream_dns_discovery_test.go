@@ -144,7 +144,6 @@ func TestResolveDNSDiscoveryPeriods(t *testing.T) {
 	t.Run("drain deadline", testDrainDeadlineResolution)
 }
 
-// hostAt returns one entry of a host list, failing the test when it is absent.
 func hostAt(t *testing.T, list *apidef.HostList, i int) string {
 	t.Helper()
 
@@ -155,7 +154,6 @@ func hostAt(t *testing.T, list *apidef.HostList, i int) string {
 	return entry
 }
 
-// mustURLFromDNS resolves an API's DNS-sourced target list, failing the test on error.
 func mustURLFromDNS(t *testing.T, gw *Gateway, spec *APISpec) *apidef.HostList {
 	t.Helper()
 
@@ -687,9 +685,6 @@ func TestUpstreamDNSDiscoveryEnabled(t *testing.T) {
 	}
 }
 
-// Which source wins, for every combination. The service discovery cases are a
-// regression test: adding DNS discovery to a chain of cases that fell through
-// replaced the registry list with the static one.
 // precedenceRegistry stands in for what a service registry returns.
 var precedenceRegistry = []string{"http://registry-1:8080", "http://registry-2:8080"}
 
@@ -815,6 +810,9 @@ func testPrecedenceNoSource(t *testing.T) {
 	}
 }
 
+// Which source wins, for every combination. The service discovery cases are a
+// regression test: adding DNS discovery to a chain of cases that fell through
+// replaced the registry list with the static one.
 func TestUpstreamTargetList_SourcePrecedence(t *testing.T) {
 	t.Run("service discovery supersedes a static list", testPrecedenceRegistryBeatsStaticList)
 	t.Run("service discovery with load balancing off", testPrecedenceRegistryWithoutLoadBalancing)
@@ -959,9 +957,6 @@ func TestPlanDrains_ForEveryAPIOnASharedHostname(t *testing.T) {
 	}
 }
 
-// A stored definition cannot be rejected, so an API the create endpoint would
-// have refused keeps serving on its configured target, and logs why.
-// loggedReason reports whether any entry names why the combination was refused.
 func loggedReason(entries []*logrus.Entry, want string) bool {
 	for _, entry := range entries {
 		if strings.Contains(entry.Message, want) {
@@ -1008,6 +1003,8 @@ func assertRefusedCombination(t *testing.T, configure func(*APISpec), wantLog st
 	}
 }
 
+// A stored definition cannot be rejected, so an API the create endpoint would
+// have refused keeps serving on its configured target, and logs why.
 func TestSetupUpstreamDNSDiscovery_RefusedCombinationsKeepServing(t *testing.T) {
 	cases := []struct {
 		name      string

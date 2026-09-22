@@ -159,7 +159,6 @@ func isH2CTarget(target string) bool {
 	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(target)), "h2c://")
 }
 
-// upstreamSchemes reports what schemes this API's upstreams are declared with.
 func upstreamSchemes(spec *APISpec) (hasH2C, hasOther bool) {
 	if spec == nil {
 		return false, false
@@ -229,8 +228,7 @@ func (gw *Gateway) nextTarget(targetData *apidef.HostList, spec *APISpec) (strin
 	return EnsureTransport(gotHost, spec.Protocol), nil
 }
 
-// upstreamTargetList returns the targets to distribute across, or nil to use
-// the configured target.
+// upstreamTargetList returns nil when the API should use its configured target.
 func (gw *Gateway) upstreamTargetList(spec *APISpec, logger *logrus.Entry) *apidef.HostList {
 	switch {
 	case spec.Proxy.ServiceDiscovery.UseDiscoveryService:
@@ -254,8 +252,7 @@ func (gw *Gateway) upstreamTargetList(spec *APISpec, logger *logrus.Entry) *apid
 	}
 }
 
-// resolveUpstreamTarget picks one request's target from whichever source
-// supplies the list, plus the authority to send as the Host header.
+// resolveUpstreamTarget picks one request's target, plus the authority to send as Host.
 func (gw *Gateway) resolveUpstreamTarget(
 	req *http.Request,
 	spec *APISpec,
@@ -279,7 +276,6 @@ func (gw *Gateway) resolveUpstreamTarget(
 
 	lbRemote, err := url.Parse(host)
 	if err != nil {
-		// Only replace the target if everything is OK.
 		logger.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", err)
 		return target, targetQuery, ""
 	}
@@ -342,7 +338,6 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		// Shadowed like target, or one request overwrites every later query string.
 		targetQuery := targetQuery
 
-		// The Host header to send instead of the address being dialled.
 		var authorityHost string
 		target, targetQuery, authorityHost = gw.resolveUpstreamTarget(req, spec, logger, target, targetQuery)
 
@@ -919,8 +914,7 @@ func (p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, re
 	return &TykRoundTripper{transport: transport, logger: p.logger, Gw: p.Gw}
 }
 
-// h2cRoundTripper returns a cleartext HTTP/2 round tripper when this API's
-// upstreams call for one, and nil when they do not.
+// h2cRoundTripper returns nil unless this API's upstreams call for cleartext HTTP/2.
 func (p *ReverseProxy) h2cRoundTripper(outReq *http.Request, transport *http.Transport) *TykRoundTripper {
 	hasH2C, hasOther := upstreamSchemes(p.TykAPISpec)
 	if outReq.URL.Scheme != "h2c" && !hasH2C {
@@ -988,32 +982,26 @@ type TykRoundTripper struct {
 	logger       *logrus.Entry
 	Gw           *Gateway `json:"-"`
 
-	// h2cOnly covers requests reaching RoundTrip unmarked, as the GraphQL v1
-	// data sources produce by dropping the execution context.
+	// h2cOnly covers requests reaching RoundTrip unmarked, as GraphQL v1 produces.
 	h2cOnly bool
 
-	// retired stops the h2c dialler: a standalone http2.Transport offers only
-	// CloseIdleConnections, which an in-flight request would re-dial past.
+	// retired stops the h2c dialler; CloseIdleConnections alone lets a request re-dial past.
 	retired atomic.Bool
 }
 
 const (
-	// How long an unused h2c connection is kept.
 	defaultH2CIdleConnTimeout = 90 * time.Second
 
-	// Idle time before a health-check ping.
 	defaultH2CReadIdleTimeout = 30 * time.Second
 )
 
 var errTransportRetired = errors.New("upstream transport retired")
 
-// newH2CRoundTripper builds the round tripper for cleartext HTTP/2 upstreams.
 func newH2CRoundTripper(spec *APISpec, transport *http.Transport, logger *logrus.Entry, gw *Gateway) *TykRoundTripper {
 	rt := &TykRoundTripper{transport: transport, logger: logger, Gw: gw}
 
 	rt.h2ctransport = &http2.Transport{
-		// Pretend to dial TLS, through the HTTP/1 dialler, so h2c keeps the
-		// dial timeout, dns_cache and any injected dialler.
+		// Pretend to dial TLS through the HTTP/1 dialler, so h2c keeps its settings.
 		DialTLSContext: func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
 			if rt.retired.Load() {
 				return nil, errTransportRetired
@@ -1032,8 +1020,7 @@ func newH2CRoundTripper(spec *APISpec, transport *http.Transport, logger *logrus
 		IdleConnTimeout: defaultH2CIdleConnTimeout,
 	}
 
-	// A backend dying without closing its side leaves requests hanging on a
-	// connection the pool still believes in.
+	// A backend dying without closing its side leaves requests hanging.
 	if upstreamDNSDiscoveryEnabled(spec) {
 		rt.h2ctransport.ReadIdleTimeout = defaultH2CReadIdleTimeout
 	}
@@ -1059,15 +1046,13 @@ func (rt *TykRoundTripper) Retire() {
 	}
 }
 
-// h2cUpstreamKey carries the transport choice past the scheme rewrite that
-// x/net/http2 forces on WrappedServeHTTP.
+// h2cUpstreamKey carries the transport choice past the scheme rewrite x/net/http2 forces.
 type h2cUpstreamKey struct{}
 
 func markUpstreamScheme(r *http.Request, isH2C bool) {
 	core.SetContext(r, context.WithValue(r.Context(), h2cUpstreamKey{}, isH2C))
 }
 
-// upstreamSchemeMark reports the recorded decision and whether one was made.
 func upstreamSchemeMark(r *http.Request) (isH2C, marked bool) {
 	isH2C, marked = r.Context().Value(h2cUpstreamKey{}).(bool)
 	return isH2C, marked

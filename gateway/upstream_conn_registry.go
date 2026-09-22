@@ -8,8 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// upstreamConnRegistry tracks connections per upstream address, in the dialler,
-// because neither transport can evict a single destination.
+// upstreamConnRegistry tracks connections per address, because neither transport evicts one destination.
 type upstreamConnRegistry struct {
 	mu     sync.Mutex
 	conns  map[string]map[*trackedConn]struct{}
@@ -32,7 +31,6 @@ func newUpstreamConnRegistry(logger *logrus.Entry) *upstreamConnRegistry {
 	}
 }
 
-// track wraps a connection so it deregisters on close.
 func (r *upstreamConnRegistry) track(addr string, conn net.Conn) net.Conn {
 	if r == nil || conn == nil {
 		return conn
@@ -57,8 +55,7 @@ func (r *upstreamConnRegistry) track(addr string, conn net.Conn) net.Conn {
 	return tracked
 }
 
-// drain closes every connection to addr after the deadline, letting a backend
-// that is shutting down finish its requests.
+// drain closes every connection to addr after the deadline, so a departing backend can finish.
 func (r *upstreamConnRegistry) drain(addr string, after time.Duration) {
 	if r == nil {
 		return
@@ -93,7 +90,6 @@ func (r *upstreamConnRegistry) drain(addr string, after time.Duration) {
 		tracked := r.takeAddrLocked(addr)
 		r.mu.Unlock()
 
-		// The close is abrupt: a running stream is cut rather than given a GOAWAY.
 		if len(tracked) > 0 && r.logger != nil {
 			r.logger.WithFields(logrus.Fields{
 				"address":     addr,
@@ -176,7 +172,6 @@ func (r *upstreamConnRegistry) close() {
 	r.conns = map[string]map[*trackedConn]struct{}{}
 }
 
-// countFor is used by tests.
 func (r *upstreamConnRegistry) countFor(addr string) int {
 	if r == nil {
 		return 0

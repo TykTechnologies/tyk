@@ -122,8 +122,7 @@ func planUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) *dnsDiscovery
 	return plan
 }
 
-// setupUpstreamDNSDiscovery reconciles both ways, so an API that stops asking
-// for discovery is released here.
+// setupUpstreamDNSDiscovery reconciles both ways: an API that stops asking is released here.
 func (gw *Gateway) setupUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) {
 	previous := spec.dnsDiscovery
 
@@ -194,8 +193,7 @@ func (p *dnsDiscoveryPlan) retire() {
 	p.conns.close()
 }
 
-// onAddressSet retires what a departed address leaves. The diff and the drains
-// it implies are one critical section.
+// onAddressSet holds the diff and the drains it implies in one critical section.
 func (p *dnsDiscoveryPlan) onAddressSet(state *dnsdiscovery.State) {
 	var addrs []string
 	if state != nil {
