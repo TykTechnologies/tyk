@@ -1901,11 +1901,9 @@ func TestEnsureTransport(t *testing.T) {
 		{"http://httpbin.org:80 ", "https", "http://httpbin.org:80"},
 		{"httpbin.org:2000 ", "tls", "tls://httpbin.org:2000"},
 		{"httpbin.org:2000 ", "", "http://httpbin.org:2000"},
-		// The h2c to http conversion. Only an inherited h2c scheme is
-		// coalesced, since protocol is what the API listens on and says
-		// nothing about the upstream. An explicitly written h2c:// target
-		// survives, because the h2c transport is chosen from the URL scheme
-		// after the Director has run.
+		// Only an inherited h2c scheme is coalesced. An explicit h2c://
+		// target survives, or enabling load balancing would downgrade an h2c
+		// upstream to HTTP/1.1.
 		{"http://httpbin.org ", "h2c", "http://httpbin.org"},
 		{"h2c://httpbin.org ", "h2c", "h2c://httpbin.org"},
 		{"httpbin.org ", "h2c", "http://httpbin.org"},

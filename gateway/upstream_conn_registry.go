@@ -6,8 +6,8 @@ import (
 	"time"
 )
 
-// Tracks connections per upstream address, in the dialler, because neither
-// transport can evict one destination.
+// upstreamConnRegistry tracks connections per upstream address, in the
+// dialler, because neither transport can evict a single destination.
 type upstreamConnRegistry struct {
 	mu     sync.Mutex
 	conns  map[string]map[*trackedConn]struct{}
@@ -15,7 +15,7 @@ type upstreamConnRegistry struct {
 	closed bool
 }
 
-// Stop cannot take back a fired timer, so the callback checks cancelled.
+// Stop cannot take back a fired timer, so the callback re-checks cancelled.
 type pendingDrain struct {
 	timer     *time.Timer
 	cancelled bool
@@ -28,7 +28,7 @@ func newUpstreamConnRegistry() *upstreamConnRegistry {
 	}
 }
 
-// Wraps the connection to deregister on close, and cancels any pending drain.
+// track wraps a connection so it deregisters on close.
 func (r *upstreamConnRegistry) track(addr string, conn net.Conn) net.Conn {
 	if r == nil || conn == nil {
 		return conn
@@ -53,7 +53,8 @@ func (r *upstreamConnRegistry) track(addr string, conn net.Conn) net.Conn {
 	return tracked
 }
 
-// The delay lets a backend that is shutting down finish its requests.
+// drain closes every connection to addr after the deadline, which lets a
+// backend that is shutting down finish its requests.
 func (r *upstreamConnRegistry) drain(addr string, after time.Duration) {
 	if r == nil {
 		return
@@ -83,8 +84,8 @@ func (r *upstreamConnRegistry) drain(addr string, after time.Duration) {
 			return
 		}
 
-		// One critical section, or a re-dial slips in a connection this
-		// callback has committed to closing.
+		// One critical section, or a re-dial slips a connection into the set
+		// this callback has committed to closing.
 		delete(r.drains, addr)
 		tracked := r.takeAddrLocked(addr)
 		r.mu.Unlock()
@@ -105,7 +106,7 @@ func (r *upstreamConnRegistry) cancelDrain(addr string) {
 	r.cancelDrainLocked(addr)
 }
 
-// The flag is what stops a callback that has already fired.
+// The flag is what stops a callback already fired and waiting on the mutex.
 func (r *upstreamConnRegistry) cancelDrainLocked(addr string) {
 	pending, ok := r.drains[addr]
 	if !ok {
@@ -141,8 +142,8 @@ func closeTracked(tracked map[*trackedConn]struct{}) {
 	}
 }
 
-// Unload has already closed the idle connections, so what remains has
-// requests on it and is left alone.
+// close retires the registry. Unload has already closed the idle connections,
+// so what remains has requests on it and is left alone.
 func (r *upstreamConnRegistry) close() {
 	if r == nil {
 		return
@@ -200,7 +201,8 @@ type trackedConn struct {
 	once     sync.Once
 }
 
-// Deregister first, so a connection the transport retires leaves the books.
+// Close deregisters first, so a connection the transport retires leaves the
+// books.
 func (c *trackedConn) Close() error {
 	c.registry.forget(c)
 
@@ -209,7 +211,7 @@ func (c *trackedConn) Close() error {
 	return err
 }
 
-// Assumes the caller has already deregistered.
+// closeUnderlying assumes the caller has already deregistered.
 func (c *trackedConn) closeUnderlying() {
 	c.once.Do(func() { _ = c.Conn.Close() })
 }

@@ -308,6 +308,14 @@ func TestScheduler_EmptyAnswerIsPublishedAsSuch(t *testing.T) {
 	sub := subscribeAndRefresh(t, scheduler, "api-1", "svc", Config{Interval: 10 * time.Second})
 
 	resolver.set("svc") // resolves, to nothing
+
+	// The first empty answer is held back; a single blip must not drain every
+	// backend.
+	scheduler.refresh(ctx, sub.entry)
+	if got := sub.State(); !got.Usable() {
+		t.Fatal("one empty answer dropped the address set")
+	}
+
 	scheduler.refresh(ctx, sub.entry)
 
 	got := sub.State()
@@ -319,6 +327,46 @@ func TestScheduler_EmptyAnswerIsPublishedAsSuch(t *testing.T) {
 	}
 	if got.Outcome != Empty {
 		t.Fatalf("outcome is %s after an empty answer, want %s", got.Outcome, Empty)
+	}
+}
+
+// A blip between two good answers must not move anything.
+func TestScheduler_SingleEmptyAnswerIsIgnored(t *testing.T) {
+	resolver := newStubResolver()
+	resolver.set("svc", "10.0.0.1", "10.0.0.2")
+
+	scheduler := newTestScheduler(resolver)
+	ctx := context.Background()
+
+	sub := subscribeAndRefresh(t, scheduler, "api-1", "svc", Config{Interval: 10 * time.Second})
+	first := sub.State()
+
+	resolver.set("svc")
+	scheduler.refresh(ctx, sub.entry)
+
+	resolver.set("svc", "10.0.0.1", "10.0.0.2")
+	scheduler.refresh(ctx, sub.entry)
+
+	got := sub.State()
+	if !got.Usable() || len(got.Addrs) != 2 {
+		t.Fatalf("a single empty answer disturbed the set: %+v", got)
+	}
+	if got.Version != first.Version {
+		t.Fatalf("republished across a blip: version %d, want %d", got.Version, first.Version)
+	}
+}
+
+// Nothing published yet means there is no set worth protecting.
+func TestScheduler_FirstAnswerEmptyIsPublishedAtOnce(t *testing.T) {
+	resolver := newStubResolver()
+	resolver.set("svc")
+
+	scheduler := newTestScheduler(resolver)
+	sub := subscribeAndRefresh(t, scheduler, "api-1", "svc", Config{Interval: 10 * time.Second})
+
+	got := sub.State()
+	if got == nil || got.Outcome != Empty {
+		t.Fatalf("first answer empty published %+v, want %s", got, Empty)
 	}
 }
 
@@ -471,7 +519,7 @@ func TestScheduler_SubscribeDoesNotResolveInline(t *testing.T) {
 }
 
 // NXDOMAIN is a fact about the name, so the stale TTL does not apply.
-func TestScheduler_NameNotFoundIsAppliedAtOnce(t *testing.T) {
+func TestScheduler_NameNotFoundIgnoresStaleTTL(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1", "10.0.0.2")
 
@@ -488,6 +536,13 @@ func TestScheduler_NameNotFoundIsAppliedAtOnce(t *testing.T) {
 	}
 
 	resolver.failNotFound("svc")
+
+	// Confirmed by a second answer, not acted on immediately.
+	scheduler.refresh(ctx, sub.entry)
+	if got := sub.State(); !got.Usable() {
+		t.Fatal("one NXDOMAIN dropped the address set")
+	}
+
 	scheduler.refresh(ctx, sub.entry)
 
 	got := sub.State()

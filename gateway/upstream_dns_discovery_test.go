@@ -95,7 +95,6 @@ func TestResolveDNSDiscoveryPeriods(t *testing.T) {
 	t.Run("refresh interval", func(t *testing.T) {
 		cases := map[int64]time.Duration{
 			0:  time.Duration(dnsDiscoveryDefaultInterval) * time.Second,
-			-1: time.Duration(dnsDiscoveryDefaultInterval) * time.Second,
 			1:  dnsdiscovery.MinInterval,
 			4:  dnsdiscovery.MinInterval,
 			5:  5 * time.Second,
@@ -103,7 +102,7 @@ func TestResolveDNSDiscoveryPeriods(t *testing.T) {
 		}
 
 		for in, want := range cases {
-			got := resolveDNSDiscoveryInterval(in)
+			got := resolveDNSDiscoveryInterval(apidef.DNSDiscoveryConfig{RefreshInterval: in})
 			if got != want {
 				t.Errorf("refresh interval for %d = %s, want %s", in, got, want)
 			}
@@ -111,26 +110,28 @@ func TestResolveDNSDiscoveryPeriods(t *testing.T) {
 	})
 
 	t.Run("stale TTL", func(t *testing.T) {
-		if got := resolveDNSDiscoveryStaleTTL(-1); got != 0 {
-			t.Errorf("resolveDNSDiscoveryStaleTTL(-1) = %s, want 0 meaning never give up", got)
+		unlimited := apidef.DNSDiscoveryConfig{StaleTTL: dnsDiscoveryStaleTTLUnlimited}
+		if got := resolveDNSDiscoveryStaleTTL(unlimited); got != dnsdiscovery.StaleTTLUnlimited {
+			t.Errorf("stale_ttl -1 = %s, want the unlimited sentinel", got)
 		}
-		if got, want := resolveDNSDiscoveryStaleTTL(0), time.Duration(dnsDiscoveryDefaultStaleTTL)*time.Second; got != want {
-			t.Errorf("resolveDNSDiscoveryStaleTTL(0) = %s, want the default %s", got, want)
+		if got, want := resolveDNSDiscoveryStaleTTL(apidef.DNSDiscoveryConfig{}), time.Duration(dnsDiscoveryDefaultStaleTTL)*time.Second; got != want {
+			t.Errorf("stale_ttl 0 = %s, want the default %s", got, want)
 		}
-		if got := resolveDNSDiscoveryStaleTTL(30); got != 30*time.Second {
-			t.Errorf("resolveDNSDiscoveryStaleTTL(30) = %s, want 30s", got)
+		if got := resolveDNSDiscoveryStaleTTL(apidef.DNSDiscoveryConfig{StaleTTL: 30}); got != 30*time.Second {
+			t.Errorf("stale_ttl 30 = %s, want 30s", got)
 		}
 	})
 
 	t.Run("drain deadline", func(t *testing.T) {
-		if got := resolveDNSDiscoveryDrainDeadline(-1); got != dnsDiscoveryDrainDisabled {
-			t.Errorf("resolveDNSDiscoveryDrainDeadline(-1) = %s, want the disabled sentinel", got)
+		disabled := apidef.DNSDiscoveryConfig{DrainDeadline: 60, DrainDisabled: true}
+		if got := resolveDNSDiscoveryDrainDeadline(disabled); got != dnsDiscoveryDrainDisabled {
+			t.Errorf("drain_disabled = %s, want the disabled sentinel", got)
 		}
-		if got, want := resolveDNSDiscoveryDrainDeadline(0), time.Duration(dnsDiscoveryDefaultDrainDeadline)*time.Second; got != want {
-			t.Errorf("resolveDNSDiscoveryDrainDeadline(0) = %s, want the default %s", got, want)
+		if got, want := resolveDNSDiscoveryDrainDeadline(apidef.DNSDiscoveryConfig{}), time.Duration(dnsDiscoveryDefaultDrainDeadline)*time.Second; got != want {
+			t.Errorf("drain_deadline 0 = %s, want the default %s", got, want)
 		}
-		if got := resolveDNSDiscoveryDrainDeadline(60); got != time.Minute {
-			t.Errorf("resolveDNSDiscoveryDrainDeadline(60) = %s, want 1m", got)
+		if got := resolveDNSDiscoveryDrainDeadline(apidef.DNSDiscoveryConfig{DrainDeadline: 60}); got != time.Minute {
+			t.Errorf("drain_deadline 60 = %s, want 1m", got)
 		}
 	})
 }
@@ -205,7 +206,7 @@ func TestPlanUpstreamDNSDiscovery_DrainDisabled(t *testing.T) {
 	spec.Proxy.TargetURL = "h2c://svc:9002"
 	spec.Proxy.EnableLoadBalancing = true
 	spec.Proxy.DNSDiscovery.Enabled = true
-	spec.Proxy.DNSDiscovery.DrainDeadline = -1
+	spec.Proxy.DNSDiscovery.DrainDisabled = true
 
 	plan := planUpstreamDNSDiscovery(spec, logrus.NewEntry(logrus.New()))
 	if plan == nil {

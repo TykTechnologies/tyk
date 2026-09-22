@@ -93,22 +93,31 @@ func Resolvable(host string) bool {
 
 // Removed returns members of was absent from now. Both must be normalised.
 func Removed(was, now []string) []string {
-	if len(was) == 0 {
+	return difference(was, now)
+}
+
+// Added returns members of now absent from was. Both must be normalised.
+func Added(was, now []string) []string {
+	return difference(now, was)
+}
+
+func difference(from, against []string) []string {
+	if len(from) == 0 {
 		return nil
 	}
 
-	current := make(map[string]struct{}, len(now))
-	for _, addr := range now {
+	current := make(map[string]struct{}, len(against))
+	for _, addr := range against {
 		current[addr] = struct{}{}
 	}
 
-	var gone []string
-	for _, addr := range was {
+	var diff []string
+	for _, addr := range from {
 		if _, ok := current[addr]; !ok {
-			gone = append(gone, addr)
+			diff = append(diff, addr)
 		}
 	}
-	return gone
+	return diff
 }
 
 func equalAddrs(a, b []string) bool {

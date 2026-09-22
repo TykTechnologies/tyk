@@ -863,3 +863,68 @@ func TestDefaultValidationRuleSet_AcceptsDNSDiscovery(t *testing.T) {
 		t.Fatalf("the documented DNS discovery configuration was refused: %v", result.ErrorStrings())
 	}
 }
+
+func TestRuleDNSDiscovery_NumericBounds(t *testing.T) {
+	base := func() *APIDefinition {
+		def := &APIDefinition{}
+		def.Proxy.EnableLoadBalancing = true
+		def.Proxy.DNSDiscovery.Enabled = true
+		return def
+	}
+
+	tests := []struct {
+		name    string
+		mutate  func(*APIDefinition)
+		wantErr error
+	}{
+		{"defaults are valid", func(*APIDefinition) {}, nil},
+		{"positive values are valid", func(d *APIDefinition) {
+			d.Proxy.DNSDiscovery.RefreshInterval = 10
+			d.Proxy.DNSDiscovery.StaleTTL = 60
+			d.Proxy.DNSDiscovery.DrainDeadline = 15
+		}, nil},
+		{"stale_ttl -1 is the unbounded sentinel", func(d *APIDefinition) {
+			d.Proxy.DNSDiscovery.StaleTTL = -1
+		}, nil},
+		{"drain_disabled needs no sentinel", func(d *APIDefinition) {
+			d.Proxy.DNSDiscovery.DrainDisabled = true
+		}, nil},
+
+		{"negative refresh_interval", func(d *APIDefinition) {
+			d.Proxy.DNSDiscovery.RefreshInterval = -1
+		}, ErrDNSDiscoveryNegativeRefreshInterval},
+		{"stale_ttl below the sentinel", func(d *APIDefinition) {
+			d.Proxy.DNSDiscovery.StaleTTL = -2
+		}, ErrDNSDiscoveryInvalidStaleTTL},
+		{"negative drain_deadline", func(d *APIDefinition) {
+			d.Proxy.DNSDiscovery.DrainDeadline = -1
+		}, ErrDNSDiscoveryNegativeDrainDeadline},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			def := base()
+			tc.mutate(def)
+
+			result := Validate(def, ValidationRuleSet{&RuleDNSDiscovery{}})
+
+			if tc.wantErr == nil {
+				assert.True(t, result.IsValid, "expected valid, got %v", result.Errors)
+				return
+			}
+
+			assert.False(t, result.IsValid)
+			assert.ErrorIs(t, result.FirstError(), tc.wantErr)
+		})
+	}
+
+	t.Run("nothing is checked while disabled", func(t *testing.T) {
+		def := &APIDefinition{}
+		def.Proxy.DNSDiscovery.RefreshInterval = -99
+		def.Proxy.DNSDiscovery.StaleTTL = -99
+		def.Proxy.DNSDiscovery.DrainDeadline = -99
+
+		result := Validate(def, ValidationRuleSet{&RuleDNSDiscovery{}})
+		assert.True(t, result.IsValid)
+	})
+}

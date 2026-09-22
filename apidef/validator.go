@@ -235,6 +235,12 @@ var (
 	ErrDNSDiscoveryRequiresLoadBalancing = errors.New("proxy.dns_discovery supplies the target list but does not distribute across it; proxy.enable_load_balancing must be enabled too")
 	// ErrDNSDiscoveryWithServiceDiscovery is the error to return when proxy.dns_discovery and proxy.service_discovery are both enabled.
 	ErrDNSDiscoveryWithServiceDiscovery = errors.New("proxy.dns_discovery and proxy.service_discovery both supply the target list and cannot be enabled together")
+	// ErrDNSDiscoveryNegativeRefreshInterval is the error to return when proxy.dns_discovery.refresh_interval is negative.
+	ErrDNSDiscoveryNegativeRefreshInterval = errors.New("proxy.dns_discovery.refresh_interval must not be negative; 0 applies the default")
+	// ErrDNSDiscoveryInvalidStaleTTL is the error to return when proxy.dns_discovery.stale_ttl is below -1.
+	ErrDNSDiscoveryInvalidStaleTTL = errors.New("proxy.dns_discovery.stale_ttl must be -1 or greater; 0 applies the default and -1 never gives up")
+	// ErrDNSDiscoveryNegativeDrainDeadline is the error to return when proxy.dns_discovery.drain_deadline is negative.
+	ErrDNSDiscoveryNegativeDrainDeadline = errors.New("proxy.dns_discovery.drain_deadline must not be negative; 0 applies the default, and drain_disabled turns draining off")
 )
 
 // RuleUpstreamAuth implements validations for upstream authentication configurations.
@@ -324,5 +330,24 @@ func (r *RuleDNSDiscovery) Validate(apiDef *APIDefinition, validationResult *Val
 	if apiDef.Proxy.ServiceDiscovery.UseDiscoveryService {
 		validationResult.IsValid = false
 		validationResult.AppendError(ErrDNSDiscoveryWithServiceDiscovery)
+	}
+
+	// Zero means "use the default" throughout, so a negative is a mistake
+	// rather than a shorthand. stale_ttl is the exception: -1 spells an
+	// unbounded value, as session lifetimes do. Anything below it is a typo
+	// that would otherwise collapse silently into the same behaviour.
+	for _, check := range []struct {
+		seconds int64
+		floor   int64
+		err     error
+	}{
+		{apiDef.Proxy.DNSDiscovery.RefreshInterval, 0, ErrDNSDiscoveryNegativeRefreshInterval},
+		{apiDef.Proxy.DNSDiscovery.StaleTTL, -1, ErrDNSDiscoveryInvalidStaleTTL},
+		{apiDef.Proxy.DNSDiscovery.DrainDeadline, 0, ErrDNSDiscoveryNegativeDrainDeadline},
+	} {
+		if check.seconds < check.floor {
+			validationResult.IsValid = false
+			validationResult.AppendError(check.err)
+		}
 	}
 }

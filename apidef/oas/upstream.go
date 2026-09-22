@@ -325,15 +325,18 @@ type DNSDiscovery struct {
 	// Enabled determines if DNS discovery is active.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
 	// RefreshInterval is how often, in seconds, the hostname is re-resolved.
-	// Defaults to 30, with a floor of 5.
+	// Zero applies the default of 30, with a floor of 5.
 	RefreshInterval int64 `bson:"refreshInterval,omitempty" json:"refreshInterval,omitempty"`
 	// StaleTTL is how long, in seconds, the last known good addresses are used
-	// while the resolver is unreachable. Defaults to 300. Negative never gives
-	// up on them.
+	// while the resolver is unreachable. Zero applies the default of 300, and
+	// -1 never gives up on them.
 	StaleTTL int64 `bson:"staleTTL,omitempty" json:"staleTTL,omitempty"`
 	// DrainDeadline is how long, in seconds, connections to a departed address
-	// stay open. Defaults to 30. Negative leaves them to the idle timeout.
+	// stay open. Zero applies the default of 30.
 	DrainDeadline int64 `bson:"drainDeadline,omitempty" json:"drainDeadline,omitempty"`
+	// DrainDisabled leaves connections to a departed address to the connection
+	// pool's idle timeout instead of closing them.
+	DrainDisabled bool `bson:"drainDisabled,omitempty" json:"drainDisabled,omitempty"`
 }
 
 // Fill populates the DNSDiscovery structure from the classic API definition.
@@ -342,6 +345,7 @@ func (d *DNSDiscovery) Fill(api apidef.APIDefinition) {
 	d.RefreshInterval = api.Proxy.DNSDiscovery.RefreshInterval
 	d.StaleTTL = api.Proxy.DNSDiscovery.StaleTTL
 	d.DrainDeadline = api.Proxy.DNSDiscovery.DrainDeadline
+	d.DrainDisabled = api.Proxy.DNSDiscovery.DrainDisabled
 }
 
 // ExtractTo copies the DNSDiscovery structure into the classic API definition.
@@ -350,6 +354,7 @@ func (d *DNSDiscovery) ExtractTo(api *apidef.APIDefinition) {
 	api.Proxy.DNSDiscovery.RefreshInterval = d.RefreshInterval
 	api.Proxy.DNSDiscovery.StaleTTL = d.StaleTTL
 	api.Proxy.DNSDiscovery.DrainDeadline = d.DrainDeadline
+	api.Proxy.DNSDiscovery.DrainDisabled = d.DrainDisabled
 }
 
 func (u *Upstream) fillDNSDiscovery(api apidef.APIDefinition) {

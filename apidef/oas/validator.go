@@ -2,6 +2,7 @@ package oas
 
 import (
 	"embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -163,34 +164,85 @@ func ValidateOASObject(documentBody []byte, oasVersion string) error {
 		return err
 	}
 
-	return validateUpstreamSources(documentBody)
+	return validateTykExtension(documentBody)
 }
 
-// In Go rather than the schema, which declares draft-04, where if/then does
-// not exist and a conditional written there is parsed and ignored.
-func validateUpstreamSources(documentBody []byte) error {
-	enabled := func(block string) bool {
-		on, err := jsonparser.GetBoolean(documentBody, ExtensionTykAPIGateway, "upstream", block, "enabled")
-		return err == nil && on
-	}
+// Cross-field rules live in Go rather than in the schema, which declares
+// draft-04, where if/then does not exist and a conditional written there is
+// parsed and ignored. They mirror apidef's rule set, on the OAS field names.
+//
+// ValidationRule checks one invariant that spans more than one field.
+type ValidationRule interface {
+	Validate(x *XTykAPIGateway) error
+}
 
-	if !enabled("dnsDiscovery") {
+// DefaultValidationRuleSet is applied to every Tyk OAS document.
+var DefaultValidationRuleSet = []ValidationRule{
+	&RuleUpstreamSources{},
+}
+
+var (
+	// ErrDNSDiscoveryWithServiceDiscovery is returned when upstream.dnsDiscovery
+	// and upstream.serviceDiscovery are both enabled.
+	ErrDNSDiscoveryWithServiceDiscovery = errors.New(
+		"upstream.dnsDiscovery and upstream.serviceDiscovery both supply the target list and cannot be enabled together")
+
+	// ErrDNSDiscoveryRequiresLoadBalancing is returned when upstream.dnsDiscovery
+	// is enabled without upstream.loadBalancing.
+	ErrDNSDiscoveryRequiresLoadBalancing = errors.New(
+		"upstream.dnsDiscovery supplies the target list but does not distribute across it; upstream.loadBalancing must be enabled too")
+)
+
+// validateTykExtension applies DefaultValidationRuleSet to the document's Tyk
+// extension. Only the extension is decoded, so a document without one costs
+// nothing.
+func validateTykExtension(documentBody []byte) error {
+	raw, dataType, _, err := jsonparser.Get(documentBody, ExtensionTykAPIGateway)
+	if err != nil || dataType != jsonparser.Object {
 		return nil
 	}
 
-	var errs []error
-
-	if enabled("serviceDiscovery") {
-		errs = append(errs, errors.New(
-			"upstream.dnsDiscovery and upstream.serviceDiscovery both supply the target list and cannot be enabled together"))
+	var x XTykAPIGateway
+	if err := json.Unmarshal(raw, &x); err != nil {
+		return fmt.Errorf("invalid %s: %w", ExtensionTykAPIGateway, err)
 	}
 
-	if !enabled("loadBalancing") {
-		errs = append(errs, errors.New(
-			"upstream.dnsDiscovery supplies the target list but does not distribute across it; upstream.loadBalancing must be enabled too"))
+	combinedErr := &multierror.Error{}
+	combinedErr.ErrorFormat = tykerrors.Formatter
+
+	for _, rule := range DefaultValidationRuleSet {
+		if ruleErr := rule.Validate(&x); ruleErr != nil {
+			combinedErr = multierror.Append(combinedErr, ruleErr)
+		}
 	}
 
-	return errors.Join(errs...)
+	return combinedErr.ErrorOrNil()
+}
+
+// RuleUpstreamSources validates how the three sources of an upstream target
+// list combine. It is the OAS counterpart of apidef.RuleDNSDiscovery.
+type RuleUpstreamSources struct{}
+
+// Validate implements ValidationRule.
+func (r *RuleUpstreamSources) Validate(x *XTykAPIGateway) error {
+	upstream := x.Upstream
+
+	if upstream.DNSDiscovery == nil || !upstream.DNSDiscovery.Enabled {
+		return nil
+	}
+
+	combinedErr := &multierror.Error{}
+	combinedErr.ErrorFormat = tykerrors.Formatter
+
+	if upstream.ServiceDiscovery != nil && upstream.ServiceDiscovery.Enabled {
+		combinedErr = multierror.Append(combinedErr, ErrDNSDiscoveryWithServiceDiscovery)
+	}
+
+	if upstream.LoadBalancing == nil || !upstream.LoadBalancing.Enabled {
+		combinedErr = multierror.Append(combinedErr, ErrDNSDiscoveryRequiresLoadBalancing)
+	}
+
+	return combinedErr.ErrorOrNil()
 }
 
 // ValidateOASTemplate checks a Tyk OAS API template for necessary fields,

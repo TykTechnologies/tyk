@@ -3045,13 +3045,19 @@
           "type": "boolean"
         },
         "refreshInterval": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 0
         },
         "staleTTL": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": -1
         },
         "drainDeadline": {
-          "type": "integer"
+          "type": "integer",
+          "minimum": 0
+        },
+        "drainDisabled": {
+          "type": "boolean"
         }
       },
       "required": [

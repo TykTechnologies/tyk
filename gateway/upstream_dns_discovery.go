@@ -18,11 +18,14 @@ import (
 // A third source for an API's target list, after target_list and service
 // discovery. Resolution lives in internal/dnsdiscovery.
 
-// Applied when the configured value is 0.
+// Defaults applied when the configured value is 0.
 const (
 	dnsDiscoveryDefaultInterval      int64 = 30
 	dnsDiscoveryDefaultStaleTTL      int64 = 300
 	dnsDiscoveryDefaultDrainDeadline int64 = 30
+
+	// The configured stale_ttl that never gives up on the last good set.
+	dnsDiscoveryStaleTTLUnlimited int64 = -1
 
 	dnsDiscoveryDrainDisabled = time.Duration(-1)
 )
@@ -32,7 +35,7 @@ type dnsRenderedTargets struct {
 	list    *apidef.HostList
 }
 
-// dnsDiscoveryPlan, non-nil on the spec, turns the feature on.
+// A non-nil plan on the spec turns the feature on.
 type dnsDiscoveryPlan struct {
 	target *url.URL
 	host   string
@@ -113,9 +116,9 @@ func planUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) *dnsDiscovery
 		target:   target,
 		host:     host,
 		port:     port,
-		interval: resolveDNSDiscoveryInterval(conf.RefreshInterval),
-		staleTTL: resolveDNSDiscoveryStaleTTL(conf.StaleTTL),
-		drain:    resolveDNSDiscoveryDrainDeadline(conf.DrainDeadline),
+		interval: resolveDNSDiscoveryInterval(conf),
+		staleTTL: resolveDNSDiscoveryStaleTTL(conf),
+		drain:    resolveDNSDiscoveryDrainDeadline(conf),
 		fallback: apidef.NewHostListFromList([]string{spec.Proxy.TargetURL}),
 	}
 
@@ -126,8 +129,8 @@ func planUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) *dnsDiscovery
 	return plan
 }
 
-// Reconciles both ways: a reload replaces a definition without unloading it,
-// so an API that stops wanting discovery is released here.
+// Reconciles both ways: a reload can replace a definition without unloading
+// it, so an API that stops asking for discovery is released here.
 func (gw *Gateway) setupUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) {
 	previous := spec.dnsDiscovery
 
@@ -165,7 +168,8 @@ func (gw *Gateway) setupUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry
 	spec.dnsDiscovery = plan
 	previous.retire()
 
-	// Once per spec, releasing what it holds then, not this plan.
+	// Once per spec. The hook releases whatever plan the spec holds when it
+	// fires, which may not be this one.
 	if !spec.dnsDiscoveryHooked {
 		spec.dnsDiscoveryHooked = true
 		spec.AddUnloadHook(func() {
@@ -198,7 +202,9 @@ func (p *dnsDiscoveryPlan) retire() {
 	p.conns.close()
 }
 
-// Retires what a departed address leaves. The list is rendered per request.
+// onAddressSet retires what a departed address leaves. The diff and the drains
+// it implies are one critical section, or two deliveries interleave and arm a
+// drain the other's cancel has already passed.
 func (p *dnsDiscoveryPlan) onAddressSet(state *dnsdiscovery.State) {
 	var addrs []string
 	if state != nil {
@@ -206,9 +212,10 @@ func (p *dnsDiscoveryPlan) onAddressSet(state *dnsdiscovery.State) {
 	}
 
 	p.mu.Lock()
+	defer p.mu.Unlock()
+
 	was := p.lastAddrs
 	p.lastAddrs = addrs
-	p.mu.Unlock()
 
 	if p.conns == nil {
 		return
@@ -219,37 +226,41 @@ func (p *dnsDiscoveryPlan) onAddressSet(state *dnsdiscovery.State) {
 	}
 
 	// A returning address keeps the connections the transport still holds.
-	for _, addr := range dnsdiscovery.Removed(addrs, was) {
+	for _, addr := range dnsdiscovery.Added(was, addrs) {
 		p.conns.cancelDrain(net.JoinHostPort(addr, p.port))
 	}
 }
 
-func resolveDNSDiscoveryInterval(seconds int64) time.Duration {
+// Zero means "use the default" throughout, as it does for every other duration
+// in an API definition. StaleTTL also takes -1 for "never give up", the
+// spelling session lifetimes use. apidef.RuleDNSDiscovery rejects the rest.
+
+func resolveDNSDiscoveryInterval(conf apidef.DNSDiscoveryConfig) time.Duration {
+	seconds := conf.RefreshInterval
 	if seconds <= 0 {
 		seconds = dnsDiscoveryDefaultInterval
 	}
 	return dnsdiscovery.NormaliseInterval(time.Duration(seconds) * time.Second)
 }
 
-// Negative means never give up, which the scheduler spells as zero.
-func resolveDNSDiscoveryStaleTTL(seconds int64) time.Duration {
+func resolveDNSDiscoveryStaleTTL(conf apidef.DNSDiscoveryConfig) time.Duration {
 	switch {
-	case seconds < 0:
-		return 0
-	case seconds == 0:
+	case conf.StaleTTL == dnsDiscoveryStaleTTLUnlimited:
+		return dnsdiscovery.StaleTTLUnlimited
+	case conf.StaleTTL <= 0:
 		return time.Duration(dnsDiscoveryDefaultStaleTTL) * time.Second
 	}
-	return time.Duration(seconds) * time.Second
+	return time.Duration(conf.StaleTTL) * time.Second
 }
 
-func resolveDNSDiscoveryDrainDeadline(seconds int64) time.Duration {
-	switch {
-	case seconds < 0:
+func resolveDNSDiscoveryDrainDeadline(conf apidef.DNSDiscoveryConfig) time.Duration {
+	if conf.DrainDisabled {
 		return dnsDiscoveryDrainDisabled
-	case seconds == 0:
+	}
+	if conf.DrainDeadline <= 0 {
 		return time.Duration(dnsDiscoveryDefaultDrainDeadline) * time.Second
 	}
-	return time.Duration(seconds) * time.Second
+	return time.Duration(conf.DrainDeadline) * time.Second
 }
 
 // On the request path: resolves nothing, takes no lock.

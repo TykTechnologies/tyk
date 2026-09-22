@@ -3,34 +3,61 @@ package dnsdiscovery
 import (
 	"context"
 	"errors"
-	"math/rand"
+	"math/rand/v2"
 	"net"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 const (
 	DefaultInterval = 30 * time.Second
 	MinInterval     = 5 * time.Second
 
-	// Applied by callers, since zero here means never.
+	// DefaultStaleTTL is applied by callers; zero here means unlimited.
 	DefaultStaleTTL = 300 * time.Second
+
+	// StaleTTLUnlimited keeps the last good set for as long as the resolver
+	// stays unreachable.
+	StaleTTLUnlimited = time.Duration(0)
 
 	LookupTimeout = 5 * time.Second
 	MaxBackoff    = 5 * time.Minute
 
-	// Added at random per cycle, so gateways do not resolve in lockstep.
-	JitterFraction = 0.1
+	// RefreshJitterFraction is one-sided, keeping the interval above MinInterval.
+	RefreshJitterFraction = 0.1
 
-	// Bounds a missed wake, with no name registered.
+	// BackoffJitterFraction is symmetric, to break up gateways failing in step.
+	BackoffJitterFraction = 0.5
+
 	idleWait = time.Minute
+	minWait  = 10 * time.Millisecond
 
-	// Keeps a pathological interval from busy-waiting.
-	minWait = 10 * time.Millisecond
+	minConcurrentLookups = 8
+	maxConcurrentLookups = 256
 
-	maxConcurrentLookups = 8
+	// EmptyAnswerThreshold is how many consecutive empty or NXDOMAIN answers
+	// drop the address set. One is often a resolver blip, and acting on it
+	// would drain every backend.
+	EmptyAnswerThreshold = 2
 )
+
+// lookupConcurrency sizes a batch so names that time out still clear within one
+// refresh interval. DefaultInterval/LookupTimeout batches fit in an interval,
+// so the batch has to be at most that fraction of the whole, rounded up.
+func lookupConcurrency(due int) int {
+	batches := int(DefaultInterval / LookupTimeout)
+	limit := (due + batches - 1) / batches
+	if limit < minConcurrentLookups {
+		return minConcurrentLookups
+	}
+	if limit > maxConcurrentLookups {
+		return maxConcurrentLookups
+	}
+	return limit
+}
 
 // LookupFunc resolves a host to a set of addresses.
 type LookupFunc func(ctx context.Context, host string) ([]string, error)
@@ -40,23 +67,22 @@ type Config struct {
 	// Host is the DNS name to resolve, without a port.
 	Host string
 
-	// Zero means DefaultInterval. No floor here; see NormaliseInterval.
+	// Interval of zero means DefaultInterval; see NormaliseInterval.
 	Interval time.Duration
 
-	// Bounds the last known good set. Zero means never give up.
+	// StaleTTL bounds the last known good set.
 	StaleTTL time.Duration
 
-	// Runs unlocked, must not block, and is skipped when nothing changed.
+	// OnChange runs unlocked, must not block, and never sees a state older
+	// than one it has already seen.
 	OnChange func(*State)
 }
 
 // Scheduler refreshes names in the background, one entry per distinct name.
-// The zero value is ready to use, and its goroutine runs from the first
-// subscription until that subscription's context is cancelled.
+// The zero value is ready to use.
 type Scheduler struct {
 	mu sync.Mutex
 
-	// Keyed by hostname, and by subscriber key.
 	entries map[string]*entry
 	subs    map[string]*Subscription
 
@@ -65,8 +91,7 @@ type Scheduler struct {
 	wake    chan struct{}
 	runCtx  context.Context
 
-	// Injectable for tests, read by the refresh goroutine: set before the
-	// first Subscribe.
+	// Set before the first Subscribe; the refresh goroutine reads them.
 	Lookup LookupFunc
 	Now    func() time.Time
 	Jitter func(time.Duration) time.Duration
@@ -74,22 +99,31 @@ type Scheduler struct {
 	lookups atomic.Int64
 }
 
-// Shared by every subscriber on one name. All fields but published are
-// guarded by the scheduler's mutex.
+// entry is shared by every subscriber on one name. All fields except
+// published are guarded by Scheduler.mu.
 type entry struct {
 	host string
 
-	// Stops Refresh and the loop publishing out of order. Taken before mu.
+	// Taken before Scheduler.mu.
 	refreshMu sync.Mutex
 
 	published atomic.Pointer[State]
 
-	interval    time.Duration
-	staleTTL    time.Duration
-	nextDue     time.Time
-	failures    int
-	lastSuccess time.Time
-	subs        map[*Subscription]struct{}
+	interval     time.Duration
+	staleTTL     time.Duration
+	nextDue      time.Time
+	failures     int
+	emptyAnswers int
+	lastSuccess  time.Time
+	subs         map[*Subscription]struct{}
+
+	// Aggregates over subs, maintained incrementally. The counters track how
+	// many subscribers sit at the current extreme, so a departure only forces
+	// a rescan when the last one leaves.
+	maxStaleTTL   time.Duration
+	atMinInterval int
+	atMaxStale    int
+	unboundedRefs int
 }
 
 // Subscription is one subscriber's handle on a name.
@@ -100,16 +134,20 @@ type Subscription struct {
 	staleTTL time.Duration
 	onChange func(*State)
 
-	// Set once, so a superseded subscription goes on reporting the last set
-	// it saw while its spec is still serving.
+	// Set once, so a superseded subscription goes on reporting its last set.
 	entry *entry
 	sched *Scheduler
 
 	detached bool
+
+	// Subscribe delivers after releasing Scheduler.mu, so a refresh can
+	// overtake it. These keep each subscriber's view monotonic.
+	notifyMu    sync.Mutex
+	lastVersion uint64
 }
 
 // State returns the published address set, or nil before the first
-// resolution. The returned pointer is never mutated.
+// resolution. It is never mutated.
 func (s *Subscription) State() *State {
 	if s == nil || s.entry == nil {
 		return nil
@@ -125,14 +163,30 @@ func (s *Subscription) Host() string {
 	return s.host
 }
 
-// Release drops this subscription, and the entry when nothing else wants that
-// name. One already superseded is ignored, so a late teardown hook cannot
-// drop the live one.
+// Release drops this subscription, and the entry with it when nothing else
+// wants that name. An already superseded subscription is ignored.
 func (s *Subscription) Release() {
 	if s == nil || s.sched == nil {
 		return
 	}
 	s.sched.release(s)
+}
+
+// deliver drops any state older than one already delivered.
+func (s *Subscription) deliver(state *State) {
+	if s == nil || s.onChange == nil || state == nil {
+		return
+	}
+
+	s.notifyMu.Lock()
+	defer s.notifyMu.Unlock()
+
+	if state.Version <= s.lastVersion {
+		return
+	}
+	s.lastVersion = state.Version
+
+	s.onChange(state)
 }
 
 // NormaliseInterval applies the default and the floor.
@@ -146,9 +200,8 @@ func NormaliseInterval(interval time.Duration) time.Duration {
 	return interval
 }
 
-// Subscribe points key at cfg.Host, moving a key already subscribed so that a
-// reload supersedes rather than duplicates. Nothing is resolved here, since an
-// inline lookup would put DNS on whatever path loads a subscriber.
+// Subscribe points key at cfg.Host, superseding any existing subscription for
+// that key. Nothing is resolved here.
 func (s *Scheduler) Subscribe(ctx context.Context, key string, cfg Config) (*Subscription, error) {
 	if cfg.Host == "" {
 		return nil, ErrNoHost
@@ -187,32 +240,28 @@ func (s *Scheduler) Subscribe(ctx context.Context, key string, cfg Config) (*Sub
 
 	sub.entry = e
 	e.subs[sub] = struct{}{}
+	s.addSubLocked(e, sub)
 
 	// Attached before the one it supersedes is released, so a reload of a
-	// name's only subscriber keeps the entry and its last good set.
+	// name's only subscriber keeps the entry.
 	if previous, ok := s.subs[key]; ok {
 		delete(s.subs, key)
 		s.detachLocked(previous)
 	}
 
 	s.subs[key] = sub
-	s.recomputeLocked(e)
 
 	current := e.published.Load()
 
 	s.ensureRunningLocked(ctx)
 	s.mu.Unlock()
 
-	// Or a subscriber joining a resolved name computes its first membership
-	// change against an empty set.
-	if current != nil && sub.onChange != nil {
-		sub.onChange(current)
-	}
+	sub.deliver(current)
 
 	return sub, nil
 }
 
-// ReleaseKey is for subscribers reconciled rather than torn down.
+// ReleaseKey drops the subscription registered under key.
 func (s *Scheduler) ReleaseKey(key string) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -252,7 +301,6 @@ func (s *Scheduler) timeNow() time.Time {
 func (s *Scheduler) resolve(ctx context.Context, host string) ([]string, error) {
 	s.lookups.Add(1)
 
-	// Wraps an injected resolver too, so a hanging stub cannot wedge a cycle.
 	ctx, cancel := context.WithTimeout(ctx, LookupTimeout)
 	defer cancel()
 
@@ -263,15 +311,40 @@ func (s *Scheduler) resolve(ctx context.Context, host string) ([]string, error) 
 	return net.DefaultResolver.LookupHost(ctx, host)
 }
 
-func (s *Scheduler) nextInterval(base time.Duration) time.Duration {
+// nextRefresh spreads successful cycles upward only.
+func (s *Scheduler) nextRefresh(base time.Duration) time.Duration {
 	if s.Jitter != nil {
 		return s.Jitter(base)
 	}
-	span := int64(float64(base) * JitterFraction)
+	span := int64(float64(base) * RefreshJitterFraction)
 	if base <= 0 || span <= 0 {
 		return base
 	}
-	return base + time.Duration(rand.Int63n(span))
+	return base + time.Duration(rand.Int64N(span))
+}
+
+// nextBackoff doubles from base, spreads the result, and clamps to MinInterval.
+func (s *Scheduler) nextBackoff(base time.Duration, failures int) time.Duration {
+	interval := base
+	for i := 1; i < failures && interval < MaxBackoff; i++ {
+		interval *= 2
+	}
+	if interval > MaxBackoff {
+		interval = MaxBackoff
+	}
+
+	if s.Jitter != nil {
+		return s.Jitter(interval)
+	}
+
+	span := int64(float64(interval) * BackoffJitterFraction)
+	if span > 0 {
+		interval = interval - time.Duration(span) + time.Duration(rand.Int64N(2*span))
+	}
+	if interval < MinInterval {
+		interval = MinInterval
+	}
+	return interval
 }
 
 func (s *Scheduler) release(sub *Subscription) {
@@ -297,36 +370,104 @@ func (s *Scheduler) detachLocked(sub *Subscription) {
 		delete(s.entries, e.host)
 		return
 	}
-	s.recomputeLocked(e)
+	s.removeSubLocked(e, sub)
 }
 
-func (s *Scheduler) recomputeLocked(e *entry) {
-	// One refresh serves everyone, so the shortest interval wins. Reaching
-	// the stale TTL discards the addresses for everyone, so the longest wins
-	// and a zero decides the entry.
-	interval, staleTTL := time.Duration(0), time.Duration(0)
-	unbounded := false
-	for sub := range e.subs {
-		if interval == 0 || sub.interval < interval {
-			interval = sub.interval
-		}
-		switch {
-		case sub.staleTTL <= 0:
-			unbounded = true
-		case sub.staleTTL > staleTTL:
-			staleTTL = sub.staleTTL
-		}
-	}
-	if unbounded {
-		staleTTL = 0
+// addSubLocked folds one arrival into the aggregates in constant time. One
+// refresh serves everyone, so the shortest interval wins; the stale TTL
+// discards addresses for everyone, so the longest wins and unlimited beats
+// every bounded value.
+func (s *Scheduler) addSubLocked(e *entry, sub *Subscription) {
+	switch {
+	case e.interval == 0 || sub.interval < e.interval:
+		e.atMinInterval = 1
+		s.setIntervalLocked(e, sub.interval)
+	case sub.interval == e.interval:
+		e.atMinInterval++
 	}
 
-	e.staleTTL = staleTTL
+	switch {
+	case sub.staleTTL <= 0:
+		e.unboundedRefs++
+	case e.maxStaleTTL == 0 || sub.staleTTL > e.maxStaleTTL:
+		e.maxStaleTTL = sub.staleTTL
+		e.atMaxStale = 1
+	case sub.staleTTL == e.maxStaleTTL:
+		e.atMaxStale++
+	}
+
+	e.applyStaleTTL()
+}
+
+// removeSubLocked is constant time unless the departing subscriber held an
+// extreme alone.
+func (s *Scheduler) removeSubLocked(e *entry, sub *Subscription) {
+	rescan := false
+
+	if sub.interval == e.interval {
+		e.atMinInterval--
+		rescan = e.atMinInterval <= 0
+	}
+
+	if sub.staleTTL <= 0 {
+		e.unboundedRefs--
+	} else if sub.staleTTL == e.maxStaleTTL {
+		e.atMaxStale--
+		rescan = rescan || e.atMaxStale <= 0
+	}
+
+	if rescan {
+		s.recomputeLocked(e)
+		return
+	}
+
+	e.applyStaleTTL()
+}
+
+// recomputeLocked rebuilds the aggregates in O(subscribers).
+func (s *Scheduler) recomputeLocked(e *entry) {
+	interval, maxStale := time.Duration(0), time.Duration(0)
+	atMin, atMax, unbounded := 0, 0, 0
+
+	for sub := range e.subs {
+		switch {
+		case interval == 0 || sub.interval < interval:
+			interval, atMin = sub.interval, 1
+		case sub.interval == interval:
+			atMin++
+		}
+
+		switch {
+		case sub.staleTTL <= 0:
+			unbounded++
+		case maxStale == 0 || sub.staleTTL > maxStale:
+			maxStale, atMax = sub.staleTTL, 1
+		case sub.staleTTL == maxStale:
+			atMax++
+		}
+	}
+
+	e.maxStaleTTL, e.atMinInterval, e.atMaxStale, e.unboundedRefs = maxStale, atMin, atMax, unbounded
+	e.applyStaleTTL()
+	s.setIntervalLocked(e, interval)
+}
+
+// applyStaleTTL resolves the aggregate into the value refresh reads.
+func (e *entry) applyStaleTTL() {
+	if e.unboundedRefs > 0 {
+		e.staleTTL = StaleTTLUnlimited
+		return
+	}
+	e.staleTTL = e.maxStaleTTL
+}
+
+// setIntervalLocked adopts a new interval, pulling the next refresh in when it
+// shortened.
+func (s *Scheduler) setIntervalLocked(e *entry, interval time.Duration) {
 	if interval == 0 || interval == e.interval {
 		return
 	}
 
-	// A shortened interval pulls the next refresh in with it.
 	if due := s.timeNow().Add(interval); interval < e.interval && due.Before(e.nextDue) {
 		e.nextDue = due
 	}
@@ -335,8 +476,8 @@ func (s *Scheduler) recomputeLocked(e *entry) {
 
 func (s *Scheduler) ensureRunningLocked(ctx context.Context) {
 	// A goroutine whose context is done may not have cleared running yet, and
-	// waking it leaves the entries with nothing refreshing them. A nil runCtx
-	// means the loop was suppressed, as tests do.
+	// waking it would leave the entries with nothing refreshing them. A nil
+	// runCtx means the loop was suppressed, as tests do.
 	if s.running && (s.runCtx == nil || s.runCtx.Err() == nil) {
 		select {
 		case s.wake <- struct{}{}:
@@ -351,8 +492,8 @@ func (s *Scheduler) ensureRunningLocked(ctx context.Context) {
 	go s.run(ctx, s.wake)
 }
 
-// Takes its own wake channel, so a replaced goroutine cannot clear the flag
-// its replacement set.
+// run takes its own wake channel, so a replaced goroutine cannot clear the
+// flag its replacement set.
 func (s *Scheduler) run(ctx context.Context, wake chan struct{}) {
 	defer func() {
 		s.mu.Lock()
@@ -378,29 +519,27 @@ func (s *Scheduler) run(ctx context.Context, wake chan struct{}) {
 }
 
 func (s *Scheduler) refreshAll(ctx context.Context, due []*entry) {
-	if len(due) <= 1 {
-		if len(due) == 1 {
-			s.refresh(ctx, due[0])
-		}
+	if len(due) == 0 {
+		return
+	}
+	if len(due) == 1 {
+		s.refresh(ctx, due[0])
 		return
 	}
 
-	sem := make(chan struct{}, maxConcurrentLookups)
-	var wg sync.WaitGroup
+	group := new(errgroup.Group)
+	group.SetLimit(lookupConcurrency(len(due)))
 	for _, e := range due {
-		wg.Add(1)
-		sem <- struct{}{}
-		go func() {
-			defer wg.Done()
-			defer func() { <-sem }()
+		group.Go(func() error {
 			s.refresh(ctx, e)
-		}()
+			return nil
+		})
 	}
-	wg.Wait()
+	_ = group.Wait()
 }
 
-// Computed after the refresh pass, because an entry just refreshed holds the
-// nearest deadline.
+// nextWait runs after the refresh pass, which is when the nearest deadline is
+// known.
 func (s *Scheduler) nextWait() time.Duration {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -441,13 +580,15 @@ func (s *Scheduler) dueEntries() []*entry {
 	return due
 }
 
-// A successful answer, with records or without, and an NXDOMAIN are applied
-// as they stand. An unreachable resolver is not a fact about the name, so the
-// addresses are kept and the entry backs off, bounded by the stale TTL.
+// refresh resolves one name and publishes the result. A successful answer and
+// an authoritative NXDOMAIN are applied as they stand; a failed lookup keeps
+// the addresses and backs off, bounded by the stale TTL.
 func (s *Scheduler) refresh(ctx context.Context, e *entry) {
-	// One at a time, or refreshes publish out of order.
-	e.refreshMu.Lock()
-	defer e.refreshMu.Unlock()
+	// Skipped rather than queued, or a name already in flight holds a slot
+	// while the cycle that owns it finishes.
+	if !e.refreshMu.TryLock() {
+		return
+	}
 
 	addrs, err := s.resolve(ctx, e.host)
 	addrs = Normalise(addrs)
@@ -460,27 +601,31 @@ func (s *Scheduler) refresh(ctx context.Context, e *entry) {
 	}
 
 	var published *State
-	var notify []func(*State)
+	var notify []*Subscription
 
 	switch {
 	case err == nil:
 		e.failures = 0
 		e.lastSuccess = s.timeNow()
-		e.nextDue = s.timeNow().Add(s.nextInterval(base))
+		e.nextDue = s.timeNow().Add(s.nextRefresh(base))
 
-		if len(addrs) == 0 {
-			published, notify = s.publishLocked(e, nil, Empty)
-		} else {
+		switch {
+		case len(addrs) > 0:
+			e.emptyAnswers = 0
 			published, notify = s.publishLocked(e, addrs, Resolved)
+		case e.confirmEmpty():
+			published, notify = s.publishLocked(e, nil, Empty)
 		}
 
 	default:
 		e.failures++
-		e.nextDue = s.timeNow().Add(s.backoffLocked(base, e.failures))
+		e.nextDue = s.timeNow().Add(s.nextBackoff(base, e.failures))
 
 		switch {
 		case isNameNotFound(err):
-			published, notify = s.publishLocked(e, nil, NotFound)
+			if e.confirmEmpty() {
+				published, notify = s.publishLocked(e, nil, NotFound)
+			}
 
 		// Nothing published yet, so no stale set to bound.
 		case e.published.Load() == nil:
@@ -494,13 +639,25 @@ func (s *Scheduler) refresh(ctx context.Context, e *entry) {
 
 	s.mu.Unlock()
 
-	// Off the lock, so a slow subscriber cannot delay other names.
-	for _, onChange := range notify {
-		onChange(published)
+	// Released before the callbacks, so a slow subscriber cannot hold up the
+	// next lookup. deliver keeps each subscriber's view monotonic regardless.
+	e.refreshMu.Unlock()
+
+	for _, sub := range notify {
+		sub.deliver(published)
 	}
 }
 
-func (s *Scheduler) publishLocked(e *entry, addrs []string, outcome Outcome) (*State, []func(*State)) {
+// confirmEmpty reports whether an empty answer should be published. Nothing
+// published yet means there is no address set worth protecting.
+func (e *entry) confirmEmpty() bool {
+	if e.emptyAnswers < EmptyAnswerThreshold {
+		e.emptyAnswers++
+	}
+	return e.emptyAnswers >= EmptyAnswerThreshold || e.published.Load() == nil
+}
+
+func (s *Scheduler) publishLocked(e *entry, addrs []string, outcome Outcome) (*State, []*Subscription) {
 	if current := e.published.Load(); current != nil &&
 		current.Outcome == outcome && equalAddrs(current.Addrs, addrs) {
 		return nil, nil
@@ -510,24 +667,13 @@ func (s *Scheduler) publishLocked(e *entry, addrs []string, outcome Outcome) (*S
 	state := &State{Version: s.version, Addrs: addrs, Outcome: outcome}
 	e.published.Store(state)
 
-	var notify []func(*State)
+	notify := make([]*Subscription, 0, len(e.subs))
 	for sub := range e.subs {
 		if sub.onChange != nil {
-			notify = append(notify, sub.onChange)
+			notify = append(notify, sub)
 		}
 	}
 	return state, notify
-}
-
-func (s *Scheduler) backoffLocked(base time.Duration, failures int) time.Duration {
-	interval := base
-	for i := 1; i < failures && interval < MaxBackoff; i++ {
-		interval *= 2
-	}
-	if interval > MaxBackoff {
-		interval = MaxBackoff
-	}
-	return s.nextInterval(interval)
 }
 
 func isNameNotFound(err error) bool {

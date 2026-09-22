@@ -655,21 +655,28 @@ type DNSDiscoveryConfig struct {
 	Enabled bool `bson:"enabled" json:"enabled"`
 
 	// RefreshInterval is how often, in seconds, the hostname is re-resolved,
-	// which bounds how long a new backend waits for traffic. Defaults to 30,
-	// with a floor of 5. Where APIs share a hostname, the shortest wins.
+	// which bounds how long a new backend waits for traffic. Zero applies the
+	// default of 30, and values below the floor of 5 are raised to it. Where
+	// APIs share a hostname, the shortest wins. Must not be negative.
 	RefreshInterval int64 `bson:"refresh_interval" json:"refresh_interval"`
 
 	// StaleTTL is how long, in seconds, the last known good addresses are used
 	// while the resolver is unreachable. Past it the API falls back to
 	// `target_url`. An authoritative answer that the name does not exist is
-	// applied immediately. Defaults to 300. Negative never gives up.
+	// applied immediately. Zero applies the default of 300, and -1 never gives
+	// up on them. No other negative value is valid.
 	StaleTTL int64 `bson:"stale_ttl" json:"stale_ttl"`
 
 	// DrainDeadline is how long, in seconds, connections to a departed address
-	// stay open, so a backend shutting down can finish its requests. Defaults
-	// to 30, the Kubernetes terminationGracePeriodSeconds default. Negative
-	// leaves them to the connection pool's idle timeout.
+	// stay open, so a backend shutting down can finish its requests. Zero
+	// applies the default of 30, the Kubernetes terminationGracePeriodSeconds
+	// default. Must not be negative; see DrainDisabled.
 	DrainDeadline int64 `bson:"drain_deadline" json:"drain_deadline"`
+
+	// DrainDisabled stops the gateway closing connections to a departed
+	// address, leaving them to the connection pool's idle timeout and to h2c's
+	// own keepalive. Connections are then not tracked at all.
+	DrainDisabled bool `bson:"drain_disabled" json:"drain_disabled"`
 }
 
 type ServiceDiscoveryConfiguration struct {
