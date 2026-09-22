@@ -81,14 +81,8 @@ func granularAccessFailReasonAsHttpStatusCode(logger abstractlogger.Logger, resu
 		logger.Error(restrictedFieldValidationFailedLogMsg, abstractlogger.Error(result.InternalErr))
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	case GranularAccessFailReasonValidationError:
-		w.Header().Set(header.ContentType, header.ApplicationJSON)
-		w.WriteHeader(http.StatusBadRequest)
-		if result.writeErrorResponse != nil {
-			_, _ = result.writeErrorResponse(w, result.ValidationError)
-		}
-
 		logger.Debug(restrictedFieldValidationFailedLogMsg, abstractlogger.Error(result.ValidationError))
-		return errCustomBodyResponse, http.StatusBadRequest
+		return result.ValidationError, http.StatusBadRequest
 	case GranularAccessFailReasonIntrospectionDisabled:
 		w.WriteHeader(http.StatusForbidden)
 		logger.Debug("introspection disabled")

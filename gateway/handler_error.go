@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	htmltemplate "html/template"
 	"io"
 	"io/ioutil"
@@ -17,6 +18,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	tykctx "github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	internalerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
 	"github.com/TykTechnologies/tyk/request"
@@ -96,9 +98,23 @@ type TemplateExecutor interface {
 }
 
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
-func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMsg string, errCode int, writeResponse bool) {
+func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, err any, errCode int, writeResponse bool) {
 	defer e.Base().UpdateRequestSession(r)
 	response := &http.Response{}
+
+	var errMsg string
+	var errObj error
+	switch v := err.(type) {
+	case error:
+		errObj = v
+		errMsg = v.Error()
+	case string:
+		errMsg = v
+		errObj = errors.New(v)
+	default:
+		errMsg = fmt.Sprint(v)
+		errObj = errors.New(errMsg)
+	}
 
 	if writeResponse {
 		if e.Spec.IsMCP() && e.shouldWriteJSONRPCError(r) {
@@ -106,7 +122,21 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		} else if resp := e.tryWriteOverride(w, r, errMsg, errCode); resp != nil {
 			response = resp
 		} else {
-			response = e.writeTemplateErrorResponse(w, r, errMsg, errCode)
+			var respWriter internalerrors.ResponseWriter
+			if errObj != nil && errors.As(errObj, &respWriter) {
+				w.Header().Set(header.ContentType, header.ApplicationJSON)
+				w.WriteHeader(errCode)
+				var buf bytes.Buffer
+				multiWriter := io.MultiWriter(w, &buf)
+				_, _ = respWriter.WriteResponse(multiWriter)
+				response = &http.Response{
+					StatusCode: errCode,
+					Header:     w.Header(),
+					Body:       io.NopCloser(&buf),
+				}
+			} else {
+				response = e.writeTemplateErrorResponse(w, r, errMsg, errCode)
+			}
 		}
 	}
 
