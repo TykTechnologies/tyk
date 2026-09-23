@@ -46,6 +46,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/roundtrippers"
 	"github.com/TykTechnologies/tyk/internal/service/core"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
@@ -409,15 +410,15 @@ type ReverseProxy struct {
 
 var idleConnTimeout = 90
 
-func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
-	timeout := 30.0
-	if dialerTimeout > 0 {
-		log.Debug("Setting timeout for outbound request to: ", dialerTimeout)
-		timeout = dialerTimeout
+func (p *ReverseProxy) defaultTransport(dialTimeout float64) *http.Transport {
+	if dialTimeout == 0 {
+		dialTimeout = 30.0
 	}
 
+	log.Debug("Setting timeout for outbound request to: ", dialTimeout)
+
 	dialer := &net.Dialer{
-		Timeout:   time.Duration(float64(timeout) * float64(time.Second)),
+		Timeout:   time.Duration(dialTimeout * float64(time.Second)),
 		KeepAlive: 30 * time.Second,
 		DualStack: true,
 	}
@@ -431,11 +432,15 @@ func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 	}
 
 	transport := &http.Transport{
-		DialContext:           dialContextFunc,
-		MaxIdleConns:          p.Gw.GetConfig().MaxIdleConns,
-		MaxIdleConnsPerHost:   p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
-		IdleConnTimeout:       time.Duration(idleConnTimeout) * time.Second,
-		ResponseHeaderTimeout: time.Duration(dialerTimeout) * time.Second,
+		DialContext:         dialContextFunc,
+		MaxIdleConns:        p.Gw.GetConfig().MaxIdleConns,
+		MaxIdleConnsPerHost: p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
+		IdleConnTimeout:     time.Duration(idleConnTimeout) * time.Second,
+
+		// ResponseHeaderTimeout logic moved to roundtrippers.HeadersTimeout decorator.
+		// It was colliding with the enforced (endpoint-level/api-level) timeout.
+		// @see https://tyktech.atlassian.net/browse/TT-17873
+		ResponseHeaderTimeout: time.Duration(0),
 		TLSHandshakeTimeout:   10 * time.Second,
 	}
 
@@ -625,9 +630,8 @@ func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Reque
 	return resp
 }
 
-const defaultProxyTimeout float64 = 30
-
 func proxyTimeout(spec *APISpec) float64 {
+	const defaultProxyTimeout float64 = 30
 	if spec.GlobalConfig.ProxyDefaultTimeout > 0 {
 		return spec.GlobalConfig.ProxyDefaultTimeout
 	}
@@ -766,9 +770,9 @@ func tlsClientConfig(s *APISpec, gw *Gateway) *tls.Config {
 	return config
 }
 
-func (p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, outReq *http.Request) *TykRoundTripper {
+func (p *ReverseProxy) httpTransport(dialTimeout float64, req *http.Request, outReq *http.Request) *TykRoundTripper {
 	p.logger.Debug("Creating new transport")
-	transport := p.defaultTransport(timeOut) // modifies a newly created transport
+	transport := p.defaultTransport(dialTimeout) // modifies a newly created transport
 	transport.TLSClientConfig = &tls.Config{}
 	transport.Proxy = proxyFromAPI(p.TykAPISpec)
 
@@ -838,10 +842,10 @@ func (p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, re
 			},
 			AllowHTTP: true,
 		}
-		return &TykRoundTripper{transport, h2t, p.logger, p.Gw}
+		return &TykRoundTripper{transport: transport, h2ctransport: h2t}
 	}
 
-	return &TykRoundTripper{transport, nil, p.logger, p.Gw}
+	return &TykRoundTripper{transport: transport, h2ctransport: nil}
 }
 
 func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config, hostName string) {
@@ -893,42 +897,45 @@ func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config,
 	}
 }
 
-type TykRoundTripper struct {
-	transport    *http.Transport
-	h2ctransport *http2.Transport
-	logger       *logrus.Entry
-	Gw           *Gateway `json:"-"`
-}
-
-func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
+func isInternalLoop(r *http.Request) bool {
+	if r.URL == nil {
+		return false
+	}
 
 	hasInternalHeader := r.Header.Get(apidef.TykInternalApiHeader) != ""
 
-	if r.URL.Scheme == "tyk" || hasInternalHeader {
-		if hasInternalHeader {
+	return r.URL.Scheme == "tyk" || r.URL.Scheme == "tyk-internal" || hasInternalHeader
+}
+
+func internalLoopRoundTripperMiddleware(gw *Gateway, logger *logrus.Entry) roundtrippers.Middleware {
+	return func(next roundtrippers.RoundTripper) roundtrippers.RoundTripper {
+		return roundtrippers.RoundTripperFn(func(r *http.Request) (*http.Response, error) {
+			if !isInternalLoop(r) {
+				return next.RoundTrip(r)
+			}
+
 			r.Header.Del(apidef.TykInternalApiHeader)
-		}
 
-		handler, _, found := rt.Gw.findInternalHttpHandlerByNameOrID(r.Host)
-		if !found {
-			rt.logger.WithField("looping_url", "tyk://"+r.Host).Error("Couldn't detect target")
-			return nil, errors.New("handler could")
-		}
+			handler, _, found := gw.findInternalHttpHandlerByNameOrID(r.Host)
 
-		rt.logger.WithField("looping_url", "tyk://"+r.Host).Debug("Executing request on internal route")
+			if !found {
+				logger.WithField("looping_url", "tyk://"+r.Host).Error("Couldn't detect target")
+				return nil, errors.New("handler could")
+			}
 
-		return handleInMemoryLoop(handler, r)
+			logger.WithField("looping_url", "tyk://"+r.Host).Debug("Executing request on internal route")
+
+			return handleInMemoryLoop(handler, r)
+		})
 	}
+}
 
-	if rt.Gw.GetConfig().OpenTelemetry.TracesEnabled() {
-		var baseRoundTripper http.RoundTripper = rt.transport
-		if rt.h2ctransport != nil {
-			baseRoundTripper = rt.h2ctransport
-		}
+type TykRoundTripper struct {
+	transport    *http.Transport
+	h2ctransport *http2.Transport
+}
 
-		tr := otel.HTTPRoundTripper(baseRoundTripper)
-		return tr.RoundTrip(r)
-	}
+func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	if rt.h2ctransport != nil {
 		return rt.h2ctransport.RoundTrip(r)
 	}
@@ -1066,7 +1073,12 @@ func handleInMemoryLoop(handler http.Handler, r *http.Request) (resp *http.Respo
 	return memConnClient.Do(r)
 }
 
-func (p *ReverseProxy) handleOutboundRequest(roundTripper *TykRoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, latency time.Duration, err error) {
+func (p *ReverseProxy) handleOutboundRequest(
+	roundTripper http.RoundTripper,
+	outreq *http.Request,
+	w http.ResponseWriter,
+) (res *http.Response, hijacked bool, latency time.Duration, err error) {
+
 	begin := time.Now()
 	defer func() {
 		latency = time.Since(begin)
@@ -1085,7 +1097,7 @@ func isCORSPreflight(r *http.Request) bool {
 	return r.Method == http.MethodOptions
 }
 
-func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
+func (p *ReverseProxy) handleGraphQL(roundTripper http.RoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
 	isWebSocketUpgrade := ctxGetGraphQLIsWebSocketUpgrade(outreq)
 	needsEngine := needsGraphQLExecutionEngine(p.TykAPISpec)
 
@@ -1134,7 +1146,7 @@ func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http
 	return res, hijacked, err
 }
 
-func (p *ReverseProxy) sendRequestToUpstream(roundTripper *TykRoundTripper, outreq *http.Request) (res *http.Response, err error) {
+func (p *ReverseProxy) sendRequestToUpstream(roundTripper http.RoundTripper, outreq *http.Request) (res *http.Response, err error) {
 	return roundTripper.RoundTrip(outreq)
 }
 
@@ -1257,15 +1269,10 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	p.TykAPISpec.Lock()
 
-	isTimeoutEnforced, enforcedTimeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, outreq)
-
-	// limit request time with context timeout
-	if isTimeoutEnforced {
-		timeoutContext, cancel := context.WithTimeout(outreq.Context(), time.Duration(enforcedTimeout)*time.Second)
-		defer cancel()
-
-		outreq = outreq.WithContext(timeoutContext)
-	}
+	isRequestTimeoutEnforced, enforcedTimeout := p.CheckHardTimeoutEnforced(p.TykAPISpec, outreq)
+	requestTimeout := time.Duration(enforcedTimeout) * time.Second
+	dialOrHeadersTimeout := proxyTimeout(p.TykAPISpec)
+	fallbackHeadersTimeout := time.Duration(dialOrHeadersTimeout) * time.Second
 
 	// create HTTP transport
 	createTransport := p.TykAPISpec.HTTPTransport == nil
@@ -1284,22 +1291,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			oldTransport.DisableKeepAlives = true
 		}
 
-		timeout := proxyTimeout(p.TykAPISpec)
-		transportTimeout := timeout
-
-		// If an enforced timeout is configured for this API endpoint, we use context timeout instead of transport timeout
-		// to avoid conflicts between ResponseHeaderTimeout and context timeout
-		if isTimeoutEnforced {
-			// Don't pass the enforced timeout to transport - let context timeout handle it
-			// Use the default proxy timeout for transport instead
-			transportTimeout = proxyTimeout(p.TykAPISpec)
-			p.logger.Debug("Using context timeout for hard timeout, transport timeout: ", transportTimeout)
-		} else {
-			// For non-enforced timeouts, we can use the global timeout on transport
-			p.logger.Debug("Using transport timeout: ", timeout)
-		}
-
-		p.TykAPISpec.HTTPTransport = p.httpTransport(transportTimeout, rw, req, outreq)
+		p.TykAPISpec.HTTPTransport = p.httpTransport(dialOrHeadersTimeout, req, outreq)
 		p.TykAPISpec.HTTPTransportCreated = time.Now()
 
 		if oldTransport != nil {
@@ -1347,6 +1339,17 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		err             error
 	)
 
+	var decoratedRoundTripper = roundtrippers.Combine(
+		roundTripper,
+		internalLoopRoundTripperMiddleware(p.Gw, p.logger),
+		roundtrippers.SkipIf(otel.HTTPRoundTripper, !p.Gw.GetConfig().OpenTelemetry.TracesEnabled()),
+		roundtrippers.Timeout(requestTimeout),
+		roundtrippers.SkipIf(
+			roundtrippers.HeadersTimeout(fallbackHeadersTimeout),
+			isRequestTimeoutEnforced,
+		),
+	)
+
 	if breakerEnforced {
 		if !breakerConf.CB.Ready() {
 			p.logger.Debug("ON REQUEST: Circuit Breaker is in OPEN state")
@@ -1357,14 +1360,14 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}
 		p.logger.Debug("ON REQUEST: Circuit Breaker is in CLOSED or HALF-OPEN state")
 
-		res, isHijacked, upstreamLatency, err = p.handleOutboundRequest(roundTripper, outreq, rw)
+		res, isHijacked, upstreamLatency, err = p.handleOutboundRequest(decoratedRoundTripper, outreq, rw)
 		if err != nil || res.StatusCode/100 == 5 {
 			breakerConf.CB.Fail()
 		} else {
 			breakerConf.CB.Success()
 		}
 	} else {
-		res, isHijacked, upstreamLatency, err = p.handleOutboundRequest(roundTripper, outreq, rw)
+		res, isHijacked, upstreamLatency, err = p.handleOutboundRequest(decoratedRoundTripper, outreq, rw)
 	}
 
 	if err != nil {
