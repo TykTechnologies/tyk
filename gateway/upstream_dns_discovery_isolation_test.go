@@ -156,8 +156,17 @@ func TestRetireLetsInFlightH2CRequestsFinish(t *testing.T) {
 	}()
 	defer backend.Close()
 
+	// The h2c dialler calls transport.DialContext directly, so the transport
+	// handed to newH2CRoundTripper has to carry one.
+	transport := &http.Transport{
+		DialContext: func(ctx context.Context, network, addr string) (net.Conn, error) {
+			var d net.Dialer
+			return d.DialContext(ctx, network, addr)
+		},
+	}
+
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
-	rt := newH2CRoundTripper(spec, &http.Transport{}, logrus.NewEntry(logrus.New()), &Gateway{})
+	rt := newH2CRoundTripper(spec, transport, logrus.NewEntry(logrus.New()), &Gateway{})
 
 	do := func() error {
 		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "http://"+ln.Addr().String()+"/", nil)
