@@ -333,7 +333,7 @@ func loadDiscoveredAPI(t *testing.T, gw *Gateway, apiID, target string, configur
 	logger.Logger.SetLevel(logrus.PanicLevel)
 
 	gw.setupUpstreamDNSDiscovery(spec, logger)
-	if spec.dnsDiscovery == nil {
+	if spec.dnsDiscovery.Load() == nil {
 		t.Fatalf("%s was not subscribed to %q", apiID, target)
 	}
 
@@ -464,7 +464,7 @@ func TestSetupUpstreamDNSDiscovery_ReleasesOnReconfigure(t *testing.T) {
 	spec.Proxy.DNSDiscovery.Enabled = false
 	gw.setupUpstreamDNSDiscovery(spec, logger)
 
-	if spec.dnsDiscovery != nil {
+	if spec.dnsDiscovery.Load() != nil {
 		t.Fatal("the API kept its plan after discovery was switched off")
 	}
 	if gw.upstreamDNS.Lookups() == 0 {
@@ -477,6 +477,40 @@ func TestSetupUpstreamDNSDiscovery_ReleasesOnReconfigure(t *testing.T) {
 	if after := gw.upstreamDNS.Lookups(); after != before {
 		t.Errorf("the hostname is still being resolved after the API stopped wanting it: %d lookups", after-before)
 	}
+}
+
+// MakeSpec hands back the live *APISpec when a definition is unchanged, so a
+// reload reconciles discovery on a spec that is already serving. The plan is
+// swapped under readers, which is why the field is an atomic.Pointer.
+func TestSetupUpstreamDNSDiscovery_RacesTheRequestPath(t *testing.T) {
+	resolver := newStubResolver()
+	resolver.set("svc", "10.0.0.1")
+
+	gw := newDiscoveryGateway(t, resolver)
+	spec := loadDiscoveredAPI(t, gw, "api-1", "h2c://svc:9002")
+	logger := quietLogger()
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 200; i++ {
+			gw.setupUpstreamDNSDiscovery(spec, logger)
+		}
+	}()
+
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 200; i++ {
+			if _, err := gw.urlFromDNS(spec); err != nil {
+				t.Errorf("urlFromDNS: %v", err)
+			}
+			upstreamDrainRegistry(spec)
+		}
+	}()
+
+	wg.Wait()
 }
 
 func TestUpstreamConnRegistry_DrainsDepartedAddresses(t *testing.T) {
@@ -630,7 +664,7 @@ func TestPlanDrainsOnMembershipChange(t *testing.T) {
 		spec.Proxy.DNSDiscovery.DrainDeadline = 1
 	})
 
-	plan := spec.dnsDiscovery
+	plan := spec.dnsDiscovery.Load()
 	departing, departingPeer := net.Pipe()
 	staying, stayingPeer := net.Pipe()
 	defer departingPeer.Close()
@@ -679,7 +713,7 @@ func TestUpstreamDNSDiscoveryEnabled(t *testing.T) {
 		t.Error("an API with no plan reported discovery enabled")
 	}
 
-	spec.dnsDiscovery = &dnsDiscoveryPlan{}
+	spec.dnsDiscovery.Store(&dnsDiscoveryPlan{})
 	if !upstreamDNSDiscoveryEnabled(spec) {
 		t.Error("an API with a plan reported discovery disabled")
 	}
@@ -942,8 +976,8 @@ func TestPlanDrains_ForEveryAPIOnASharedHostname(t *testing.T) {
 	defer firstPeer.Close()
 	defer secondPeer.Close()
 
-	trackedFirst := first.dnsDiscovery.conns.track("10.0.0.1:9002", firstConn)
-	trackedSecond := second.dnsDiscovery.conns.track("10.0.0.1:9002", secondConn)
+	trackedFirst := first.dnsDiscovery.Load().conns.track("10.0.0.1:9002", firstConn)
+	trackedSecond := second.dnsDiscovery.Load().conns.track("10.0.0.1:9002", secondConn)
 
 	resolver.set("svc", "10.0.0.2")
 	gw.upstreamDNS.Refresh(context.Background())
@@ -986,7 +1020,7 @@ func assertRefusedCombination(t *testing.T, configure func(*APISpec), wantLog st
 	logger := logrus.NewEntry(log)
 	gw.setupUpstreamDNSDiscovery(spec, logger)
 
-	if spec.dnsDiscovery != nil {
+	if spec.dnsDiscovery.Load() != nil {
 		t.Fatal("DNS discovery was enabled for a configuration that cannot work")
 	}
 

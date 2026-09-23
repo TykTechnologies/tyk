@@ -237,6 +237,13 @@ func (gw *Gateway) upstreamTargetList(spec *APISpec, logger *logrus.Entry) *apid
 			logger.Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", err)
 			return nil
 		}
+		if list == nil {
+			// A refresh in flight before the first good set was stored. An empty
+			// list keeps the all-hosts-down path; nil would use target_url, which
+			// for a registry-backed API is usually a placeholder.
+			logger.Warning("[PROXY] [SERVICE DISCOVERY] No host list yet, refusing rather than using target_url")
+			return apidef.NewHostList()
+		}
 		return list
 
 	case upstreamDNSDiscoveryEnabled(spec):
@@ -921,6 +928,11 @@ func (p *ReverseProxy) h2cRoundTripper(outReq *http.Request, transport *http.Tra
 		return nil
 	}
 
+	if hasH2C && hasOther {
+		p.logger.Warning("[PROXY] Target list mixes h2c:// with another scheme; " +
+			"each target keeps the protocol it was declared with")
+	}
+
 	p.logger.Info("Enabling h2c mode")
 	rt := newH2CRoundTripper(p.TykAPISpec, transport, p.logger, p.Gw)
 	rt.h2cOnly = hasH2C && !hasOther
@@ -1028,14 +1040,12 @@ func newH2CRoundTripper(spec *APISpec, transport *http.Transport, logger *logrus
 	return rt
 }
 
-// Retire covers both transports: closing only rt.transport leaves h2c open.
+// Retire covers both transports: closing only rt.transport leaves h2c open. A
+// request still holding this round tripper finishes, dialling if it has to.
 func (rt *TykRoundTripper) Retire() {
 	if rt == nil {
 		return
 	}
-
-	// Set first, so a racing request cannot dial past the close.
-	rt.retired.Store(true)
 
 	if rt.transport != nil {
 		rt.transport.DisableKeepAlives = true
@@ -1044,6 +1054,18 @@ func (rt *TykRoundTripper) Retire() {
 	if rt.h2ctransport != nil {
 		rt.h2ctransport.CloseIdleConnections()
 	}
+}
+
+// Shutdown retires the transports and stops the h2c dialler, for an API being
+// unloaded rather than rebuilt.
+func (rt *TykRoundTripper) Shutdown() {
+	if rt == nil {
+		return
+	}
+
+	// Set first, so a racing request cannot dial past the close.
+	rt.retired.Store(true)
+	rt.Retire()
 }
 
 // h2cUpstreamKey carries the transport choice past the scheme rewrite x/net/http2 forces.

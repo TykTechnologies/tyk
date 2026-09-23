@@ -662,8 +662,8 @@ type DNSDiscoveryConfig struct {
 	// stay open. Zero applies the default of 30.
 	DrainDeadline int64 `bson:"drain_deadline" json:"drain_deadline"`
 
-	// DrainDisabled leaves connections to a departed address to the connection
-	// pool's idle timeout instead of closing them.
+	// DrainDisabled overrides DrainDeadline, leaving connections to a departed
+	// address to the connection pool's idle timeout instead of closing them.
 	DrainDisabled bool `bson:"drain_disabled" json:"drain_disabled"`
 }
 

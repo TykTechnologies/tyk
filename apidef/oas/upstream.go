@@ -341,8 +341,8 @@ type DNSDiscovery struct {
 	// stay open. Zero applies the default of 30.
 	// Tyk classic API definition: `proxy.dns_discovery.drain_deadline`.
 	DrainDeadline int64 `bson:"drainDeadline,omitempty" json:"drainDeadline,omitempty"`
-	// DrainDisabled leaves connections to a departed address to the connection
-	// pool's idle timeout instead of closing them.
+	// DrainDisabled overrides DrainDeadline, leaving connections to a departed
+	// address to the connection pool's idle timeout instead of closing them.
 	// Tyk classic API definition: `proxy.dns_discovery.drain_disabled`.
 	DrainDisabled bool `bson:"drainDisabled,omitempty" json:"drainDisabled,omitempty"`
 }

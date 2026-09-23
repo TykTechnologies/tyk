@@ -53,14 +53,14 @@ type dnsDiscoveryPlan struct {
 }
 
 func upstreamDNSDiscoveryEnabled(spec *APISpec) bool {
-	return spec != nil && spec.dnsDiscovery != nil
+	return spec != nil && spec.dnsDiscovery.Load() != nil
 }
 
 func upstreamDrainRegistry(spec *APISpec) *upstreamConnRegistry {
-	if spec == nil || spec.dnsDiscovery == nil {
+	if spec == nil {
 		return nil
 	}
-	return spec.dnsDiscovery.conns
+	return spec.dnsDiscovery.Load().registry()
 }
 
 func planUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) *dnsDiscoveryPlan {
@@ -102,6 +102,8 @@ func planUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) *dnsDiscovery
 
 	host, port := splitUpstreamHostPort(target)
 	if !dnsdiscovery.Resolvable(host) {
+		logger.WithField("host", host).
+			Warning("[PROXY] [DNS DISCOVERY] DNS discovery needs a resolvable hostname, not an IP literal or localhost; leaving this API on its configured target")
 		return nil
 	}
 
@@ -124,10 +126,10 @@ func planUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) *dnsDiscovery
 
 // setupUpstreamDNSDiscovery reconciles both ways: an API that stops asking is released here.
 func (gw *Gateway) setupUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) {
-	previous := spec.dnsDiscovery
+	previous := spec.dnsDiscovery.Load()
 
 	disable := func() {
-		spec.dnsDiscovery = nil
+		spec.dnsDiscovery.Store(nil)
 		gw.upstreamDNS.ReleaseKey(spec.APIID)
 		previous.retire()
 	}
@@ -157,14 +159,14 @@ func (gw *Gateway) setupUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry
 	}
 
 	plan.sub = sub
-	spec.dnsDiscovery = plan
+	spec.dnsDiscovery.Store(plan)
 	previous.retire()
 
 	// Once per spec; the hook releases whatever plan the spec holds when it fires.
 	if !spec.dnsDiscoveryHooked {
 		spec.dnsDiscoveryHooked = true
 		spec.AddUnloadHook(func() {
-			current := spec.dnsDiscovery
+			current := spec.dnsDiscovery.Load()
 			if current == nil {
 				return
 			}
@@ -184,6 +186,14 @@ func (gw *Gateway) setupUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry
 		"stale_ttl":        plan.staleTTL.String(),
 		"drain_deadline":   drain,
 	}).Info("[PROXY] [DNS DISCOVERY] Sourcing the target list from DNS")
+}
+
+// registry is nil-safe: an API with no plan, or with draining disabled, has none.
+func (p *dnsDiscoveryPlan) registry() *upstreamConnRegistry {
+	if p == nil {
+		return nil
+	}
+	return p.conns
 }
 
 func (p *dnsDiscoveryPlan) retire() {
@@ -250,7 +260,7 @@ func resolveDNSDiscoveryDrainDeadline(conf apidef.DNSDiscoveryConfig) time.Durat
 
 // urlFromDNS runs on the request path: it resolves nothing and takes no lock.
 func (gw *Gateway) urlFromDNS(spec *APISpec) (*apidef.HostList, error) {
-	plan := spec.dnsDiscovery
+	plan := spec.dnsDiscovery.Load()
 	if plan == nil {
 		return spec.Proxy.StructuredTargetList, nil
 	}

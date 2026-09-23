@@ -9,6 +9,7 @@ import (
 )
 
 // upstreamConnRegistry tracks connections per address, because neither transport evicts one destination.
+// track and close tolerate a nil receiver: an API with draining disabled has no registry.
 type upstreamConnRegistry struct {
 	mu     sync.Mutex
 	conns  map[string]map[*trackedConn]struct{}
@@ -57,10 +58,6 @@ func (r *upstreamConnRegistry) track(addr string, conn net.Conn) net.Conn {
 
 // drain closes every connection to addr after the deadline, so a departing backend can finish.
 func (r *upstreamConnRegistry) drain(addr string, after time.Duration) {
-	if r == nil {
-		return
-	}
-
 	if after <= 0 {
 		r.closeAddr(addr)
 		return
@@ -104,10 +101,6 @@ func (r *upstreamConnRegistry) drain(addr string, after time.Duration) {
 }
 
 func (r *upstreamConnRegistry) cancelDrain(addr string) {
-	if r == nil {
-		return
-	}
-
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -127,11 +120,8 @@ func (r *upstreamConnRegistry) cancelDrainLocked(addr string) {
 }
 
 func (r *upstreamConnRegistry) closeAddr(addr string) {
-	if r == nil {
-		return
-	}
-
 	r.mu.Lock()
+	r.cancelDrainLocked(addr)
 	tracked := r.takeAddrLocked(addr)
 	r.mu.Unlock()
 
@@ -164,19 +154,14 @@ func (r *upstreamConnRegistry) close() {
 	}
 	r.closed = true
 
-	for _, pending := range r.drains {
-		pending.cancelled = true
-		pending.timer.Stop()
+	// cancelDrainLocked deletes as it goes, which range tolerates.
+	for addr := range r.drains {
+		r.cancelDrainLocked(addr)
 	}
-	r.drains = map[string]*pendingDrain{}
 	r.conns = map[string]map[*trackedConn]struct{}{}
 }
 
 func (r *upstreamConnRegistry) countFor(addr string) int {
-	if r == nil {
-		return 0
-	}
-
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -184,10 +169,6 @@ func (r *upstreamConnRegistry) countFor(addr string) int {
 }
 
 func (r *upstreamConnRegistry) forget(conn *trackedConn) {
-	if r == nil {
-		return
-	}
-
 	r.mu.Lock()
 	defer r.mu.Unlock()
 

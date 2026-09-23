@@ -198,8 +198,8 @@ func (s *APISpec) Unload() {
 	}
 
 	if s.HTTPTransport != nil {
-		// Retire covers both transports; closing the HTTP/1 one leaves h2c untouched.
-		s.HTTPTransport.Retire()
+		// Shutdown covers both transports; closing the HTTP/1 one leaves h2c untouched.
+		s.HTTPTransport.Shutdown()
 		s.HTTPTransport = nil
 	}
 

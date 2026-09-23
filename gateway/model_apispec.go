@@ -65,8 +65,8 @@ type APISpec struct {
 	OrgHasNoSession          bool
 	AnalyticsPluginConfig    *GoAnalyticsPlugin
 
-	// Set during load, read-only after, non-nil only with the feature on.
-	dnsDiscovery *dnsDiscoveryPlan
+	// Swapped by a reload while requests read it, so the reads stay lock-free.
+	dnsDiscovery atomic.Pointer[dnsDiscoveryPlan]
 
 	// So reconciling a spec twice does not stack unload hooks.
 	dnsDiscoveryHooked bool

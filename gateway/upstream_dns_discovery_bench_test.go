@@ -48,7 +48,7 @@ func benchSpec(b *testing.B, gw *Gateway, apiID, target string) *APISpec {
 	logger.Logger.SetLevel(logrus.PanicLevel)
 
 	gw.setupUpstreamDNSDiscovery(spec, logger)
-	if spec.dnsDiscovery == nil {
+	if spec.dnsDiscovery.Load() == nil {
 		b.Fatalf("%s got no plan for %q", apiID, target)
 	}
 
@@ -109,7 +109,7 @@ func BenchmarkUpstreamDNS_RequestPathRebuild(b *testing.B) {
 		b.Run(fmt.Sprintf("pods=%d", pods), func(b *testing.B) {
 			gw := benchGateway(pods)
 			spec := benchSpec(b, gw, "api-1", "h2c://svc:9002")
-			plan := spec.dnsDiscovery
+			plan := spec.dnsDiscovery.Load()
 
 			b.ReportAllocs()
 			b.ResetTimer()

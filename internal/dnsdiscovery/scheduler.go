@@ -8,6 +8,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -60,7 +62,8 @@ type Config struct {
 	// Host is the DNS name to resolve, without a port.
 	Host string
 
-	// Interval of zero means DefaultInterval; see NormaliseInterval.
+	// Zero means DefaultInterval. Applying the MinInterval floor is the
+	// caller's; see NormaliseInterval.
 	Interval time.Duration
 
 	// StaleTTL bounds the last known good set.
@@ -277,7 +280,7 @@ func (s *Scheduler) ReleaseKey(key string) {
 	s.detachLocked(sub)
 }
 
-// Refresh resolves every registered name on the calling goroutine.
+// Refresh resolves every name not already in flight, on the calling goroutine.
 func (s *Scheduler) Refresh(ctx context.Context) {
 	s.mu.Lock()
 	all := make([]*entry, 0, len(s.entries))
@@ -289,7 +292,7 @@ func (s *Scheduler) Refresh(ctx context.Context) {
 	s.refreshAll(ctx, all)
 }
 
-// Lookups counts the lookups completed since the scheduler started.
+// Lookups counts the lookups attempted since the scheduler started.
 func (s *Scheduler) Lookups() int64 {
 	return s.lookups.Load()
 }
@@ -474,39 +477,30 @@ func (s *Scheduler) run(ctx context.Context, wake chan struct{}) {
 	for {
 		s.refreshAll(ctx, s.dueEntries())
 
-		timer := time.NewTimer(s.nextWait())
 		select {
 		case <-ctx.Done():
-			timer.Stop()
 			return
-		case <-timer.C:
+		case <-time.After(s.nextWait()):
 		case <-wake:
-			timer.Stop()
 		}
 	}
 }
 
 func (s *Scheduler) refreshAll(ctx context.Context, due []*entry) {
-	if len(due) == 0 {
-		return
-	}
 	if len(due) == 1 {
 		s.refresh(ctx, due[0])
 		return
 	}
 
-	var wg sync.WaitGroup
-	slots := make(chan struct{}, lookupConcurrency(len(due)))
+	group := new(errgroup.Group)
+	group.SetLimit(lookupConcurrency(len(due)))
 	for _, e := range due {
-		wg.Add(1)
-		slots <- struct{}{}
-		go func() {
-			defer wg.Done()
-			defer func() { <-slots }()
+		group.Go(func() error {
 			s.refresh(ctx, e)
-		}()
+			return nil
+		})
 	}
-	wg.Wait()
+	_ = group.Wait() //nolint:errcheck // refresh never returns an error
 }
 
 func (s *Scheduler) nextWait() time.Duration {
