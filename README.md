@@ -14,39 +14,36 @@
 ![X twitter Follow](https://img.shields.io/twitter/follow/tyk_io?logoColor=8836FB&cacheSeconds=120)
 
 ---
-[Documentation](https://tyk.io/docs/) | [Forum](https://community.tyk.io) | [Blog](https://tyk.io/blog/) | [About](https://tyk.io)
+[Documentation](https://tyk.io/docs/) | [MCP Gateway](https://tyk.io/tyk-mcp-gateway/) | [AI Gateway](https://tyk.io/tyk-ai-studio/) | [Forum](https://community.tyk.io) | [Blog](https://tyk.io/blog/) | [About](https://tyk.io)
 
 
 # Tyk API Gateway
-**Tyk Gateway** is the cloud-native, open source, enterprise-ready API Gateway supporting REST, GraphQL, TCP and gRPC protocols.
+**Tyk Gateway** is the cloud-native, open source, enterprise-ready API and AI Gateway supporting REST, GraphQL, TCP, gRPC and MCP (Model Context Protocol).
 
 Built from the ground up, as the [fastest API Gateway](https://tyk.io/performance-benchmarks/) on the planet since 2014.
 
 _Tyk Gateway_ is provided ‘Batteries-included’, with no feature lockout. Enabling your organization to rate limit, auth, gather analytics, apply microservice patterns [and more](#open-source-api-gateway-features) with ease.
 
-Tyk runs natively on _Kubernetes_, if you prefer, thanks to the _[Tyk Kubernetes Operator](https://github.com/TykTechnologies/tyk-operator)_
+There are three different ways you can [try Tyk]( https://tyk.io/docs):
 
 <table>
   <tr>
    <td>
      <center>
-        <a href="https://tyk.io/docs/deployment-and-operations/tyk-open-source-api-gateway/quick-start"> <img src="https://raw.githubusercontent.com/TykTechnologies/tyk-docs/master/tyk-docs/assets/img/logos/tyk-logo-opensource.svg" width="30%"></a>
      </center>
-     </br>Everything you need to manage APIs. Follow the simple Get Started guide below 👇
+     </br>Everything you need to manage APIs using Tyk Open Source. Follow the simple Get Started guide below 👇
    </td>
    <td>
      <center>
-       <a href="https://tyk.io/docs/tyk-self-managed/install"> <img src="https://raw.githubusercontent.com/TykTechnologies/tyk-docs/master/tyk-docs/assets/img/logos/tyk-logo-selfmanaged.png" width="25%"></a>
      </center>
-     </br>The Enterprise API Management platform: Management Control Plane, Dashboard GUI & Developer Portal.
-     </br><a href="https://tyk.io/api-lifecycle-management/">Install Tyk Self Managed</a>
+     </br>The Enterprise API Management platform: Management Control Plane with GUI & Developer Portal.
+     </br><a href="https://tyk.io/docs/tyk-self-managed/">Tyk Self Managed</a>
    </td>
    <td>
      <center>
-       <a href="https://tyk.io/docs/tyk-cloud"> <img src="https://raw.githubusercontent.com/TykTechnologies/tyk-docs/master/tyk-docs/assets/img/logos/tyk-logo-cloud.png" width="20%"></a>
      </center>
-     </br>The Enterprise API Management platform SaaS: Management Control Plane, Dashboard GUI & Developer Portal.
-     </br><a href="https://tyk.io/docs/deployment-and-operations/tyk-cloud-platform/quick-start">Deploy Tyk Cloud </a>
+     </br>The Enterprise API Management SaaS platform: hosted Management Control Plane with GUI & Developer Portal.
+     </br><a href="https://tyk.io/docs/deployment-and-operations/tyk-cloud-platform/quick-start">Tyk Cloud </a>
    </td>
   </tr>
 </table>
@@ -102,11 +99,18 @@ Other Installations are available:
 7. [CentOS](https://tyk.io/docs/tyk-oss/ce-centos/)
 8. [Compile Tyk from Source](#compiling-tyk-gateway)
 
+### Getting started with AI Gateway for LLM and MCP
+
+Tyk Gateway governs MCP traffic from AI agents, applying authentication, rate limiting and per-tool access control to every JSON-RPC call. [Tyk AI Studio](https://tyk.io/tyk-ai-studio/) handles LLM management, with model routing, budgets and guardrails across providers. Start at the [AI management overview](https://tyk.io/docs/ai-management/overview).
 
 ## Open Source API Gateway Features
-Use any protocol: REST, SOAP, [GraphQL](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/graphql/), [gRPC](https://tyk.io/docs/key-concepts/grpc-proxy/), and [TCP](https://tyk.io/docs/key-concepts/tcp-proxy/).
+Use any protocol: REST (with native [OpenAPI support](https://tyk.io/docs/api-management/gateway-config-tyk-oas)), SOAP, [GraphQL](https://tyk.io/docs/api-management/graphql), [gRPC](https://tyk.io/docs/key-concepts/grpc-proxy/), [TCP](https://tyk.io/docs/key-concepts/tcp-proxy/), and [MCP](https://tyk.io/docs/ai-management/mcp-gateway/overview).
 
-Industry Standard Authentication: [OIDC](https://tyk.io/docs/advanced-configuration/integrate/api-auth-mode/open-id-connect/#setting-up-oidc), [JWT,](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/jwt/) [bearer Tokens](https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/bearer-tokens/), [Basic Auth](https://tyk.io/docs/tyk-apis/tyk-dashboard-api/basic-authentication/), Client Certificates and more.
+[MCP Gateway](https://tyk.io/docs/ai-management/mcp-gateway/overview): Put the gateway in front of remote [Model Context Protocol](https://modelcontextprotocol.io) servers so AI agent traffic is authenticated, rate limited and auditable. Tyk parses JSON-RPC 2.0 and applies policy per tool, resource and prompt rather than treating MCP as opaque HTTP.
+
+[API to MCP](https://tyk.io/docs/ai-management/mcps/api-to-mcp): Generate an MCP proxy directly from a REST API in Tyk Gateway, without building or hosting a separate MCP server.
+
+Industry Standard Authentication: [JWT,](https://tyk.io/docs/basic-config-and-security/security/authentication-authorization/json-web-tokens) [bearer Tokens](https://tyk.io/docs/api-management/authentication/bearer-token/), [Basic Auth](https://tyk.io/docs/api-management/authentication/basic-authentication/), [Client Certificates](https://tyk.io/docs/api-management/authentication/certificate-auth/) and more.
 
 [Open API Standards:](https://tyk.io/docs/getting-started/using-oas-definitions/import-an-oas-api/) Import your Swagger and OpenAPI Documents (OAS 2.X and OAS 3.0.1) to scaffold APIs in Tyk.
 
@@ -144,9 +148,10 @@ Tyk Technologies uses the same API Gateway for all it’s applications. Protecti
 
 Tyk Technologies maintains other Open Source Software which can be used in conjunction with Tyk API Gateway:
 
+[Tyk AI Studio](https://github.com/TykTechnologies/ai-studio) - Open source (AGPL-3.0) AI management platform for LLM traffic: model routing, budgets and cost controls, RAG data sources, tools and agents, with governance across providers including OpenAI, Anthropic, AWS Bedrock, Google Vertex AI, Hugging Face and Ollama. Use it alongside Tyk Gateway when you need LLM and AI management rather than MCP proxying. [Docs](https://tyk.io/docs/ai-management/ai-studio/overview)
+
 [Tyk Pump](https://github.com/TykTechnologies/tyk-pump) - Pluggable analytics purger to move Analytics generated by your Tyk nodes to any back-end.
 
-[Tyk Operator](https://github.com/TykTechnologies/tyk-operator) - Brings API Management capabilities to Kubernetes. Configure Ingress, APIs, Security Policies, Authentication, Authorization, Mediation and more - all using Custom Resources and Kubernetes Native primitives
 
 [Tyk Identity Broker](https://github.com/TykTechnologies/tyk-identity-broker) - Tyk Authentication Proxy for third-party login
 
@@ -156,7 +161,7 @@ Tyk Technologies maintains other Open Source Software which can be used in conju
 
 
 ## Documentation
-All the documentation for Tyk Gateway and other OSS-related topics can be found at [https://tyk.io/docs/tyk-oss-gateway/](https://tyk.io/docs/tyk-oss-gateway/)
+All the documentation for Tyk Gateway and other OSS-related topics can be found at [https://tyk.io/docs/tyk-open-source](https://tyk.io/docs/tyk-open-source)
 
 
 ## Community
