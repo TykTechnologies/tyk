@@ -25,7 +25,7 @@ require (
 	github.com/TykTechnologies/goautosocket v0.0.0-20190430121222-97bfa5e7e481
 	github.com/TykTechnologies/gorpc v0.0.0-20250214161245-e9f3f088e8c6
 	github.com/TykTechnologies/goverify v0.0.0-20260203113354-7a104729566e
-	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20260818151404-c416c52a2dd3
+	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20260901124330-4d3f73488d86
 	github.com/TykTechnologies/graphql-translator v0.0.0-20250602105400-41c2e7514a36
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.2
@@ -97,7 +97,7 @@ require (
 	github.com/Azure/go-amqp v1.4.0
 	github.com/IBM/sarama v1.46.3
 	github.com/Jeffail/gabs/v2 v2.7.0
-	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20260818151404-c416c52a2dd3
+	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20260901124330-4d3f73488d86
 	github.com/TykTechnologies/opentelemetry v0.0.26
 	github.com/TykTechnologies/structviewer v1.2.0
 	github.com/alecthomas/kingpin/v2 v2.4.0
