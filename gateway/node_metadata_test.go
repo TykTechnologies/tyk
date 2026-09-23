@@ -105,15 +105,33 @@ func TestNodeMetadata_AddressFollowsGetHostDetails(t *testing.T) {
 	})
 }
 
-func TestNodeMetadata_TagsHeaderBoundedSize(t *testing.T) {
+// TestNodeMetadata_TagsHeaderEncoding pins how the tags header is encoded:
+// values joined by one comma, no padding, nothing escaped. A tag containing a
+// comma is therefore indistinguishable from two tags on the wire.
+//
+// setHeaders applies no size limit of its own, so the 50-tag case is a fixed
+// reference point for a large node, not a bound the code enforces. Its length
+// is asserted exactly rather than against a ceiling: an exact length fails if
+// the encoding changes (a padded separator would be 1698 bytes), where "under
+// 2 KB" would pass and hide it.
+func TestNodeMetadata_TagsHeaderEncoding(t *testing.T) {
+	h := http.Header{}
+	nodeMetadata{Tags: []string{"alpha", "beta", "gamma"}}.setHeaders(h)
+
+	got := h.Get(header.XTykNodeTags)
+	assert.Equal(t, "alpha,beta,gamma", got)
+	assert.NotContains(t, got, " ")
+	assert.Equal(t, 2, strings.Count(got, ","), "one separator between values")
+
 	tags := make([]string, 50)
 	for i := range tags {
 		tags[i] = strings.Repeat("t", 32)
 	}
-	h := http.Header{}
+	h = http.Header{}
 	nodeMetadata{Tags: tags}.setHeaders(h)
 
-	assert.Less(t, len(h.Get(header.XTykNodeTags)), 2048, "50 tags of 32 bytes: 1600 bytes plus 49 commas")
+	// 50 tags of 32 bytes, plus 49 separators.
+	assert.Equal(t, 50*32+49, len(h.Get(header.XTykNodeTags)))
 }
 
 func TestNodeMetadata_ParityWithBuildNodeInfo(t *testing.T) {
