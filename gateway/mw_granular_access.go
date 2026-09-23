@@ -80,6 +80,11 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 			if err != nil || !match {
 				continue
 			}
+
+			if !m.conditionsMatch(r, accessSpec) {
+				continue
+			}
+
 			return m.pass()
 		}
 
@@ -109,7 +114,7 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 		}
 
 		match := asRegex.MatchString(r.URL.Path)
-		if match {
+		if match && m.conditionsMatch(r, accessSpec) {
 			return m.pass()
 		}
 	}

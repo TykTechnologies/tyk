@@ -183,8 +183,8 @@ github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20260818151404-c416c52a2dd
 github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20260818151404-c416c52a2dd3/go.mod h1:XM1owY0ZCJ1Rai64Q1UKXZYNDkWikZDojgefZw8raPk=
 github.com/TykTechnologies/graphql-translator v0.0.0-20250602105400-41c2e7514a36 h1:7nNsyocI/RKBqo73RR9G/SiFMZ8w2sN+HMsQXYp9wPI=
 github.com/TykTechnologies/graphql-translator v0.0.0-20250602105400-41c2e7514a36/go.mod h1:qiglVaUPPOWET4bQsBmsAaLiCml20a01REQSi7TSUa0=
-github.com/TykTechnologies/kin-openapi v0.512.1-0.20260817104659-7198d52254ff h1:lpF67zYIQzUMacE5UraBYrzaajVEkHO3h/TzCNWSCwY=
-github.com/TykTechnologies/kin-openapi v0.512.1-0.20260817104659-7198d52254ff/go.mod h1:sVo98lE4i2FbZEBScpB1sGbZOPK+KLgtE/pRlzYHLkQ=
+github.com/TykTechnologies/kin-openapi v0.512.1-0.20260921123310-5d76ff536981 h1:cINxLAbxZaevx4GLaLRzWO73K0TFWBlH4dotLrXrpWo=
+github.com/TykTechnologies/kin-openapi v0.512.1-0.20260921123310-5d76ff536981/go.mod h1:sVo98lE4i2FbZEBScpB1sGbZOPK+KLgtE/pRlzYHLkQ=
 github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632 h1:T5NWziFusj8au5nxAqMMh/bZyX9CAyYnBkaMSsfH6BA=
 github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632/go.mod h1:UsPYgOFBpNzDXLEti7MKOwHLpVSqdzuNGkVFPspQmnQ=
 github.com/TykTechnologies/openid2go v0.1.2 h1:WXctksOahA/epTVVvbn9iNUuMXKRr0ksrF4dY9KW8o8=
@@ -195,8 +195,8 @@ github.com/TykTechnologies/storage v1.5.0 h1:W4ezPleAj/toq4DFT3nb7P4V92AIpE9TcMz
 github.com/TykTechnologies/storage v1.5.0/go.mod h1:swwt7vWgv6dDG9yvNXn7kf6r/QUWzOQc9XUXnXHeOg0=
 github.com/TykTechnologies/structviewer v1.2.0 h1:wV3AyTmWCZ3n7/llp+6xuDjnS/EJ/Ct/HG2pPE9+VX8=
 github.com/TykTechnologies/structviewer v1.2.0/go.mod h1:XKJbqX8Q7n9FUrqTK58yVZUi5zWAkeRcULcPLDoWvvY=
-github.com/TykTechnologies/tyk-pump v1.17.0-rc2 h1:YejBrAQGIgnC6aCKiDSsXzFrkKAHBnrMAOYN0+10kFk=
-github.com/TykTechnologies/tyk-pump v1.17.0-rc2/go.mod h1:SPCHD8XgAEP169mP97m3mKAygQW6raPLrrVsjgxcwYU=
+github.com/TykTechnologies/tyk-pump v1.17.0 h1:pnfgWmAsMqgtfark0IZ+sUATPUmbz+MQUQoKlskZd/A=
+github.com/TykTechnologies/tyk-pump v1.17.0/go.mod h1:sweZqtQ/Fys3hYcrfe0XpmrtLune3kBFo9Qm+++Cb+E=
 github.com/agnivade/levenshtein v1.1.1 h1:QY8M92nrzkmr798gCo3kmMyqXFzdQVpxLlGPRBij0P8=
 github.com/agnivade/levenshtein v1.1.1/go.mod h1:veldBMzWxcCG2ZvUTKD2kJNRdCk5hVbJomOvKkmgYbo=
 github.com/ajstarks/svgo v0.0.0-20180226025133-644b8db467af/go.mod h1:K08gAheRH3/J6wwsYMMT4xOr94bZjxIelGM0+d/wbFw=
