@@ -330,10 +330,11 @@ type DNSDiscovery struct {
 	// Tyk classic API definition: `proxy.dns_discovery.refresh_interval`.
 	RefreshInterval time.ReadableDuration `bson:"refreshInterval,omitempty" json:"refreshInterval,omitempty"`
 	// StaleTTL is how long the last addresses stay in use while lookups fail.
-	// Empty keeps them until a lookup succeeds. Once expired, requests fail with 503.
+	// Empty or `0` means that known addresses will continue to be used until a lookup succeeds. Once expired, requests fail with 503.
 	// Tyk classic API definition: `proxy.dns_discovery.stale_ttl`.
 	StaleTTL time.ReadableDuration `bson:"staleTTL,omitempty" json:"staleTTL,omitempty"`
 	// ConnectionDraining controls the behaviour when an address is no longer returned by the DNS resolver.
+	// Disabled by default.
 	// Tyk classic API definition: `proxy.dns_discovery.connection_draining`.
 	ConnectionDraining *ConnectionDraining `bson:"connectionDraining,omitempty" json:"connectionDraining,omitempty"`
 }

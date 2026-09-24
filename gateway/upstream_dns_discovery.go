@@ -243,10 +243,10 @@ func resolveDNSDiscoveryStaleTTL(conf apidef.DNSDiscoveryConfig) time.Duration {
 
 func resolveDNSDiscoveryDrainTimeout(conf apidef.DNSDiscoveryConfig) time.Duration {
 	draining := conf.ConnectionDraining
-	if draining != nil && !draining.Enabled {
+	if draining == nil || !draining.Enabled {
 		return dnsDiscoveryDrainDisabled
 	}
-	if draining == nil || draining.Timeout <= 0 {
+	if draining.Timeout <= 0 {
 		return dnsDiscoveryDefaultDrainTimeout
 	}
 	return time.Duration(draining.Timeout)

@@ -121,7 +121,7 @@ func testDrainTimeoutResolution(t *testing.T) {
 		draining *apidef.ConnectionDrainingConfig
 		want     time.Duration
 	}{
-		{"omitted", nil, dnsDiscoveryDefaultDrainTimeout},
+		{"omitted", nil, dnsDiscoveryDrainDisabled},
 		{"enabled without a timeout", &apidef.ConnectionDrainingConfig{Enabled: true}, dnsDiscoveryDefaultDrainTimeout},
 		{"enabled with a timeout", &apidef.ConnectionDrainingConfig{Enabled: true, Timeout: tyktime.ReadableDuration(time.Minute)}, time.Minute},
 		{"disabled", &apidef.ConnectionDrainingConfig{Timeout: tyktime.ReadableDuration(time.Minute)}, dnsDiscoveryDrainDisabled},
