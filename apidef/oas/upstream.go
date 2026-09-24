@@ -333,7 +333,7 @@ type DNSDiscovery struct {
 	// Empty keeps them until a lookup succeeds. Once expired, requests fail with 503.
 	// Tyk classic API definition: `proxy.dns_discovery.stale_ttl`.
 	StaleTTL time.ReadableDuration `bson:"staleTTL,omitempty" json:"staleTTL,omitempty"`
-	// ConnectionDraining contains the configuration related to connection draining.
+	// ConnectionDraining controls the behaviour when an address is no longer returned by the DNS resolver.
 	// Tyk classic API definition: `proxy.dns_discovery.connection_draining`.
 	ConnectionDraining *ConnectionDraining `bson:"connectionDraining,omitempty" json:"connectionDraining,omitempty"`
 }
