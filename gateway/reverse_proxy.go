@@ -26,7 +26,6 @@ import (
 	"net/url"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/akutz/memconn"
@@ -47,6 +46,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/roundtrippers"
 	"github.com/TykTechnologies/tyk/internal/service/core"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
@@ -494,15 +494,15 @@ type ReverseProxy struct {
 
 var idleConnTimeout = 90
 
-func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
-	timeout := 30.0
-	if dialerTimeout > 0 {
-		log.Debug("Setting timeout for outbound request to: ", dialerTimeout)
-		timeout = dialerTimeout
+func (p *ReverseProxy) defaultTransport(dialTimeout float64) *http.Transport {
+	if dialTimeout == 0 {
+		dialTimeout = 30.0
 	}
 
+	log.Debug("Setting timeout for outbound request to: ", dialTimeout)
+
 	dialer := &net.Dialer{
-		Timeout:   time.Duration(float64(timeout) * float64(time.Second)),
+		Timeout:   time.Duration(dialTimeout * float64(time.Second)),
 		KeepAlive: 30 * time.Second,
 		DualStack: true,
 	}
@@ -516,11 +516,15 @@ func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 	}
 
 	transport := &http.Transport{
-		DialContext:           dialContextFunc,
-		MaxIdleConns:          p.Gw.GetConfig().MaxIdleConns,
-		MaxIdleConnsPerHost:   p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
-		IdleConnTimeout:       time.Duration(idleConnTimeout) * time.Second,
-		ResponseHeaderTimeout: time.Duration(dialerTimeout) * time.Second,
+		DialContext:         dialContextFunc,
+		MaxIdleConns:        p.Gw.GetConfig().MaxIdleConns,
+		MaxIdleConnsPerHost: p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
+		IdleConnTimeout:     time.Duration(idleConnTimeout) * time.Second,
+
+		// ResponseHeaderTimeout logic moved to roundtrippers.HeadersTimeout decorator.
+		// It was colliding with the enforced (endpoint-level/api-level) timeout.
+		// @see https://tyktech.atlassian.net/browse/TT-17873
+		ResponseHeaderTimeout: time.Duration(0),
 		TLSHandshakeTimeout:   10 * time.Second,
 	}
 
@@ -710,9 +714,8 @@ func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Reque
 	return resp
 }
 
-const defaultProxyTimeout float64 = 30
-
 func proxyTimeout(spec *APISpec) float64 {
+	const defaultProxyTimeout float64 = 30
 	if spec.GlobalConfig.ProxyDefaultTimeout > 0 {
 		return spec.GlobalConfig.ProxyDefaultTimeout
 	}
@@ -855,9 +858,9 @@ func tlsClientConfig(s *APISpec, gw *Gateway) *tls.Config {
 	return config
 }
 
-func (p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, outReq *http.Request) *TykRoundTripper {
+func (p *ReverseProxy) httpTransport(dialTimeout float64, req *http.Request, outReq *http.Request) *TykRoundTripper {
 	p.logger.Debug("Creating new transport")
-	transport := p.defaultTransport(timeOut) // modifies a newly created transport
+	transport := p.defaultTransport(dialTimeout) // modifies a newly created transport
 	transport.TLSClientConfig = &tls.Config{}
 	transport.Proxy = proxyFromAPI(p.TykAPISpec)
 
@@ -918,29 +921,19 @@ func (p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, re
 
 	p.logger.Debug("Out request url: ", outReq.URL.String())
 
-	if rt := p.h2cRoundTripper(outReq, transport); rt != nil {
-		return rt
+	if outReq.URL.Scheme == "h2c" {
+		p.logger.Info("Enabling h2c mode")
+		h2t := &http2.Transport{
+			// kind of a hack, but for plaintext/H2C requests, pretend to dial TLS
+			DialTLS: func(network, addr string, _ *tls.Config) (net.Conn, error) {
+				return net.Dial(network, addr)
+			},
+			AllowHTTP: true,
+		}
+		return &TykRoundTripper{transport: transport, h2ctransport: h2t}
 	}
 
-	return &TykRoundTripper{transport: transport, logger: p.logger, Gw: p.Gw}
-}
-
-// h2cRoundTripper returns nil unless this API's upstreams call for cleartext HTTP/2.
-func (p *ReverseProxy) h2cRoundTripper(outReq *http.Request, transport *http.Transport) *TykRoundTripper {
-	hasH2C, hasOther := upstreamSchemes(p.TykAPISpec)
-	if outReq.URL.Scheme != "h2c" && !hasH2C {
-		return nil
-	}
-
-	if hasH2C && hasOther {
-		p.logger.Warning("[PROXY] Target list mixes h2c:// with another scheme; " +
-			"each target keeps the protocol it was declared with")
-	}
-
-	p.logger.Info("Enabling h2c mode")
-	rt := newH2CRoundTripper(p.TykAPISpec, transport, p.logger, p.Gw)
-	rt.h2cOnly = hasH2C && !hasOther
-	return rt
+	return &TykRoundTripper{transport: transport, h2ctransport: nil}
 }
 
 func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config, hostName string) {
@@ -992,174 +985,47 @@ func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config,
 	}
 }
 
-type TykRoundTripper struct {
-	transport    *http.Transport
-	h2ctransport *http2.Transport
-	h2cUnowned   *http2.Transport
-	logger       *logrus.Entry
-	Gw           *Gateway `json:"-"`
-
-	// h2cOnly covers requests reaching RoundTrip unmarked, as GraphQL v1 produces.
-	h2cOnly bool
-
-	// retired stops the h2c dialler; CloseIdleConnections alone lets a request re-dial past.
-	retired atomic.Bool
-}
-
-const defaultH2CIdleConnTimeout = 90 * time.Second
-
-var errTransportRetired = errors.New("upstream transport retired")
-
-func newH2CRoundTripper(spec *APISpec, transport *http.Transport, logger *logrus.Entry, gw *Gateway) *TykRoundTripper {
-	rt := &TykRoundTripper{transport: transport, logger: logger, Gw: gw}
-
-	dial := func(ctx context.Context, network, addr string) (net.Conn, error) {
-		if rt.retired.Load() {
-			return nil, errTransportRetired
-		}
-		return transport.DialContext(ctx, network, addr)
+func isInternalLoop(r *http.Request) bool {
+	if r.URL == nil {
+		return false
 	}
-
-	// Pretend to dial TLS through the HTTP/1 dialler, so h2c keeps its settings.
-	rt.h2ctransport = newH2CTransport(func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
-		conn, err := dial(ctx, network, addr)
-		if err != nil {
-			return nil, err
-		}
-
-		// Looked up per dial, so a reload hands new connections to the live registry.
-		registry := upstreamDrainRegistry(spec)
-		if registry == nil {
-			return conn, nil
-		}
-		return registry.track(upstreamPeerKey(conn, addr), conn), nil
-	})
-	rt.h2cUnowned = newH2CTransport(func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
-		return dial(ctx, network, addr)
-	})
-
-	return rt
-}
-
-func newH2CTransport(dial func(context.Context, string, string, *tls.Config) (net.Conn, error)) *http2.Transport {
-	return &http2.Transport{
-		DialTLSContext: dial,
-		AllowHTTP:      true,
-		// Without this, ClientConns never self-close and readLoop pins them.
-		IdleConnTimeout: defaultH2CIdleConnTimeout,
-	}
-}
-
-func (rt *TykRoundTripper) h2cFor(r *http.Request) *http2.Transport {
-	mark, marked := r.Context().Value(h2cUpstreamKey{}).(upstreamMark)
-	if marked && !mark.discovered && rt.h2cUnowned != nil {
-		return rt.h2cUnowned
-	}
-	return rt.h2ctransport
-}
-
-// Retire covers both transports: closing only rt.transport leaves h2c open. A
-// request still holding this round tripper finishes, dialling if it has to.
-func (rt *TykRoundTripper) Retire() {
-	if rt == nil {
-		return
-	}
-
-	if rt.transport != nil {
-		rt.transport.DisableKeepAlives = true
-		rt.transport.CloseIdleConnections()
-	}
-	if rt.h2ctransport != nil {
-		rt.h2ctransport.CloseIdleConnections()
-	}
-	if rt.h2cUnowned != nil {
-		rt.h2cUnowned.CloseIdleConnections()
-	}
-}
-
-// Shutdown retires the transports and stops the h2c dialler, for an API being
-// unloaded rather than rebuilt.
-func (rt *TykRoundTripper) Shutdown() {
-	if rt == nil {
-		return
-	}
-
-	// Set first, so a racing request cannot dial past the close.
-	rt.retired.Store(true)
-	rt.Retire()
-}
-
-// h2cUpstreamKey carries the transport choice past the scheme rewrite x/net/http2 forces.
-type h2cUpstreamKey struct{}
-
-type upstreamMark struct {
-	h2c        bool
-	discovered bool
-}
-
-func withUpstreamMark(ctx context.Context, isH2C, discovered bool) context.Context {
-	return context.WithValue(ctx, h2cUpstreamKey{}, upstreamMark{h2c: isH2C, discovered: discovered})
-}
-
-func markUpstreamScheme(r *http.Request, isH2C, discovered bool) {
-	core.SetContext(r, withUpstreamMark(r.Context(), isH2C, discovered))
-}
-
-func upstreamSchemeMark(r *http.Request) (isH2C, marked bool) {
-	mark, marked := r.Context().Value(h2cUpstreamKey{}).(upstreamMark)
-	return mark.h2c, marked
-}
-
-func upstreamPeerKey(conn net.Conn, addr string) string {
-	remote := conn.RemoteAddr()
-	if remote == nil {
-		return addr
-	}
-	host, _, err := net.SplitHostPort(remote.String())
-	if err != nil || net.ParseIP(host) == nil {
-		return addr
-	}
-	return remote.String()
-}
-
-func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 
 	hasInternalHeader := r.Header.Get(apidef.TykInternalApiHeader) != ""
 
-	if r.URL.Scheme == "tyk" || hasInternalHeader {
-		if hasInternalHeader {
+	return r.URL.Scheme == "tyk" || r.URL.Scheme == "tyk-internal" || hasInternalHeader
+}
+
+func internalLoopRoundTripperMiddleware(gw *Gateway, logger *logrus.Entry) roundtrippers.Middleware {
+	return func(next roundtrippers.RoundTripper) roundtrippers.RoundTripper {
+		return roundtrippers.RoundTripperFn(func(r *http.Request) (*http.Response, error) {
+			if !isInternalLoop(r) {
+				return next.RoundTrip(r)
+			}
+
 			r.Header.Del(apidef.TykInternalApiHeader)
-		}
 
-		handler, _, found := rt.Gw.findInternalHTTPHandlerForLoop(r.Host, nil, r)
-		if !found {
-			rt.logger.WithField("looping_url", "tyk://"+r.Host).Error("Couldn't detect target")
-			return nil, errors.New("handler could")
-		}
+			handler, _, found := gw.findInternalHTTPHandlerForLoop(r.Host, nil, r)
 
-		rt.logger.WithField("looping_url", "tyk://"+r.Host).Debug("Executing request on internal route")
+			if !found {
+				logger.WithField("looping_url", "tyk://"+r.Host).Error("Couldn't detect target")
+				return nil, errors.New("handler could")
+			}
 
-		return handleInMemoryLoop(handler, r)
+			logger.WithField("looping_url", "tyk://"+r.Host).Debug("Executing request on internal route")
+
+			return handleInMemoryLoop(handler, r)
+		})
 	}
+}
 
-	// Per request, so a mixed-scheme target_list keeps each target on its own protocol.
-	useH2C := false
+type TykRoundTripper struct {
+	transport    *http.Transport
+	h2ctransport *http2.Transport
+}
+
+func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	if rt.h2ctransport != nil {
-		isH2C, marked := upstreamSchemeMark(r)
-		useH2C = isH2C || (!marked && rt.h2cOnly)
-	}
-
-	if rt.Gw.GetConfig().OpenTelemetry.TracesEnabled() {
-		var baseRoundTripper http.RoundTripper = rt.transport
-		if useH2C {
-			baseRoundTripper = rt.h2cFor(r)
-		}
-
-		tr := otel.HTTPRoundTripper(baseRoundTripper)
-		return tr.RoundTrip(r)
-	}
-	if useH2C {
-		return rt.h2cFor(r).RoundTrip(r)
+		return rt.h2ctransport.RoundTrip(r)
 	}
 
 	return rt.transport.RoundTrip(r)
@@ -1295,7 +1161,12 @@ func handleInMemoryLoop(handler http.Handler, r *http.Request) (resp *http.Respo
 	return memConnClient.Do(r)
 }
 
-func (p *ReverseProxy) handleOutboundRequest(roundTripper *TykRoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, latency time.Duration, err error) {
+func (p *ReverseProxy) handleOutboundRequest(
+	roundTripper http.RoundTripper,
+	outreq *http.Request,
+	w http.ResponseWriter,
+) (res *http.Response, hijacked bool, latency time.Duration, err error) {
+
 	begin := time.Now()
 	defer func() {
 		latency = time.Since(begin)
@@ -1314,7 +1185,7 @@ func isCORSPreflight(r *http.Request) bool {
 	return r.Method == http.MethodOptions
 }
 
-func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
+func (p *ReverseProxy) handleGraphQL(roundTripper http.RoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
 	isWebSocketUpgrade := ctxGetGraphQLIsWebSocketUpgrade(outreq)
 	needsEngine := needsGraphQLExecutionEngine(p.TykAPISpec)
 
@@ -1363,7 +1234,7 @@ func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http
 	return res, hijacked, err
 }
 
-func (p *ReverseProxy) sendRequestToUpstream(roundTripper *TykRoundTripper, outreq *http.Request) (res *http.Response, err error) {
+func (p *ReverseProxy) sendRequestToUpstream(roundTripper http.RoundTripper, outreq *http.Request) (res *http.Response, err error) {
 	return roundTripper.RoundTrip(outreq)
 }
 
@@ -1485,16 +1356,10 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	p.TykAPISpec.Lock()
+	dialOrHeadersTimeout := proxyTimeout(p.TykAPISpec)
+	fallbackHeadersTimeout := time.Duration(dialOrHeadersTimeout) * time.Second
 
-	enforcedTimeout, isTimeoutEnforced := p.GetEnforcedTimeoutSettings(p.TykAPISpec, outreq)
-
-	// limit request time with context timeout
-	if isTimeoutEnforced {
-		timeoutContext, cancel := context.WithTimeout(outreq.Context(), enforcedTimeout)
-		defer cancel()
-
-		outreq = outreq.WithContext(timeoutContext)
-	}
+	requestTimeout, isRequestTimeoutEnforced := p.GetEnforcedTimeoutSettings(p.TykAPISpec, outreq)
 
 	// create HTTP transport
 	createTransport := p.TykAPISpec.HTTPTransport == nil
@@ -1515,22 +1380,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 			}
 		}
 
-		timeout := proxyTimeout(p.TykAPISpec)
-		transportTimeout := timeout
-
-		// If an enforced timeout is configured for this API endpoint, we use context timeout instead of transport timeout
-		// to avoid conflicts between ResponseHeaderTimeout and context timeout
-		if isTimeoutEnforced {
-			// Don't pass the enforced timeout to transport - let context timeout handle it
-			// Use the default proxy timeout for transport instead
-			transportTimeout = proxyTimeout(p.TykAPISpec)
-			p.logger.Debug("Using context timeout for hard timeout, transport timeout: ", transportTimeout)
-		} else {
-			// For non-enforced timeouts, we can use the global timeout on transport
-			p.logger.Debug("Using transport timeout: ", timeout)
-		}
-
-		p.TykAPISpec.HTTPTransport = p.httpTransport(transportTimeout, rw, req, outreq)
+		p.TykAPISpec.HTTPTransport = p.httpTransport(dialOrHeadersTimeout, req, outreq)
 		p.TykAPISpec.HTTPTransportCreated = time.Now()
 
 		oldTransport.Retire()
@@ -1582,6 +1432,17 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		err             error
 	)
 
+	var decoratedRoundTripper = roundtrippers.Combine(
+		roundTripper,
+		internalLoopRoundTripperMiddleware(p.Gw, p.logger),
+		roundtrippers.SkipIf(otel.HTTPRoundTripper, !p.Gw.GetConfig().OpenTelemetry.TracesEnabled()),
+		roundtrippers.Timeout(requestTimeout),
+		roundtrippers.SkipIf(
+			roundtrippers.HeadersTimeout(fallbackHeadersTimeout),
+			isRequestTimeoutEnforced,
+		),
+	)
+
 	if breakerEnforced {
 		if !breakerConf.CB.Ready() {
 			p.logger.Debug("ON REQUEST: Circuit Breaker is in OPEN state")
@@ -1592,14 +1453,14 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}
 		p.logger.Debug("ON REQUEST: Circuit Breaker is in CLOSED or HALF-OPEN state")
 
-		res, isHijacked, upstreamLatency, err = p.handleOutboundRequest(roundTripper, outreq, rw)
+		res, isHijacked, upstreamLatency, err = p.handleOutboundRequest(decoratedRoundTripper, outreq, rw)
 		if err != nil || res.StatusCode/100 == 5 {
 			breakerConf.CB.Fail()
 		} else {
 			breakerConf.CB.Success()
 		}
 	} else {
-		res, isHijacked, upstreamLatency, err = p.handleOutboundRequest(roundTripper, outreq, rw)
+		res, isHijacked, upstreamLatency, err = p.handleOutboundRequest(decoratedRoundTripper, outreq, rw)
 	}
 
 	if err != nil {
