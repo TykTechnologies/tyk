@@ -316,9 +316,9 @@ func (u *Upstream) loadBalancingExtractTo(api *apidef.APIDefinition) {
 	u.LoadBalancing.ExtractTo(api)
 }
 
-// DNSDiscovery periodically resolves the hostname in `url` and sets the load
-// balancing target list to the returned addresses. Only `h2c://` upstreams are
-// supported. It requires `loadBalancing.enabled` and cannot be combined with
+// DNSDiscovery is used with gRPC upstreams (`h2c://` only) to resolve the upstream hostname
+// and set the load balancing target list to the returned addresses.
+// It requires `loadBalancing.enabled` and cannot be combined with
 // `serviceDiscovery`.
 //
 // Tyk classic API definition: `proxy.dns_discovery`.
@@ -333,13 +333,12 @@ type DNSDiscovery struct {
 	// Empty keeps them until a lookup succeeds. Once expired, requests fail with 503.
 	// Tyk classic API definition: `proxy.dns_discovery.stale_ttl`.
 	StaleTTL time.ReadableDuration `bson:"staleTTL,omitempty" json:"staleTTL,omitempty"`
-	// ConnectionDraining contains the configuration related to connection draining.
-	// Enabled with a 30s timeout by default.
+	// ConnectionDraining controls the behaviour when an address is no longer returned by the DNS resolver.
 	// Tyk classic API definition: `proxy.dns_discovery.connection_draining`.
 	ConnectionDraining *ConnectionDraining `bson:"connectionDraining,omitempty" json:"connectionDraining,omitempty"`
 }
 
-// ConnectionDraining closes connections to addresses DNS no longer returns.
+// ConnectionDraining controls the behaviour when an address is no longer returned by the DNS resolver.
 //
 // Tyk classic API definition: `proxy.dns_discovery.connection_draining`.
 type ConnectionDraining struct {
