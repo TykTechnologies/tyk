@@ -44,8 +44,7 @@ type Upstream struct {
 	// Tyk classic API definition: `proxy.enable_load_balancing` and `proxy.targets`.
 	LoadBalancing *LoadBalancing `bson:"loadBalancing,omitempty" json:"loadBalancing,omitempty"`
 
-	// DNSDiscovery sources this upstream's target list by resolving the hostname
-	// in `url`. Only supported for `h2c://` upstreams.
+	// DNSDiscovery contains the configuration related to DNS discovery.
 	// Tyk classic API definition: `proxy.dns_discovery`.
 	DNSDiscovery *DNSDiscovery `bson:"dnsDiscovery,omitempty" json:"dnsDiscovery,omitempty"`
 
@@ -317,46 +316,38 @@ func (u *Upstream) loadBalancingExtractTo(api *apidef.APIDefinition) {
 	u.LoadBalancing.ExtractTo(api)
 }
 
-// DNSDiscovery sources this upstream's target list from DNS, by resolving the
-// hostname in `url`. Only supported for `h2c://` upstreams. It requires
-// `loadBalancing.enabled` and cannot be combined with `serviceDiscovery`.
+// DNSDiscovery periodically resolves the hostname in `url` and sets the load
+// balancing target list to the returned addresses. Only `h2c://` upstreams are
+// supported. It requires `loadBalancing.enabled` and cannot be combined with
+// `serviceDiscovery`.
 //
 // Tyk classic API definition: `proxy.dns_discovery`.
 type DNSDiscovery struct {
 	// Enabled determines if DNS discovery is active.
 	// Tyk classic API definition: `proxy.dns_discovery.enabled`.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
-	// RefreshInterval is how often the hostname is re-resolved, as a duration
-	// such as `30s`. Empty or zero applies the default of 30s; the minimum is 5s.
-	// The hostname is resolved as `url` spells it; an absolute name, with a
-	// trailing dot, costs four times fewer queries per refresh in Kubernetes.
+	// RefreshInterval is how often the hostname is resolved. Defaults to 30s, minimum 5s.
 	// Tyk classic API definition: `proxy.dns_discovery.refresh_interval`.
 	RefreshInterval time.ReadableDuration `bson:"refreshInterval,omitempty" json:"refreshInterval,omitempty"`
-	// StaleTTL is how long this API keeps selecting the last known good
-	// addresses while lookups fail, as a duration such as `5m`. Empty or zero
-	// keeps them until a lookup succeeds. Expiry stops selection only and
-	// does not close existing connections. APIs resolving the same hostname
-	// share one lookup, and each applies its own TTL.
+	// StaleTTL is how long the last addresses stay in use while lookups fail.
+	// Empty keeps them until a lookup succeeds. Once expired, requests fail with 503.
 	// Tyk classic API definition: `proxy.dns_discovery.stale_ttl`.
 	StaleTTL time.ReadableDuration `bson:"staleTTL,omitempty" json:"staleTTL,omitempty"`
-	// ConnectionDraining closes connections to an address that has left DNS.
-	// Omitted, draining is on with a 30s timeout.
+	// ConnectionDraining contains the configuration related to connection draining.
+	// Enabled with a 30s timeout by default.
 	// Tyk classic API definition: `proxy.dns_discovery.connection_draining`.
 	ConnectionDraining *ConnectionDraining `bson:"connectionDraining,omitempty" json:"connectionDraining,omitempty"`
 }
 
-// ConnectionDraining controls how connections to an address that has left DNS
-// are closed.
+// ConnectionDraining closes connections to addresses DNS no longer returns.
 //
 // Tyk classic API definition: `proxy.dns_discovery.connection_draining`.
 type ConnectionDraining struct {
-	// Enabled closes connections to a departed address once Timeout has passed.
-	// When false, they are left to the connection pool's idle timeout.
+	// Enabled determines if connection draining is active.
+	// When disabled, connections close once idle.
 	// Tyk classic API definition: `proxy.dns_discovery.connection_draining.enabled`.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
-	// Timeout is how long existing connections may remain after DNS confirms
-	// their address has departed, as a duration such as `30s`. Empty or zero
-	// applies the default of 30s.
+	// Timeout is how long connections to a removed address stay open. Defaults to 30s.
 	// Tyk classic API definition: `proxy.dns_discovery.connection_draining.timeout`.
 	Timeout time.ReadableDuration `bson:"timeout,omitempty" json:"timeout,omitempty"`
 }

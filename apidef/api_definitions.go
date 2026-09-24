@@ -641,38 +641,33 @@ type ResponseProcessor struct {
 	Options interface{} `bson:"options" json:"options"`
 }
 
-// DNSDiscoveryConfig sources an API's target list by resolving the hostname in
-// `target_url`. Only supported for `h2c://` upstreams. Requires
-// `enable_load_balancing`, and cannot be combined with `service_discovery`.
+// DNSDiscoveryConfig periodically resolves the hostname in `target_url` and sets
+// the load balancing target list to the returned addresses. Only `h2c://`
+// upstreams are supported. It requires `enable_load_balancing` and cannot be
+// combined with `service_discovery`.
 type DNSDiscoveryConfig struct {
+	// Enabled determines if DNS discovery is active.
 	Enabled bool `bson:"enabled" json:"enabled"`
 
-	// RefreshInterval is how often the hostname is re-resolved, as a duration
-	// such as `30s`. Empty or zero applies the default of 30s; the minimum is 5s.
+	// RefreshInterval is how often the hostname is resolved. Defaults to 30s, minimum 5s.
 	RefreshInterval tyktime.ReadableDuration `bson:"refresh_interval" json:"refresh_interval"`
 
-	// StaleTTL is how long this API keeps selecting the last known good
-	// addresses while lookups fail, as a duration such as `5m`. Empty or zero
-	// keeps them until a lookup succeeds. Expiry stops selection only and
-	// does not close existing connections. APIs resolving the same hostname
-	// share one lookup, and each applies its own TTL.
+	// StaleTTL is how long the last addresses stay in use while lookups fail.
+	// Empty keeps them until a lookup succeeds. Once expired, requests fail with 503.
 	StaleTTL tyktime.ReadableDuration `bson:"stale_ttl" json:"stale_ttl"`
 
-	// ConnectionDraining closes connections to an address that has left DNS.
-	// Omitted, draining is on with a 30s timeout.
+	// ConnectionDraining contains the configuration related to connection draining.
+	// Enabled with a 30s timeout by default.
 	ConnectionDraining *ConnectionDrainingConfig `bson:"connection_draining,omitempty" json:"connection_draining,omitempty"`
 }
 
-// ConnectionDrainingConfig controls how connections to an address that has
-// left DNS are closed.
+// ConnectionDrainingConfig closes connections to addresses DNS no longer returns.
 type ConnectionDrainingConfig struct {
-	// Enabled closes connections to a departed address once Timeout has passed.
-	// When false, they are left to the connection pool's idle timeout.
+	// Enabled determines if connection draining is active.
+	// When disabled, connections close once idle.
 	Enabled bool `bson:"enabled" json:"enabled"`
 
-	// Timeout is how long existing connections may remain after DNS confirms
-	// their address has departed, as a duration such as `30s`. Empty or zero
-	// applies the default of 30s.
+	// Timeout is how long connections to a removed address stay open. Defaults to 30s.
 	Timeout tyktime.ReadableDuration `bson:"timeout" json:"timeout"`
 }
 
@@ -1132,8 +1127,7 @@ type ProxyConfig struct {
 	StructuredTargetList        *HostList                     `bson:"-" json:"-"`
 	CheckHostAgainstUptimeTests bool                          `bson:"check_host_against_uptime_tests" json:"check_host_against_uptime_tests"`
 	ServiceDiscovery            ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
-	// DNSDiscovery sources the target list by resolving the hostname in
-	// `target_url`. Only supported for `h2c://` upstreams.
+	// DNSDiscovery contains the configuration related to DNS discovery.
 	DNSDiscovery DNSDiscoveryConfig `bson:"dns_discovery" json:"dns_discovery"`
 	Transport    struct {
 		SSLInsecureSkipVerify   bool     `bson:"ssl_insecure_skip_verify" json:"ssl_insecure_skip_verify"`
