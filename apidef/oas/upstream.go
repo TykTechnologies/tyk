@@ -334,7 +334,6 @@ type DNSDiscovery struct {
 	// Tyk classic API definition: `proxy.dns_discovery.stale_ttl`.
 	StaleTTL time.ReadableDuration `bson:"staleTTL,omitempty" json:"staleTTL,omitempty"`
 	// ConnectionDraining contains the configuration related to connection draining.
-	// Enabled with a 30s timeout by default.
 	// Tyk classic API definition: `proxy.dns_discovery.connection_draining`.
 	ConnectionDraining *ConnectionDraining `bson:"connectionDraining,omitempty" json:"connectionDraining,omitempty"`
 }
