@@ -1561,6 +1561,9 @@
         "loadBalancing": {
           "$ref": "#/definitions/X-Tyk-LoadBalancing"
         },
+        "dnsDiscovery": {
+          "$ref": "#/definitions/X-Tyk-DNSDiscovery"
+        },
         "preserveHostHeader": {
           "$ref": "#/definitions/X-Tyk-PreserveHostHeader"
         },
@@ -3028,6 +3031,42 @@
       "properties": {
         "enabled": {
           "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
+    "X-Tyk-DNSDiscovery": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "refreshInterval": {
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
+        },
+        "staleTTL": {
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
+        },
+        "connectionDraining": {
+          "$ref": "#/definitions/X-Tyk-ConnectionDraining"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
+    "X-Tyk-ConnectionDraining": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "timeout": {
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
         }
       },
       "required": [

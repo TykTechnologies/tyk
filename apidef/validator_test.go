@@ -704,3 +704,230 @@ func TestRuleLoadBalancingTargets_Validate(t *testing.T) {
 		t.Run(tc.name, runValidationTest(tc.apiDef, ruleSet, tc.result))
 	}
 }
+
+// TestRuleLoadBalancingTargets_DNSDiscoveryExemption covers the shape a valid
+// DNS discovery API has: load balancing on and no static targets, with the
+// list resolved from the upstream hostname at runtime. Without the exemption
+// the create and update endpoints refuse the one configuration the feature
+// exists to support.
+func TestRuleLoadBalancingTargets_DNSDiscoveryExemption(t *testing.T) {
+	ruleSet := ValidationRuleSet{
+		&RuleLoadBalancingTargets{},
+	}
+
+	testCases := []struct {
+		name   string
+		apiDef *APIDefinition
+		result ValidationResult
+	}{
+		{
+			name: "dns discovery supplies the targets",
+			apiDef: &APIDefinition{
+				Proxy: ProxyConfig{
+					TargetURL:           "h2c://my-grpc-svc:9002",
+					EnableLoadBalancing: true,
+					DNSDiscovery:        DNSDiscoveryConfig{Enabled: true, RefreshInterval: tyktime.ReadableDuration(10 * time.Second)},
+				},
+			},
+			result: ValidationResult{
+				IsValid: true,
+				Errors:  nil,
+			},
+		},
+		{
+			// The exemption is keyed on the block being on, so an API that
+			// carries it switched off is still held to the original rule.
+			name: "dns discovery configured but disabled",
+			apiDef: &APIDefinition{
+				Proxy: ProxyConfig{
+					TargetURL:           "h2c://my-grpc-svc:9002",
+					EnableLoadBalancing: true,
+					DNSDiscovery:        DNSDiscoveryConfig{RefreshInterval: tyktime.ReadableDuration(10 * time.Second)},
+				},
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors: []error{
+					ErrAllLoadBalancingTargetsZeroWeight,
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, runValidationTest(tc.apiDef, ruleSet, tc.result))
+	}
+}
+
+// TestRuleDNSDiscovery_Validate covers the two combinations refused on create
+// and update. DNS discovery supplies a target list without distributing across
+// it, and two sources for one list have no tie-break.
+func TestRuleDNSDiscovery_Validate(t *testing.T) {
+	ruleSet := ValidationRuleSet{
+		&RuleDNSDiscovery{},
+	}
+
+	testCases := []struct {
+		name   string
+		apiDef *APIDefinition
+		result ValidationResult
+	}{
+		{
+			name: "dns discovery disabled",
+			apiDef: &APIDefinition{
+				Proxy: ProxyConfig{TargetURL: "h2c://my-grpc-svc:9002"},
+			},
+			result: ValidationResult{IsValid: true, Errors: nil},
+		},
+		{
+			name: "dns discovery with load balancing",
+			apiDef: &APIDefinition{
+				Proxy: ProxyConfig{
+					TargetURL:           "h2c://my-grpc-svc:9002",
+					EnableLoadBalancing: true,
+					DNSDiscovery:        DNSDiscoveryConfig{Enabled: true},
+				},
+			},
+			result: ValidationResult{IsValid: true, Errors: nil},
+		},
+		{
+			name: "dns discovery without load balancing",
+			apiDef: &APIDefinition{
+				Proxy: ProxyConfig{
+					TargetURL:    "h2c://my-grpc-svc:9002",
+					DNSDiscovery: DNSDiscoveryConfig{Enabled: true},
+				},
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrDNSDiscoveryRequiresLoadBalancing},
+			},
+		},
+		{
+			name: "dns discovery alongside service discovery",
+			apiDef: &APIDefinition{
+				Proxy: ProxyConfig{
+					TargetURL:           "h2c://my-grpc-svc:9002",
+					EnableLoadBalancing: true,
+					DNSDiscovery:        DNSDiscoveryConfig{Enabled: true},
+					ServiceDiscovery:    ServiceDiscoveryConfiguration{UseDiscoveryService: true},
+				},
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrDNSDiscoveryWithServiceDiscovery},
+			},
+		},
+		{
+			name: "both rules broken at once",
+			apiDef: &APIDefinition{
+				Proxy: ProxyConfig{
+					TargetURL:        "h2c://my-grpc-svc:9002",
+					DNSDiscovery:     DNSDiscoveryConfig{Enabled: true},
+					ServiceDiscovery: ServiceDiscoveryConfiguration{UseDiscoveryService: true},
+				},
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors: []error{
+					ErrDNSDiscoveryRequiresLoadBalancing,
+					ErrDNSDiscoveryWithServiceDiscovery,
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, runValidationTest(tc.apiDef, ruleSet, tc.result))
+	}
+}
+
+// TestDefaultValidationRuleSet_AcceptsDNSDiscovery checks the whole rule set
+// the create and update endpoints run, since the valid shape has to survive
+// every rule in it rather than the one written for it.
+func TestDefaultValidationRuleSet_AcceptsDNSDiscovery(t *testing.T) {
+	apiDef := &APIDefinition{
+		Proxy: ProxyConfig{
+			TargetURL:           "h2c://my-grpc-svc:9002",
+			EnableLoadBalancing: true,
+			DNSDiscovery: DNSDiscoveryConfig{
+				Enabled:            true,
+				RefreshInterval:    tyktime.ReadableDuration(10 * time.Second),
+				StaleTTL:           tyktime.ReadableDuration(5 * time.Minute),
+				ConnectionDraining: &ConnectionDrainingConfig{Enabled: true, Timeout: tyktime.ReadableDuration(30 * time.Second)},
+			},
+		},
+	}
+
+	if result := Validate(apiDef, DefaultValidationRuleSet); !result.IsValid {
+		t.Fatalf("the documented DNS discovery configuration was refused: %v", result.ErrorStrings())
+	}
+}
+
+func TestRuleDNSDiscovery_NumericBounds(t *testing.T) {
+	base := func() *APIDefinition {
+		def := &APIDefinition{}
+		def.Proxy.EnableLoadBalancing = true
+		def.Proxy.DNSDiscovery.Enabled = true
+		return def
+	}
+
+	tests := []struct {
+		name    string
+		mutate  func(*APIDefinition)
+		wantErr error
+	}{
+		{"defaults are valid", func(*APIDefinition) {}, nil},
+		{"positive values are valid", func(d *APIDefinition) {
+			d.Proxy.DNSDiscovery.RefreshInterval = tyktime.ReadableDuration(10 * time.Second)
+			d.Proxy.DNSDiscovery.StaleTTL = tyktime.ReadableDuration(time.Minute)
+			d.Proxy.DNSDiscovery.ConnectionDraining = &ConnectionDrainingConfig{Enabled: true, Timeout: tyktime.ReadableDuration(15 * time.Second)}
+		}, nil},
+		{"refresh_interval at the floor", func(d *APIDefinition) {
+			d.Proxy.DNSDiscovery.RefreshInterval = tyktime.ReadableDuration(5 * time.Second)
+		}, nil},
+		{"draining turned off", func(d *APIDefinition) {
+			d.Proxy.DNSDiscovery.ConnectionDraining = &ConnectionDrainingConfig{Enabled: false}
+		}, nil},
+
+		{"negative refresh_interval", func(d *APIDefinition) {
+			d.Proxy.DNSDiscovery.RefreshInterval = tyktime.ReadableDuration(-time.Second)
+		}, ErrDNSDiscoveryInvalidRefreshInterval},
+		{"refresh_interval under the floor", func(d *APIDefinition) {
+			d.Proxy.DNSDiscovery.RefreshInterval = tyktime.ReadableDuration(time.Second)
+		}, ErrDNSDiscoveryInvalidRefreshInterval},
+		{"negative stale_ttl", func(d *APIDefinition) {
+			d.Proxy.DNSDiscovery.StaleTTL = tyktime.ReadableDuration(-time.Second)
+		}, ErrDNSDiscoveryNegativeStaleTTL},
+		{"negative drain timeout", func(d *APIDefinition) {
+			d.Proxy.DNSDiscovery.ConnectionDraining = &ConnectionDrainingConfig{Enabled: true, Timeout: tyktime.ReadableDuration(-time.Second)}
+		}, ErrDNSDiscoveryNegativeDrainTimeout},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			def := base()
+			tc.mutate(def)
+
+			result := Validate(def, ValidationRuleSet{&RuleDNSDiscovery{}})
+
+			if tc.wantErr == nil {
+				assert.True(t, result.IsValid, "expected valid, got %v", result.Errors)
+				return
+			}
+
+			assert.False(t, result.IsValid)
+			assert.ErrorIs(t, result.FirstError(), tc.wantErr)
+		})
+	}
+
+	t.Run("nothing is checked while disabled", func(t *testing.T) {
+		def := &APIDefinition{}
+		def.Proxy.DNSDiscovery.RefreshInterval = tyktime.ReadableDuration(-time.Second)
+		def.Proxy.DNSDiscovery.StaleTTL = tyktime.ReadableDuration(-time.Second)
+		def.Proxy.DNSDiscovery.ConnectionDraining = &ConnectionDrainingConfig{Timeout: tyktime.ReadableDuration(-time.Second)}
+
+		result := Validate(def, ValidationRuleSet{&RuleDNSDiscovery{}})
+		assert.True(t, result.IsValid)
+	})
+}

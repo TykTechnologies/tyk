@@ -57,6 +57,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/compression"
 	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/dnsdiscovery"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/mcp/pairing"
@@ -129,6 +130,10 @@ type Gateway struct {
 	drlOnce    sync.Once
 	DRLManager *drl.DRL
 	reloadMu   sync.Mutex
+
+	// Keyed by hostname, so query volume scales with upstreams, not APIs.
+	upstreamDNS   dnsdiscovery.Scheduler
+	upstreamConns upstreamConnRegistries
 
 	Analytics            RedisAnalyticsHandler
 	GlobalEventsJSVM     JSVM

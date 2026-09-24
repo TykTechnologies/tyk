@@ -2,6 +2,7 @@ package oas
 
 import (
 	"embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -159,7 +160,74 @@ func ValidateOASObject(documentBody []byte, oasVersion string) error {
 		return err
 	}
 
-	return validateJSON(oasSchema, documentBody)
+	if err := validateJSON(oasSchema, documentBody); err != nil {
+		return err
+	}
+
+	return validateTykExtension(documentBody)
+}
+
+type validator interface {
+	Validate(x *XTykAPIGateway) error
+}
+
+var validationRules = []validator{
+	&ruleUpstreamSources{},
+}
+
+var (
+	errDNSDiscoveryWithServiceDiscovery = errors.New(
+		"upstream.dnsDiscovery and upstream.serviceDiscovery both supply the target list and cannot be enabled together")
+
+	errDNSDiscoveryRequiresLoadBalancing = errors.New(
+		"upstream.dnsDiscovery supplies the target list but does not distribute across it; upstream.loadBalancing must be enabled too")
+)
+
+func validateTykExtension(documentBody []byte) error {
+	raw, dataType, _, err := jsonparser.Get(documentBody, ExtensionTykAPIGateway)
+	if err != nil || dataType != jsonparser.Object {
+		return nil //nolint:nilerr // absent or malformed extension: schema validation reports it
+	}
+
+	var x XTykAPIGateway
+	if err := json.Unmarshal(raw, &x); err != nil {
+		return fmt.Errorf("invalid %s: %w", ExtensionTykAPIGateway, err)
+	}
+
+	combinedErr := &multierror.Error{}
+	combinedErr.ErrorFormat = tykerrors.Formatter
+
+	for _, rule := range validationRules {
+		if ruleErr := rule.Validate(&x); ruleErr != nil {
+			combinedErr = multierror.Append(combinedErr, ruleErr)
+		}
+	}
+
+	return combinedErr.ErrorOrNil()
+}
+
+// ruleUpstreamSources is the OAS counterpart of apidef.RuleDNSDiscovery.
+type ruleUpstreamSources struct{}
+
+func (r *ruleUpstreamSources) Validate(x *XTykAPIGateway) error {
+	upstream := x.Upstream
+
+	if upstream.DNSDiscovery == nil || !upstream.DNSDiscovery.Enabled {
+		return nil
+	}
+
+	combinedErr := &multierror.Error{}
+	combinedErr.ErrorFormat = tykerrors.Formatter
+
+	if upstream.ServiceDiscovery != nil && upstream.ServiceDiscovery.Enabled {
+		combinedErr = multierror.Append(combinedErr, errDNSDiscoveryWithServiceDiscovery)
+	}
+
+	if upstream.LoadBalancing == nil || !upstream.LoadBalancing.Enabled {
+		combinedErr = multierror.Append(combinedErr, errDNSDiscoveryRequiresLoadBalancing)
+	}
+
+	return combinedErr.ErrorOrNil()
 }
 
 // ValidateOASTemplate checks a Tyk OAS API template for necessary fields,

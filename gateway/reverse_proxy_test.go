@@ -263,7 +263,15 @@ func TestReverseProxyDnsCache(t *testing.T) {
 	)
 
 	ts := StartTest(nil)
-	ts.MockHandle, _ = test.InitDNSMock(etcHostsMap, nil)
+	// Take a handle on the process-wide mock without registering anything.
+	// flakySetupTestReverseProxyDnsCache pushes etcHostsMap below and pulls it
+	// again on teardown. Registering here as well would append each address to
+	// itself, so every lookup would answer with the list twice over.
+	var mockErr error
+	ts.MockHandle, mockErr = test.InitDNSMock(map[string][]string{}, nil)
+	if mockErr != nil {
+		t.Fatalf("init dns mock: %v", mockErr)
+	}
 	defer ts.Close()
 	defer func() {
 		_ = ts.MockHandle.ShutdownDnsMock()
@@ -1897,9 +1905,11 @@ func TestEnsureTransport(t *testing.T) {
 		{"http://httpbin.org:80 ", "https", "http://httpbin.org:80"},
 		{"httpbin.org:2000 ", "tls", "tls://httpbin.org:2000"},
 		{"httpbin.org:2000 ", "", "http://httpbin.org:2000"},
-		// This is the h2c proto to http conversion
+		// Only an inherited h2c scheme is coalesced. An explicit h2c://
+		// target survives, or enabling load balancing would downgrade an h2c
+		// upstream to HTTP/1.1.
 		{"http://httpbin.org ", "h2c", "http://httpbin.org"},
-		{"h2c://httpbin.org ", "h2c", "http://httpbin.org"},
+		{"h2c://httpbin.org ", "h2c", "h2c://httpbin.org"},
 		{"httpbin.org ", "h2c", "http://httpbin.org"},
 		// This is the default parse section
 		{"https://httpbin.org ", "https", "https://httpbin.org"},
@@ -2996,4 +3006,49 @@ func getResponseForGivenURL(r *http.Request, sResp string, msResp string) string
 	}
 
 	return ""
+}
+
+// Master declared targetQuery outside the director closure and assigned it from
+// inside, so every request on a load-balanced API wrote one shared variable and
+// one request's query string could surface on another's. Run under -race.
+func TestDirector_TargetQueryIsPerRequest(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	targets := []string{
+		"http://upstream-a.example.com/?from=a",
+		"http://upstream-b.example.com/?from=b",
+	}
+
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	spec.Proxy.EnableLoadBalancing = true
+	spec.Proxy.Targets = targets
+	spec.Proxy.StructuredTargetList = apidef.NewHostListFromList(targets)
+
+	target, err := url.Parse("http://upstream-a.example.com/?from=configured")
+	if err != nil {
+		t.Fatal(err)
+	}
+	proxy := ts.Gw.TykNewSingleHostReverseProxy(target, spec, nil)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+
+			own := fmt.Sprintf("req=%d", i)
+			req := TestReq(t, http.MethodGet, "http://gateway/path?"+own, nil)
+			proxy.Director(req)
+
+			if !strings.Contains(req.URL.RawQuery, own) {
+				t.Errorf("request %d lost its own query string, got %q", i, req.URL.RawQuery)
+			}
+			if strings.Contains(req.URL.RawQuery, "req=") &&
+				strings.Count(req.URL.RawQuery, "req=") != 1 {
+				t.Errorf("request %d carries another request's query: %q", i, req.URL.RawQuery)
+			}
+		}(i)
+	}
+	wg.Wait()
 }
