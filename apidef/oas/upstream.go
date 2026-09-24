@@ -318,7 +318,7 @@ func (u *Upstream) loadBalancingExtractTo(api *apidef.APIDefinition) {
 
 // DNSDiscovery is used with gRPC upstreams (`h2c://` only) to resolve the upstream hostname
 // and set the load balancing target list to the returned addresses.
-// supported. It requires `loadBalancing.enabled` and cannot be combined with
+// It requires `loadBalancing.enabled` and cannot be combined with
 // `serviceDiscovery`.
 //
 // Tyk classic API definition: `proxy.dns_discovery`.
