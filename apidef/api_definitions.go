@@ -652,7 +652,7 @@ type DNSDiscoveryConfig struct {
 	// RefreshInterval is how often the hostname is resolved. Defaults to 30s, minimum 5s.
 	RefreshInterval tyktime.ReadableDuration `bson:"refresh_interval" json:"refresh_interval"`
 
-	// StaleTTL is how long the last known good addresses keep being used if the resolver becomes unreachable. Set as human-readable format (e.g. `30s`).
+	// StaleTTL is how long the last known good addresses keep being used if the resolver becomes unreachable. Set as human-readable format; (e.g. `300s`).
 	// Empty or `0` means that known addresses will continue to be used until a lookup succeeds. Once expired, requests fail with 503.
 	StaleTTL tyktime.ReadableDuration `bson:"stale_ttl" json:"stale_ttl"`
 

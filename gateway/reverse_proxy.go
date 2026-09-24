@@ -1038,19 +1038,19 @@ type TykRoundTripper struct {
 
 const defaultH2CIdleConnTimeout = 90 * time.Second
 
-func newH2CRoundTripper(spec *APISpec, transport *http.Transport, dial func(ctx context.Context, network, addr string) (net.Conn, error)) *TykRoundTripper {
+func newH2CRoundTripper(spec *APISpec, transport *http.Transport, dial func(dialCtx context.Context, network, addr string) (net.Conn, error)) *TykRoundTripper {
 	rt := &TykRoundTripper{transport: transport}
 
-	rt.h2ctransport = newH2CTransport(func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
-		conn, err := dial(ctx, network, addr)
+	rt.h2ctransport = newH2CTransport(func(dialCtx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
+		conn, err := dial(dialCtx, network, addr)
 		if err != nil {
 			return nil, err
 		}
-		mark, _ := upstreamMarkFrom(ctx)
+		mark, _ := upstreamMarkFrom(dialCtx)
 		return upstreamDrainRegistry(spec).track(addr, conn, mark.selection)
 	})
-	rt.h2cUnowned = newH2CTransport(func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
-		return dial(ctx, network, addr)
+	rt.h2cUnowned = newH2CTransport(func(dialCtx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
+		return dial(dialCtx, network, addr)
 	})
 
 	return rt
@@ -1114,8 +1114,8 @@ func upstreamMarkOf(r *http.Request) (upstreamMark, bool) {
 	return upstreamMarkFrom(r.Context())
 }
 
-func upstreamMarkFrom(ctx context.Context) (upstreamMark, bool) {
-	mark, marked := ctx.Value(upstreamMarkKey{}).(upstreamMark)
+func upstreamMarkFrom(reqCtx context.Context) (upstreamMark, bool) {
+	mark, marked := reqCtx.Value(upstreamMarkKey{}).(upstreamMark)
 	return mark, marked
 }
 

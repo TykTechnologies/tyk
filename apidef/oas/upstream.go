@@ -1448,16 +1448,7 @@ type LoadBalancingTarget struct {
 // Fill populates the LoadBalancing structure based on the provided APIDefinition, including targets and their weights.
 func (l *LoadBalancing) Fill(api apidef.APIDefinition) {
 	if len(api.Proxy.Targets) == 0 {
-		// A DNS-sourced API has an empty list by design, so `enabled` must survive.
-		if api.Proxy.DNSDiscovery.Enabled {
-			l.Enabled = api.Proxy.EnableLoadBalancing
-			l.SkipUnavailableHosts = api.Proxy.CheckHostAgainstUptimeTests
-			return
-		}
-
-		api.Proxy.EnableLoadBalancing = false
-		api.Proxy.CheckHostAgainstUptimeTests = false
-		api.Proxy.Targets = nil
+		l.fillWithoutTargets(api)
 		return
 	}
 
@@ -1503,6 +1494,19 @@ func (l *LoadBalancing) Fill(api apidef.APIDefinition) {
 
 	sort.Slice(targets, targetsSorter)
 	l.Targets = targets
+}
+
+func (l *LoadBalancing) fillWithoutTargets(api apidef.APIDefinition) {
+	// A DNS-sourced API has an empty list by design, so `enabled` must survive.
+	if api.Proxy.DNSDiscovery.Enabled {
+		l.Enabled = api.Proxy.EnableLoadBalancing
+		l.SkipUnavailableHosts = api.Proxy.CheckHostAgainstUptimeTests
+		return
+	}
+
+	api.Proxy.EnableLoadBalancing = false
+	api.Proxy.CheckHostAgainstUptimeTests = false
+	api.Proxy.Targets = nil
 }
 
 // ExtractTo populates an APIDefinition's proxy load balancing configuration with data from the LoadBalancing instance.
