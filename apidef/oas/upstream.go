@@ -338,7 +338,7 @@ type DNSDiscovery struct {
 	ConnectionDraining *ConnectionDraining `bson:"connectionDraining,omitempty" json:"connectionDraining,omitempty"`
 }
 
-// ConnectionDraining closes connections to addresses DNS no longer returns.
+// ConnectionDraining controls the behaviour when an address is no longer returned by the DNS resolver.
 //
 // Tyk classic API definition: `proxy.dns_discovery.connection_draining`.
 type ConnectionDraining struct {
