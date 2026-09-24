@@ -762,6 +762,22 @@ func mergeBundleManifest(spec *APISpec, manifest *apidef.BundleManifest, subdir,
 		spec.CustomMiddleware.AuthCheck = rewritePath(src.AuthCheck)
 	}
 
+	// traffic_logs (the analytics plugin) is single-valued across the whole
+	// API. Mirror Bundle.AddToSpec on the single-bundle path: honour
+	// `disabled`, and project the hook onto spec.AnalyticsPlugin so
+	// api_loader picks it up. A second active declaration is a hard error,
+	// the same rule auth_check follows.
+	// todo: add feature flag !cfg.DisabledBudledTrafficLogs
+	if !src.TrafficLogs.Disabled && src.TrafficLogs.Name != "" {
+		if spec.CustomMiddleware.TrafficLogs.Name != "" {
+			return fmt.Errorf("bundle %q declares a traffic_logs hook but another bundle has already set one (%q)", bundleName, spec.CustomMiddleware.TrafficLogs.Name)
+		}
+		spec.CustomMiddleware.TrafficLogs = rewritePath(src.TrafficLogs)
+		spec.AnalyticsPlugin.Enabled = true
+		spec.AnalyticsPlugin.FuncName = spec.CustomMiddleware.TrafficLogs.Name
+		spec.AnalyticsPlugin.PluginPath = spec.CustomMiddleware.TrafficLogs.Path
+	}
+
 	for _, md := range src.Pre {
 		spec.CustomMiddleware.Pre = append(spec.CustomMiddleware.Pre, rewritePath(md))
 	}
