@@ -102,7 +102,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/lambda v1.88.5
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.97.3
 	github.com/coder/websocket v1.8.12
-	github.com/getkin/kin-openapi v0.133.0
+	github.com/getkin/kin-openapi v0.149.0
 	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/goccy/go-json v0.10.4
 	github.com/goccy/go-yaml v1.15.23
