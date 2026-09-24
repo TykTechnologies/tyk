@@ -317,7 +317,7 @@ func (u *Upstream) loadBalancingExtractTo(api *apidef.APIDefinition) {
 }
 
 // DNSDiscovery is used with gRPC upstreams (`h2c://` only) to resolve the upstream hostname
-// balancing target list to the returned addresses. Only `h2c://` upstreams are
+// and set the load balancing target list to the returned addresses.
 // supported. It requires `loadBalancing.enabled` and cannot be combined with
 // `serviceDiscovery`.
 //
