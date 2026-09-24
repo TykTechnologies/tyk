@@ -567,3 +567,59 @@ func TestWebhookTemplateFuncs(t *testing.T) {
 		})
 	})
 }
+
+func TestWebHookHandler_resolveTemplatePath(t *testing.T) {
+	tests := []struct {
+		name        string
+		allowUnsafe bool
+		rootPath    string
+		path        string
+		want        string
+		wantErr     bool
+	}{
+		{
+			// Flag on: path returned verbatim, template root is never opened.
+			name:        "unsafe flag bypasses validation",
+			allowUnsafe: true,
+			rootPath:    "does-not-exist",
+			path:        "../../etc/passwd",
+			want:        "../../etc/passwd",
+		},
+		{
+			// Flag off: same input is handed to osutil.Root and rejected.
+			name:     "flag off delegates to root validation",
+			rootPath: "templates",
+			path:     "../../etc/passwd",
+			wantErr:  true,
+		},
+		{
+			// Flag off: missing template root surfaces as an error.
+			name:     "flag off requires a valid template root",
+			rootPath: "does-not-exist",
+			path:     "breaker_webhook.json",
+			wantErr:  true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gw := &Gateway{}
+			gw.SetConfig(config.Config{
+				TemplatePath:                    tc.rootPath,
+				AllowUnsafeWebhookTemplatePaths: tc.allowUnsafe,
+			})
+			h := &WebHookHandler{Gw: gw}
+
+			got, err := h.resolveTemplatePath(tc.path)
+
+			if tc.wantErr {
+				assert.Error(t, err)
+				assert.Empty(t, got)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
