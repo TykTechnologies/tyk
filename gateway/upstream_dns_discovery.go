@@ -5,7 +5,6 @@ import (
 	"net"
 	"net/url"
 	"strings"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -23,12 +22,13 @@ const (
 	dnsDiscoveryDrainDisabled = time.Duration(-1)
 )
 
+var dnsDiscoveryClock = time.Now
+
 type dnsRenderedTargets struct {
 	version uint64
 	list    *apidef.HostList
 }
 
-// dnsDiscoveryPlan is non-nil on a spec exactly when discovery is on.
 type dnsDiscoveryPlan struct {
 	target *url.URL
 	host   string
@@ -39,20 +39,15 @@ type dnsDiscoveryPlan struct {
 	drain    time.Duration
 
 	sub       *dnsdiscovery.Subscription
-	fallback  *apidef.HostList
 	noTargets *apidef.HostList
 	rendered  atomic.Pointer[dnsRenderedTargets]
 
-	// conns is nil when draining is disabled.
 	conns      *upstreamConnRegistry
-	apiID      string
-	registries *upstreamConnRegistries
+	generation uint64
 
-	logger         *logrus.Entry
-	fallbackLogged atomic.Bool
-
-	mu        sync.Mutex
-	lastAddrs []string
+	logger           *logrus.Entry
+	unresolvedLogged atomic.Bool
+	expiredLogged    atomic.Bool
 }
 
 func upstreamDNSDiscoveryEnabled(spec *APISpec) bool {
@@ -90,7 +85,6 @@ func planUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) *dnsDiscovery
 		return nil
 	}
 
-	// A resolved backend is an IP literal, which no service certificate covers.
 	if tlsUpstreamScheme(target.Scheme) {
 		logger.WithField("scheme", target.Scheme).
 			Warning("[PROXY] [DNS DISCOVERY] DNS discovery does not support TLS upstreams; leaving this API on its configured target")
@@ -110,29 +104,19 @@ func planUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) *dnsDiscovery
 		return nil
 	}
 
-	plan := &dnsDiscoveryPlan{
+	return &dnsDiscoveryPlan{
 		target:    target,
 		host:      host,
 		port:      port,
 		interval:  resolveDNSDiscoveryInterval(conf),
 		staleTTL:  resolveDNSDiscoveryStaleTTL(conf),
 		drain:     resolveDNSDiscoveryDrainTimeout(conf),
-		fallback:  apidef.NewHostListFromList([]string{spec.Proxy.TargetURL}),
 		noTargets: apidef.NewHostList(),
 		logger:    logger,
 	}
-
-	if plan.drain >= 0 {
-		plan.conns = newUpstreamConnRegistry(logger)
-	}
-
-	return plan
 }
 
-// setupUpstreamDNSDiscovery reconciles both ways: an API that stops asking is released here.
 func (gw *Gateway) setupUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry) {
-	previous := spec.dnsDiscovery.Load()
-
 	disable := func() {
 		spec.dnsDiscovery.Store(nil)
 		gw.upstreamDNS.ReleaseKey(spec.APIID)
@@ -145,10 +129,9 @@ func (gw *Gateway) setupUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry
 		return
 	}
 
-	if plan.conns != nil {
-		plan.apiID = spec.APIID
-		plan.registries = &gw.upstreamConns
-		plan.conns = gw.upstreamConns.claim(spec.APIID, plan, plan.conns)
+	if plan.drain >= 0 {
+		plan.conns = gw.upstreamConns.get(spec.APIID, logger)
+		plan.generation = plan.conns.newGeneration()
 	} else {
 		gw.upstreamConns.abandon(spec.APIID)
 	}
@@ -161,7 +144,6 @@ func (gw *Gateway) setupUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry
 	sub, err := gw.upstreamDNS.Subscribe(ctx, spec.APIID, dnsdiscovery.Config{
 		Host:     plan.host,
 		Interval: plan.interval,
-		StaleTTL: plan.staleTTL,
 		OnChange: plan.onAddressSet,
 	})
 	if err != nil {
@@ -173,18 +155,13 @@ func (gw *Gateway) setupUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry
 
 	plan.sub = sub
 	spec.dnsDiscovery.Store(plan)
-	previous.retire()
 
-	// Once per spec; the hook releases whatever plan the spec holds when it fires.
 	if !spec.dnsDiscoveryHooked {
 		spec.dnsDiscoveryHooked = true
 		spec.AddUnloadHook(func() {
-			current := spec.dnsDiscovery.Load()
-			if current == nil {
-				return
+			if current := spec.dnsDiscovery.Load(); current != nil {
+				current.sub.Release()
 			}
-			current.sub.Release()
-			current.retire()
 		})
 	}
 
@@ -206,6 +183,19 @@ func (gw *Gateway) setupUpstreamDNSDiscovery(spec *APISpec, logger *logrus.Entry
 	}).Info("[PROXY] [DNS DISCOVERY] Sourcing the target list from DNS")
 }
 
+func (gw *Gateway) releaseUpstreamDNSDiscovery(spec *APISpec) {
+	if spec == nil {
+		return
+	}
+
+	plan := spec.dnsDiscovery.Load()
+	if plan == nil || plan.conns == nil {
+		gw.upstreamConns.abandon(spec.APIID)
+		return
+	}
+	gw.upstreamConns.release(spec.APIID, plan.drain)
+}
+
 func (gw *Gateway) warmUpstreamDNS() {
 	ctx := gw.ctx
 	if ctx == nil {
@@ -217,11 +207,10 @@ func (gw *Gateway) warmUpstreamDNS() {
 
 	for _, host := range gw.upstreamDNS.Warm(ctx) {
 		mainLog.WithField("host", host).
-			Warning("[PROXY] [DNS DISCOVERY] Upstream hostname did not resolve at load; serving its configured target until it does")
+			Warning("[PROXY] [DNS DISCOVERY] Upstream hostname did not resolve at load; refusing requests until it does")
 	}
 }
 
-// registry is nil-safe: an API with no plan, or with draining disabled, has none.
 func (p *dnsDiscoveryPlan) registry() *upstreamConnRegistry {
 	if p == nil {
 		return nil
@@ -229,58 +218,16 @@ func (p *dnsDiscoveryPlan) registry() *upstreamConnRegistry {
 	return p.conns
 }
 
-func (p *dnsDiscoveryPlan) retire() {
-	if p == nil {
-		return
-	}
-	if p.registries != nil {
-		p.registries.release(p.apiID, p, p.drain)
-		return
-	}
-	p.conns.retire(p.drain)
-}
-
-// onAddressSet holds the diff and the drains it implies in one critical section.
 func (p *dnsDiscoveryPlan) onAddressSet(state *dnsdiscovery.State) {
-	var addrs []string
-	if state != nil {
-		addrs = state.Addrs
-	}
-
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	was := p.lastAddrs
-	p.lastAddrs = addrs
-
-	if state != nil && state.Outcome == dnsdiscovery.Unreachable && len(was) > 0 && p.logger != nil {
-		p.logger.WithFields(logrus.Fields{
-			"host":      p.host,
-			"stale_ttl": p.staleTTL.String(),
-		}).Warning("[PROXY] [DNS DISCOVERY] Resolver unreachable past stale_ttl; dropping the last known addresses")
-	}
-
-	if p.conns == nil {
+	if p.conns == nil || state == nil {
 		return
 	}
 
-	for _, addr := range dnsdiscovery.Removed(was, addrs) {
-		p.conns.drain(net.JoinHostPort(addr, p.port), p.drain)
+	addrs := make([]string, 0, len(state.Addrs))
+	for _, addr := range state.Addrs {
+		addrs = append(addrs, net.JoinHostPort(addr, p.port))
 	}
-
-	var members map[string]struct{}
-	if state != nil && state.Outcome != dnsdiscovery.Unresolved {
-		members = make(map[string]struct{}, len(addrs))
-		for _, addr := range addrs {
-			members[net.JoinHostPort(addr, p.port)] = struct{}{}
-		}
-	}
-	p.conns.reconcile(members, p.drain)
-
-	// A returning address keeps the connections the transport still holds.
-	for _, addr := range dnsdiscovery.Added(was, addrs) {
-		p.conns.cancelDrain(net.JoinHostPort(addr, p.port))
-	}
+	p.conns.update(p.generation, state.Version, addrs, p.drain)
 }
 
 func resolveDNSDiscoveryInterval(conf apidef.DNSDiscoveryConfig) time.Duration {
@@ -289,7 +236,7 @@ func resolveDNSDiscoveryInterval(conf apidef.DNSDiscoveryConfig) time.Duration {
 
 func resolveDNSDiscoveryStaleTTL(conf apidef.DNSDiscoveryConfig) time.Duration {
 	if conf.StaleTTL <= 0 {
-		return dnsdiscovery.StaleTTLUnlimited
+		return 0
 	}
 	return time.Duration(conf.StaleTTL)
 }
@@ -305,27 +252,25 @@ func resolveDNSDiscoveryDrainTimeout(conf apidef.DNSDiscoveryConfig) time.Durati
 	return time.Duration(draining.Timeout)
 }
 
-// urlFromDNS runs on the request path: it resolves nothing and takes no lock.
-func (gw *Gateway) urlFromDNS(spec *APISpec) (*apidef.HostList, error) {
+func (gw *Gateway) urlFromDNS(spec *APISpec) (*apidef.HostList, upstreamSelection) {
 	plan := spec.dnsDiscovery.Load()
 	if plan == nil {
-		return spec.Proxy.StructuredTargetList, nil
+		return spec.Proxy.StructuredTargetList, upstreamSelection{}
 	}
 
 	state := plan.sub.State()
-	if !state.Usable() {
-		if state == nil || state.Outcome == dnsdiscovery.Unresolved {
-			if plan.logger != nil && plan.fallbackLogged.CompareAndSwap(false, true) {
-				plan.logger.WithField("host", plan.host).
-					Warning("[PROXY] [DNS DISCOVERY] No addresses resolved yet; serving the configured target")
-			}
-			return plan.fallback, nil
-		}
-		return plan.noTargets, nil
+	if !state.Selectable(plan.staleTTL, dnsDiscoveryClock) {
+		plan.logRefusal(state)
+		return plan.noTargets, upstreamSelection{}
+	}
+	if plan.expiredLogged.Load() {
+		plan.expiredLogged.Store(false)
 	}
 
+	sel := upstreamSelection{generation: plan.generation, version: state.Version}
+
 	if rendered := plan.rendered.Load(); rendered != nil && rendered.version == state.Version {
-		return rendered.list, nil
+		return rendered.list, sel
 	}
 
 	targets := make([]string, 0, len(state.Addrs))
@@ -335,17 +280,36 @@ func (gw *Gateway) urlFromDNS(spec *APISpec) (*apidef.HostList, error) {
 
 	list := apidef.NewHostListFromList(targets)
 	plan.rendered.Store(&dnsRenderedTargets{version: state.Version, list: list})
-	return list, nil
+	return list, sel
 }
 
-// splitUpstreamHostPort keeps the port, since resolution answers with bare addresses.
+func (p *dnsDiscoveryPlan) logRefusal(state *dnsdiscovery.State) {
+	if p.logger == nil {
+		return
+	}
+
+	switch {
+	case state == nil || state.Outcome == dnsdiscovery.Unresolved:
+		if p.unresolvedLogged.CompareAndSwap(false, true) {
+			p.logger.WithField("host", p.host).
+				Warning("[PROXY] [DNS DISCOVERY] No addresses resolved yet; refusing requests until the hostname resolves")
+		}
+	case state.Usable():
+		if p.expiredLogged.CompareAndSwap(false, true) {
+			p.logger.WithFields(logrus.Fields{
+				"host":      p.host,
+				"stale_ttl": p.staleTTL.String(),
+			}).Warning("[PROXY] [DNS DISCOVERY] Lookups failing past stale_ttl; refusing requests until one succeeds")
+		}
+	}
+}
+
 func splitUpstreamHostPort(target *url.URL) (host, port string) {
 	host, port = target.Hostname(), target.Port()
 	if port != "" {
 		return host, port
 	}
 
-	// Only h2c reaches here, and cleartext HTTP/2 has no port of its own.
 	return host, "80"
 }
 

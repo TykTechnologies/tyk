@@ -71,3 +71,27 @@ func TestHeadersTimeout(t *testing.T) {
 		assert.Equal(t, http.StatusOK, res.StatusCode)
 	})
 }
+
+func TestHeadersTimeout_HeadersBeforeTheBodyIsWritten(t *testing.T) {
+	timeout := 10 * time.Millisecond
+	mw := HeadersTimeout(timeout)
+
+	next := RoundTripperFn(func(r *http.Request) (*http.Response, error) {
+		trace := httptrace.ContextClientTrace(r.Context())
+		require.NotNil(t, trace)
+
+		trace.GotFirstResponseByte()
+		trace.WroteRequest(httptrace.WroteRequestInfo{})
+
+		time.Sleep(3 * timeout)
+
+		return &http.Response{StatusCode: http.StatusOK}, r.Context().Err()
+	})
+
+	rt := mw(next)
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "http://example.com", nil)
+
+	res, err := rt.RoundTrip(req)
+	require.NoError(t, err, "a response that began before the upload finished was cancelled by the headers timeout")
+	assert.Equal(t, http.StatusOK, res.StatusCode)
+}

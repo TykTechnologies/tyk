@@ -228,58 +228,55 @@ func (gw *Gateway) nextTarget(targetData *apidef.HostList, spec *APISpec) (strin
 	return EnsureTransport(gotHost, spec.Protocol), nil
 }
 
-// upstreamTargetList returns nil when the API should use its configured target.
-func (gw *Gateway) upstreamTargetList(spec *APISpec, logger *logrus.Entry) *apidef.HostList {
+type upstreamRoute struct {
+	target        *url.URL
+	query         string
+	authorityHost string
+	discovered    bool
+	selection     upstreamSelection
+}
+
+func (gw *Gateway) upstreamTargetList(spec *APISpec, logger *logrus.Entry) (*apidef.HostList, upstreamSelection) {
 	switch {
 	case spec.Proxy.ServiceDiscovery.UseDiscoveryService:
 		list, err := urlFromService(spec, gw)
 		if err != nil {
 			logger.Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", err)
-			return nil
+			return nil, upstreamSelection{}
 		}
 		if list == nil {
-			// A refresh in flight before the first good set was stored. An empty
-			// list keeps the all-hosts-down path; nil would use target_url, which
-			// for a registry-backed API is usually a placeholder.
 			logger.Warning("[PROXY] [SERVICE DISCOVERY] No host list yet, refusing rather than using target_url")
-			return apidef.NewHostList()
+			return apidef.NewHostList(), upstreamSelection{}
 		}
-		return list
+		return list, upstreamSelection{}
 
 	case upstreamDNSDiscoveryEnabled(spec):
-		list, err := gw.urlFromDNS(spec)
-		if err != nil {
-			logger.Error("[PROXY] [DNS DISCOVERY] Failed target lookup: ", err)
-			return nil
-		}
-		return list
+		return gw.urlFromDNS(spec)
 
 	default:
 		list := spec.Proxy.StructuredTargetList
 		if spec.Proxy.DNSDiscovery.Enabled && (list == nil || list.Len() == 0) {
-			return nil
+			return nil, upstreamSelection{}
 		}
-		return list
+		return list, upstreamSelection{}
 	}
 }
 
-// resolveUpstreamTarget picks one request's target, plus the authority to send as Host.
-func (gw *Gateway) resolveUpstreamTarget(
-	req *http.Request,
-	spec *APISpec,
-	logger *logrus.Entry,
-	target *url.URL,
-	targetQuery string,
-) (*url.URL, string, string) {
-	hostList := gw.upstreamTargetList(spec, logger)
+func (gw *Gateway) resolveUpstreamTarget(req *http.Request, spec *APISpec, logger *logrus.Entry, target *url.URL, targetQuery string) upstreamRoute {
+	route := upstreamRoute{target: target, query: targetQuery}
 
-	// Service discovery has always implied load balancing, flag or not.
+	hostList, sel := gw.upstreamTargetList(spec, logger)
 	if hostList == nil || (!spec.Proxy.EnableLoadBalancing && !spec.Proxy.ServiceDiscovery.UseDiscoveryService) {
-		return target, targetQuery, ""
+		return route
 	}
 
-	host, err := gw.nextTarget(hostList, spec)
-	if err != nil {
+	var host string
+	var err error
+	if hostList.Len() == 0 {
+		logger.Debug("[PROXY] [LOAD BALANCING] No targets to choose from")
+		host = allHostsDownURL
+		ctx.SetErrorClassification(req, tykerrors.ClassifyNoHealthyUpstreamsError(target.Host))
+	} else if host, err = gw.nextTarget(hostList, spec); err != nil {
 		logger.Error("[PROXY] [LOAD BALANCING] ", err)
 		host = allHostsDownURL
 		ctx.SetErrorClassification(req, tykerrors.ClassifyNoHealthyUpstreamsError(target.Host))
@@ -288,16 +285,17 @@ func (gw *Gateway) resolveUpstreamTarget(
 	lbRemote, err := url.Parse(host)
 	if err != nil {
 		logger.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", err)
-		return target, targetQuery, ""
+		return route
 	}
 
-	// A DNS-sourced list holds backend addresses: right to dial, wrong as the authority.
-	var authorityHost string
+	route.target = lbRemote
+	route.query = lbRemote.RawQuery
 	if upstreamDNSDiscoveryEnabled(spec) && host != allHostsDownURL {
-		authorityHost = target.Host
+		route.authorityHost = target.Host
+		route.discovered = true
+		route.selection = sel
 	}
-
-	return lbRemote, lbRemote.RawQuery, authorityHost
+	return route
 }
 
 var (
@@ -346,11 +344,8 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		target := target
 		gw := gw
 
-		// Shadowed like target, or one request overwrites every later query string.
-		targetQuery := targetQuery
-
-		var authorityHost string
-		target, targetQuery, authorityHost = gw.resolveUpstreamTarget(req, spec, logger, target, targetQuery)
+		route := gw.resolveUpstreamTarget(req, spec, logger, target, targetQuery)
+		target, targetQuery, authorityHost := route.target, route.query, route.authorityHost
 
 		targetToUse := target
 
@@ -393,10 +388,16 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 			}
 		}
 
+		if route.discovered {
+			markUpstream(req, upstreamMark{
+				discovered: targetToUse == target,
+				selection:  route.selection,
+			})
+		}
+
 		if !spec.Proxy.PreserveHostHeader {
 			req.Host = targetToUse.Host
 
-			// A URL rewrite that retained the host outranks the service name.
 			if authorityHost != "" && targetToUse == target {
 				req.Host = authorityHost
 			}
@@ -921,19 +922,27 @@ func (p *ReverseProxy) httpTransport(dialTimeout float64, req *http.Request, out
 
 	p.logger.Debug("Out request url: ", outReq.URL.String())
 
-	if outReq.URL.Scheme == "h2c" {
-		p.logger.Info("Enabling h2c mode")
-		h2t := &http2.Transport{
-			// kind of a hack, but for plaintext/H2C requests, pretend to dial TLS
-			DialTLS: func(network, addr string, _ *tls.Config) (net.Conn, error) {
-				return net.Dial(network, addr)
-			},
-			AllowHTTP: true,
-		}
-		return &TykRoundTripper{transport: transport, h2ctransport: h2t}
+	if rt := p.h2cRoundTripper(outReq, transport); rt != nil {
+		return rt
 	}
 
-	return &TykRoundTripper{transport: transport, h2ctransport: nil}
+	return &TykRoundTripper{transport: transport}
+}
+
+func (p *ReverseProxy) h2cRoundTripper(outReq *http.Request, transport *http.Transport) *TykRoundTripper {
+	hasH2C, hasOther := upstreamSchemes(p.TykAPISpec)
+	if outReq.URL.Scheme != "h2c" && !hasH2C {
+		return nil
+	}
+
+	if hasH2C && hasOther {
+		p.logger.Warning("[PROXY] Target list mixes h2c:// with another scheme; each target keeps the protocol it was declared with")
+	}
+
+	p.logger.Info("Enabling h2c mode")
+	rt := newH2CRoundTripper(p.TykAPISpec, transport)
+	rt.h2cOnly = hasH2C && !hasOther
+	return rt
 }
 
 func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config, hostName string) {
@@ -1021,11 +1030,97 @@ func internalLoopRoundTripperMiddleware(gw *Gateway, logger *logrus.Entry) round
 type TykRoundTripper struct {
 	transport    *http.Transport
 	h2ctransport *http2.Transport
+	h2cUnowned   *http2.Transport
+	h2cOnly      bool
+}
+
+const defaultH2CIdleConnTimeout = 90 * time.Second
+
+func newH2CRoundTripper(spec *APISpec, transport *http.Transport) *TykRoundTripper {
+	rt := &TykRoundTripper{transport: transport}
+
+	dial := transport.DialContext
+	if dial == nil {
+		dial = (&net.Dialer{}).DialContext
+	}
+
+	rt.h2ctransport = newH2CTransport(func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
+		conn, err := dial(ctx, network, addr)
+		if err != nil {
+			return nil, err
+		}
+		mark, _ := ctx.Value(upstreamMarkKey{}).(upstreamMark)
+		return upstreamDrainRegistry(spec).track(addr, conn, mark.selection)
+	})
+	rt.h2cUnowned = newH2CTransport(func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
+		return dial(ctx, network, addr)
+	})
+
+	return rt
+}
+
+func newH2CTransport(dial func(context.Context, string, string, *tls.Config) (net.Conn, error)) *http2.Transport {
+	return &http2.Transport{
+		DialTLSContext:  dial,
+		AllowHTTP:       true,
+		IdleConnTimeout: defaultH2CIdleConnTimeout,
+	}
+}
+
+func (rt *TykRoundTripper) h2cFor(mark upstreamMark, marked bool) *http2.Transport {
+	if marked && !mark.discovered && rt.h2cUnowned != nil {
+		return rt.h2cUnowned
+	}
+	return rt.h2ctransport
+}
+
+func (rt *TykRoundTripper) Retire() {
+	if rt == nil {
+		return
+	}
+
+	if rt.transport != nil {
+		rt.transport.CloseIdleConnections()
+	}
+	if rt.h2ctransport != nil {
+		rt.h2ctransport.CloseIdleConnections()
+	}
+	if rt.h2cUnowned != nil {
+		rt.h2cUnowned.CloseIdleConnections()
+	}
+}
+
+type upstreamMarkKey struct{}
+
+type upstreamMark struct {
+	h2c        bool
+	discovered bool
+	selection  upstreamSelection
+}
+
+func markUpstream(r *http.Request, mark upstreamMark) {
+	core.SetContext(r, context.WithValue(r.Context(), upstreamMarkKey{}, mark))
+}
+
+func markFinalScheme(r *http.Request) {
+	mark, _ := upstreamMarkOf(r)
+	mark.h2c = strings.EqualFold(r.URL.Scheme, "h2c")
+	markUpstream(r, mark)
+}
+
+func upstreamMarkOf(r *http.Request) (upstreamMark, bool) {
+	mark, marked := r.Context().Value(upstreamMarkKey{}).(upstreamMark)
+	return mark, marked
 }
 
 func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
-	if rt.h2ctransport != nil {
-		return rt.h2ctransport.RoundTrip(r)
+	if rt.h2ctransport == nil {
+		return rt.transport.RoundTrip(r)
+	}
+
+	mark, marked := upstreamMarkOf(r)
+	if mark.h2c || (!marked && rt.h2cOnly) {
+		return rt.h2cFor(mark, marked).RoundTrip(r)
 	}
 
 	return rt.transport.RoundTrip(r)
@@ -1374,10 +1469,6 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 		if p.TykAPISpec.HTTPTransport != nil {
 			oldTransport = p.TykAPISpec.HTTPTransport
-			// Prevent new idle connections to be generated.
-			if oldTransport.transport != nil {
-				oldTransport.transport.DisableKeepAlives = true
-			}
 		}
 
 		p.TykAPISpec.HTTPTransport = p.httpTransport(dialOrHeadersTimeout, req, outreq)
@@ -1396,14 +1487,11 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 	p.TykAPISpec.Unlock()
 
-	// The last point where an h2c target is distinguishable; RoundTrip reads the mark.
-	isH2CUpstream := outreq.URL.Scheme == "h2c"
-	if isH2CUpstream {
-		outreq.URL.Scheme = "http"
-	}
 	if roundTripper.h2ctransport != nil {
-		rewritten := p.TykAPISpec.URLRewriteEnabled && outreq.Context().Value(ctx.RetainHost) == true
-		markUpstreamScheme(outreq, isH2CUpstream, upstreamDNSDiscoveryEnabled(p.TykAPISpec) && !rewritten)
+		markFinalScheme(outreq)
+	}
+	if outreq.URL.Scheme == "h2c" {
+		outreq.URL.Scheme = "http"
 	}
 
 	if p.TykAPISpec.Proxy.Transport.SSLForceCommonNameCheck || p.Gw.GetConfig().SSLForceCommonNameCheck {

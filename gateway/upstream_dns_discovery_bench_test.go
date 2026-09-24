@@ -18,15 +18,12 @@ import (
 	tyktime "github.com/TykTechnologies/tyk/internal/time"
 )
 
-// The request path runs per proxied request, so it must not resolve, lock, or
-// rebuild the target list while membership is unchanged.
-
-// Holds a mutex, so it is wired in place and never copied.
-func benchGateway(addrsPerHost int) *Gateway {
+func benchGateway(b *testing.B, addrsPerHost int) *Gateway {
+	b.Helper()
 	addrs := benchAddrs(addrsPerHost)
 
 	gw := &Gateway{}
-	gw.ctx = context.Background()
+	gw.ctx = b.Context()
 	gw.upstreamDNS.Lookup = func(_ context.Context, _ string) ([]string, error) {
 		return addrs, nil
 	}
@@ -34,7 +31,6 @@ func benchGateway(addrsPerHost int) *Gateway {
 	return gw
 }
 
-// Subscribed to host, with its first address set published.
 func benchSpec(b *testing.B, gw *Gateway, apiID, target string) *APISpec {
 	b.Helper()
 
@@ -49,83 +45,75 @@ func benchSpec(b *testing.B, gw *Gateway, apiID, target string) *APISpec {
 	logger.Logger.SetLevel(logrus.PanicLevel)
 
 	gw.setupUpstreamDNSDiscovery(spec, logger)
-	if spec.dnsDiscovery.Load() == nil {
+	plan := spec.dnsDiscovery.Load()
+	if plan == nil {
 		b.Fatalf("%s got no plan for %q", apiID, target)
 	}
+	b.Cleanup(plan.sub.Release)
 
-	// Keeps the measured iterations to cache hits.
-	gw.upstreamDNS.Refresh(context.Background())
+	// Refresh can skip a lookup already claimed by the background loop.
+	// Warm waits for that lookup so we never measure the unresolved path.
+	ctx, cancel := context.WithTimeout(gw.ctx, 5*time.Second)
+	defer cancel()
+	if unresolved := gw.upstreamDNS.Warm(ctx); len(unresolved) != 0 {
+		b.Fatalf("unresolved benchmark hosts: %v", unresolved)
+	}
+	if !plan.sub.State().Usable() {
+		b.Fatal("benchmark hostname has no usable addresses")
+	}
+	if list, _ := gw.urlFromDNS(spec); list == nil || list.Len() == 0 {
+		b.Fatal("benchmark hostname has no rendered targets")
+	}
 	return spec
 }
 
-// The steady state: an atomic load and a comparison.
 func BenchmarkUpstreamDNS_RequestPath(b *testing.B) {
 	for _, pods := range []int{2, 10, 50} {
 		b.Run(fmt.Sprintf("pods=%d", pods), func(b *testing.B) {
-			gw := benchGateway(pods)
+			gw := benchGateway(b, pods)
 			spec := benchSpec(b, gw, "api-1", "h2c://svc:9002")
-
-			// Prime the rendered list so the loop measures cache hits.
-			if _, err := gw.urlFromDNS(spec); err != nil {
-				b.Fatal(err)
-			}
 
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				list, err := gw.urlFromDNS(spec)
-				if err != nil || list == nil {
-					b.Fatalf("urlFromDNS: %v", err)
+				if list, _ := gw.urlFromDNS(spec); list == nil {
+					b.Fatal("no target list")
 				}
 			}
 		})
 	}
 }
 
-// The set is shared, and the atomic pointer is there so reads do not
-// contend.
 func BenchmarkUpstreamDNS_RequestPathParallel(b *testing.B) {
-	gw := benchGateway(10)
+	gw := benchGateway(b, 10)
 	spec := benchSpec(b, gw, "api-1", "h2c://svc:9002")
-
-	if _, err := gw.urlFromDNS(spec); err != nil {
-		b.Fatal(err)
-	}
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			if _, err := gw.urlFromDNS(spec); err != nil {
-				b.Fatal(err)
-			}
+			gw.urlFromDNS(spec)
 		}
 	})
 }
 
-// The cost when a refresh moved the set, paid by every request in flight, so
-// bounded by request concurrency.
 func BenchmarkUpstreamDNS_RequestPathRebuild(b *testing.B) {
 	for _, pods := range []int{2, 10, 50} {
 		b.Run(fmt.Sprintf("pods=%d", pods), func(b *testing.B) {
-			gw := benchGateway(pods)
+			gw := benchGateway(b, pods)
 			spec := benchSpec(b, gw, "api-1", "h2c://svc:9002")
 			plan := spec.dnsDiscovery.Load()
 
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				// Drop the cache so every iteration rebuilds.
 				plan.rendered.Store(nil)
-				if _, err := gw.urlFromDNS(spec); err != nil {
-					b.Fatal(err)
-				}
+				gw.urlFromDNS(spec)
 			}
 		})
 	}
 }
 
-// The control: an API without the feature must not pay for it existing.
 func BenchmarkUpstreamDNS_RequestPathDisabled(b *testing.B) {
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 	spec.APIID = "api-1"
@@ -140,7 +128,6 @@ func BenchmarkUpstreamDNS_RequestPathDisabled(b *testing.B) {
 	}
 }
 
-// Runs once per address on every membership change.
 func BenchmarkUpstreamDNS_BuildTarget(b *testing.B) {
 	target, err := url.Parse("h2c://my-grpc-svc:9002/base")
 	if err != nil {
@@ -156,13 +143,12 @@ func BenchmarkUpstreamDNS_BuildTarget(b *testing.B) {
 	}
 }
 
-// The whole per-request cost, read against the static arm.
 func BenchmarkUpstreamDNS_Director(b *testing.B) {
 	newDirector := func(b *testing.B, configure func(*Gateway) *APISpec) func(*http.Request) {
 		b.Helper()
 
 		gw := &Gateway{}
-		gw.ctx = context.Background()
+		gw.ctx = b.Context()
 		gw.SetConfig(config.Config{}, true)
 
 		spec := configure(gw)
@@ -179,10 +165,17 @@ func BenchmarkUpstreamDNS_Director(b *testing.B) {
 	}
 
 	run := func(b *testing.B, director func(*http.Request)) {
+		req := httptest.NewRequest(http.MethodPost, "http://gateway/greet", nil)
+		req.Header.Set("User-Agent", "benchmark")
+		original, originalURL := *req, *req.URL
+
 		b.ReportAllocs()
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			director(httptest.NewRequest(http.MethodPost, "http://gateway/greet", nil))
+			// Reset routing and context mutations without timing request creation.
+			*req = original
+			*req.URL = originalURL
+			director(req)
 		}
 	}
 
@@ -229,7 +222,6 @@ func BenchmarkUpstreamDNS_Director(b *testing.B) {
 	})
 }
 
-// One mutex covers the registry, so the parallel case is what matters.
 func BenchmarkUpstreamConnRegistry_Track(b *testing.B) {
 	addrs := benchAddrs(10)
 
@@ -240,7 +232,7 @@ func BenchmarkUpstreamConnRegistry_Track(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			addr := net.JoinHostPort(addrs[i%len(addrs)], "9002")
-			tracked := registry.track(addr, benchNopConn{})
+			tracked, _ := registry.track(addr, benchNopConn{}, upstreamSelection{})
 			_ = tracked.Close()
 		}
 	})
@@ -254,7 +246,7 @@ func BenchmarkUpstreamConnRegistry_Track(b *testing.B) {
 			i := 0
 			for pb.Next() {
 				addr := net.JoinHostPort(addrs[i%len(addrs)], "9002")
-				tracked := registry.track(addr, benchNopConn{})
+				tracked, _ := registry.track(addr, benchNopConn{}, upstreamSelection{})
 				_ = tracked.Close()
 				i++
 			}
@@ -262,28 +254,23 @@ func BenchmarkUpstreamConnRegistry_Track(b *testing.B) {
 	})
 }
 
-// Two set differences and a drain or cancel per moved address, once per API
-// per refresh.
 func BenchmarkUpstreamDNS_MembershipChange(b *testing.B) {
 	for _, pods := range []int{2, 10, 50} {
 		b.Run(fmt.Sprintf("pods=%d", pods), func(b *testing.B) {
 			addrs := benchAddrs(pods)
 
 			plan := &dnsDiscoveryPlan{
-				port:  "9002",
-				drain: 30 * time.Second,
-				conns: newUpstreamConnRegistry(nil),
+				port:       "9002",
+				drain:      30 * time.Second,
+				conns:      newUpstreamConnRegistry(nil),
+				generation: 1,
 			}
-
-			// Both directions of the diff non-empty, the worst case.
-			full := &dnsdiscovery.State{Version: 1, Addrs: addrs}
-			short := &dnsdiscovery.State{Version: 2, Addrs: addrs[1:]}
 
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				plan.onAddressSet(short)
-				plan.onAddressSet(full)
+				plan.onAddressSet(&dnsdiscovery.State{Version: uint64(2*i + 1), Addrs: addrs[1:]})
+				plan.onAddressSet(&dnsdiscovery.State{Version: uint64(2*i + 2), Addrs: addrs})
 			}
 		})
 	}
@@ -297,7 +284,6 @@ func benchAddrs(n int) []string {
 	return addrs
 }
 
-// Measures the bookkeeping rather than the kernel.
 type benchNopConn struct{ net.Conn }
 
 func (benchNopConn) Close() error { return nil }
@@ -317,11 +303,14 @@ func benchSchemeMark(b *testing.B) {
 	for _, depth := range benchContextDepths {
 		b.Run(fmt.Sprintf("depth=%d", depth), func(b *testing.B) {
 			req := deepContextRequest(depth)
+			original := *req
 
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				markUpstreamScheme(req, true, true)
+				// Each operation starts at the advertised context depth.
+				*req = original
+				markUpstream(req, upstreamMark{h2c: true, discovered: true})
 			}
 		})
 	}
@@ -331,12 +320,12 @@ func benchSchemeRead(b *testing.B) {
 	for _, depth := range benchContextDepths {
 		b.Run(fmt.Sprintf("depth=%d/marked", depth), func(b *testing.B) {
 			req := deepContextRequest(depth)
-			markUpstreamScheme(req, true, true)
+			markUpstream(req, upstreamMark{h2c: true, discovered: true})
 
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				if _, marked := upstreamSchemeMark(req); !marked {
+				if _, marked := upstreamMarkOf(req); !marked {
 					b.Fatal("mark not found")
 				}
 			}
@@ -348,7 +337,7 @@ func benchSchemeRead(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				if _, marked := upstreamSchemeMark(req); marked {
+				if _, marked := upstreamMarkOf(req); marked {
 					b.Fatal("unexpected mark")
 				}
 			}
@@ -378,9 +367,6 @@ func benchSchemeClassify(b *testing.B) {
 	}
 }
 
-// The transport is chosen per request, so the choice sits on the hot path of
-// every API in the gateway. Lookup cost follows context depth, and a gateway
-// request carries a middleware chain, a session and a trace span.
 func BenchmarkUpstreamSchemeSelection(b *testing.B) {
 	b.Run("mark", benchSchemeMark)
 	b.Run("read", benchSchemeRead)

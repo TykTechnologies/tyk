@@ -47,6 +47,7 @@ func HeadersTimeout(timeout time.Duration) Middleware {
 type headersTimeoutTracker struct {
 	mu       sync.Mutex
 	timer    *time.Timer
+	stopped  bool
 	timedOut atomic.Bool
 
 	ctx     context.Context
@@ -79,7 +80,7 @@ func (t *headersTimeoutTracker) OnWroteRequest(_ httptrace.WroteRequestInfo) {
 	}
 
 	// Ignore secondary timer initialization
-	if t.timer != nil {
+	if t.stopped || t.timer != nil {
 		return
 	}
 
@@ -99,6 +100,7 @@ func (t *headersTimeoutTracker) Stop() {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
+	t.stopped = true
 	if t.timer != nil {
 		t.timer.Stop()
 	}

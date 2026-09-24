@@ -3,7 +3,6 @@ package dnsdiscovery
 import (
 	"context"
 	"fmt"
-	"math/rand/v2"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -15,21 +14,17 @@ func orderingScheduler() *Scheduler {
 	return &Scheduler{
 		entries: map[string]*entry{},
 		subs:    map[string]*Subscription{},
-		running: true, // no background loop
+		running: true,
 		wake:    make(chan struct{}, 1),
 		Jitter:  func(d time.Duration) time.Duration { return d },
 	}
 }
 
-// Subscribe reads the published set under the lock and delivers it after
-// releasing, so a concurrent refresh can overtake it. No subscriber may ever
-// see a version go backwards.
 func TestSubscribeNeverDeliversAStaleState(t *testing.T) {
 	s := orderingScheduler()
 
 	var round atomic.Int64
 	s.Lookup = func(context.Context, string) ([]string, error) {
-		// A different set every call, so every refresh publishes.
 		return []string{fmt.Sprintf("10.0.0.%d", round.Add(1)%250+1)}, nil
 	}
 
@@ -40,7 +35,6 @@ func TestSubscribeNeverDeliversAStaleState(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Hammer refreshes while subscriptions are created against the same name.
 	var refreshers sync.WaitGroup
 	for i := 0; i < 4; i++ {
 		refreshers.Add(1)
@@ -89,85 +83,19 @@ func TestSubscribeNeverDeliversAStaleState(t *testing.T) {
 	}
 }
 
-// deliver must drop a state the subscriber has already been handed a newer
-// version of, whichever order the two calls arrive in.
 func TestDeliverDropsSupersededStates(t *testing.T) {
 	var got []uint64
 	sub := &Subscription{onChange: func(st *State) { got = append(got, st.Version) }}
 
 	sub.deliver(&State{Version: 2, Addrs: []string{"a"}})
-	sub.deliver(&State{Version: 1, Addrs: []string{"b"}}) // stale, dropped
-	sub.deliver(&State{Version: 2, Addrs: []string{"c"}}) // duplicate, dropped
+	sub.deliver(&State{Version: 1, Addrs: []string{"b"}})
+	sub.deliver(&State{Version: 2, Addrs: []string{"c"}})
 	sub.deliver(&State{Version: 3, Addrs: []string{"d"}})
 
 	want := []uint64{2, 3}
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Fatalf("delivered %v, want %v", got, want)
 	}
-}
-
-// The cached aggregates must agree with a full rescan after any sequence of
-// arrivals and departures.
-func TestEntryAggregatesMatchFullRescan(t *testing.T) {
-	intervals := []time.Duration{5 * time.Second, 30 * time.Second, time.Minute}
-	staleTTLs := []time.Duration{0, time.Minute, 5 * time.Minute}
-
-	ctx := context.Background()
-	s := orderingScheduler()
-
-	live := map[string]bool{}
-	rng := rand.New(rand.NewPCG(1, 2))
-
-	for step := 0; step < 3000; step++ {
-		key := fmt.Sprintf("api-%d", rng.IntN(25))
-
-		if live[key] && rng.IntN(3) == 0 {
-			s.ReleaseKey(key)
-			delete(live, key)
-		} else {
-			if _, err := s.Subscribe(ctx, key, Config{
-				Host:     "svc",
-				Interval: intervals[rng.IntN(len(intervals))],
-				StaleTTL: staleTTLs[rng.IntN(len(staleTTLs))],
-			}); err != nil {
-				t.Fatal(err)
-			}
-			live[key] = true
-		}
-
-		s.mu.Lock()
-		if e, ok := s.entries["svc"]; ok {
-			incremental := aggregatesOf(e)
-			s.recomputeLocked(e)
-			rescan := aggregatesOf(e)
-
-			// Restore the incremental state, or the check would heal any
-			// drift it just found and later steps would start from correct.
-			applyAggregates(e, incremental)
-
-			if incremental != rescan {
-				s.mu.Unlock()
-				t.Fatalf("step %d: cached aggregates disagree with a full rescan:\n incremental %+v\n rescan      %+v",
-					step, incremental, rescan)
-			}
-		}
-		s.mu.Unlock()
-	}
-}
-
-// entryState is the comparable part of an entry: everything addSubLocked and
-// removeSubLocked maintain without rescanning.
-type entryState struct {
-	aggregates
-	StaleTTL time.Duration
-}
-
-func aggregatesOf(e *entry) entryState {
-	return entryState{e.aggregates, e.staleTTL}
-}
-
-func applyAggregates(e *entry, a entryState) {
-	e.aggregates, e.staleTTL = a.aggregates, a.StaleTTL
 }
 
 func TestLookupConcurrency(t *testing.T) {
@@ -186,7 +114,6 @@ func TestLookupConcurrency(t *testing.T) {
 		}
 	}
 
-	// A batch of timing-out names has to clear inside one refresh interval.
 	for _, due := range []int{200, 1000} {
 		limit := lookupConcurrency(due)
 		cycle := time.Duration((due+limit-1)/limit) * LookupTimeout
@@ -197,7 +124,6 @@ func TestLookupConcurrency(t *testing.T) {
 	}
 }
 
-// A name already being refreshed must not consume a worker slot.
 func TestRefreshSkipsAnEntryInFlight(t *testing.T) {
 	s := orderingScheduler()
 
@@ -223,7 +149,6 @@ func TestRefreshSkipsAnEntryInFlight(t *testing.T) {
 		s.refresh(ctx, sub.entry)
 	}()
 
-	// Wait for the first lookup to be in flight, then race a second at it.
 	for calls.Load() == 0 {
 		runtime.Gosched()
 	}

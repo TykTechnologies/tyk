@@ -5,28 +5,18 @@ import (
 	"net"
 	"sort"
 	"strings"
+	"time"
 )
 
-// Outcome records what a resolution established about a name.
 type Outcome uint8
 
 const (
-	// Resolved means the name answered with at least one address.
 	Resolved Outcome = iota
-
-	// Empty means no records: a Service with no ready endpoints.
 	Empty
-
-	// NotFound means an authoritative NXDOMAIN.
 	NotFound
-
-	// Unreachable means the last good set is older than the stale TTL.
-	Unreachable
-
 	Unresolved
 )
 
-// String implements fmt.Stringer.
 func (o Outcome) String() string {
 	switch o {
 	case Resolved:
@@ -35,8 +25,6 @@ func (o Outcome) String() string {
 		return "empty"
 	case NotFound:
 		return "not_found"
-	case Unreachable:
-		return "unreachable"
 	case Unresolved:
 		return "unresolved"
 	default:
@@ -44,24 +32,31 @@ func (o Outcome) String() string {
 	}
 }
 
-// State is one published address set, swapped in atomically and never mutated.
-// Version lets a subscriber cache what it renders.
 type State struct {
 	Version uint64
 	Addrs   []string
 	Outcome Outcome
+
+	Confirmed time.Time
+	Failing   bool
 }
 
-// Usable reports whether this state carries addresses to use.
 func (s *State) Usable() bool {
 	return s != nil && len(s.Addrs) > 0
 }
 
-// ErrNoHost is returned by Subscribe when the configuration names no host.
+func (s *State) Selectable(staleTTL time.Duration, now func() time.Time) bool {
+	if !s.Usable() {
+		return false
+	}
+	if !s.Failing || staleTTL <= 0 {
+		return true
+	}
+	return now().Sub(s.Confirmed) < staleTTL
+}
+
 var ErrNoHost = errors.New("dnsdiscovery: Host is required")
 
-// Normalise sorts and de-duplicates. CoreDNS shuffles, so without the sort
-// every refresh looks like a membership change.
 func Normalise(addrs []string) []string {
 	if len(addrs) == 0 {
 		return nil
@@ -83,8 +78,6 @@ func Normalise(addrs []string) []string {
 	return out
 }
 
-// Resolvable excludes IP literals and localhost, whose membership cannot
-// change.
 func Resolvable(host string) bool {
 	if host == "" {
 		return false
@@ -95,12 +88,10 @@ func Resolvable(host string) bool {
 	return !strings.EqualFold(host, "localhost")
 }
 
-// Removed returns members of was absent from now. Both must be normalised.
 func Removed(was, now []string) []string {
 	return difference(was, now)
 }
 
-// Added returns members of now absent from was. Both must be normalised.
 func Added(was, now []string) []string {
 	return difference(now, was)
 }

@@ -651,12 +651,11 @@ type DNSDiscoveryConfig struct {
 	// such as `30s`. Empty or zero applies the default of 30s; the minimum is 5s.
 	RefreshInterval tyktime.ReadableDuration `bson:"refresh_interval" json:"refresh_interval"`
 
-	// StaleTTL is how long the last known good addresses are used while the
-	// resolver is unreachable, as a duration such as `5m`. Empty or zero keeps
-	// them for as long as the resolver stays down.
-	// The value applies to the hostname, not to the API: every API resolving
-	// the same hostname shares one lookup, the longest stale TTL among them is
-	// used, and an unlimited value on any of them makes it unlimited for all.
+	// StaleTTL is how long this API keeps selecting the last known good
+	// addresses while lookups fail, as a duration such as `5m`. Empty or zero
+	// keeps them until a lookup succeeds. Expiry stops selection only and
+	// does not close existing connections. APIs resolving the same hostname
+	// share one lookup, and each applies its own TTL.
 	StaleTTL tyktime.ReadableDuration `bson:"stale_ttl" json:"stale_ttl"`
 
 	// ConnectionDraining closes connections to an address that has left DNS.
@@ -671,8 +670,9 @@ type ConnectionDrainingConfig struct {
 	// When false, they are left to the connection pool's idle timeout.
 	Enabled bool `bson:"enabled" json:"enabled"`
 
-	// Timeout is how long connections to a departed address stay open, as a
-	// duration such as `30s`. Empty or zero applies the default of 30s.
+	// Timeout is how long existing connections may remain after DNS confirms
+	// their address has departed, as a duration such as `30s`. Empty or zero
+	// applies the default of 30s.
 	Timeout tyktime.ReadableDuration `bson:"timeout" json:"timeout"`
 }
 

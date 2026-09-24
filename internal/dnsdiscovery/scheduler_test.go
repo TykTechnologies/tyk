@@ -38,7 +38,6 @@ func (r *stubResolver) fail(host string, err error) {
 	r.errs[host] = err
 }
 
-// NXDOMAIN, which is treated differently from an unreachable resolver.
 func (r *stubResolver) failNotFound(host string) {
 	r.fail(host, &net.DNSError{Err: "no such host", Name: host, IsNotFound: true})
 }
@@ -60,15 +59,13 @@ func (r *stubResolver) lookup(_ context.Context, host string) ([]string, error) 
 	return r.answers[host], nil
 }
 
-// No refresh goroutine, so tests drive refreshes explicitly.
 func newTestScheduler(resolver *stubResolver) *Scheduler {
 	s := &Scheduler{}
 	configureTestScheduler(s, resolver)
-	s.running = true // suppress the background loop
+	s.running = true
 	return s
 }
 
-// Holds a mutex, so it is prepared in place and never copied.
 func configureTestScheduler(s *Scheduler, resolver *stubResolver) {
 	s.entries = map[string]*entry{}
 	s.subs = map[string]*Subscription{}
@@ -94,7 +91,6 @@ func subscribeWith(t *testing.T, s *Scheduler, key, host string, cfg Config) *Su
 	return sub
 }
 
-// Does inline what the refresh goroutine does in production.
 func subscribeAndRefresh(t *testing.T, s *Scheduler, key, host string, cfg Config) *Subscription {
 	t.Helper()
 
@@ -112,7 +108,6 @@ func (s *Scheduler) refreshAndReportDelay(ctx context.Context, e *entry) time.Du
 	return e.nextDue.Sub(before)
 }
 
-// Query volume follows hostnames, not subscribers: ten here would be two.
 func TestScheduler_OneLookupPerHostname(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc-a", "10.0.0.1", "10.0.0.2")
@@ -172,8 +167,6 @@ func TestScheduler_ReleaseDropsEntryWhenLastSubscriberLeaves(t *testing.T) {
 	scheduler.ReleaseKey("api-2")
 }
 
-// The replacement subscribes under the same key before the old definition is
-// torn down, so that teardown must not drop the live one.
 func TestScheduler_ReleaseIsIgnoredOnceSuperseded(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1")
@@ -215,7 +208,6 @@ func TestScheduler_RepointingASubscriberMovesItsSubscription(t *testing.T) {
 	}
 }
 
-// Subscribers share one refresh, so the most eager request wins.
 func TestScheduler_SharedHostnameTakesShortestInterval(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1")
@@ -229,7 +221,6 @@ func TestScheduler_SharedHostnameTakesShortestInterval(t *testing.T) {
 		t.Errorf("shared entry refreshes every %s, want the shortest requested 5s", got)
 	}
 
-	// And back up when the eager subscriber leaves.
 	scheduler.ReleaseKey("api-fast")
 	if got := scheduler.entries["svc"].interval; got != 60*time.Second {
 		t.Errorf("entry still refreshes every %s after the eager subscriber left, want 60s", got)
@@ -238,8 +229,6 @@ func TestScheduler_SharedHostnameTakesShortestInterval(t *testing.T) {
 	slow.Release()
 }
 
-// A departing subscription must come off the books before the name it leaves
-// recomputes, or it keeps dictating that name's rate.
 func TestScheduler_RepointingRecomputesTheNameItLeft(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("shared", "10.0.0.1")
@@ -257,8 +246,6 @@ func TestScheduler_RepointingRecomputesTheNameItLeft(t *testing.T) {
 	}
 }
 
-// An unreachable resolver says nothing about the backends, so discarding a
-// working set would turn its outage into theirs.
 func TestScheduler_FailedLookupKeepsLastGoodAndBacksOff(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1", "10.0.0.2")
@@ -279,13 +266,22 @@ func TestScheduler_FailedLookupKeepsLastGoodAndBacksOff(t *testing.T) {
 	if !after.Usable() || len(after.Addrs) != 2 {
 		t.Fatalf("a failed lookup discarded the last good set: %+v", after)
 	}
-	if after.Version != before.Version {
-		t.Error("a failed lookup bumped the published version, which makes every subscriber rebuild for nothing")
+	if !after.Failing {
+		t.Error("a failed lookup did not mark the snapshot failing")
+	}
+	if after.Version == before.Version {
+		t.Error("the first failure did not publish a new version")
+	}
+	if !after.Confirmed.Equal(before.Confirmed) {
+		t.Error("a failed lookup moved the confirmation time")
 	}
 
 	secondBackoff := scheduler.refreshAndReportDelay(ctx, sub.entry)
 	if secondBackoff <= firstBackoff {
 		t.Errorf("consecutive failures did not back off: %s then %s", firstBackoff, secondBackoff)
+	}
+	if got := sub.State(); got.Version != after.Version {
+		t.Error("a second consecutive failure published another version")
 	}
 
 	resolver.set("svc", "10.0.0.1", "10.0.0.2", "10.0.0.3")
@@ -293,7 +289,7 @@ func TestScheduler_FailedLookupKeepsLastGoodAndBacksOff(t *testing.T) {
 	if sub.entry.failures != 0 {
 		t.Errorf("failure count is %d after a successful lookup, want 0", sub.entry.failures)
 	}
-	if got := sub.State(); !got.Usable() || len(got.Addrs) != 3 {
+	if got := sub.State(); !got.Usable() || len(got.Addrs) != 3 || got.Failing {
 		t.Fatalf("recovery did not publish the new set: %+v", got)
 	}
 }
@@ -307,10 +303,8 @@ func TestScheduler_EmptyAnswerIsPublishedAsSuch(t *testing.T) {
 
 	sub := subscribeAndRefresh(t, scheduler, "api-1", "svc", Config{Interval: 10 * time.Second})
 
-	resolver.set("svc") // resolves, to nothing
+	resolver.set("svc")
 
-	// The first empty answer is held back; a single blip must not drain every
-	// backend.
 	scheduler.refresh(ctx, sub.entry)
 	if got := sub.State(); !got.Usable() {
 		t.Fatal("one empty answer dropped the address set")
@@ -330,7 +324,6 @@ func TestScheduler_EmptyAnswerIsPublishedAsSuch(t *testing.T) {
 	}
 }
 
-// A blip between two good answers must not move anything.
 func TestScheduler_SingleEmptyAnswerIsIgnored(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1", "10.0.0.2")
@@ -356,7 +349,6 @@ func TestScheduler_SingleEmptyAnswerIsIgnored(t *testing.T) {
 	}
 }
 
-// Nothing published yet means there is no set worth protecting.
 func TestScheduler_FirstAnswerEmptyIsPublishedAtOnce(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc")
@@ -370,7 +362,6 @@ func TestScheduler_FirstAnswerEmptyIsPublishedAtOnce(t *testing.T) {
 	}
 }
 
-// CoreDNS shuffles, so without sort and compare every refresh looks changed.
 func TestScheduler_UnchangedAnswerDoesNotBumpVersion(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.2", "10.0.0.1")
@@ -414,10 +405,10 @@ func TestScheduler_OnChangeFiresOnMembershipChangesOnly(t *testing.T) {
 		OnChange: record,
 	})
 
-	resolver.set("svc", "10.0.0.1") // unchanged
+	resolver.set("svc", "10.0.0.1")
 	scheduler.refresh(ctx, sub.entry)
 
-	resolver.set("svc", "10.0.0.2") // moved
+	resolver.set("svc", "10.0.0.2")
 	scheduler.refresh(ctx, sub.entry)
 
 	mu.Lock()
@@ -431,8 +422,6 @@ func TestScheduler_OnChangeFiresOnMembershipChangesOnly(t *testing.T) {
 	}
 }
 
-// What resolving on demand cannot do: nothing reads the addresses until the
-// assertion.
 func TestScheduler_DiscoversWithoutTraffic(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1")
@@ -460,8 +449,6 @@ func TestScheduler_DiscoversWithoutTraffic(t *testing.T) {
 	t.Fatalf("the scheduler did not pick up the second address without any traffic; published %+v", sub.State())
 }
 
-// Computing the sleep before the refresh pass skips the entries just
-// refreshed, letting the longest interval pace the shortest.
 func TestScheduler_ShortIntervalIsNotStarvedByLongOne(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("fast", "10.0.0.1")
@@ -473,7 +460,6 @@ func TestScheduler_ShortIntervalIsNotStarvedByLongOne(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	// Registered first, so a naive minimum picks up its deadline.
 	if _, err := scheduler.Subscribe(ctx, "api-slow", Config{Host: "slow", Interval: time.Hour}); err != nil {
 		t.Fatalf("subscribe slow: %v", err)
 	}
@@ -496,13 +482,11 @@ func TestScheduler_ShortIntervalIsNotStarvedByLongOne(t *testing.T) {
 		resolver.callsFor("fast")-before, 3)
 }
 
-// Subscribe runs on the spec loop that gates the router swap, so fifty new
-// hostnames against a sick resolver would be fifty serial timeouts.
 func TestScheduler_SubscribeDoesNotResolveInline(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1")
 
-	scheduler := newTestScheduler(resolver) // loop suppressed
+	scheduler := newTestScheduler(resolver)
 	sub := subscribe(t, scheduler, "api-1", "svc", time.Minute)
 
 	if got := resolver.callsFor("svc"); got != 0 {
@@ -512,24 +496,19 @@ func TestScheduler_SubscribeDoesNotResolveInline(t *testing.T) {
 		t.Error("Subscribe published an address set, so it must have resolved inline")
 	}
 
-	// Due at once, so the loop need not wait a whole interval.
 	if len(scheduler.dueEntries()) != 1 {
 		t.Error("a newly subscribed hostname is not due, so the loop would wait an interval before resolving it")
 	}
 }
 
-// NXDOMAIN is a fact about the name, so the stale TTL does not apply.
-func TestScheduler_NameNotFoundIgnoresStaleTTL(t *testing.T) {
+func TestScheduler_NameNotFoundIsConfirmedByASecondAnswer(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1", "10.0.0.2")
 
 	scheduler := newTestScheduler(resolver)
 	ctx := context.Background()
 
-	sub := subscribeAndRefresh(t, scheduler, "api-1", "svc", Config{
-		Interval: 10 * time.Second,
-		StaleTTL: time.Hour, // long enough that a stale bound cannot explain the result
-	})
+	sub := subscribeAndRefresh(t, scheduler, "api-1", "svc", Config{Interval: 10 * time.Second})
 
 	if got := sub.State(); !got.Usable() || len(got.Addrs) != 2 {
 		t.Fatalf("first resolution published %+v, want two addresses", got)
@@ -537,7 +516,6 @@ func TestScheduler_NameNotFoundIgnoresStaleTTL(t *testing.T) {
 
 	resolver.failNotFound("svc")
 
-	// Confirmed by a second answer, not acted on immediately.
 	scheduler.refresh(ctx, sub.entry)
 	if got := sub.State(); !got.Usable() {
 		t.Fatal("one NXDOMAIN dropped the address set")
@@ -554,62 +532,131 @@ func TestScheduler_NameNotFoundIgnoresStaleTTL(t *testing.T) {
 	}
 }
 
-// Without it, a deleted upstream gets traffic at dead addresses forever.
-func TestScheduler_StaleTTLBoundsAnUnreachableResolver(t *testing.T) {
+func TestScheduler_UnchangedAnswerAdvancesConfirmation(t *testing.T) {
 	resolver := newStubResolver()
-	resolver.set("svc", "10.0.0.1", "10.0.0.2")
-
+	resolver.set("svc", "10.0.0.1")
 	scheduler := newTestScheduler(resolver)
 	ctx := context.Background()
 
-	now := time.Now()
+	now := time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)
 	scheduler.Now = func() time.Time { return now }
 
-	sub := subscribeAndRefresh(t, scheduler, "api-1", "svc", Config{
-		Interval: 10 * time.Second,
-		StaleTTL: 5 * time.Minute,
-	})
+	sub := subscribeAndRefresh(t, scheduler, "api-1", "svc", Config{Interval: 10 * time.Second})
+	first := sub.State()
 
-	resolver.fail("svc", errors.New("i/o timeout"))
-
-	now = now.Add(time.Minute)
+	now = now.Add(10 * time.Second)
 	scheduler.refresh(ctx, sub.entry)
-	if got := sub.State(); !got.Usable() || len(got.Addrs) != 2 {
-		t.Fatalf("addresses were dropped one minute into a five minute stale TTL: %+v", got)
-	}
 
-	now = now.Add(6 * time.Minute)
-	scheduler.refresh(ctx, sub.entry)
-	got := sub.State()
-	if got.Usable() {
-		t.Fatalf("published %v past the stale TTL, want no addresses", got.Addrs)
+	second := sub.State()
+	if second.Version != first.Version {
+		t.Fatalf("an unchanged answer bumped the version from %d to %d", first.Version, second.Version)
 	}
-	if got.Outcome != Unreachable {
-		t.Fatalf("outcome is %s past the stale TTL, want %s", got.Outcome, Unreachable)
+	if !second.Confirmed.Equal(now) {
+		t.Fatalf("confirmation time is %s after an unchanged answer at %s", second.Confirmed, now)
 	}
 }
 
-func TestScheduler_ZeroStaleTTLNeverGivesUp(t *testing.T) {
+func TestScheduler_UnchangedAnswerKeepsItsVersionWhileAnotherHostnameChanges(t *testing.T) {
 	resolver := newStubResolver()
-	resolver.set("svc", "10.0.0.1", "10.0.0.2")
-
+	resolver.set("svc-a", "10.0.0.1")
+	resolver.set("svc-b", "10.0.1.1")
 	scheduler := newTestScheduler(resolver)
 	ctx := context.Background()
 
-	now := time.Now()
-	scheduler.Now = func() time.Time { return now }
+	a := subscribeAndRefresh(t, scheduler, "api-a", "svc-a", Config{Interval: 10 * time.Second})
+	first := a.State().Version
 
+	b := subscribeAndRefresh(t, scheduler, "api-b", "svc-b", Config{Interval: 10 * time.Second})
+	resolver.set("svc-b", "10.0.1.2")
+	scheduler.refresh(ctx, b.entry)
+
+	scheduler.refresh(ctx, a.entry)
+	if got := a.State().Version; got != first {
+		t.Fatalf("svc-a answered the same set and its version moved from %d to %d because svc-b changed", first, got)
+	}
+}
+
+func TestScheduler_RecoveryPublishesANewVersionWithUnchangedAddresses(t *testing.T) {
+	resolver := newStubResolver()
+	resolver.set("svc", "10.0.0.1")
+	scheduler := newTestScheduler(resolver)
+	ctx := context.Background()
+
+	var versions []uint64
 	sub := subscribeAndRefresh(t, scheduler, "api-1", "svc", Config{
 		Interval: 10 * time.Second,
-		StaleTTL: 0, // never
+		OnChange: func(state *State) { versions = append(versions, state.Version) },
 	})
 
 	resolver.fail("svc", errors.New("i/o timeout"))
-	now = now.Add(48 * time.Hour)
 	scheduler.refresh(ctx, sub.entry)
+	failing := sub.State()
 
-	if got := sub.State(); !got.Usable() || len(got.Addrs) != 2 {
-		t.Fatalf("addresses were dropped after two days with the bound disabled: %+v", got)
+	resolver.set("svc", "10.0.0.1")
+	scheduler.refresh(ctx, sub.entry)
+	recovered := sub.State()
+
+	if !failing.Failing || recovered.Failing {
+		t.Fatalf("failure state did not follow the lookups: %+v then %+v", failing, recovered)
+	}
+	if recovered.Version <= failing.Version {
+		t.Fatalf("recovery with unchanged addresses kept version %d", recovered.Version)
+	}
+	if len(versions) != 3 {
+		t.Fatalf("subscriber saw %d versions, want the first answer, the failure and the recovery", len(versions))
+	}
+}
+
+func TestState_Selectable(t *testing.T) {
+	confirmed := time.Date(2026, 9, 24, 12, 0, 0, 0, time.UTC)
+	clockReads := 0
+	now := func() time.Time {
+		clockReads++
+		return confirmed.Add(2 * time.Minute)
+	}
+	stale := func() *State { return &State{Addrs: []string{"a"}, Confirmed: confirmed, Failing: true} }
+
+	cases := []struct {
+		name  string
+		state *State
+		ttl   time.Duration
+		want  bool
+		reads int
+	}{
+		{"nil", nil, time.Minute, false, 0},
+		{"no addresses", &State{Outcome: Empty}, time.Minute, false, 0},
+		{"healthy", &State{Addrs: []string{"a"}, Confirmed: confirmed}, time.Minute, true, 0},
+		{"failing, unlimited", stale(), 0, true, 0},
+		{"failing, inside the TTL", stale(), 5 * time.Minute, true, 1},
+		{"failing, past the TTL", stale(), time.Minute, false, 1},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			clockReads = 0
+			if got := tc.state.Selectable(tc.ttl, now); got != tc.want {
+				t.Fatalf("Selectable = %v, want %v", got, tc.want)
+			}
+			if clockReads != tc.reads {
+				t.Fatalf("read the clock %d times, want %d", clockReads, tc.reads)
+			}
+		})
+	}
+}
+
+func TestScheduler_ReplacementRecomputesTheIntervalOnlyWhenItChanges(t *testing.T) {
+	scheduler := newTestScheduler(newStubResolver())
+	subscribe(t, scheduler, "api-1", "svc", 5*time.Second)
+	subscribe(t, scheduler, "api-2", "svc", time.Minute)
+
+	subscribe(t, scheduler, "api-1", "svc", 5*time.Second)
+	if got := scheduler.entries["svc"].interval; got != 5*time.Second {
+		t.Fatalf("a same-interval replacement moved the interval to %s", got)
+	}
+
+	subscribe(t, scheduler, "api-1", "svc", time.Hour)
+	if got := scheduler.entries["svc"].interval; got != time.Minute {
+		t.Fatalf("interval is %s after the 5s holder was replaced with an hour, want 1m", got)
 	}
 }
 
@@ -638,7 +685,6 @@ func TestNormaliseInterval(t *testing.T) {
 	}
 }
 
-// A shuffling resolver and a duplicate record look alike: both false.
 func TestNormalise(t *testing.T) {
 	got := Normalise([]string{"10.0.0.3", "", "10.0.0.1", "10.0.0.3", "10.0.0.2"})
 	want := []string{"10.0.0.1", "10.0.0.2", "10.0.0.3"}
@@ -702,21 +748,18 @@ func TestResolvable(t *testing.T) {
 	}
 }
 
-// A reload re-subscribes the same key. Detaching before attaching would drop
-// the entry when the reloading subscriber was the only one on that name.
 func TestScheduler_ReloadKeepsTheEntryAndItsState(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1", "10.0.0.2")
 
 	scheduler := newTestScheduler(resolver)
 
-	cfg := Config{Interval: 10 * time.Second, StaleTTL: time.Minute}
+	cfg := Config{Interval: 10 * time.Second}
 	first := subscribeAndRefresh(t, scheduler, "api-1", "svc", cfg)
 	if !first.State().Usable() {
 		t.Fatal("no state after the first resolution")
 	}
 
-	// Subscribe resolves nothing, so this came from the entry kept.
 	before := resolver.callsFor("svc")
 	second := subscribeWith(t, scheduler, "api-1", "svc", cfg)
 
@@ -733,10 +776,7 @@ func TestScheduler_ReloadKeepsTheEntryAndItsState(t *testing.T) {
 	}
 }
 
-// An outage is when an operator is most likely to edit an API. If the reload
-// rebuilt the entry, the next failed lookup would find nothing published and
-// withdraw the addresses at once, whatever stale_ttl says.
-func TestScheduler_ReloadDuringAnOutageKeepsTheStaleSet(t *testing.T) {
+func TestScheduler_ReloadDuringAnOutageKeepsTheSetAndItsAge(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1", "10.0.0.2")
 
@@ -746,8 +786,9 @@ func TestScheduler_ReloadDuringAnOutageKeepsTheStaleSet(t *testing.T) {
 	now := time.Now()
 	scheduler.Now = func() time.Time { return now }
 
-	cfg := Config{Interval: 10 * time.Second, StaleTTL: time.Hour}
+	cfg := Config{Interval: 10 * time.Second}
 	sub := subscribeAndRefresh(t, scheduler, "api-1", "svc", cfg)
+	confirmed := sub.State().Confirmed
 
 	resolver.fail("svc", errors.New("i/o timeout"))
 	now = now.Add(time.Minute)
@@ -756,7 +797,6 @@ func TestScheduler_ReloadDuringAnOutageKeepsTheStaleSet(t *testing.T) {
 		t.Fatal("the stale set was dropped before any reload")
 	}
 
-	// The edit lands while the resolver is still down.
 	reloaded := subscribeWith(t, scheduler, "api-1", "svc", cfg)
 	now = now.Add(time.Minute)
 	scheduler.refresh(ctx, reloaded.entry)
@@ -768,11 +808,11 @@ func TestScheduler_ReloadDuringAnOutageKeepsTheStaleSet(t *testing.T) {
 	if len(state.Addrs) != 2 {
 		t.Fatalf("the reloaded subscription holds %v, want the two last known good addresses", state.Addrs)
 	}
+	if !state.Confirmed.Equal(confirmed) || !state.Failing {
+		t.Fatalf("the reload reset the age of the addresses: %+v, confirmed at %s", state, confirmed)
+	}
 }
 
-// A subscriber joining a resolved name hears nothing until membership next
-// changes, and without an initial delivery would compute that change against
-// an empty set.
 func TestScheduler_LateSubscriberReceivesTheCurrentSet(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1", "10.0.0.2", "10.0.0.3")
@@ -807,7 +847,6 @@ func TestScheduler_LateSubscriberReceivesTheCurrentSet(t *testing.T) {
 		t.Fatalf("late subscriber reports %+v, want the three addresses already published", got)
 	}
 
-	// Only a departure against the set it was seeded with.
 	resolver.set("svc", "10.0.0.1", "10.0.0.3")
 	scheduler.refresh(ctx, late.entry)
 
@@ -821,34 +860,6 @@ func TestScheduler_LateSubscriberReceivesTheCurrentSet(t *testing.T) {
 	}
 }
 
-// Reaching the stale TTL withdraws the addresses for everyone on the name, so
-// the longest bound wins and a never-give-up decides the entry.
-func TestScheduler_SharedHostnameKeepsTheLongestStaleTTL(t *testing.T) {
-	t.Run("longest bound wins", func(t *testing.T) {
-		scheduler := newTestScheduler(newStubResolver())
-
-		subscribeWith(t, scheduler, "api-1", "svc", Config{Interval: time.Minute, StaleTTL: time.Minute})
-		subscribeWith(t, scheduler, "api-2", "svc", Config{Interval: time.Minute, StaleTTL: time.Hour})
-
-		if got := scheduler.entries["svc"].staleTTL; got != time.Hour {
-			t.Errorf("shared entry holds a stale TTL of %s, want the longest asked for (1h)", got)
-		}
-	})
-
-	t.Run("never give up decides the entry", func(t *testing.T) {
-		scheduler := newTestScheduler(newStubResolver())
-
-		subscribeWith(t, scheduler, "api-1", "svc", Config{Interval: time.Minute, StaleTTL: 0})
-		subscribeWith(t, scheduler, "api-2", "svc", Config{Interval: time.Minute, StaleTTL: time.Minute})
-
-		if got := scheduler.entries["svc"].staleTTL; got != 0 {
-			t.Errorf("shared entry holds a stale TTL of %s; a subscriber asking never to give up was overridden", got)
-		}
-	})
-}
-
-// Race regression test, for -race. A reload re-subscribes the key while the
-// superseded spec is still serving and reading its subscription.
 func TestScheduler_StateIsSafeAcrossAReload(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1", "10.0.0.2")
@@ -868,7 +879,6 @@ func TestScheduler_StateIsSafeAcrossAReload(t *testing.T) {
 					return
 				default:
 				}
-				// Must stay readable, not go nil mid-request.
 				if state := sub.State(); state != nil && !state.Usable() {
 					t.Error("a superseded subscription reported an empty set while still serving")
 					return
@@ -883,73 +893,6 @@ func TestScheduler_StateIsSafeAcrossAReload(t *testing.T) {
 
 	close(stop)
 	readers.Wait()
-}
-
-func TestScheduler_StaleTTLExpiresBetweenBackedOffLookups(t *testing.T) {
-	resolver := newStubResolver()
-	resolver.set("svc", "10.0.0.1")
-	s := newTestScheduler(resolver)
-
-	start := time.Date(2026, 9, 23, 12, 0, 0, 0, time.UTC)
-	now := start
-	s.Now = func() time.Time { return now }
-
-	sub := subscribeAndRefresh(t, s, "api-1", "svc", Config{Interval: 30 * time.Second, StaleTTL: time.Minute})
-	resolver.fail("svc", errors.New("resolver timeout"))
-
-	for _, at := range []time.Duration{30 * time.Second, 60 * time.Second} {
-		now = start.Add(at)
-		s.refresh(context.Background(), sub.entry)
-	}
-
-	now = start.Add(61 * time.Second)
-	if sub.State().Usable() && s.nextWait() > minWait {
-		t.Fatalf("last good answer is 61s old with stale_ttl=1m, yet %v is still served and the next lookup is %s away",
-			sub.State().Addrs, s.nextWait())
-	}
-}
-
-func TestScheduler_StaleTTLExpiryIsPublishedWithoutALookup(t *testing.T) {
-	resolver := newStubResolver()
-	resolver.set("svc", "10.0.0.1")
-	s := newTestScheduler(resolver)
-
-	start := time.Date(2026, 9, 23, 12, 0, 0, 0, time.UTC)
-	now := start
-	s.Now = func() time.Time { return now }
-
-	var delivered []*State
-	sub := subscribeAndRefresh(t, s, "api-1", "svc", Config{
-		Interval: 30 * time.Second,
-		StaleTTL: 45 * time.Second,
-		OnChange: func(state *State) { delivered = append(delivered, state) },
-	})
-	resolver.fail("svc", errors.New("resolver timeout"))
-
-	now = start.Add(30 * time.Second)
-	s.refresh(context.Background(), sub.entry)
-	if !sub.State().Usable() {
-		t.Fatal("the stale set was dropped before stale_ttl")
-	}
-	lookups := resolver.callsFor("svc")
-
-	now = start.Add(44 * time.Second)
-	if wait := s.nextWait(); wait != time.Second {
-		t.Fatalf("next wake-up in %s, want 1s: the stale deadline, ahead of the next lookup", wait)
-	}
-
-	now = start.Add(45 * time.Second)
-	s.expireStale()
-
-	if state := sub.State(); state.Usable() || state.Outcome != Unreachable {
-		t.Fatalf("state at the stale deadline is %+v, want an unreachable empty set", state)
-	}
-	if last := delivered[len(delivered)-1]; last.Outcome != Unreachable {
-		t.Fatalf("subscriber last saw %+v, want the expiry", last)
-	}
-	if resolver.callsFor("svc") != lookups {
-		t.Fatal("expiry waited on a lookup")
-	}
 }
 
 func TestScheduler_SupersededSubscriptionHearsNothingAfterItsReplacement(t *testing.T) {
@@ -998,87 +941,13 @@ func TestScheduler_SupersededSubscriptionHearsNothingAfterItsReplacement(t *test
 	}
 }
 
-func TestScheduler_StaleExpiryDoesNotWaitForALookupBatch(t *testing.T) {
-	resolver := newStubResolver()
-	resolver.set("svc", "10.0.0.1")
-	resolver.set("slow", "10.0.0.9")
-	s := newTestScheduler(resolver)
-
-	var gate sync.Mutex
-	var hold bool
-	entered := make(chan struct{}, 1)
-	release := make(chan struct{})
-	s.Lookup = func(ctx context.Context, host string) ([]string, error) {
-		gate.Lock()
-		blocked := host == "slow" && hold
-		gate.Unlock()
-		if blocked {
-			entered <- struct{}{}
-			select {
-			case <-release:
-			case <-ctx.Done():
-				return nil, ctx.Err()
-			}
-		}
-		return resolver.lookup(ctx, host)
-	}
-
-	const interval, staleTTL = 200 * time.Millisecond, 300 * time.Millisecond
-	sub := subscribeWith(t, s, "api-1", "svc", Config{Interval: interval, StaleTTL: staleTTL})
-	subscribeWith(t, s, "api-2", "slow", Config{Interval: interval})
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	defer close(release)
-	go s.run(ctx, make(chan struct{}, 1))
-
-	waitUntil(t, time.Second, func() bool { return sub.State().Usable() && resolver.callsFor("slow") == 1 })
-	resolved := time.Now()
-
-	resolver.fail("svc", errors.New("resolver timeout"))
-	gate.Lock()
-	hold = true
-	gate.Unlock()
-
-	<-entered
-	waitUntil(t, time.Second, func() bool { return resolver.callsFor("svc") == 2 })
-	if !sub.State().Usable() {
-		t.Fatal("the stale set was dropped before stale_ttl")
-	}
-
-	deadline := resolved.Add(staleTTL)
-	for time.Now().Before(deadline.Add(400 * time.Millisecond)) {
-		if !sub.State().Usable() {
-			if late := time.Since(deadline); late > 100*time.Millisecond {
-				t.Fatalf("expiry landed %s after the stale deadline", late)
-			}
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	t.Fatalf("stale deadline passed %s ago while a lookup for another name was in flight; %v is still published",
-		time.Since(deadline).Round(time.Millisecond), sub.State().Addrs)
-}
-
-func waitUntil(t *testing.T, d time.Duration, cond func() bool) {
-	t.Helper()
-
-	deadline := time.Now().Add(d)
-	for !cond() {
-		if time.Now().After(deadline) {
-			t.Fatal("condition not met in time")
-		}
-		time.Sleep(5 * time.Millisecond)
-	}
-}
-
 func TestScheduler_FailureBeforeAnyAnswerIsUnresolved(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.fail("svc", errors.New("i/o timeout"))
 	s := newTestScheduler(resolver)
 
-	sub := subscribeAndRefresh(t, s, "api-1", "svc", Config{Interval: 10 * time.Second, StaleTTL: time.Minute})
-	if got := sub.State(); got == nil || got.Outcome != Unresolved {
+	sub := subscribeAndRefresh(t, s, "api-1", "svc", Config{Interval: 10 * time.Second})
+	if got := sub.State(); got == nil || got.Outcome != Unresolved || !got.Failing {
 		t.Fatalf("state after a failure with nothing resolved is %+v, want %s", got, Unresolved)
 	}
 
