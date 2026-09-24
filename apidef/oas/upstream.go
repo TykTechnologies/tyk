@@ -343,11 +343,11 @@ type DNSDiscovery struct {
 //
 // Tyk classic API definition: `proxy.dns_discovery.connection_draining`.
 type ConnectionDraining struct {
-	// Enabled determines if connection draining is active.
+	// Enabled maintains connections for the `timeout` period after they are no longer returned by the DNS resolver. Default: false.
 	// When disabled, connections close once idle.
 	// Tyk classic API definition: `proxy.dns_discovery.connection_draining.enabled`.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
-	// Timeout is how long connections to a removed address stay open. Defaults to 30s.
+	// Timeout is how long connections to a removed address stay open. Set as human-readable format; default: 30s (when enabled).
 	// Tyk classic API definition: `proxy.dns_discovery.connection_draining.timeout`.
 	Timeout time.ReadableDuration `bson:"timeout,omitempty" json:"timeout,omitempty"`
 }

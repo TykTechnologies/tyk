@@ -641,10 +641,10 @@ type ResponseProcessor struct {
 	Options interface{} `bson:"options" json:"options"`
 }
 
-// DNSDiscoveryConfig periodically resolves the hostname in `target_url` and sets
-// the load balancing target list to the returned addresses. Only `h2c://`
-// upstreams are supported. It requires `enable_load_balancing` and cannot be
-// combined with `service_discovery`.
+// DNSDiscoveryConfig is used with gRPC upstreams (`h2c://` only) to resolve the upstream hostname
+// and set the load balancing target list to the returned addresses.
+// It requires `enable_load_balancing` and cannot be combined with
+// `service_discovery`.
 type DNSDiscoveryConfig struct {
 	// Enabled determines if DNS discovery is active.
 	Enabled bool `bson:"enabled" json:"enabled"`
@@ -652,22 +652,22 @@ type DNSDiscoveryConfig struct {
 	// RefreshInterval is how often the hostname is resolved. Defaults to 30s, minimum 5s.
 	RefreshInterval tyktime.ReadableDuration `bson:"refresh_interval" json:"refresh_interval"`
 
-	// StaleTTL is how long the last addresses stay in use while lookups fail.
+	// StaleTTL is how long the last known good addresses keep being used if the resolver becomes unreachable. Set as human-readable format (e.g. `30s`).
 	// Empty or `0` means that known addresses will continue to be used until a lookup succeeds. Once expired, requests fail with 503.
 	StaleTTL tyktime.ReadableDuration `bson:"stale_ttl" json:"stale_ttl"`
 
-	// ConnectionDraining contains the configuration related to connection draining.
+	// ConnectionDraining controls the behaviour when an address is no longer returned by the DNS resolver.
 	// Disabled by default.
 	ConnectionDraining *ConnectionDrainingConfig `bson:"connection_draining,omitempty" json:"connection_draining,omitempty"`
 }
 
-// ConnectionDrainingConfig closes connections to addresses DNS no longer returns.
+// ConnectionDrainingConfig controls the behaviour when an address is no longer returned by the DNS resolver.
 type ConnectionDrainingConfig struct {
-	// Enabled determines if connection draining is active.
+	// Enabled maintains connections for the `timeout` period after they are no longer returned by the DNS resolver. Default: false.
 	// When disabled, connections close once idle.
 	Enabled bool `bson:"enabled" json:"enabled"`
 
-	// Timeout is how long connections to a removed address stay open. Defaults to 30s.
+	// Timeout is how long connections to a removed address stay open. Set as human-readable format; default: 30s (when enabled).
 	Timeout tyktime.ReadableDuration `bson:"timeout" json:"timeout"`
 }
 
