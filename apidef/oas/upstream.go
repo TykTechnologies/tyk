@@ -329,7 +329,7 @@ type DNSDiscovery struct {
 	// RefreshInterval is how often the hostname is resolved. Defaults to 30s, minimum 5s.
 	// Tyk classic API definition: `proxy.dns_discovery.refresh_interval`.
 	RefreshInterval time.ReadableDuration `bson:"refreshInterval,omitempty" json:"refreshInterval,omitempty"`
-	// StaleTTL is how long the last addresses stay in use while lookups fail.
+	// StaleTTL is how long the last known good addresses keep being used if the resolver becomes unreachable. Set as human-readable format; (e.g. `300s`).
 	// Empty or `0` means that known addresses will continue to be used until a lookup succeeds. Once expired, requests fail with 503.
 	// Tyk classic API definition: `proxy.dns_discovery.stale_ttl`.
 	StaleTTL time.ReadableDuration `bson:"staleTTL,omitempty" json:"staleTTL,omitempty"`
