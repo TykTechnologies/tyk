@@ -33,8 +33,24 @@ func listenLocal(t *testing.T) (net.Listener, string) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { ln.Close() })
-	_, port, _ := net.SplitHostPort(ln.Addr().String())
+	_, port, err := net.SplitHostPort(ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
 	return ln, port
+}
+
+func serveInBackground(t *testing.T, serve func() error) {
+	t.Helper()
+
+	done := make(chan error, 1)
+	go func() { done <- serve() }()
+	t.Cleanup(func() {
+		err := <-done
+		if err != nil && !errors.Is(err, http.ErrServerClosed) && !errors.Is(err, grpc.ErrServerStopped) {
+			t.Errorf("backend stopped serving: %v", err)
+		}
+	})
 }
 
 func drainingIn(timeout time.Duration) func(*APISpec) {
@@ -88,8 +104,14 @@ func TestSetupUpstreamDNSDiscovery_DeclinedTargetKeepsConfiguredTarget(t *testin
 	gw := &Gateway{}
 	logger := logrus.NewEntry(logrus.New())
 	gw.setupUpstreamDNSDiscovery(spec, logger)
-	target, _ := url.Parse(spec.Proxy.TargetURL)
-	req, _ := http.NewRequest(http.MethodGet, "http://gateway/", nil)
+	target, err := url.Parse(spec.Proxy.TargetURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	req, err := http.NewRequest(http.MethodGet, "http://gateway/", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	proxy := gw.TykNewSingleHostReverseProxy(target, spec, logger)
 	proxy.Director(req)
 	if req.URL.Host != target.Host {
@@ -110,7 +132,7 @@ func TestH2CTransport_HealthPingsSpareQuietGRPCStreams(t *testing.T) {
 		<-stream.Context().Done()
 		return stream.Context().Err()
 	}))
-	go srv.Serve(ln)
+	serveInBackground(t, func() error { return srv.Serve(ln) })
 	defer srv.Stop()
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 	spec.dnsDiscovery.Store(&dnsDiscoveryPlan{})
@@ -119,7 +141,10 @@ func TestH2CTransport_HealthPingsSpareQuietGRPCStreams(t *testing.T) {
 	defer rt.Retire()
 	ctx, cancel := context.WithTimeout(context.Background(), 140*time.Second)
 	defer cancel()
-	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, "http://"+ln.Addr().String()+"/stream.Service/Watch", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://"+ln.Addr().String()+"/stream.Service/Watch", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	req.Header.Set("Content-Type", "application/grpc")
 	req.Header.Set("TE", "trailers")
 	started := time.Now()
@@ -455,7 +480,7 @@ func TestH2CTransport_ReusedConnectionKeepsItsOwnership(t *testing.T) {
 					<-r.Context().Done()
 				}
 			}), &http2.Server{})}
-			go srv.Serve(ln)
+			serveInBackground(t, func() error { return srv.Serve(ln) })
 			defer srv.Close()
 
 			p := localPlan(port, 20*time.Millisecond)
@@ -482,7 +507,9 @@ func TestH2CTransport_ReusedConnectionKeepsItsOwnership(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			io.Copy(io.Discard, resp.Body)
+			if _, err := io.Copy(io.Discard, resp.Body); err != nil {
+				t.Fatal(err)
+			}
 			resp.Body.Close()
 
 			ctx, cancel := context.WithTimeout(withMark(context.Background(), markFor(tc.held)), 2*time.Second)
@@ -497,10 +524,10 @@ func TestH2CTransport_ReusedConnectionKeepsItsOwnership(t *testing.T) {
 			}
 			defer resp.Body.Close()
 
-			ended := make(chan struct{})
+			ended := make(chan error, 1)
 			go func() {
-				io.Copy(io.Discard, resp.Body)
-				close(ended)
+				_, err := io.Copy(io.Discard, resp.Body)
+				ended <- err
 			}()
 
 			p.onAddressSet(&dnsdiscovery.State{Version: 2, Addrs: []string{"127.0.0.2"}})

@@ -57,78 +57,91 @@ func TestProcessSpecWithoutUpstreamDNSDiscovery(t *testing.T) {
 }
 
 func TestRetireLetsInFlightH2CRequestsFinish(t *testing.T) {
-	for _, discovered := range []bool{true, false} {
-		name := "discovered"
-		if !discovered {
-			name = "unowned"
-		}
-		t.Run(name, func(t *testing.T) {
-			finishStream := make(chan struct{})
-			backend := httptest.NewServer(h2c.NewHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if r.URL.Path == "/stream" {
-					_, _ = io.WriteString(w, "before retirement\n")
-					w.(http.Flusher).Flush()
-					select {
-					case <-finishStream:
-					case <-r.Context().Done():
-						return
-					}
-				}
-				_, _ = io.WriteString(w, "after retirement\n")
-			}), &http2.Server{}))
-			defer backend.Close()
+	t.Run("discovered", func(t *testing.T) { testRetireLetsInFlightH2CRequestsFinish(t, true) })
+	t.Run("unowned", func(t *testing.T) { testRetireLetsInFlightH2CRequestsFinish(t, false) })
+}
 
-			spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
-			rt := newH2CRoundTripper(spec, &http.Transport{})
-			defer rt.Retire()
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
+func testRetireLetsInFlightH2CRequestsFinish(t *testing.T, discovered bool) {
+	finishStream := make(chan struct{})
+	backend := newRetirementBackend(t, finishStream)
 
-			do := func(path string) *http.Response {
-				t.Helper()
-				req, err := http.NewRequestWithContext(ctx, http.MethodGet, backend.URL+path, nil)
-				if err != nil {
-					t.Fatal(err)
-				}
-				markUpstream(req, upstreamMark{h2c: true, discovered: discovered})
-				resp, err := rt.RoundTrip(req)
-				if err != nil {
-					t.Fatalf("request to %s failed: %v", path, err)
-				}
-				t.Cleanup(func() { resp.Body.Close() })
-				if resp.ProtoMajor != 2 || resp.StatusCode != http.StatusOK {
-					t.Fatalf("unexpected response: %s %s", resp.Proto, resp.Status)
-				}
-				return resp
-			}
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	rt := newH2CRoundTripper(spec, &http.Transport{})
+	defer rt.Retire()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	mark := upstreamMark{h2c: true, discovered: discovered}
 
-			resp := do("/stream")
-			prefix := make([]byte, len("before retirement\n"))
-			if _, err := io.ReadFull(resp.Body, prefix); err != nil {
-				t.Fatalf("reading the stream before retirement: %v", err)
-			}
-			if string(prefix) != "before retirement\n" {
-				t.Fatalf("unexpected stream prefix: %q", prefix)
-			}
-
-			// The backend cannot finish the response until after retirement.
-			rt.Retire()
-			close(finishStream)
-			body, err := io.ReadAll(resp.Body)
-			resp.Body.Close()
-			if err != nil || string(body) != "after retirement\n" {
-				t.Fatalf("retirement interrupted the active stream: body %q, error %v", body, err)
-			}
-
-			// Close the now-idle connection so the next request must dial again.
-			// Requests already holding a replaced transport must still be served.
-			rt.Retire()
-			resp = do("/after")
-			body, err = io.ReadAll(resp.Body)
-			resp.Body.Close()
-			if err != nil || string(body) != "after retirement\n" {
-				t.Fatalf("request through the retired transport failed: body %q, error %v", body, err)
-			}
-		})
+	resp := roundTripMarked(ctx, t, rt, backend.URL+"/stream", mark)
+	prefix := make([]byte, len("before retirement\n"))
+	if _, err := io.ReadFull(resp.Body, prefix); err != nil {
+		t.Fatalf("reading the stream before retirement: %v", err)
 	}
+	if string(prefix) != "before retirement\n" {
+		t.Fatalf("unexpected stream prefix: %q", prefix)
+	}
+
+	// The backend cannot finish the response until after retirement.
+	rt.Retire()
+	close(finishStream)
+	if body := readRemainingBody(t, resp, "retirement interrupted the active stream"); body != "after retirement\n" {
+		t.Fatalf("retirement interrupted the active stream: body %q", body)
+	}
+
+	// Close the now-idle connection so the next request must dial again.
+	// Requests already holding a replaced transport must still be served.
+	rt.Retire()
+	resp = roundTripMarked(ctx, t, rt, backend.URL+"/after", mark)
+	if body := readRemainingBody(t, resp, "request through the retired transport failed"); body != "after retirement\n" {
+		t.Fatalf("request through the retired transport failed: body %q", body)
+	}
+}
+
+func newRetirementBackend(t *testing.T, finishStream <-chan struct{}) *httptest.Server {
+	t.Helper()
+
+	backend := httptest.NewServer(h2c.NewHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/stream" {
+			writeBody(t, w, "before retirement\n")
+			w.(http.Flusher).Flush()
+			select {
+			case <-finishStream:
+			case <-r.Context().Done():
+				return
+			}
+		}
+		writeBody(t, w, "after retirement\n")
+	}), &http2.Server{}))
+	t.Cleanup(backend.Close)
+	return backend
+}
+
+func roundTripMarked(ctx context.Context, t *testing.T, rt *TykRoundTripper, url string, mark upstreamMark) *http.Response {
+	t.Helper()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	markUpstream(req, mark)
+	resp, err := rt.RoundTrip(req)
+	if err != nil {
+		t.Fatalf("request to %s failed: %v", url, err)
+	}
+	t.Cleanup(func() { resp.Body.Close() })
+	if resp.ProtoMajor != 2 || resp.StatusCode != http.StatusOK {
+		t.Fatalf("unexpected response: %s %s", resp.Proto, resp.Status)
+	}
+	return resp
+}
+
+func readRemainingBody(t *testing.T, resp *http.Response, failure string) string {
+	t.Helper()
+
+	body, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		t.Fatalf("%s: %v", failure, err)
+	}
+	return string(body)
 }

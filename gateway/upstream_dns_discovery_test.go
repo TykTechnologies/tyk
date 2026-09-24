@@ -640,7 +640,7 @@ func TestUpstreamConnRegistries_ReplacementReusesTheRegistry(t *testing.T) {
 	var registries upstreamConnRegistries
 
 	shared := registries.get("api-1", nil)
-	if got := registries.get("api-1", nil); got != shared {
+	if registries.get("api-1", nil) != shared {
 		t.Fatal("a second plan for the same API got a new registry instead of the existing one")
 	}
 	if shared.newGeneration() != 1 || shared.newGeneration() != 2 {
@@ -654,7 +654,7 @@ func TestUpstreamConnRegistries_ReplacementReusesTheRegistry(t *testing.T) {
 	if !closedWithin(t, tracked, time.Second) {
 		t.Fatal("releasing the API did not bound the connections it held")
 	}
-	if got := registries.get("api-1", nil); got == shared {
+	if registries.get("api-1", nil) == shared {
 		t.Fatal("a released registry was handed to a returning API")
 	}
 }
@@ -1251,17 +1251,7 @@ func TestDirector_SendsTheServiceNameAsTheAuthority(t *testing.T) {
 		if req.URL.Scheme != "h2c" {
 			t.Errorf("scheme is %q, want h2c: rewriting it sends a gRPC upstream HTTP/1.1", req.URL.Scheme)
 		}
-		mark, marked := upstreamMarkOf(req)
-		if !marked || !mark.discovered {
-			t.Fatalf("request mark is %+v (marked=%v), want discovered", mark, marked)
-		}
-		if want := planSelection(proxy.TykAPISpec); mark.selection != want {
-			t.Errorf("request selection is %+v, want %+v", mark.selection, want)
-		}
-		markFinalScheme(req)
-		if final, _ := upstreamMarkOf(req); !final.h2c || !final.discovered || final.selection != mark.selection {
-			t.Errorf("final mark is %+v, want h2c with the Director's discovery and selection kept", final)
-		}
+		assertDiscoveredMark(t, req, planSelection(proxy.TykAPISpec))
 	})
 
 	t.Run("preserve_host_header still wins", func(t *testing.T) {
@@ -1276,6 +1266,44 @@ func TestDirector_SendsTheServiceNameAsTheAuthority(t *testing.T) {
 		}
 		if req.URL.Host != "10.0.0.1:9002" {
 			t.Errorf("dialling %q, want the resolved pod address", req.URL.Host)
+		}
+	})
+}
+
+func assertDiscoveredMark(t *testing.T, req *http.Request, want upstreamSelection) {
+	t.Helper()
+
+	mark, marked := upstreamMarkOf(req)
+	if !marked || !mark.discovered || !mark.h2c {
+		t.Fatalf("request mark is %+v (marked=%v), want discovered h2c", mark, marked)
+	}
+	if mark.selection != want {
+		t.Errorf("request selection is %+v, want %+v", mark.selection, want)
+	}
+
+	directed := req.Context()
+	markFinalScheme(req)
+	if req.Context() != directed {
+		t.Error("the final scheme was marked again although the Director's mark already recorded it")
+	}
+}
+
+func TestMarkFinalScheme_RecordsTheSchemeTheRequestLeavesWith(t *testing.T) {
+	t.Run("unmarked h2c request", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "h2c://svc:9002/", nil)
+		markFinalScheme(req)
+		if mark, marked := upstreamMarkOf(req); !marked || !mark.h2c || mark.discovered {
+			t.Errorf("mark is %+v (marked=%v), want h2c and not discovered", mark, marked)
+		}
+	})
+
+	t.Run("marked request whose scheme changed after the Director", func(t *testing.T) {
+		req := httptest.NewRequest(http.MethodGet, "http://svc:9002/", nil)
+		sel := upstreamSelection{generation: 2, version: 5}
+		markUpstream(req, upstreamMark{h2c: true, discovered: true, selection: sel})
+		markFinalScheme(req)
+		if mark, _ := upstreamMarkOf(req); mark.h2c || !mark.discovered || mark.selection != sel {
+			t.Errorf("mark is %+v, want http with the discovery fields kept", mark)
 		}
 	})
 }

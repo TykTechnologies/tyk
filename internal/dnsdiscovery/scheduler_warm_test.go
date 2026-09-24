@@ -86,8 +86,7 @@ func TestScheduler_WarmBoundsConcurrentLookups(t *testing.T) {
 	s.Lookup = func(ctx context.Context, _ string) ([]string, error) {
 		n := active.Add(1)
 		defer active.Add(-1)
-		for old := peak.Load(); n > old && !peak.CompareAndSwap(old, n); old = peak.Load() {
-		}
+		storeMax(&peak, n)
 		select {
 		case <-release:
 			return []string{"10.0.0.1"}, nil

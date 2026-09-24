@@ -209,73 +209,75 @@ func BenchmarkRescanOnExtremeDeparture(b *testing.B) {
 }
 
 func BenchmarkLoopScan(b *testing.B) {
-	newScheduler := func(b *testing.B, hosts int, due bool) *Scheduler {
-		b.Helper()
-		scheduler := benchScheduler(4)
-		now := time.Now()
-		scheduler.Now = func() time.Time { return now }
-		for i := 0; i < hosts; i++ {
-			sub, err := scheduler.Subscribe(b.Context(), fmt.Sprintf("api-%d", i), Config{
-				Host:     fmt.Sprintf("svc-%d", i),
-				Interval: time.Hour,
-			})
-			if err != nil {
-				b.Fatal(err)
-			}
-			sub.entry.nextDue = now.Add(time.Hour)
-			if due {
-				// Distinct deadlines exercise the production sort as well as the scan.
-				sub.entry.nextDue = now.Add(-time.Duration(i) * time.Millisecond)
-			}
-		}
-		return scheduler
-	}
-
 	for _, hosts := range []int{10, 100, 1000, 10000, 100000} {
 		b.Run(fmt.Sprintf("hosts=%d", hosts), func(b *testing.B) {
-			for _, due := range []bool{false, true} {
-				name := "launchDue/no_due"
-				if due {
-					name = "launchDue/saturated"
-				}
-				b.Run(name, func(b *testing.B) {
-					scheduler := newScheduler(b, hosts, due)
-					slots := scheduler.lookupSlots()
-					if due {
-						// Hold every slot to measure scanning and sorting a pending
-						// backlog without mixing resolver goroutines into the result.
-						for i := 0; i < cap(slots); i++ {
-							slots <- struct{}{}
-						}
-					}
-					ctx := b.Context()
-					var workers sync.WaitGroup
-					defer workers.Wait()
-					b.ReportAllocs()
-					b.ResetTimer()
-					for i := 0; i < b.N; i++ {
-						if saturated := scheduler.launchDue(ctx, &workers); saturated != due {
-							b.Fatalf("launchDue saturation = %t, want %t", saturated, due)
-						}
-					}
-					b.StopTimer()
-					if scheduler.Lookups() != 0 {
-						b.Fatal("scan benchmark unexpectedly launched a lookup")
-					}
-				})
-			}
-
-			b.Run("nextWait", func(b *testing.B) {
-				scheduler := newScheduler(b, hosts, false)
-				b.ReportAllocs()
-				b.ResetTimer()
-				for i := 0; i < b.N; i++ {
-					if wait := scheduler.nextWait(); wait != time.Hour {
-						b.Fatalf("nextWait = %s, want 1h", wait)
-					}
-				}
-			})
+			b.Run("launchDue/no_due", func(b *testing.B) { benchLaunchDue(b, hosts, false) })
+			b.Run("launchDue/saturated", func(b *testing.B) { benchLaunchDue(b, hosts, true) })
+			b.Run("nextWait", func(b *testing.B) { benchNextWait(b, hosts) })
 		})
+	}
+}
+
+func newLoopScanScheduler(b *testing.B, hosts int, due bool) *Scheduler {
+	b.Helper()
+	scheduler := benchScheduler(4)
+	now := time.Now()
+	scheduler.Now = func() time.Time { return now }
+	for i := 0; i < hosts; i++ {
+		sub, err := scheduler.Subscribe(b.Context(), fmt.Sprintf("api-%d", i), Config{
+			Host:     fmt.Sprintf("svc-%d", i),
+			Interval: time.Hour,
+		})
+		if err != nil {
+			b.Fatal(err)
+		}
+		sub.entry.nextDue = now.Add(time.Hour)
+		if due {
+			// Distinct deadlines exercise the production sort as well as the scan.
+			sub.entry.nextDue = now.Add(-time.Duration(i) * time.Millisecond)
+		}
+	}
+	return scheduler
+}
+
+func benchLaunchDue(b *testing.B, hosts int, due bool) {
+	scheduler := newLoopScanScheduler(b, hosts, due)
+	if due {
+		// Hold every slot to measure scanning and sorting a pending
+		// backlog without mixing resolver goroutines into the result.
+		slots := scheduler.lookupSlots()
+		for i := 0; i < cap(slots); i++ {
+			slots <- struct{}{}
+		}
+	}
+
+	ctx := b.Context()
+	var workers sync.WaitGroup
+	defer workers.Wait()
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if saturated := scheduler.launchDue(ctx, &workers); saturated != due {
+			b.Fatalf("launchDue saturation = %t, want %t", saturated, due)
+		}
+	}
+	b.StopTimer()
+
+	if scheduler.Lookups() != 0 {
+		b.Fatal("scan benchmark unexpectedly launched a lookup")
+	}
+}
+
+func benchNextWait(b *testing.B, hosts int) {
+	scheduler := newLoopScanScheduler(b, hosts, false)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if wait := scheduler.nextWait(); wait != time.Hour {
+			b.Fatalf("nextWait = %s, want 1h", wait)
+		}
 	}
 }
 

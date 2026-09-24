@@ -390,6 +390,7 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 
 		if route.discovered {
 			markUpstream(req, upstreamMark{
+				h2c:        strings.EqualFold(req.URL.Scheme, "h2c"),
 				discovered: targetToUse == target,
 				selection:  route.selection,
 			})
@@ -1049,7 +1050,7 @@ func newH2CRoundTripper(spec *APISpec, transport *http.Transport) *TykRoundTripp
 		if err != nil {
 			return nil, err
 		}
-		mark, _ := ctx.Value(upstreamMarkKey{}).(upstreamMark)
+		mark, _ := upstreamMarkFrom(ctx)
 		return upstreamDrainRegistry(spec).track(addr, conn, mark.selection)
 	})
 	rt.h2cUnowned = newH2CTransport(func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
@@ -1103,13 +1104,21 @@ func markUpstream(r *http.Request, mark upstreamMark) {
 }
 
 func markFinalScheme(r *http.Request) {
-	mark, _ := upstreamMarkOf(r)
-	mark.h2c = strings.EqualFold(r.URL.Scheme, "h2c")
+	h2c := strings.EqualFold(r.URL.Scheme, "h2c")
+	mark, marked := upstreamMarkOf(r)
+	if marked && mark.h2c == h2c {
+		return
+	}
+	mark.h2c = h2c
 	markUpstream(r, mark)
 }
 
 func upstreamMarkOf(r *http.Request) (upstreamMark, bool) {
-	mark, marked := r.Context().Value(upstreamMarkKey{}).(upstreamMark)
+	return upstreamMarkFrom(r.Context())
+}
+
+func upstreamMarkFrom(ctx context.Context) (upstreamMark, bool) {
+	mark, marked := ctx.Value(upstreamMarkKey{}).(upstreamMark)
 	return mark, marked
 }
 

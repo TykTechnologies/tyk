@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -57,6 +58,14 @@ func (r *stubResolver) lookup(_ context.Context, host string) ([]string, error) 
 		return nil, err
 	}
 	return r.answers[host], nil
+}
+
+func storeMax(v *atomic.Int64, n int64) {
+	for old := v.Load(); n > old; old = v.Load() {
+		if v.CompareAndSwap(old, n) {
+			return
+		}
+	}
 }
 
 func newTestScheduler(resolver *stubResolver) *Scheduler {

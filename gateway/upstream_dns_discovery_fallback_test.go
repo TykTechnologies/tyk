@@ -76,7 +76,11 @@ func TestTykRoundTripper_RetireIsSafeDuringRequests(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			for j := 0; j < 50; j++ {
-				req, _ := http.NewRequest(http.MethodGet, backend.URL, nil)
+				req, err := http.NewRequest(http.MethodGet, backend.URL, nil)
+				if err != nil {
+					t.Error(err)
+					return
+				}
 				if resp, err := rt.RoundTrip(req); err == nil {
 					resp.Body.Close()
 				}
@@ -133,7 +137,7 @@ func TestDNSDiscovery_ProtocolChangeReleasesTheRegistry(t *testing.T) {
 	if !closedWithin(t, tracked, time.Second) {
 		t.Fatal("replacing the discovered HTTP API with a TCP API left its connection without a drain deadline")
 	}
-	if got := ts.Gw.upstreamConns.get(apiID, nil); got == registry {
+	if ts.Gw.upstreamConns.get(apiID, nil) == registry {
 		t.Fatal("the replaced API's registry is still held by the gateway")
 	}
 }

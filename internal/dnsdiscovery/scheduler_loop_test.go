@@ -34,8 +34,7 @@ func (b *blockingLookup) lookup(ctx context.Context, host string) ([]string, err
 
 	n := b.active.Add(1)
 	defer b.active.Add(-1)
-	for old := b.peak.Load(); n > old && !b.peak.CompareAndSwap(old, n); old = b.peak.Load() {
-	}
+	storeMax(&b.peak, n)
 
 	select {
 	case <-b.release:

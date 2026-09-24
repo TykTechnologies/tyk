@@ -9,8 +9,6 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -488,15 +486,11 @@ func (s *Scheduler) refreshAll(ctx context.Context, due []*entry) {
 		return
 	}
 
-	group := new(errgroup.Group)
-	group.SetLimit(lookupConcurrency(len(due)))
+	group := newBoundedGroup(lookupConcurrency(len(due)))
 	for _, e := range due {
-		group.Go(func() error {
-			s.refresh(ctx, e)
-			return nil
-		})
+		group.Go(func() { s.refresh(ctx, e) })
 	}
-	_ = group.Wait() //nolint:errcheck // refresh never returns an error
+	group.Wait()
 }
 
 func (s *Scheduler) nextWait() time.Duration {
@@ -598,18 +592,14 @@ func (s *Scheduler) Warm(ctx context.Context) []string {
 	}
 	s.mu.Unlock()
 
-	group := new(errgroup.Group)
-	group.SetLimit(lookupConcurrency(len(cold)))
+	group := newBoundedGroup(lookupConcurrency(len(cold)))
 	for _, e := range cold {
 		if ctx.Err() != nil {
 			break
 		}
-		group.Go(func() error {
-			s.warm(ctx, e)
-			return nil
-		})
+		group.Go(func() { s.warm(ctx, e) })
 	}
-	_ = group.Wait()
+	group.Wait()
 
 	var unresolved []string
 	for _, e := range cold {
@@ -746,6 +736,27 @@ func (s *Scheduler) publishLocked(e *entry, addrs []string, outcome Outcome, fai
 		}
 	}
 	return state, notify
+}
+
+type boundedGroup struct {
+	wg    sync.WaitGroup
+	slots chan struct{}
+}
+
+func newBoundedGroup(limit int) *boundedGroup {
+	return &boundedGroup{slots: make(chan struct{}, limit)}
+}
+
+func (g *boundedGroup) Go(fn func()) {
+	g.slots <- struct{}{}
+	g.wg.Go(func() {
+		defer func() { <-g.slots }()
+		fn()
+	})
+}
+
+func (g *boundedGroup) Wait() {
+	g.wg.Wait()
 }
 
 func isNameNotFound(err error) bool {

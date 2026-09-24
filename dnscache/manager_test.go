@@ -155,7 +155,10 @@ func TestWrapDialer_DialsACachedIPv6Address(t *testing.T) {
 			c.Close()
 		}
 	}()
-	_, port, _ := net.SplitHostPort(ln.Addr().String())
+	_, port, err := net.SplitHostPort(ln.Addr().String())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	for _, strategy := range []config.IPsHandleStrategy{config.PickFirstStrategy, config.RandomStrategy, config.NoCacheStrategy} {
 		t.Run(string(strategy), func(t *testing.T) {

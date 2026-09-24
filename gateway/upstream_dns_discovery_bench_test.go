@@ -232,8 +232,13 @@ func BenchmarkUpstreamConnRegistry_Track(b *testing.B) {
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			addr := net.JoinHostPort(addrs[i%len(addrs)], "9002")
-			tracked, _ := registry.track(addr, benchNopConn{}, upstreamSelection{})
-			_ = tracked.Close()
+			tracked, err := registry.track(addr, benchNopConn{}, upstreamSelection{})
+			if err != nil {
+				b.Fatal(err)
+			}
+			if err := tracked.Close(); err != nil {
+				b.Fatal(err)
+			}
 		}
 	})
 
@@ -246,8 +251,15 @@ func BenchmarkUpstreamConnRegistry_Track(b *testing.B) {
 			i := 0
 			for pb.Next() {
 				addr := net.JoinHostPort(addrs[i%len(addrs)], "9002")
-				tracked, _ := registry.track(addr, benchNopConn{}, upstreamSelection{})
-				_ = tracked.Close()
+				tracked, err := registry.track(addr, benchNopConn{}, upstreamSelection{})
+				if err != nil {
+					b.Error(err)
+					return
+				}
+				if err := tracked.Close(); err != nil {
+					b.Error(err)
+					return
+				}
 				i++
 			}
 		})
