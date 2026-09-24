@@ -1472,7 +1472,7 @@ type Config struct {
 	// The use of other characters in IDs can cause unpredictable behavior and is not recommended.
 	AllowUnsafePolicyIds bool `json:"allow_unsafe_policy_ids"`
 
-	// AllowUnsafeWebhookTemplatePaths disables webhook template path validation on the dashboard side (default: false).
+	// AllowUnsafeWebhookTemplatePaths disables webhook template path validation. This is provided for compatibility with legacy webhook definitions containing potentially unsafe template paths (default: false).
 	AllowUnsafeWebhookTemplatePaths bool `json:"allow_unsafe_webhook_template_paths"`
 }
 
