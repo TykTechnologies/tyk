@@ -1,0 +1,29 @@
+{
+  "name": "Test API",
+  "slug": "test-api",
+  "api_id": "test-api",
+  "org_id": "default",
+  "use_keyless": true,
+  "auth": {
+    "auth_header_name": "Authorization"
+  },
+  "definition": {
+    "location": "header",
+    "key": "x-api-version"
+  },
+  "version_data": {
+    "not_versioned": true,
+    "versions": {
+      "Default": {
+        "name": "Default",
+        "use_extended_paths": true
+      }
+    }
+  },
+  "proxy": {
+    "listen_path": "/test/",
+    "target_url": "http://upstream:80/",
+    "strip_listen_path": true
+  },
+  "active": true
+}
