@@ -3,11 +3,13 @@ package gateway
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -24,10 +26,10 @@ func dnsDiscoveryClassicAPI(apiID, listenPath string, loadBalancing, serviceDisc
 	def.Proxy.EnableLoadBalancing = loadBalancing
 	def.Proxy.ServiceDiscovery.UseDiscoveryService = serviceDiscovery
 	def.Proxy.DNSDiscovery = apidef.DNSDiscoveryConfig{
-		Enabled:         true,
-		RefreshInterval: 10,
-		StaleTTL:        300,
-		DrainDeadline:   30,
+		Enabled:            true,
+		RefreshInterval:    tyktime.ReadableDuration(10 * time.Second),
+		StaleTTL:           tyktime.ReadableDuration(5 * time.Minute),
+		ConnectionDraining: &apidef.ConnectionDrainingConfig{Enabled: true, Timeout: tyktime.ReadableDuration(30 * time.Second)},
 	}
 	return &def
 }
@@ -35,8 +37,13 @@ func dnsDiscoveryClassicAPI(apiID, listenPath string, loadBalancing, serviceDisc
 // dnsDiscoveryOASAPI is the same API as a Tyk OAS document.
 func dnsDiscoveryOASAPI(name, listenPath string, loadBalancing, serviceDiscovery bool) *oas.OAS {
 	upstream := oas.Upstream{
-		URL:          "h2c://my-grpc-svc:9002",
-		DNSDiscovery: &oas.DNSDiscovery{Enabled: true, RefreshInterval: 10, StaleTTL: 300, DrainDeadline: 30},
+		URL: "h2c://my-grpc-svc:9002",
+		DNSDiscovery: &oas.DNSDiscovery{
+			Enabled:            true,
+			RefreshInterval:    tyktime.ReadableDuration(10 * time.Second),
+			StaleTTL:           tyktime.ReadableDuration(5 * time.Minute),
+			ConnectionDraining: &oas.ConnectionDraining{Enabled: true, Timeout: tyktime.ReadableDuration(30 * time.Second)},
+		},
 	}
 	if loadBalancing {
 		upstream.LoadBalancing = &oas.LoadBalancing{Enabled: true}

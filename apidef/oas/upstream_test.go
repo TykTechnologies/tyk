@@ -1552,32 +1552,34 @@ func TestDNSDiscovery(t *testing.T) {
 			},
 			{
 				title: "enabled with an explicit interval",
-				input: apidef.DNSDiscoveryConfig{Enabled: true, RefreshInterval: 10},
+				input: apidef.DNSDiscoveryConfig{Enabled: true, RefreshInterval: ReadableDuration(10 * time.Second)},
 			},
 			{
 				// Below the floor, which is applied when the API loads rather
 				// than during conversion, so the configured value has to
 				// survive the round trip unchanged.
 				title: "interval below the floor",
-				input: apidef.DNSDiscoveryConfig{Enabled: true, RefreshInterval: 1},
+				input: apidef.DNSDiscoveryConfig{Enabled: true, RefreshInterval: ReadableDuration(time.Second)},
 			},
 			{
 				// Not a useful configuration, but it must not be rewritten.
 				// An interval set while disabled is preserved, so an operator
 				// toggling `enabled` gets the interval they left.
 				title: "interval set while disabled",
-				input: apidef.DNSDiscoveryConfig{RefreshInterval: 30},
+				input: apidef.DNSDiscoveryConfig{RefreshInterval: ReadableDuration(30 * time.Second)},
 			},
 			{
 				title: "every period set",
-				input: apidef.DNSDiscoveryConfig{Enabled: true, RefreshInterval: 10, StaleTTL: 120, DrainDeadline: 45},
+				input: apidef.DNSDiscoveryConfig{
+					Enabled:            true,
+					RefreshInterval:    ReadableDuration(10 * time.Second),
+					StaleTTL:           ReadableDuration(2 * time.Minute),
+					ConnectionDraining: &apidef.ConnectionDrainingConfig{Enabled: true, Timeout: ReadableDuration(45 * time.Second)},
+				},
 			},
 			{
-				// Each period spells "off" with a negative value, and each one
-				// turns off something different, so none of them may be
-				// normalised away during conversion.
-				title: "the negative sentinels",
-				input: apidef.DNSDiscoveryConfig{Enabled: true, StaleTTL: -1, DrainDeadline: -1},
+				title: "draining turned off",
+				input: apidef.DNSDiscoveryConfig{Enabled: true, ConnectionDraining: &apidef.ConnectionDrainingConfig{}},
 			},
 		}
 
@@ -1611,20 +1613,20 @@ func TestDNSDiscovery(t *testing.T) {
 
 		var api apidef.APIDefinition
 		api.Proxy.DNSDiscovery = apidef.DNSDiscoveryConfig{
-			Enabled:         true,
-			RefreshInterval: 15,
-			StaleTTL:        120,
-			DrainDeadline:   45,
+			Enabled:            true,
+			RefreshInterval:    ReadableDuration(15 * time.Second),
+			StaleTTL:           ReadableDuration(2 * time.Minute),
+			ConnectionDraining: &apidef.ConnectionDrainingConfig{Enabled: true, Timeout: ReadableDuration(45 * time.Second)},
 		}
 
 		var upstream Upstream
 		upstream.Fill(api)
 
 		assert.Equal(t, &DNSDiscovery{
-			Enabled:         true,
-			RefreshInterval: 15,
-			StaleTTL:        120,
-			DrainDeadline:   45,
+			Enabled:            true,
+			RefreshInterval:    ReadableDuration(15 * time.Second),
+			StaleTTL:           ReadableDuration(2 * time.Minute),
+			ConnectionDraining: &ConnectionDraining{Enabled: true, Timeout: ReadableDuration(45 * time.Second)},
 		}, upstream.DNSDiscovery)
 	})
 }
@@ -1646,7 +1648,7 @@ func TestDNSDiscovery_RoundTripsWithLoadBalancing(t *testing.T) {
 		upstream := Upstream{
 			URL:           "h2c://my-grpc-svc:9002",
 			LoadBalancing: &LoadBalancing{Enabled: true},
-			DNSDiscovery:  &DNSDiscovery{Enabled: true, RefreshInterval: 10},
+			DNSDiscovery:  &DNSDiscovery{Enabled: true, RefreshInterval: ReadableDuration(10 * time.Second)},
 		}
 
 		var api apidef.APIDefinition
@@ -1665,7 +1667,7 @@ func TestDNSDiscovery_RoundTripsWithLoadBalancing(t *testing.T) {
 		var api apidef.APIDefinition
 		api.Proxy.TargetURL = "h2c://my-grpc-svc:9002"
 		api.Proxy.EnableLoadBalancing = true
-		api.Proxy.DNSDiscovery = apidef.DNSDiscoveryConfig{Enabled: true, RefreshInterval: 10}
+		api.Proxy.DNSDiscovery = apidef.DNSDiscoveryConfig{Enabled: true, RefreshInterval: ReadableDuration(10 * time.Second)}
 
 		var upstream Upstream
 		upstream.Fill(api)
@@ -1686,7 +1688,10 @@ func TestDNSDiscovery_RoundTripsWithLoadBalancing(t *testing.T) {
 		api.Proxy.EnableLoadBalancing = true
 		api.Proxy.CheckHostAgainstUptimeTests = true
 		api.Proxy.DNSDiscovery = apidef.DNSDiscoveryConfig{
-			Enabled: true, RefreshInterval: 10, StaleTTL: 120, DrainDeadline: 45,
+			Enabled:            true,
+			RefreshInterval:    ReadableDuration(10 * time.Second),
+			StaleTTL:           ReadableDuration(2 * time.Minute),
+			ConnectionDraining: &apidef.ConnectionDrainingConfig{Enabled: true, Timeout: ReadableDuration(45 * time.Second)},
 		}
 
 		var upstream Upstream
@@ -1739,7 +1744,10 @@ func TestDNSDiscovery_DocumentedExampleIsAccepted(t *testing.T) {
 			URL:           "h2c://my-grpc-svc:9002",
 			LoadBalancing: &LoadBalancing{Enabled: true},
 			DNSDiscovery: &DNSDiscovery{
-				Enabled: true, RefreshInterval: 10, StaleTTL: 300, DrainDeadline: 30,
+				Enabled:            true,
+				RefreshInterval:    ReadableDuration(10 * time.Second),
+				StaleTTL:           ReadableDuration(5 * time.Minute),
+				ConnectionDraining: &ConnectionDraining{Enabled: true, Timeout: ReadableDuration(30 * time.Second)},
 			},
 		},
 	})
@@ -1754,7 +1762,10 @@ func TestDNSDiscovery_DocumentedExampleIsAccepted(t *testing.T) {
 
 	assert.True(t, api.Proxy.EnableLoadBalancing)
 	assert.Equal(t, apidef.DNSDiscoveryConfig{
-		Enabled: true, RefreshInterval: 10, StaleTTL: 300, DrainDeadline: 30,
+		Enabled:            true,
+		RefreshInterval:    ReadableDuration(10 * time.Second),
+		StaleTTL:           ReadableDuration(5 * time.Minute),
+		ConnectionDraining: &apidef.ConnectionDrainingConfig{Enabled: true, Timeout: ReadableDuration(30 * time.Second)},
 	}, api.Proxy.DNSDiscovery)
 
 	// And the rule set the create and update endpoints run against the

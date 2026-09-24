@@ -16,6 +16,8 @@ import (
 	pbexample "google.golang.org/grpc/examples/helloworld/helloworld"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 )
 
 // A real gRPC server and client either side of the gateway, rather than
@@ -456,7 +458,7 @@ func TestGRPCUpstream_DNSDiscovery_RealGRPC(t *testing.T) {
 				spec.Proxy.TargetURL = fmt.Sprintf("h2c://%s:%s", upstreamHost, port)
 				spec.Proxy.EnableLoadBalancing = tc.enabled
 				spec.Proxy.DNSDiscovery.Enabled = tc.enabled
-				spec.Proxy.DNSDiscovery.RefreshInterval = dnsCacheTimeout
+				spec.Proxy.DNSDiscovery.RefreshInterval = tyktime.ReadableDuration(dnsCacheTimeout * time.Second)
 			})
 
 			gatewayAddr := gatewayHostPort(t, ts)
@@ -523,7 +525,7 @@ func TestGRPCUpstream_DNSDiscovery_ScaleUp(t *testing.T) {
 		spec.Proxy.TargetURL = fmt.Sprintf("h2c://%s:%s", upstreamHost, port)
 		spec.Proxy.EnableLoadBalancing = true
 		spec.Proxy.DNSDiscovery.Enabled = true
-		spec.Proxy.DNSDiscovery.RefreshInterval = refreshInterval
+		spec.Proxy.DNSDiscovery.RefreshInterval = tyktime.ReadableDuration(refreshInterval * time.Second)
 	})
 
 	gatewayAddr := gatewayHostPort(t, ts)

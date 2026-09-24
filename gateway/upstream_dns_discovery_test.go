@@ -21,6 +21,7 @@ import (
 	"github.com/TykTechnologies/tyk/dnscache"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/dnsdiscovery"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 )
 
 // Dialling a backend means an IP literal, which no service certificate
@@ -92,56 +93,55 @@ func TestBuildUpstreamTarget(t *testing.T) {
 }
 
 func testRefreshIntervalResolution(t *testing.T) {
-	cases := map[int64]time.Duration{
-		0:  time.Duration(dnsDiscoveryDefaultInterval) * time.Second,
-		1:  dnsdiscovery.MinInterval,
-		4:  dnsdiscovery.MinInterval,
-		5:  5 * time.Second,
-		60: 60 * time.Second,
+	cases := map[time.Duration]time.Duration{
+		0:                dnsdiscovery.DefaultInterval,
+		time.Second:      dnsdiscovery.MinInterval,
+		4 * time.Second:  dnsdiscovery.MinInterval,
+		5 * time.Second:  5 * time.Second,
+		60 * time.Second: 60 * time.Second,
 	}
 
 	for in, want := range cases {
-		got := resolveDNSDiscoveryInterval(apidef.DNSDiscoveryConfig{RefreshInterval: in})
+		got := resolveDNSDiscoveryInterval(apidef.DNSDiscoveryConfig{RefreshInterval: tyktime.ReadableDuration(in)})
 		if got != want {
-			t.Errorf("refresh interval for %d = %s, want %s", in, got, want)
+			t.Errorf("refresh interval for %s = %s, want %s", in, got, want)
 		}
 	}
 }
 
 func testStaleTTLResolution(t *testing.T) {
-	unlimited := apidef.DNSDiscoveryConfig{StaleTTL: dnsDiscoveryStaleTTLUnlimited}
-	if got := resolveDNSDiscoveryStaleTTL(unlimited); got != dnsdiscovery.StaleTTLUnlimited {
-		t.Errorf("stale_ttl -1 = %s, want the unlimited sentinel", got)
+	if got := resolveDNSDiscoveryStaleTTL(apidef.DNSDiscoveryConfig{}); got != dnsdiscovery.StaleTTLUnlimited {
+		t.Errorf("empty stale_ttl = %s, want unlimited", got)
 	}
-
-	wantDefault := time.Duration(dnsDiscoveryDefaultStaleTTL) * time.Second
-	if got := resolveDNSDiscoveryStaleTTL(apidef.DNSDiscoveryConfig{}); got != wantDefault {
-		t.Errorf("stale_ttl 0 = %s, want the default %s", got, wantDefault)
-	}
-	if got := resolveDNSDiscoveryStaleTTL(apidef.DNSDiscoveryConfig{StaleTTL: 30}); got != 30*time.Second {
-		t.Errorf("stale_ttl 30 = %s, want 30s", got)
+	if got := resolveDNSDiscoveryStaleTTL(apidef.DNSDiscoveryConfig{StaleTTL: tyktime.ReadableDuration(30 * time.Second)}); got != 30*time.Second {
+		t.Errorf("stale_ttl 30s = %s, want 30s", got)
 	}
 }
 
-func testDrainDeadlineResolution(t *testing.T) {
-	disabled := apidef.DNSDiscoveryConfig{DrainDeadline: 60, DrainDisabled: true}
-	if got := resolveDNSDiscoveryDrainDeadline(disabled); got != dnsDiscoveryDrainDisabled {
-		t.Errorf("drain_disabled = %s, want the disabled sentinel", got)
+func testDrainTimeoutResolution(t *testing.T) {
+	cases := []struct {
+		name     string
+		draining *apidef.ConnectionDrainingConfig
+		want     time.Duration
+	}{
+		{"omitted", nil, dnsDiscoveryDefaultDrainTimeout},
+		{"enabled without a timeout", &apidef.ConnectionDrainingConfig{Enabled: true}, dnsDiscoveryDefaultDrainTimeout},
+		{"enabled with a timeout", &apidef.ConnectionDrainingConfig{Enabled: true, Timeout: tyktime.ReadableDuration(time.Minute)}, time.Minute},
+		{"disabled", &apidef.ConnectionDrainingConfig{Timeout: tyktime.ReadableDuration(time.Minute)}, dnsDiscoveryDrainDisabled},
 	}
 
-	wantDefault := time.Duration(dnsDiscoveryDefaultDrainDeadline) * time.Second
-	if got := resolveDNSDiscoveryDrainDeadline(apidef.DNSDiscoveryConfig{}); got != wantDefault {
-		t.Errorf("drain_deadline 0 = %s, want the default %s", got, wantDefault)
-	}
-	if got := resolveDNSDiscoveryDrainDeadline(apidef.DNSDiscoveryConfig{DrainDeadline: 60}); got != time.Minute {
-		t.Errorf("drain_deadline 60 = %s, want 1m", got)
+	for _, tc := range cases {
+		got := resolveDNSDiscoveryDrainTimeout(apidef.DNSDiscoveryConfig{ConnectionDraining: tc.draining})
+		if got != tc.want {
+			t.Errorf("%s: drain timeout = %s, want %s", tc.name, got, tc.want)
+		}
 	}
 }
 
 func TestResolveDNSDiscoveryPeriods(t *testing.T) {
 	t.Run("refresh interval", testRefreshIntervalResolution)
 	t.Run("stale TTL", testStaleTTLResolution)
-	t.Run("drain deadline", testDrainDeadlineResolution)
+	t.Run("drain timeout", testDrainTimeoutResolution)
 }
 
 func hostAt(t *testing.T, list *apidef.HostList, i int) string {
@@ -211,7 +211,7 @@ func TestPlanUpstreamDNSDiscovery_Accepts(t *testing.T) {
 	spec.Proxy.TargetURL = "h2c://svc:9002"
 	spec.Proxy.EnableLoadBalancing = true
 	spec.Proxy.DNSDiscovery.Enabled = true
-	spec.Proxy.DNSDiscovery.RefreshInterval = 10
+	spec.Proxy.DNSDiscovery.RefreshInterval = tyktime.ReadableDuration(10 * time.Second)
 
 	plan := planUpstreamDNSDiscovery(spec, logger)
 	if plan == nil {
@@ -234,7 +234,7 @@ func TestPlanUpstreamDNSDiscovery_DrainDisabled(t *testing.T) {
 	spec.Proxy.TargetURL = "h2c://svc:9002"
 	spec.Proxy.EnableLoadBalancing = true
 	spec.Proxy.DNSDiscovery.Enabled = true
-	spec.Proxy.DNSDiscovery.DrainDisabled = true
+	spec.Proxy.DNSDiscovery.ConnectionDraining = &apidef.ConnectionDrainingConfig{Enabled: false}
 
 	plan := planUpstreamDNSDiscovery(spec, logrus.NewEntry(logrus.New()))
 	if plan == nil {
@@ -324,7 +324,7 @@ func loadDiscoveredAPI(t *testing.T, gw *Gateway, apiID, target string, configur
 	spec.Proxy.TargetURL = target
 	spec.Proxy.EnableLoadBalancing = true
 	spec.Proxy.DNSDiscovery.Enabled = true
-	spec.Proxy.DNSDiscovery.RefreshInterval = 3600
+	spec.Proxy.DNSDiscovery.RefreshInterval = tyktime.ReadableDuration(time.Hour)
 	for _, fn := range configure {
 		fn(spec)
 	}
@@ -337,7 +337,7 @@ func loadDiscoveredAPI(t *testing.T, gw *Gateway, apiID, target string, configur
 		t.Fatalf("%s was not subscribed to %q", apiID, target)
 	}
 
-	gw.upstreamDNS.Refresh(context.Background())
+	gw.warmUpstreamDNS()
 	return spec
 }
 
@@ -406,12 +406,17 @@ func TestUrlFromDNS_ReusesRenderedListUntilMembershipChanges(t *testing.T) {
 func TestUrlFromDNS_FallsBackToTheConfiguredTarget(t *testing.T) {
 	cases := []struct {
 		name    string
-		prepare func(*stubResolver)
+		refresh bool
+		prepare func(*Gateway, *stubResolver)
 	}{
-		{"nothing resolved yet", nil},
-		{"the name answered with no addresses", func(r *stubResolver) { r.set("svc") }},
-		{"the name does not exist", func(r *stubResolver) {
-			r.fail("svc", &net.DNSError{Err: "no such host", Name: "svc", IsNotFound: true})
+		{"nothing resolved yet", false, func(gw *Gateway, _ *stubResolver) {
+			gw.upstreamDNS.Lookup = func(ctx context.Context, _ string) ([]string, error) {
+				<-ctx.Done()
+				return nil, ctx.Err()
+			}
+		}},
+		{"the resolver was unreachable before any answer", true, func(_ *Gateway, r *stubResolver) {
+			r.fail("svc", errors.New("i/o timeout"))
 		}},
 	}
 
@@ -419,6 +424,7 @@ func TestUrlFromDNS_FallsBackToTheConfiguredTarget(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			resolver := newStubResolver()
 			gw := newDiscoveryGateway(t, resolver)
+			tc.prepare(gw, resolver)
 
 			spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 			spec.APIID = "api-1"
@@ -430,8 +436,7 @@ func TestUrlFromDNS_FallsBackToTheConfiguredTarget(t *testing.T) {
 			logger.Logger.SetLevel(logrus.PanicLevel)
 			gw.setupUpstreamDNSDiscovery(spec, logger)
 
-			if tc.prepare != nil {
-				tc.prepare(resolver)
+			if tc.refresh {
 				gw.upstreamDNS.Refresh(context.Background())
 			}
 
@@ -444,6 +449,35 @@ func TestUrlFromDNS_FallsBackToTheConfiguredTarget(t *testing.T) {
 			}
 			if entry := hostAt(t, list, 0); entry != "h2c://svc:9002" {
 				t.Errorf("fell back to %q, want the configured target", entry)
+			}
+		})
+	}
+}
+
+func TestUrlFromDNS_AnsweredWithNoAddressesHasNoTargets(t *testing.T) {
+	cases := []struct {
+		name    string
+		prepare func(*stubResolver)
+	}{
+		{"the name answered with no addresses", func(r *stubResolver) { r.set("svc") }},
+		{"the name does not exist", func(r *stubResolver) {
+			r.fail("svc", &net.DNSError{Err: "no such host", Name: "svc", IsNotFound: true})
+		}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			resolver := newStubResolver()
+			tc.prepare(resolver)
+			gw := newDiscoveryGateway(t, resolver)
+			spec := loadDiscoveredAPI(t, gw, "api-1", "h2c://svc:9002")
+
+			list, err := gw.urlFromDNS(spec)
+			if err != nil {
+				t.Fatalf("urlFromDNS: %v", err)
+			}
+			if list.Len() != 0 {
+				t.Fatalf("list holds %d entries, want none so requests get the no-healthy-upstreams response", list.Len())
 			}
 		})
 	}
@@ -572,8 +606,7 @@ func TestUpstreamConnRegistry_ReturningAddressCancelsItsDrain(t *testing.T) {
 	}
 }
 
-// Unload has already closed the idle connections, so what is left is busy.
-func TestUpstreamConnRegistry_CloseRetiresWithoutSevering(t *testing.T) {
+func TestUpstreamConnRegistry_RetireKeepsInFlightConnectionsUntilTheTimeout(t *testing.T) {
 	registry := newUpstreamConnRegistry(nil)
 
 	inFlight, inFlightPeer := net.Pipe()
@@ -581,61 +614,127 @@ func TestUpstreamConnRegistry_CloseRetiresWithoutSevering(t *testing.T) {
 	defer inFlight.Close()
 
 	tracked := registry.track("10.0.0.1:9002", inFlight)
-	registry.drain("10.0.0.2:9002", 10*time.Millisecond)
+	registry.retire(80 * time.Millisecond)
 
-	registry.close()
-
-	if closedWithin(t, tracked, 200*time.Millisecond) {
-		t.Error("unloading the API severed a connection that still had a request on it")
+	if closedWithin(t, tracked, 30*time.Millisecond) {
+		t.Fatal("retiring the registry severed a connection that still had a request on it")
 	}
-	if got := registry.countFor("10.0.0.1:9002"); got != 0 {
-		t.Errorf("a closed registry still tracks %d connections", got)
+	if !closedWithin(t, tracked, time.Second) {
+		t.Fatal("a connection held by a retired registry outlived the drain timeout")
 	}
 
-	// An unloaded API cannot leak through a dialler that outlives it.
 	late, latePeer := net.Pipe()
 	defer latePeer.Close()
 	defer late.Close()
 
 	registry.track("10.0.0.3:9002", late)
 	if got := registry.countFor("10.0.0.3:9002"); got != 0 {
-		t.Errorf("a closed registry tracked %d new connections", got)
+		t.Errorf("a retired registry tracked %d new connections", got)
 	}
 }
 
-// Race regression test. Stop cannot take back a fired timer, so a drain
-// expiring as the address is re-dialled has a callback track cannot cancel.
-func TestUpstreamConnRegistry_RedialBeatsAnExpiringDrain(t *testing.T) {
+func TestUpstreamConnRegistry_RetireKeepsPendingDrainsArmed(t *testing.T) {
+	registry := newUpstreamConnRegistry(nil)
+
+	departing, departingPeer := net.Pipe()
+	defer departingPeer.Close()
+
+	tracked := registry.track("10.0.0.1:9002", departing)
+	registry.drain("10.0.0.1:9002", 30*time.Millisecond)
+	registry.retire(time.Hour)
+
+	if !closedWithin(t, tracked, 500*time.Millisecond) {
+		t.Fatal("retiring the registry cancelled a pending drain")
+	}
+}
+
+func TestUpstreamConnRegistries_SupersededReleaseIsIgnored(t *testing.T) {
+	var registries upstreamConnRegistries
+	first, second := new(int), new(int)
+
+	shared := registries.claim("api-1", first, newUpstreamConnRegistry(nil))
+	if got := registries.claim("api-1", second, newUpstreamConnRegistry(nil)); got != shared {
+		t.Fatal("a reload claimed a new registry instead of taking over the existing one")
+	}
+
+	conn, peer := net.Pipe()
+	defer peer.Close()
+	tracked := shared.track("10.0.0.1:9002", conn)
+	defer tracked.Close()
+
+	registries.release("api-1", first, time.Millisecond)
+	if closedWithin(t, tracked, 50*time.Millisecond) {
+		t.Fatal("the superseded copy of the API retired the registry its replacement owns")
+	}
+
+	registries.release("api-1", second, time.Millisecond)
+	if !closedWithin(t, tracked, time.Second) {
+		t.Fatal("releasing the current owner did not bound the connections it held")
+	}
+}
+
+func TestUpstreamConnRegistry_DialAsTheDrainExpiresIsStillDrained(t *testing.T) {
 	const addr = "10.0.0.1:9002"
 
-	closedFresh := 0
-	const attempts = 200
-
-	for i := 0; i < attempts; i++ {
+	for i := 0; i < 50; i++ {
 		registry := newUpstreamConnRegistry(nil)
 
 		departing, departingPeer := net.Pipe()
 		registry.track(addr, departing)
 		registry.drain(addr, 2*time.Millisecond)
 
-		// Re-dial as the deadline arrives, as a returning address does.
 		time.Sleep(2 * time.Millisecond)
-		fresh, freshPeer := net.Pipe()
-		tracked := registry.track(addr, fresh)
+		late, latePeer := net.Pipe()
+		tracked := registry.track(addr, late)
 
-		time.Sleep(10 * time.Millisecond)
-		if closedWithin(t, tracked, 5*time.Millisecond) {
-			closedFresh++
+		if !closedWithin(t, tracked, 100*time.Millisecond) {
+			t.Fatalf("attempt %d: a connection dialled as the drain expired escaped it", i)
 		}
 
 		departingPeer.Close()
-		freshPeer.Close()
-		registry.close()
+		latePeer.Close()
+		registry.retire(0)
+	}
+}
+
+func TestUpstreamConnRegistry_DialAfterTheDrainFiredIsDrained(t *testing.T) {
+	const addr = "10.0.0.1:9002"
+	registry := newUpstreamConnRegistry(nil)
+	defer registry.retire(0)
+
+	departing, departingPeer := net.Pipe()
+	defer departingPeer.Close()
+	registry.track(addr, departing)
+	registry.drain(addr, 10*time.Millisecond)
+	if !closedWithin(t, departing, 200*time.Millisecond) {
+		t.Fatal("the departing connection was not drained")
 	}
 
-	if closedFresh > 0 {
-		t.Errorf("%d of %d connections re-dialled as the drain expired were closed by the drain that "+
-			"track was supposed to have cancelled", closedFresh, attempts)
+	late, latePeer := net.Pipe()
+	defer latePeer.Close()
+	tracked := registry.track(addr, late)
+
+	if !closedWithin(t, tracked, 200*time.Millisecond) {
+		t.Fatal("a connection dialled after the drain fired escaped draining")
+	}
+}
+
+func TestUpstreamConnRegistry_ReturningAddressKeepsLateConnections(t *testing.T) {
+	const addr = "10.0.0.1:9002"
+	registry := newUpstreamConnRegistry(nil)
+	defer registry.retire(0)
+
+	registry.drain(addr, 20*time.Millisecond)
+
+	late, latePeer := net.Pipe()
+	defer latePeer.Close()
+	tracked := registry.track(addr, late)
+	defer tracked.Close()
+
+	registry.cancelDrain(addr)
+
+	if closedWithin(t, tracked, 100*time.Millisecond) {
+		t.Fatal("a connection to an address that returned to DNS was drained")
 	}
 }
 
@@ -661,7 +760,7 @@ func TestPlanDrainsOnMembershipChange(t *testing.T) {
 
 	gw := newDiscoveryGateway(t, resolver)
 	spec := loadDiscoveredAPI(t, gw, "api-1", "h2c://svc:9002", func(spec *APISpec) {
-		spec.Proxy.DNSDiscovery.DrainDeadline = 1
+		spec.Proxy.DNSDiscovery.ConnectionDraining = &apidef.ConnectionDrainingConfig{Enabled: true, Timeout: tyktime.ReadableDuration(1 * time.Second)}
 	})
 
 	plan := spec.dnsDiscovery.Load()
@@ -858,7 +957,7 @@ func TestUpstreamTargetList_SourcePrecedence(t *testing.T) {
 
 // Dead-peer detection. A backend that dies without closing its side leaves a
 // connection the pool believes in, and requests onto it hang.
-func TestH2CTransport_HealthChecksDiscoveredUpstreams(t *testing.T) {
+func TestH2CTransport_SendsNoHealthPings(t *testing.T) {
 	resolver := newStubResolver()
 	resolver.set("svc", "10.0.0.1")
 
@@ -887,9 +986,8 @@ func TestH2CTransport_HealthChecksDiscoveredUpstreams(t *testing.T) {
 		spec := loadDiscoveredAPI(t, gw, "api-1", "h2c://svc:9002")
 
 		rt := newTransport(t, gw, spec)
-		if rt.h2ctransport.ReadIdleTimeout != defaultH2CReadIdleTimeout {
-			t.Errorf("ReadIdleTimeout is %s, want %s: a dead backend would go unnoticed",
-				rt.h2ctransport.ReadIdleTimeout, defaultH2CReadIdleTimeout)
+		if rt.h2ctransport.ReadIdleTimeout != 0 {
+			t.Errorf("ReadIdleTimeout is %s, want 0", rt.h2ctransport.ReadIdleTimeout)
 		}
 		if rt.h2ctransport.IdleConnTimeout != defaultH2CIdleConnTimeout {
 			t.Errorf("IdleConnTimeout is %s, want %s", rt.h2ctransport.IdleConnTimeout, defaultH2CIdleConnTimeout)
@@ -923,7 +1021,7 @@ func TestUrlFromDNS_HoldsTheLastGoodSetWhileTheResolverIsDown(t *testing.T) {
 	gw.upstreamDNS.Now = clock.now
 
 	spec := loadDiscoveredAPI(t, gw, "api-1", "h2c://svc:9002", func(spec *APISpec) {
-		spec.Proxy.DNSDiscovery.StaleTTL = 60
+		spec.Proxy.DNSDiscovery.StaleTTL = tyktime.ReadableDuration(60 * time.Second)
 	})
 
 	resolver.fail("svc", errors.New("i/o timeout"))
@@ -939,7 +1037,6 @@ func TestUrlFromDNS_HoldsTheLastGoodSetWhileTheResolverIsDown(t *testing.T) {
 		t.Fatalf("target list holds %d entries thirty seconds into a sixty second stale TTL, want the 2 already found", list.Len())
 	}
 
-	// Past the bound the API falls back to its configured target.
 	clock.advance(90 * time.Second)
 	gw.upstreamDNS.Refresh(context.Background())
 
@@ -947,11 +1044,33 @@ func TestUrlFromDNS_HoldsTheLastGoodSetWhileTheResolverIsDown(t *testing.T) {
 	if err != nil {
 		t.Fatalf("urlFromDNS: %v", err)
 	}
-	if list.Len() != 1 {
-		t.Fatalf("target list holds %d entries past the stale TTL, want the configured target only", list.Len())
+	if list.Len() != 0 {
+		t.Fatalf("target list holds %d entries past a bounded stale TTL, want none", list.Len())
 	}
-	if entry := hostAt(t, list, 0); entry != "h2c://svc:9002" {
-		t.Errorf("fell back to %q, want the configured target", entry)
+}
+
+func TestUrlFromDNS_KeepsTheLastGoodSetWithoutAStaleTTL(t *testing.T) {
+	resolver := newStubResolver()
+	resolver.set("svc", "10.0.0.1", "10.0.0.2")
+
+	gw := newDiscoveryGateway(t, resolver)
+	clock := newTestClock()
+	gw.upstreamDNS.Now = clock.now
+
+	spec := loadDiscoveredAPI(t, gw, "api-1", "h2c://svc:9002")
+
+	resolver.fail("svc", errors.New("i/o timeout"))
+	for i := 0; i < 5; i++ {
+		clock.advance(time.Hour)
+		gw.upstreamDNS.Refresh(context.Background())
+	}
+
+	list, err := gw.urlFromDNS(spec)
+	if err != nil {
+		t.Fatalf("urlFromDNS: %v", err)
+	}
+	if list.Len() != 2 {
+		t.Fatalf("target list holds %d entries after five hours without a resolver, want the 2 already found", list.Len())
 	}
 }
 
@@ -965,10 +1084,10 @@ func TestPlanDrains_ForEveryAPIOnASharedHostname(t *testing.T) {
 	gw := newDiscoveryGateway(t, resolver)
 
 	first := loadDiscoveredAPI(t, gw, "api-1", "h2c://svc:9002", func(spec *APISpec) {
-		spec.Proxy.DNSDiscovery.DrainDeadline = 1
+		spec.Proxy.DNSDiscovery.ConnectionDraining = &apidef.ConnectionDrainingConfig{Enabled: true, Timeout: tyktime.ReadableDuration(1 * time.Second)}
 	})
 	second := loadDiscoveredAPI(t, gw, "api-2", "h2c://svc:9002", func(spec *APISpec) {
-		spec.Proxy.DNSDiscovery.DrainDeadline = 1
+		spec.Proxy.DNSDiscovery.ConnectionDraining = &apidef.ConnectionDrainingConfig{Enabled: true, Timeout: tyktime.ReadableDuration(1 * time.Second)}
 	})
 
 	firstConn, firstPeer := net.Pipe()
@@ -1015,6 +1134,9 @@ func assertRefusedCombination(t *testing.T, configure func(*APISpec), wantLog st
 	spec.Proxy.EnableLoadBalancing = true
 	spec.Proxy.DNSDiscovery.Enabled = true
 	configure(spec)
+	if spec.Proxy.EnableLoadBalancing {
+		spec.Proxy.StructuredTargetList = apidef.NewHostListFromList(spec.Proxy.Targets)
+	}
 
 	log, hook := logrustest.NewNullLogger()
 	logger := logrus.NewEntry(log)
@@ -1139,5 +1261,34 @@ func TestBuildUpstreamTarget_KeepsTheConfiguredQuery(t *testing.T) {
 	got := buildUpstreamTarget(target, "10.0.0.1", "9002")
 	if want := "h2c://10.0.0.1:9002/base?tenant=acme"; got != want {
 		t.Errorf("buildUpstreamTarget = %q, want %q", got, want)
+	}
+}
+
+func TestWarmUpstreamDNS_FirstRequestSeesResolvedAddresses(t *testing.T) {
+	resolver := newStubResolver()
+	resolver.set("svc", "10.0.0.1", "10.0.0.2")
+	gw := newDiscoveryGateway(t, resolver)
+	gw.upstreamDNS.Lookup = func(ctx context.Context, host string) ([]string, error) {
+		time.Sleep(50 * time.Millisecond)
+		return resolver.lookup(ctx, host)
+	}
+
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	spec.APIID = "api-1"
+	spec.Proxy.TargetURL = "h2c://svc:9002"
+	spec.Proxy.EnableLoadBalancing = true
+	spec.Proxy.DNSDiscovery.Enabled = true
+
+	logger := logrus.NewEntry(logrus.New())
+	logger.Logger.SetLevel(logrus.PanicLevel)
+	gw.setupUpstreamDNSDiscovery(spec, logger)
+	gw.warmUpstreamDNS()
+
+	list, err := gw.urlFromDNS(spec)
+	if err != nil {
+		t.Fatalf("urlFromDNS: %v", err)
+	}
+	if list.Len() != 2 {
+		t.Fatalf("first request saw %d targets, want the 2 resolved at load", list.Len())
 	}
 }

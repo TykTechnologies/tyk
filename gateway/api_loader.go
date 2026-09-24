@@ -1449,6 +1449,8 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 		}()
 	}
 
+	gw.warmUpstreamDNS()
+
 	gw.DefaultProxyMux.swap(muxer, gw)
 
 	var specsToUnload []*APISpec

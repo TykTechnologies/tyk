@@ -6,6 +6,9 @@ import (
 	"net"
 	"sort"
 	"strings"
+	"time"
+
+	"github.com/TykTechnologies/tyk/internal/dnsdiscovery"
 )
 
 type ValidationResult struct {
@@ -231,12 +234,12 @@ var (
 	// ErrInvalidUpstreamOAuthClientAuthMethod is the error to return when the configured upstream OAuth client authentication method is invalid.
 	ErrInvalidUpstreamOAuthClientAuthMethod = errors.New("invalid upstream OAuth client authentication method, valid values are: client_secret_basic, client_secret_post")
 	// ErrAllLoadBalancingTargetsZeroWeight is the error to return when all load balancing targets have weight 0.
-	ErrAllLoadBalancingTargetsZeroWeight   = errors.New("all load balancing targets have weight 0, at least one target must have weight > 0")
-	ErrDNSDiscoveryRequiresLoadBalancing   = errors.New("proxy.dns_discovery supplies the target list but does not distribute across it; proxy.enable_load_balancing must be enabled too")
-	ErrDNSDiscoveryWithServiceDiscovery    = errors.New("proxy.dns_discovery and proxy.service_discovery both supply the target list and cannot be enabled together")
-	ErrDNSDiscoveryNegativeRefreshInterval = errors.New("proxy.dns_discovery.refresh_interval must not be negative; 0 applies the default")
-	ErrDNSDiscoveryInvalidStaleTTL         = errors.New("proxy.dns_discovery.stale_ttl must be -1 or greater; 0 applies the default and -1 never gives up")
-	ErrDNSDiscoveryNegativeDrainDeadline   = errors.New("proxy.dns_discovery.drain_deadline must not be negative; 0 applies the default, and drain_disabled turns draining off")
+	ErrAllLoadBalancingTargetsZeroWeight  = errors.New("all load balancing targets have weight 0, at least one target must have weight > 0")
+	ErrDNSDiscoveryRequiresLoadBalancing  = errors.New("proxy.dns_discovery supplies the target list but does not distribute across it; proxy.enable_load_balancing must be enabled too")
+	ErrDNSDiscoveryWithServiceDiscovery   = errors.New("proxy.dns_discovery and proxy.service_discovery both supply the target list and cannot be enabled together")
+	ErrDNSDiscoveryInvalidRefreshInterval = errors.New("proxy.dns_discovery.refresh_interval must be empty for the 30s default, or at least 5s")
+	ErrDNSDiscoveryNegativeStaleTTL       = errors.New("proxy.dns_discovery.stale_ttl must not be negative; empty keeps the last known addresses until the resolver answers")
+	ErrDNSDiscoveryNegativeDrainTimeout   = errors.New("proxy.dns_discovery.connection_draining.timeout must not be negative; empty applies the 30s default")
 )
 
 // RuleUpstreamAuth implements validations for upstream authentication configurations.
@@ -327,19 +330,20 @@ func (r *RuleDNSDiscovery) Validate(apiDef *APIDefinition, validationResult *Val
 		validationResult.AppendError(ErrDNSDiscoveryWithServiceDiscovery)
 	}
 
-	// Zero means "use the default" throughout; stale_ttl also takes -1 for unbounded.
-	for _, check := range []struct {
-		seconds int64
-		floor   int64
-		err     error
-	}{
-		{apiDef.Proxy.DNSDiscovery.RefreshInterval, 0, ErrDNSDiscoveryNegativeRefreshInterval},
-		{apiDef.Proxy.DNSDiscovery.StaleTTL, -1, ErrDNSDiscoveryInvalidStaleTTL},
-		{apiDef.Proxy.DNSDiscovery.DrainDeadline, 0, ErrDNSDiscoveryNegativeDrainDeadline},
-	} {
-		if check.seconds < check.floor {
-			validationResult.IsValid = false
-			validationResult.AppendError(check.err)
-		}
+	conf := apiDef.Proxy.DNSDiscovery
+
+	if conf.RefreshInterval < 0 || (conf.RefreshInterval > 0 && time.Duration(conf.RefreshInterval) < dnsdiscovery.MinInterval) {
+		validationResult.IsValid = false
+		validationResult.AppendError(ErrDNSDiscoveryInvalidRefreshInterval)
+	}
+
+	if conf.StaleTTL < 0 {
+		validationResult.IsValid = false
+		validationResult.AppendError(ErrDNSDiscoveryNegativeStaleTTL)
+	}
+
+	if conf.ConnectionDraining != nil && conf.ConnectionDraining.Timeout < 0 {
+		validationResult.IsValid = false
+		validationResult.AppendError(ErrDNSDiscoveryNegativeDrainTimeout)
 	}
 }

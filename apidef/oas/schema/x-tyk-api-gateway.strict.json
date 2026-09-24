@@ -3045,19 +3045,28 @@
           "type": "boolean"
         },
         "refreshInterval": {
-          "type": "integer",
-          "minimum": 0
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
         },
         "staleTTL": {
-          "type": "integer",
-          "minimum": -1
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
         },
-        "drainDeadline": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "drainDisabled": {
+        "connectionDraining": {
+          "$ref": "#/definitions/X-Tyk-ConnectionDraining"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
+    "X-Tyk-ConnectionDraining": {
+      "type": "object",
+      "properties": {
+        "enabled": {
           "type": "boolean"
+        },
+        "timeout": {
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
         }
       },
       "required": [

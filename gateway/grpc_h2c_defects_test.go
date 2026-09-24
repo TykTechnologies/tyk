@@ -21,6 +21,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -537,7 +538,7 @@ func TestH2C_Upstream_RoundRobin_Distributes(t *testing.T) {
 				// Discovery supplies the list, load balancing spreads it.
 				spec.Proxy.EnableLoadBalancing = tc.enabled
 				spec.Proxy.DNSDiscovery.Enabled = tc.enabled
-				spec.Proxy.DNSDiscovery.RefreshInterval = 10
+				spec.Proxy.DNSDiscovery.RefreshInterval = tyktime.ReadableDuration(10 * time.Second)
 			})
 
 			for i := 0; i < requests; i++ {

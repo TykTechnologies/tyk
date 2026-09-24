@@ -44,8 +44,8 @@ type Upstream struct {
 	// Tyk classic API definition: `proxy.enable_load_balancing` and `proxy.targets`.
 	LoadBalancing *LoadBalancing `bson:"loadBalancing,omitempty" json:"loadBalancing,omitempty"`
 
-	// DNSDiscovery contains the configuration for sourcing this upstream's
-	// target list from DNS.
+	// DNSDiscovery sources this upstream's target list by resolving the hostname
+	// in `url`. Only supported for `h2c://` upstreams.
 	// Tyk classic API definition: `proxy.dns_discovery`.
 	DNSDiscovery *DNSDiscovery `bson:"dnsDiscovery,omitempty" json:"dnsDiscovery,omitempty"`
 
@@ -318,51 +318,77 @@ func (u *Upstream) loadBalancingExtractTo(api *apidef.APIDefinition) {
 }
 
 // DNSDiscovery sources this upstream's target list from DNS, by resolving the
-// hostname in `url`. It requires `loadBalancing.enabled` and cannot be
-// combined with `serviceDiscovery`.
+// hostname in `url`. Only supported for `h2c://` upstreams. It requires
+// `loadBalancing.enabled` and cannot be combined with `serviceDiscovery`.
 //
 // Tyk classic API definition: `proxy.dns_discovery`.
 type DNSDiscovery struct {
 	// Enabled determines if DNS discovery is active.
 	// Tyk classic API definition: `proxy.dns_discovery.enabled`.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
-	// RefreshInterval is how often, in seconds, the hostname is re-resolved.
-	// Zero applies the default of 30, with a floor of 5. The hostname is
-	// resolved as `url` spells it; an absolute name, with a trailing dot,
-	// costs four times fewer queries per refresh in Kubernetes.
+	// RefreshInterval is how often the hostname is re-resolved, as a duration
+	// such as `30s`. Empty or zero applies the default of 30s; the minimum is 5s.
+	// The hostname is resolved as `url` spells it; an absolute name, with a
+	// trailing dot, costs four times fewer queries per refresh in Kubernetes.
 	// Tyk classic API definition: `proxy.dns_discovery.refresh_interval`.
-	RefreshInterval int64 `bson:"refreshInterval,omitempty" json:"refreshInterval,omitempty"`
-	// StaleTTL is how long, in seconds, the last known good addresses are used
-	// while the resolver is unreachable. Zero applies the default of 300, and
-	// -1 never gives up on them.
+	RefreshInterval time.ReadableDuration `bson:"refreshInterval,omitempty" json:"refreshInterval,omitempty"`
+	// StaleTTL is how long the last known good addresses are used while the
+	// resolver is unreachable, as a duration such as `5m`. Empty or zero keeps
+	// them for as long as the resolver stays down.
+	// The value applies to the hostname, not to the API: every API resolving
+	// the same hostname shares one lookup, the longest stale TTL among them is
+	// used, and an unlimited value on any of them makes it unlimited for all.
 	// Tyk classic API definition: `proxy.dns_discovery.stale_ttl`.
-	StaleTTL int64 `bson:"staleTTL,omitempty" json:"staleTTL,omitempty"`
-	// DrainDeadline is how long, in seconds, connections to a departed address
-	// stay open. Zero applies the default of 30.
-	// Tyk classic API definition: `proxy.dns_discovery.drain_deadline`.
-	DrainDeadline int64 `bson:"drainDeadline,omitempty" json:"drainDeadline,omitempty"`
-	// DrainDisabled overrides DrainDeadline, leaving connections to a departed
-	// address to the connection pool's idle timeout instead of closing them.
-	// Tyk classic API definition: `proxy.dns_discovery.drain_disabled`.
-	DrainDisabled bool `bson:"drainDisabled,omitempty" json:"drainDisabled,omitempty"`
+	StaleTTL time.ReadableDuration `bson:"staleTTL,omitempty" json:"staleTTL,omitempty"`
+	// ConnectionDraining closes connections to an address that has left DNS.
+	// Omitted, draining is on with a 30s timeout.
+	// Tyk classic API definition: `proxy.dns_discovery.connection_draining`.
+	ConnectionDraining *ConnectionDraining `bson:"connectionDraining,omitempty" json:"connectionDraining,omitempty"`
+}
+
+// ConnectionDraining controls how connections to an address that has left DNS
+// are closed.
+//
+// Tyk classic API definition: `proxy.dns_discovery.connection_draining`.
+type ConnectionDraining struct {
+	// Enabled closes connections to a departed address once Timeout has passed.
+	// When false, they are left to the connection pool's idle timeout.
+	// Tyk classic API definition: `proxy.dns_discovery.connection_draining.enabled`.
+	Enabled bool `bson:"enabled" json:"enabled"` // required
+	// Timeout is how long connections to a departed address stay open, as a
+	// duration such as `30s`. Empty or zero applies the default of 30s.
+	// Tyk classic API definition: `proxy.dns_discovery.connection_draining.timeout`.
+	Timeout time.ReadableDuration `bson:"timeout,omitempty" json:"timeout,omitempty"`
 }
 
 // Fill populates the DNSDiscovery structure from the classic API definition.
 func (d *DNSDiscovery) Fill(api apidef.APIDefinition) {
-	d.Enabled = api.Proxy.DNSDiscovery.Enabled
-	d.RefreshInterval = api.Proxy.DNSDiscovery.RefreshInterval
-	d.StaleTTL = api.Proxy.DNSDiscovery.StaleTTL
-	d.DrainDeadline = api.Proxy.DNSDiscovery.DrainDeadline
-	d.DrainDisabled = api.Proxy.DNSDiscovery.DrainDisabled
+	conf := api.Proxy.DNSDiscovery
+	d.Enabled = conf.Enabled
+	d.RefreshInterval = conf.RefreshInterval
+	d.StaleTTL = conf.StaleTTL
+	d.ConnectionDraining = nil
+	if conf.ConnectionDraining != nil {
+		d.ConnectionDraining = &ConnectionDraining{
+			Enabled: conf.ConnectionDraining.Enabled,
+			Timeout: conf.ConnectionDraining.Timeout,
+		}
+	}
 }
 
 // ExtractTo copies the DNSDiscovery structure into the classic API definition.
 func (d *DNSDiscovery) ExtractTo(api *apidef.APIDefinition) {
-	api.Proxy.DNSDiscovery.Enabled = d.Enabled
-	api.Proxy.DNSDiscovery.RefreshInterval = d.RefreshInterval
-	api.Proxy.DNSDiscovery.StaleTTL = d.StaleTTL
-	api.Proxy.DNSDiscovery.DrainDeadline = d.DrainDeadline
-	api.Proxy.DNSDiscovery.DrainDisabled = d.DrainDisabled
+	conf := &api.Proxy.DNSDiscovery
+	conf.Enabled = d.Enabled
+	conf.RefreshInterval = d.RefreshInterval
+	conf.StaleTTL = d.StaleTTL
+	conf.ConnectionDraining = nil
+	if d.ConnectionDraining != nil {
+		conf.ConnectionDraining = &apidef.ConnectionDrainingConfig{
+			Enabled: d.ConnectionDraining.Enabled,
+			Timeout: d.ConnectionDraining.Timeout,
+		}
+	}
 }
 
 func (u *Upstream) fillDNSDiscovery(api apidef.APIDefinition) {

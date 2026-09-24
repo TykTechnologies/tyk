@@ -22,6 +22,8 @@ const (
 
 	// Unreachable means the last good set is older than the stale TTL.
 	Unreachable
+
+	Unresolved
 )
 
 // String implements fmt.Stringer.
@@ -35,6 +37,8 @@ func (o Outcome) String() string {
 		return "not_found"
 	case Unreachable:
 		return "unreachable"
+	case Unresolved:
+		return "unresolved"
 	default:
 		return "unknown"
 	}

@@ -255,7 +255,11 @@ func (gw *Gateway) upstreamTargetList(spec *APISpec, logger *logrus.Entry) *apid
 		return list
 
 	default:
-		return spec.Proxy.StructuredTargetList
+		list := spec.Proxy.StructuredTargetList
+		if spec.Proxy.DNSDiscovery.Enabled && (list == nil || list.Len() == 0) {
+			return nil
+		}
+		return list
 	}
 }
 
@@ -991,6 +995,7 @@ func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config,
 type TykRoundTripper struct {
 	transport    *http.Transport
 	h2ctransport *http2.Transport
+	h2cUnowned   *http2.Transport
 	logger       *logrus.Entry
 	Gw           *Gateway `json:"-"`
 
@@ -1001,43 +1006,56 @@ type TykRoundTripper struct {
 	retired atomic.Bool
 }
 
-const (
-	defaultH2CIdleConnTimeout = 90 * time.Second
-
-	defaultH2CReadIdleTimeout = 30 * time.Second
-)
+const defaultH2CIdleConnTimeout = 90 * time.Second
 
 var errTransportRetired = errors.New("upstream transport retired")
 
 func newH2CRoundTripper(spec *APISpec, transport *http.Transport, logger *logrus.Entry, gw *Gateway) *TykRoundTripper {
 	rt := &TykRoundTripper{transport: transport, logger: logger, Gw: gw}
 
-	rt.h2ctransport = &http2.Transport{
-		// Pretend to dial TLS through the HTTP/1 dialler, so h2c keeps its settings.
-		DialTLSContext: func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
-			if rt.retired.Load() {
-				return nil, errTransportRetired
-			}
+	dial := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		if rt.retired.Load() {
+			return nil, errTransportRetired
+		}
+		return transport.DialContext(ctx, network, addr)
+	}
 
-			conn, err := transport.DialContext(ctx, network, addr)
-			if err != nil {
-				return nil, err
-			}
+	// Pretend to dial TLS through the HTTP/1 dialler, so h2c keeps its settings.
+	rt.h2ctransport = newH2CTransport(func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
+		conn, err := dial(ctx, network, addr)
+		if err != nil {
+			return nil, err
+		}
 
-			// Looked up per dial, so a reload hands new connections to the live registry.
-			return upstreamDrainRegistry(spec).track(addr, conn), nil
-		},
-		AllowHTTP: true,
+		// Looked up per dial, so a reload hands new connections to the live registry.
+		registry := upstreamDrainRegistry(spec)
+		if registry == nil {
+			return conn, nil
+		}
+		return registry.track(upstreamPeerKey(conn, addr), conn), nil
+	})
+	rt.h2cUnowned = newH2CTransport(func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
+		return dial(ctx, network, addr)
+	})
+
+	return rt
+}
+
+func newH2CTransport(dial func(context.Context, string, string, *tls.Config) (net.Conn, error)) *http2.Transport {
+	return &http2.Transport{
+		DialTLSContext: dial,
+		AllowHTTP:      true,
 		// Without this, ClientConns never self-close and readLoop pins them.
 		IdleConnTimeout: defaultH2CIdleConnTimeout,
 	}
+}
 
-	// A backend dying without closing its side leaves requests hanging.
-	if upstreamDNSDiscoveryEnabled(spec) {
-		rt.h2ctransport.ReadIdleTimeout = defaultH2CReadIdleTimeout
+func (rt *TykRoundTripper) h2cFor(r *http.Request) *http2.Transport {
+	mark, marked := r.Context().Value(h2cUpstreamKey{}).(upstreamMark)
+	if marked && !mark.discovered && rt.h2cUnowned != nil {
+		return rt.h2cUnowned
 	}
-
-	return rt
+	return rt.h2ctransport
 }
 
 // Retire covers both transports: closing only rt.transport leaves h2c open. A
@@ -1053,6 +1071,9 @@ func (rt *TykRoundTripper) Retire() {
 	}
 	if rt.h2ctransport != nil {
 		rt.h2ctransport.CloseIdleConnections()
+	}
+	if rt.h2cUnowned != nil {
+		rt.h2cUnowned.CloseIdleConnections()
 	}
 }
 
@@ -1071,13 +1092,34 @@ func (rt *TykRoundTripper) Shutdown() {
 // h2cUpstreamKey carries the transport choice past the scheme rewrite x/net/http2 forces.
 type h2cUpstreamKey struct{}
 
-func markUpstreamScheme(r *http.Request, isH2C bool) {
-	core.SetContext(r, context.WithValue(r.Context(), h2cUpstreamKey{}, isH2C))
+type upstreamMark struct {
+	h2c        bool
+	discovered bool
+}
+
+func withUpstreamMark(ctx context.Context, isH2C, discovered bool) context.Context {
+	return context.WithValue(ctx, h2cUpstreamKey{}, upstreamMark{h2c: isH2C, discovered: discovered})
+}
+
+func markUpstreamScheme(r *http.Request, isH2C, discovered bool) {
+	core.SetContext(r, withUpstreamMark(r.Context(), isH2C, discovered))
 }
 
 func upstreamSchemeMark(r *http.Request) (isH2C, marked bool) {
-	isH2C, marked = r.Context().Value(h2cUpstreamKey{}).(bool)
-	return isH2C, marked
+	mark, marked := r.Context().Value(h2cUpstreamKey{}).(upstreamMark)
+	return mark.h2c, marked
+}
+
+func upstreamPeerKey(conn net.Conn, addr string) string {
+	remote := conn.RemoteAddr()
+	if remote == nil {
+		return addr
+	}
+	host, _, err := net.SplitHostPort(remote.String())
+	if err != nil || net.ParseIP(host) == nil {
+		return addr
+	}
+	return remote.String()
 }
 
 func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
@@ -1110,14 +1152,14 @@ func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
 	if rt.Gw.GetConfig().OpenTelemetry.TracesEnabled() {
 		var baseRoundTripper http.RoundTripper = rt.transport
 		if useH2C {
-			baseRoundTripper = rt.h2ctransport
+			baseRoundTripper = rt.h2cFor(r)
 		}
 
 		tr := otel.HTTPRoundTripper(baseRoundTripper)
 		return tr.RoundTrip(r)
 	}
 	if useH2C {
-		return rt.h2ctransport.RoundTrip(r)
+		return rt.h2cFor(r).RoundTrip(r)
 	}
 
 	return rt.transport.RoundTrip(r)
@@ -1510,7 +1552,8 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		outreq.URL.Scheme = "http"
 	}
 	if roundTripper.h2ctransport != nil {
-		markUpstreamScheme(outreq, isH2CUpstream)
+		rewritten := p.TykAPISpec.URLRewriteEnabled && outreq.Context().Value(ctx.RetainHost) == true
+		markUpstreamScheme(outreq, isH2CUpstream, upstreamDNSDiscoveryEnabled(p.TykAPISpec) && !rewritten)
 	}
 
 	if p.TykAPISpec.Proxy.Transport.SSLForceCommonNameCheck || p.Gw.GetConfig().SSLForceCommonNameCheck {

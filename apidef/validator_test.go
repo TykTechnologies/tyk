@@ -726,7 +726,7 @@ func TestRuleLoadBalancingTargets_DNSDiscoveryExemption(t *testing.T) {
 				Proxy: ProxyConfig{
 					TargetURL:           "h2c://my-grpc-svc:9002",
 					EnableLoadBalancing: true,
-					DNSDiscovery:        DNSDiscoveryConfig{Enabled: true, RefreshInterval: 10},
+					DNSDiscovery:        DNSDiscoveryConfig{Enabled: true, RefreshInterval: tyktime.ReadableDuration(10 * time.Second)},
 				},
 			},
 			result: ValidationResult{
@@ -742,7 +742,7 @@ func TestRuleLoadBalancingTargets_DNSDiscoveryExemption(t *testing.T) {
 				Proxy: ProxyConfig{
 					TargetURL:           "h2c://my-grpc-svc:9002",
 					EnableLoadBalancing: true,
-					DNSDiscovery:        DNSDiscoveryConfig{RefreshInterval: 10},
+					DNSDiscovery:        DNSDiscoveryConfig{RefreshInterval: tyktime.ReadableDuration(10 * time.Second)},
 				},
 			},
 			result: ValidationResult{
@@ -851,10 +851,10 @@ func TestDefaultValidationRuleSet_AcceptsDNSDiscovery(t *testing.T) {
 			TargetURL:           "h2c://my-grpc-svc:9002",
 			EnableLoadBalancing: true,
 			DNSDiscovery: DNSDiscoveryConfig{
-				Enabled:         true,
-				RefreshInterval: 10,
-				StaleTTL:        300,
-				DrainDeadline:   30,
+				Enabled:            true,
+				RefreshInterval:    tyktime.ReadableDuration(10 * time.Second),
+				StaleTTL:           tyktime.ReadableDuration(5 * time.Minute),
+				ConnectionDraining: &ConnectionDrainingConfig{Enabled: true, Timeout: tyktime.ReadableDuration(30 * time.Second)},
 			},
 		},
 	}
@@ -879,26 +879,29 @@ func TestRuleDNSDiscovery_NumericBounds(t *testing.T) {
 	}{
 		{"defaults are valid", func(*APIDefinition) {}, nil},
 		{"positive values are valid", func(d *APIDefinition) {
-			d.Proxy.DNSDiscovery.RefreshInterval = 10
-			d.Proxy.DNSDiscovery.StaleTTL = 60
-			d.Proxy.DNSDiscovery.DrainDeadline = 15
+			d.Proxy.DNSDiscovery.RefreshInterval = tyktime.ReadableDuration(10 * time.Second)
+			d.Proxy.DNSDiscovery.StaleTTL = tyktime.ReadableDuration(time.Minute)
+			d.Proxy.DNSDiscovery.ConnectionDraining = &ConnectionDrainingConfig{Enabled: true, Timeout: tyktime.ReadableDuration(15 * time.Second)}
 		}, nil},
-		{"stale_ttl -1 is the unbounded sentinel", func(d *APIDefinition) {
-			d.Proxy.DNSDiscovery.StaleTTL = -1
+		{"refresh_interval at the floor", func(d *APIDefinition) {
+			d.Proxy.DNSDiscovery.RefreshInterval = tyktime.ReadableDuration(5 * time.Second)
 		}, nil},
-		{"drain_disabled needs no sentinel", func(d *APIDefinition) {
-			d.Proxy.DNSDiscovery.DrainDisabled = true
+		{"draining turned off", func(d *APIDefinition) {
+			d.Proxy.DNSDiscovery.ConnectionDraining = &ConnectionDrainingConfig{Enabled: false}
 		}, nil},
 
 		{"negative refresh_interval", func(d *APIDefinition) {
-			d.Proxy.DNSDiscovery.RefreshInterval = -1
-		}, ErrDNSDiscoveryNegativeRefreshInterval},
-		{"stale_ttl below the sentinel", func(d *APIDefinition) {
-			d.Proxy.DNSDiscovery.StaleTTL = -2
-		}, ErrDNSDiscoveryInvalidStaleTTL},
-		{"negative drain_deadline", func(d *APIDefinition) {
-			d.Proxy.DNSDiscovery.DrainDeadline = -1
-		}, ErrDNSDiscoveryNegativeDrainDeadline},
+			d.Proxy.DNSDiscovery.RefreshInterval = tyktime.ReadableDuration(-time.Second)
+		}, ErrDNSDiscoveryInvalidRefreshInterval},
+		{"refresh_interval under the floor", func(d *APIDefinition) {
+			d.Proxy.DNSDiscovery.RefreshInterval = tyktime.ReadableDuration(time.Second)
+		}, ErrDNSDiscoveryInvalidRefreshInterval},
+		{"negative stale_ttl", func(d *APIDefinition) {
+			d.Proxy.DNSDiscovery.StaleTTL = tyktime.ReadableDuration(-time.Second)
+		}, ErrDNSDiscoveryNegativeStaleTTL},
+		{"negative drain timeout", func(d *APIDefinition) {
+			d.Proxy.DNSDiscovery.ConnectionDraining = &ConnectionDrainingConfig{Enabled: true, Timeout: tyktime.ReadableDuration(-time.Second)}
+		}, ErrDNSDiscoveryNegativeDrainTimeout},
 	}
 
 	for _, tc := range tests {
@@ -920,9 +923,9 @@ func TestRuleDNSDiscovery_NumericBounds(t *testing.T) {
 
 	t.Run("nothing is checked while disabled", func(t *testing.T) {
 		def := &APIDefinition{}
-		def.Proxy.DNSDiscovery.RefreshInterval = -99
-		def.Proxy.DNSDiscovery.StaleTTL = -99
-		def.Proxy.DNSDiscovery.DrainDeadline = -99
+		def.Proxy.DNSDiscovery.RefreshInterval = tyktime.ReadableDuration(-time.Second)
+		def.Proxy.DNSDiscovery.StaleTTL = tyktime.ReadableDuration(-time.Second)
+		def.Proxy.DNSDiscovery.ConnectionDraining = &ConnectionDrainingConfig{Timeout: tyktime.ReadableDuration(-time.Second)}
 
 		result := Validate(def, ValidationRuleSet{&RuleDNSDiscovery{}})
 		assert.True(t, result.IsValid)

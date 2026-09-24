@@ -884,3 +884,233 @@ func TestScheduler_StateIsSafeAcrossAReload(t *testing.T) {
 	close(stop)
 	readers.Wait()
 }
+
+func TestScheduler_StaleTTLExpiresBetweenBackedOffLookups(t *testing.T) {
+	resolver := newStubResolver()
+	resolver.set("svc", "10.0.0.1")
+	s := newTestScheduler(resolver)
+
+	start := time.Date(2026, 9, 23, 12, 0, 0, 0, time.UTC)
+	now := start
+	s.Now = func() time.Time { return now }
+
+	sub := subscribeAndRefresh(t, s, "api-1", "svc", Config{Interval: 30 * time.Second, StaleTTL: time.Minute})
+	resolver.fail("svc", errors.New("resolver timeout"))
+
+	for _, at := range []time.Duration{30 * time.Second, 60 * time.Second} {
+		now = start.Add(at)
+		s.refresh(context.Background(), sub.entry)
+	}
+
+	now = start.Add(61 * time.Second)
+	if sub.State().Usable() && s.nextWait() > minWait {
+		t.Fatalf("last good answer is 61s old with stale_ttl=1m, yet %v is still served and the next lookup is %s away",
+			sub.State().Addrs, s.nextWait())
+	}
+}
+
+func TestScheduler_StaleTTLExpiryIsPublishedWithoutALookup(t *testing.T) {
+	resolver := newStubResolver()
+	resolver.set("svc", "10.0.0.1")
+	s := newTestScheduler(resolver)
+
+	start := time.Date(2026, 9, 23, 12, 0, 0, 0, time.UTC)
+	now := start
+	s.Now = func() time.Time { return now }
+
+	var delivered []*State
+	sub := subscribeAndRefresh(t, s, "api-1", "svc", Config{
+		Interval: 30 * time.Second,
+		StaleTTL: 45 * time.Second,
+		OnChange: func(state *State) { delivered = append(delivered, state) },
+	})
+	resolver.fail("svc", errors.New("resolver timeout"))
+
+	now = start.Add(30 * time.Second)
+	s.refresh(context.Background(), sub.entry)
+	if !sub.State().Usable() {
+		t.Fatal("the stale set was dropped before stale_ttl")
+	}
+	lookups := resolver.callsFor("svc")
+
+	now = start.Add(44 * time.Second)
+	if wait := s.nextWait(); wait != time.Second {
+		t.Fatalf("next wake-up in %s, want 1s: the stale deadline, ahead of the next lookup", wait)
+	}
+
+	now = start.Add(45 * time.Second)
+	s.expireStale()
+
+	if state := sub.State(); state.Usable() || state.Outcome != Unreachable {
+		t.Fatalf("state at the stale deadline is %+v, want an unreachable empty set", state)
+	}
+	if last := delivered[len(delivered)-1]; last.Outcome != Unreachable {
+		t.Fatalf("subscriber last saw %+v, want the expiry", last)
+	}
+	if resolver.callsFor("svc") != lookups {
+		t.Fatal("expiry waited on a lookup")
+	}
+}
+
+func TestScheduler_SupersededSubscriptionHearsNothingAfterItsReplacement(t *testing.T) {
+	resolver := newStubResolver()
+	resolver.set("svc-a", "10.0.0.1")
+	resolver.set("svc-b", "10.0.0.2")
+	s := newTestScheduler(resolver)
+	ctx := context.Background()
+
+	var mu sync.Mutex
+	var replaced, late bool
+
+	reloader := func(*State) {
+		mu.Lock()
+		replaced = true
+		mu.Unlock()
+		if _, err := s.Subscribe(ctx, "api-1", Config{Host: "svc-b", OnChange: func(*State) {}}); err != nil {
+			t.Error(err)
+		}
+	}
+	superseded := func(*State) {
+		mu.Lock()
+		defer mu.Unlock()
+		if replaced {
+			late = true
+		}
+	}
+
+	subscribeWith(t, s, "api-2", "svc-a", Config{OnChange: reloader})
+
+	for attempt := 1; attempt <= 64; attempt++ {
+		mu.Lock()
+		replaced = false
+		mu.Unlock()
+
+		sub := subscribeWith(t, s, "api-1", "svc-a", Config{OnChange: superseded})
+		resolver.set("svc-a", fmt.Sprintf("10.0.%d.1", attempt))
+		s.refresh(ctx, sub.entry)
+
+		mu.Lock()
+		hit := late
+		mu.Unlock()
+		if hit {
+			t.Fatalf("attempt %d: api-1's subscription on svc-a received a callback after api-1 had been repointed at svc-b", attempt)
+		}
+	}
+}
+
+func TestScheduler_StaleExpiryDoesNotWaitForALookupBatch(t *testing.T) {
+	resolver := newStubResolver()
+	resolver.set("svc", "10.0.0.1")
+	resolver.set("slow", "10.0.0.9")
+	s := newTestScheduler(resolver)
+
+	var gate sync.Mutex
+	var hold bool
+	entered := make(chan struct{}, 1)
+	release := make(chan struct{})
+	s.Lookup = func(ctx context.Context, host string) ([]string, error) {
+		gate.Lock()
+		blocked := host == "slow" && hold
+		gate.Unlock()
+		if blocked {
+			entered <- struct{}{}
+			select {
+			case <-release:
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+		return resolver.lookup(ctx, host)
+	}
+
+	const interval, staleTTL = 200 * time.Millisecond, 300 * time.Millisecond
+	sub := subscribeWith(t, s, "api-1", "svc", Config{Interval: interval, StaleTTL: staleTTL})
+	subscribeWith(t, s, "api-2", "slow", Config{Interval: interval})
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	defer close(release)
+	go s.run(ctx, make(chan struct{}, 1))
+
+	waitUntil(t, time.Second, func() bool { return sub.State().Usable() && resolver.callsFor("slow") == 1 })
+	resolved := time.Now()
+
+	resolver.fail("svc", errors.New("resolver timeout"))
+	gate.Lock()
+	hold = true
+	gate.Unlock()
+
+	<-entered
+	waitUntil(t, time.Second, func() bool { return resolver.callsFor("svc") == 2 })
+	if !sub.State().Usable() {
+		t.Fatal("the stale set was dropped before stale_ttl")
+	}
+
+	deadline := resolved.Add(staleTTL)
+	for time.Now().Before(deadline.Add(400 * time.Millisecond)) {
+		if !sub.State().Usable() {
+			if late := time.Since(deadline); late > 100*time.Millisecond {
+				t.Fatalf("expiry landed %s after the stale deadline", late)
+			}
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("stale deadline passed %s ago while a lookup for another name was in flight; %v is still published",
+		time.Since(deadline).Round(time.Millisecond), sub.State().Addrs)
+}
+
+func waitUntil(t *testing.T, d time.Duration, cond func() bool) {
+	t.Helper()
+
+	deadline := time.Now().Add(d)
+	for !cond() {
+		if time.Now().After(deadline) {
+			t.Fatal("condition not met in time")
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+func TestScheduler_FailureBeforeAnyAnswerIsUnresolved(t *testing.T) {
+	resolver := newStubResolver()
+	resolver.fail("svc", errors.New("i/o timeout"))
+	s := newTestScheduler(resolver)
+
+	sub := subscribeAndRefresh(t, s, "api-1", "svc", Config{Interval: 10 * time.Second, StaleTTL: time.Minute})
+	if got := sub.State(); got == nil || got.Outcome != Unresolved {
+		t.Fatalf("state after a failure with nothing resolved is %+v, want %s", got, Unresolved)
+	}
+
+	resolver.set("svc", "10.0.0.1")
+	s.refresh(context.Background(), sub.entry)
+	if got := sub.State(); !got.Usable() || got.Outcome != Resolved {
+		t.Fatalf("state after the first answer is %+v, want %s", got, Resolved)
+	}
+}
+
+func TestScheduler_AuthoritativeAbsenceKeepsTheRefreshInterval(t *testing.T) {
+	resolver := newStubResolver()
+	resolver.set("svc", "10.0.0.1")
+	s := newTestScheduler(resolver)
+
+	now := time.Date(2026, 9, 23, 12, 0, 0, 0, time.UTC)
+	s.Now = func() time.Time { return now }
+
+	const interval = 30 * time.Second
+	sub := subscribeAndRefresh(t, s, "api-1", "svc", Config{Interval: interval})
+	resolver.failNotFound("svc")
+
+	for i := 0; i < 6; i++ {
+		now = sub.entry.nextDue
+		s.refresh(context.Background(), sub.entry)
+	}
+	if state := sub.State(); state.Usable() || state.Outcome != NotFound {
+		t.Fatalf("state after six NXDOMAIN answers is %+v, want not found with no addresses", state)
+	}
+
+	resolver.set("svc", "10.0.0.2")
+	if wait := s.nextWait(); wait > interval {
+		t.Fatalf("a resolver answering NXDOMAIN is polled again in %s with refresh_interval %s; the service returning is noticed only then", wait, interval)
+	}
+}

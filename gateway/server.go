@@ -132,7 +132,8 @@ type Gateway struct {
 	reloadMu   sync.Mutex
 
 	// Keyed by hostname, so query volume scales with upstreams, not APIs.
-	upstreamDNS dnsdiscovery.Scheduler
+	upstreamDNS   dnsdiscovery.Scheduler
+	upstreamConns upstreamConnRegistries
 
 	Analytics            RedisAnalyticsHandler
 	GlobalEventsJSVM     JSVM

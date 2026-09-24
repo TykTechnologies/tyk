@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
+	"github.com/TykTechnologies/tyk/internal/time"
 )
 
 //go:embed testdata/*-oas-template.json
@@ -743,7 +744,7 @@ func TestValidateOASObject_DNSDiscovery(t *testing.T) {
 		err := ValidateOASObject(build(Upstream{
 			URL:           "h2c://my-grpc-svc:9002",
 			LoadBalancing: &LoadBalancing{Enabled: true},
-			DNSDiscovery:  &DNSDiscovery{Enabled: true, RefreshInterval: 10},
+			DNSDiscovery:  &DNSDiscovery{Enabled: true, RefreshInterval: ReadableDuration(10 * time.Second)},
 		}), "3.0.3")
 		assert.NoError(t, err)
 	})

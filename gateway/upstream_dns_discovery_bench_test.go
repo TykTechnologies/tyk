@@ -15,6 +15,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/dnsdiscovery"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 )
 
 // The request path runs per proxied request, so it must not resolve, lock, or
@@ -42,7 +43,7 @@ func benchSpec(b *testing.B, gw *Gateway, apiID, target string) *APISpec {
 	spec.Proxy.TargetURL = target
 	spec.Proxy.EnableLoadBalancing = true
 	spec.Proxy.DNSDiscovery.Enabled = true
-	spec.Proxy.DNSDiscovery.RefreshInterval = 3600
+	spec.Proxy.DNSDiscovery.RefreshInterval = tyktime.ReadableDuration(time.Hour)
 
 	logger := logrus.NewEntry(logrus.New())
 	logger.Logger.SetLevel(logrus.PanicLevel)
@@ -320,7 +321,7 @@ func benchSchemeMark(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				markUpstreamScheme(req, true)
+				markUpstreamScheme(req, true, true)
 			}
 		})
 	}
@@ -330,7 +331,7 @@ func benchSchemeRead(b *testing.B) {
 	for _, depth := range benchContextDepths {
 		b.Run(fmt.Sprintf("depth=%d/marked", depth), func(b *testing.B) {
 			req := deepContextRequest(depth)
-			markUpstreamScheme(req, true)
+			markUpstreamScheme(req, true, true)
 
 			b.ReportAllocs()
 			b.ResetTimer()

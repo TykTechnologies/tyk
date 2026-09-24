@@ -642,29 +642,38 @@ type ResponseProcessor struct {
 }
 
 // DNSDiscoveryConfig sources an API's target list by resolving the hostname in
-// `target_url`. Requires `enable_load_balancing`, and cannot be combined with
-// `service_discovery`.
+// `target_url`. Only supported for `h2c://` upstreams. Requires
+// `enable_load_balancing`, and cannot be combined with `service_discovery`.
 type DNSDiscoveryConfig struct {
 	Enabled bool `bson:"enabled" json:"enabled"`
 
-	// RefreshInterval is how often, in seconds, the hostname is re-resolved.
-	// Zero applies the default of 30, with a floor of 5. The hostname is
-	// resolved as `target_url` spells it; an absolute name, with a trailing
-	// dot, costs four times fewer queries per refresh in Kubernetes.
-	RefreshInterval int64 `bson:"refresh_interval" json:"refresh_interval"`
+	// RefreshInterval is how often the hostname is re-resolved, as a duration
+	// such as `30s`. Empty or zero applies the default of 30s; the minimum is 5s.
+	RefreshInterval tyktime.ReadableDuration `bson:"refresh_interval" json:"refresh_interval"`
 
-	// StaleTTL is how long, in seconds, the last known good addresses are used
-	// while the resolver is unreachable. Zero applies the default of 300, and
-	// -1 never gives up on them.
-	StaleTTL int64 `bson:"stale_ttl" json:"stale_ttl"`
+	// StaleTTL is how long the last known good addresses are used while the
+	// resolver is unreachable, as a duration such as `5m`. Empty or zero keeps
+	// them for as long as the resolver stays down.
+	// The value applies to the hostname, not to the API: every API resolving
+	// the same hostname shares one lookup, the longest stale TTL among them is
+	// used, and an unlimited value on any of them makes it unlimited for all.
+	StaleTTL tyktime.ReadableDuration `bson:"stale_ttl" json:"stale_ttl"`
 
-	// DrainDeadline is how long, in seconds, connections to a departed address
-	// stay open. Zero applies the default of 30.
-	DrainDeadline int64 `bson:"drain_deadline" json:"drain_deadline"`
+	// ConnectionDraining closes connections to an address that has left DNS.
+	// Omitted, draining is on with a 30s timeout.
+	ConnectionDraining *ConnectionDrainingConfig `bson:"connection_draining,omitempty" json:"connection_draining,omitempty"`
+}
 
-	// DrainDisabled overrides DrainDeadline, leaving connections to a departed
-	// address to the connection pool's idle timeout instead of closing them.
-	DrainDisabled bool `bson:"drain_disabled" json:"drain_disabled"`
+// ConnectionDrainingConfig controls how connections to an address that has
+// left DNS are closed.
+type ConnectionDrainingConfig struct {
+	// Enabled closes connections to a departed address once Timeout has passed.
+	// When false, they are left to the connection pool's idle timeout.
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// Timeout is how long connections to a departed address stay open, as a
+	// duration such as `30s`. Empty or zero applies the default of 30s.
+	Timeout tyktime.ReadableDuration `bson:"timeout" json:"timeout"`
 }
 
 type ServiceDiscoveryConfiguration struct {
@@ -1123,8 +1132,10 @@ type ProxyConfig struct {
 	StructuredTargetList        *HostList                     `bson:"-" json:"-"`
 	CheckHostAgainstUptimeTests bool                          `bson:"check_host_against_uptime_tests" json:"check_host_against_uptime_tests"`
 	ServiceDiscovery            ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
-	DNSDiscovery                DNSDiscoveryConfig            `bson:"dns_discovery" json:"dns_discovery"`
-	Transport                   struct {
+	// DNSDiscovery sources the target list by resolving the hostname in
+	// `target_url`. Only supported for `h2c://` upstreams.
+	DNSDiscovery DNSDiscoveryConfig `bson:"dns_discovery" json:"dns_discovery"`
+	Transport    struct {
 		SSLInsecureSkipVerify   bool     `bson:"ssl_insecure_skip_verify" json:"ssl_insecure_skip_verify"`
 		SSLCipherSuites         []string `bson:"ssl_ciphers" json:"ssl_ciphers"`
 		SSLMinVersion           uint16   `bson:"ssl_min_version" json:"ssl_min_version"`

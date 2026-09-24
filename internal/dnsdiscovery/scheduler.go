@@ -92,6 +92,9 @@ type Scheduler struct {
 	Jitter func(time.Duration) time.Duration
 
 	lookups atomic.Int64
+
+	slotsOnce sync.Once
+	slots     chan struct{}
 }
 
 // aggregates folds one name's subscribers into the shortest interval and longest stale TTL.
@@ -155,6 +158,7 @@ type Subscription struct {
 	// Keep the subscriber's view monotonic: a refresh can overtake Subscribe.
 	notifyMu    sync.Mutex
 	lastVersion uint64
+	quiesced    bool
 }
 
 // State returns the published address set, or nil before the first resolution.
@@ -189,12 +193,21 @@ func (s *Subscription) deliver(state *State) {
 	s.notifyMu.Lock()
 	defer s.notifyMu.Unlock()
 
-	if state.Version <= s.lastVersion {
+	if s.quiesced || state.Version <= s.lastVersion {
 		return
 	}
 	s.lastVersion = state.Version
 
 	s.onChange(state)
+}
+
+func (s *Subscription) quiesce() {
+	if s == nil {
+		return
+	}
+	s.notifyMu.Lock()
+	s.quiesced = true
+	s.notifyMu.Unlock()
 }
 
 // NormaliseInterval applies the default and the floor.
@@ -250,7 +263,8 @@ func (s *Scheduler) Subscribe(ctx context.Context, key string, cfg Config) (*Sub
 	s.addSubLocked(e, sub)
 
 	// Attach before releasing what it supersedes, or a reload drops the entry.
-	if previous, ok := s.subs[key]; ok {
+	previous, superseded := s.subs[key]
+	if superseded {
 		delete(s.subs, key)
 		s.detachLocked(previous)
 	}
@@ -262,6 +276,9 @@ func (s *Scheduler) Subscribe(ctx context.Context, key string, cfg Config) (*Sub
 	s.ensureRunningLocked(ctx)
 	s.mu.Unlock()
 
+	if superseded {
+		previous.quiesce()
+	}
 	sub.deliver(current)
 
 	return sub, nil
@@ -270,14 +287,16 @@ func (s *Scheduler) Subscribe(ctx context.Context, key string, cfg Config) (*Sub
 // ReleaseKey drops the subscription registered under key.
 func (s *Scheduler) ReleaseKey(key string) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	sub, ok := s.subs[key]
 	if !ok {
+		s.mu.Unlock()
 		return
 	}
 	delete(s.subs, key)
 	s.detachLocked(sub)
+	s.mu.Unlock()
+
+	sub.quiesce()
 }
 
 // Refresh resolves every name not already in flight, on the calling goroutine.
@@ -289,6 +308,7 @@ func (s *Scheduler) Refresh(ctx context.Context) {
 	}
 	s.mu.Unlock()
 
+	s.expireStale()
 	s.refreshAll(ctx, all)
 }
 
@@ -304,7 +324,20 @@ func (s *Scheduler) timeNow() time.Time {
 	return time.Now()
 }
 
+func (s *Scheduler) lookupSlots() chan struct{} {
+	s.slotsOnce.Do(func() { s.slots = make(chan struct{}, maxConcurrentLookups) })
+	return s.slots
+}
+
 func (s *Scheduler) resolve(ctx context.Context, host string) ([]string, error) {
+	slots := s.lookupSlots()
+	select {
+	case slots <- struct{}{}:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	defer func() { <-slots }()
+
 	s.lookups.Add(1)
 
 	ctx, cancel := context.WithTimeout(ctx, LookupTimeout)
@@ -354,13 +387,15 @@ func (s *Scheduler) nextBackoff(base time.Duration, failures int) time.Duration 
 
 func (s *Scheduler) release(sub *Subscription) {
 	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	if current, ok := s.subs[sub.key]; !ok || current != sub {
+		s.mu.Unlock()
 		return
 	}
 	delete(s.subs, sub.key)
 	s.detachLocked(sub)
+	s.mu.Unlock()
+
+	sub.quiesce()
 }
 
 func (s *Scheduler) detachLocked(sub *Subscription) {
@@ -475,6 +510,7 @@ func (s *Scheduler) run(ctx context.Context, wake chan struct{}) {
 	}()
 
 	for {
+		s.expireStale()
 		s.refreshAll(ctx, s.dueEntries())
 
 		select {
@@ -514,7 +550,11 @@ func (s *Scheduler) nextWait() time.Duration {
 	now := s.timeNow()
 	wait := time.Duration(-1)
 	for _, e := range s.entries {
-		remaining := e.nextDue.Sub(now)
+		due := e.nextDue
+		if deadline, ok := e.staleDeadline(); ok && deadline.Before(due) {
+			due = deadline
+		}
+		remaining := due.Sub(now)
 		if remaining < 0 {
 			remaining = 0
 		}
@@ -550,6 +590,68 @@ func (s *Scheduler) refresh(ctx context.Context, e *entry) {
 	}
 
 	addrs, err := s.resolve(ctx, e.host)
+	s.apply(e, addrs, err)
+}
+
+// Warm resolves every name not yet published and returns those still unresolved when ctx is done.
+func (s *Scheduler) Warm(ctx context.Context) []string {
+	s.mu.Lock()
+	var cold []*entry
+	for _, e := range s.entries {
+		if e.published.Load() == nil {
+			cold = append(cold, e)
+		}
+	}
+	s.mu.Unlock()
+
+	group := new(errgroup.Group)
+	group.SetLimit(lookupConcurrency(len(cold)))
+	for _, e := range cold {
+		if ctx.Err() != nil {
+			break
+		}
+		group.Go(func() error {
+			s.warm(ctx, e)
+			return nil
+		})
+	}
+	_ = group.Wait()
+
+	var unresolved []string
+	for _, e := range cold {
+		if e.published.Load() == nil {
+			unresolved = append(unresolved, e.host)
+		}
+	}
+	return unresolved
+}
+
+func (s *Scheduler) warm(ctx context.Context, e *entry) {
+	for e.published.Load() == nil {
+		if e.refreshMu.TryLock() {
+			if e.published.Load() != nil {
+				e.refreshMu.Unlock()
+				return
+			}
+
+			addrs, err := s.resolve(ctx, e.host)
+			if err != nil && ctx.Err() != nil {
+				e.refreshMu.Unlock()
+				return
+			}
+			s.apply(e, addrs, err)
+			return
+		}
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(minWait):
+		}
+	}
+}
+
+func (s *Scheduler) apply(e *entry, addrs []string, err error) {
 	addrs = Normalise(addrs)
 
 	s.mu.Lock()
@@ -560,9 +662,12 @@ func (s *Scheduler) refresh(ctx context.Context, e *entry) {
 
 	var published *State
 	var notify []*Subscription
-	if err == nil {
-		published, notify = s.applyAnswerLocked(e, base, addrs)
-	} else {
+	switch {
+	case err == nil:
+		published, notify = s.applyAnswerLocked(e, base, addrs, Empty)
+	case isNameNotFound(err):
+		published, notify = s.applyAnswerLocked(e, base, nil, NotFound)
+	default:
 		published, notify = s.applyFailureLocked(e, base, err)
 	}
 	s.mu.Unlock()
@@ -575,7 +680,7 @@ func (s *Scheduler) refresh(ctx context.Context, e *entry) {
 	}
 }
 
-func (s *Scheduler) applyAnswerLocked(e *entry, base time.Duration, addrs []string) (*State, []*Subscription) {
+func (s *Scheduler) applyAnswerLocked(e *entry, base time.Duration, addrs []string, absent Outcome) (*State, []*Subscription) {
 	e.failures = 0
 	e.lastSuccess = s.timeNow()
 	e.nextDue = e.lastSuccess.Add(s.nextRefresh(base))
@@ -586,7 +691,7 @@ func (s *Scheduler) applyAnswerLocked(e *entry, base time.Duration, addrs []stri
 	}
 
 	if e.confirmEmpty() {
-		return s.publishLocked(e, nil, Empty)
+		return s.publishLocked(e, nil, absent)
 	}
 	return nil, nil
 }
@@ -598,26 +703,56 @@ func (s *Scheduler) applyFailureLocked(e *entry, base time.Duration, err error) 
 	e.nextDue = now.Add(s.nextBackoff(base, e.failures))
 
 	switch {
-	case isNameNotFound(err):
-		if e.confirmEmpty() {
-			return s.publishLocked(e, nil, NotFound)
-		}
-
 	// Nothing published yet, so no stale set to bound.
 	case e.published.Load() == nil:
-		return s.publishLocked(e, nil, Unreachable)
+		return s.publishLocked(e, nil, Unresolved)
 
-	case e.staleTTL > 0 && !e.lastSuccess.IsZero() && now.Sub(e.lastSuccess) > e.staleTTL:
+	case e.staleTTL > 0 && !e.lastSuccess.IsZero() && now.Sub(e.lastSuccess) >= e.staleTTL:
 		return s.publishLocked(e, nil, Unreachable)
 	}
 	return nil, nil
+}
+
+func (e *entry) staleDeadline() (time.Time, bool) {
+	if e.failures == 0 || e.staleTTL <= 0 || e.lastSuccess.IsZero() || !e.published.Load().Usable() {
+		return time.Time{}, false
+	}
+	return e.lastSuccess.Add(e.staleTTL), true
+}
+
+func (s *Scheduler) expireStale() {
+	type expiry struct {
+		state *State
+		subs  []*Subscription
+	}
+
+	now := s.timeNow()
+	var expired []expiry
+
+	s.mu.Lock()
+	for _, e := range s.entries {
+		deadline, ok := e.staleDeadline()
+		if !ok || now.Before(deadline) {
+			continue
+		}
+		if state, subs := s.publishLocked(e, nil, Unreachable); state != nil {
+			expired = append(expired, expiry{state: state, subs: subs})
+		}
+	}
+	s.mu.Unlock()
+
+	for _, x := range expired {
+		for _, sub := range x.subs {
+			sub.deliver(x.state)
+		}
+	}
 }
 
 func (e *entry) confirmEmpty() bool {
 	if e.emptyAnswers < EmptyAnswerThreshold {
 		e.emptyAnswers++
 	}
-	return e.emptyAnswers >= EmptyAnswerThreshold || e.published.Load() == nil
+	return e.emptyAnswers >= EmptyAnswerThreshold || !e.published.Load().Usable()
 }
 
 func (s *Scheduler) publishLocked(e *entry, addrs []string, outcome Outcome) (*State, []*Subscription) {
