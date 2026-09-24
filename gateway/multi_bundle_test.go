@@ -495,3 +495,221 @@ func TestParseBundleNames(t *testing.T) {
 	assert.Equal(t, []string{"a.zip"}, parseBundleNames("a.zip,"))
 	assert.Nil(t, parseBundleNames(", , "))
 }
+
+// TestMergeBundleManifestTrafficLogs covers the multi-bundle handling of the
+// traffic_logs (analytics plugin) hook, which the single-bundle path wires up
+// in Bundle.AddToSpec. TT-18097: before this, mergeBundleManifest dropped it
+// silently and spec.AnalyticsPlugin never got enabled.
+func TestMergeBundleManifestTrafficLogs(t *testing.T) {
+	t.Run("single bundle declares it", func(t *testing.T) {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+
+		a := &apidef.BundleManifest{
+			CustomMiddleware: apidef.MiddlewareSection{
+				Driver: apidef.GoPluginDriver,
+				Pre:    []apidef.MiddlewareDefinition{{Name: "preA", Path: "plugin.so"}},
+			},
+		}
+		b := &apidef.BundleManifest{
+			CustomMiddleware: apidef.MiddlewareSection{
+				Driver:      apidef.GoPluginDriver,
+				TrafficLogs: apidef.MiddlewareDefinition{Name: "AnalyticsB", Path: "analytics.so"},
+			},
+		}
+
+		require.NoError(t, mergeBundleManifest(spec, a, "bundle-a", "bundle-a.zip"))
+		require.NoError(t, mergeBundleManifest(spec, b, "bundle-b", "bundle-b.zip"))
+
+		assert.True(t, spec.AnalyticsPlugin.Enabled)
+		assert.Equal(t, "AnalyticsB", spec.AnalyticsPlugin.FuncName)
+		assert.Equal(t, filepath.Join("bundle-b", "analytics.so"), spec.AnalyticsPlugin.PluginPath)
+
+		// The merged middleware section carries the rewritten hook as well,
+		// so the manifest and the analytics config agree on the path.
+		assert.Equal(t, "AnalyticsB", spec.CustomMiddleware.TrafficLogs.Name)
+		assert.Equal(t, filepath.Join("bundle-b", "analytics.so"), spec.CustomMiddleware.TrafficLogs.Path)
+	})
+
+	t.Run("duplicate declaration is rejected", func(t *testing.T) {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+
+		a := &apidef.BundleManifest{
+			CustomMiddleware: apidef.MiddlewareSection{
+				Driver:      apidef.GoPluginDriver,
+				TrafficLogs: apidef.MiddlewareDefinition{Name: "AnalyticsA", Path: "analytics.so"},
+			},
+		}
+		b := &apidef.BundleManifest{
+			CustomMiddleware: apidef.MiddlewareSection{
+				Driver:      apidef.GoPluginDriver,
+				TrafficLogs: apidef.MiddlewareDefinition{Name: "AnalyticsB", Path: "analytics.so"},
+			},
+		}
+
+		require.NoError(t, mergeBundleManifest(spec, a, "bundle-a", "bundle-a.zip"))
+		err := mergeBundleManifest(spec, b, "bundle-b", "bundle-b.zip")
+		require.Error(t, err, "second traffic_logs must be rejected")
+		assert.Contains(t, err.Error(), "traffic_logs")
+		assert.Contains(t, err.Error(), "bundle-b.zip")
+		assert.Contains(t, err.Error(), "AnalyticsA")
+
+		// The first bundle's plugin stays in place; the conflicting one did
+		// not overwrite it.
+		assert.True(t, spec.AnalyticsPlugin.Enabled)
+		assert.Equal(t, "AnalyticsA", spec.AnalyticsPlugin.FuncName)
+	})
+
+	t.Run("disabled entries are skipped", func(t *testing.T) {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+
+		disabled := &apidef.BundleManifest{
+			CustomMiddleware: apidef.MiddlewareSection{
+				Driver:      apidef.GoPluginDriver,
+				TrafficLogs: apidef.MiddlewareDefinition{Name: "AnalyticsOff", Path: "analytics.so", Disabled: true},
+			},
+		}
+		require.NoError(t, mergeBundleManifest(spec, disabled, "bundle-off", "bundle-off.zip"))
+		assert.False(t, spec.AnalyticsPlugin.Enabled)
+		assert.Empty(t, spec.AnalyticsPlugin.FuncName)
+		assert.Empty(t, spec.CustomMiddleware.TrafficLogs.Name)
+
+		// A disabled entry must not count as a conflicting declaration
+		// either: an active one in a later bundle still wins.
+		active := &apidef.BundleManifest{
+			CustomMiddleware: apidef.MiddlewareSection{
+				Driver:      apidef.GoPluginDriver,
+				TrafficLogs: apidef.MiddlewareDefinition{Name: "AnalyticsOn", Path: "analytics.so"},
+			},
+		}
+		require.NoError(t, mergeBundleManifest(spec, active, "bundle-on", "bundle-on.zip"))
+		assert.True(t, spec.AnalyticsPlugin.Enabled)
+		assert.Equal(t, "AnalyticsOn", spec.AnalyticsPlugin.FuncName)
+		assert.Equal(t, filepath.Join("bundle-on", "analytics.so"), spec.AnalyticsPlugin.PluginPath)
+	})
+
+	t.Run("no declaration leaves analytics plugin untouched", func(t *testing.T) {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+
+		a := &apidef.BundleManifest{
+			CustomMiddleware: apidef.MiddlewareSection{
+				Driver: apidef.GoPluginDriver,
+				Pre:    []apidef.MiddlewareDefinition{{Name: "preA", Path: "plugin.so"}},
+			},
+		}
+		require.NoError(t, mergeBundleManifest(spec, a, "bundle-a", "bundle-a.zip"))
+		assert.False(t, spec.AnalyticsPlugin.Enabled)
+		assert.Equal(t, apidef.AnalyticsPluginConfig{}, spec.AnalyticsPlugin)
+	})
+}
+
+// TestLoadBundleWithFs_CommaSeparatedTrafficLogs exercises the full
+// multi-bundle load path with a traffic_logs hook declared in exactly one of
+// the composed bundles, and asserts the analytics plugin is enabled with a
+// path rewritten into that bundle's subdirectory (TT-18097).
+func TestLoadBundleWithFs_CommaSeparatedTrafficLogs(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.BundleBaseURL = "http://bundles.local/"
+		globalConf.SkipVerifyExistingPluginBundle = true
+	})
+	defer ts.Close()
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID:                  "multi-bundle-traffic-logs",
+			CustomMiddlewareBundle: "bundle-a.zip,bundle-b.zip",
+		},
+	}
+
+	rootPath := ts.Gw.getBundleDestPath(spec)
+	subdirA := bundleSubdirName("bundle-a.zip")
+	subdirB := bundleSubdirName("bundle-b.zip")
+
+	memFs := afero.NewMemMapFs()
+	require.NoError(t, memFs.MkdirAll(filepath.Join(rootPath, subdirA), 0755))
+	require.NoError(t, memFs.MkdirAll(filepath.Join(rootPath, subdirB), 0755))
+
+	writeManifest := func(subdir, body string) {
+		f, err := memFs.Create(filepath.Join(rootPath, subdir, "manifest.json"))
+		require.NoError(t, err)
+		_, err = f.WriteString(body)
+		require.NoError(t, err)
+		require.NoError(t, f.Close())
+	}
+
+	// Bundle A: a pre hook only.
+	writeManifest(subdirA, `{
+		"file_list": ["plugin.so"],
+		"custom_middleware": {
+			"driver": "goplugin",
+			"pre": [{"name": "PreA", "path": "plugin.so"}]
+		},
+		"checksum": "deadbeef",
+		"signature": ""
+	}`)
+
+	// Bundle B: the analytics plugin.
+	writeManifest(subdirB, `{
+		"file_list": ["analytics.so"],
+		"custom_middleware": {
+			"driver": "goplugin",
+			"traffic_logs": {"name": "ModifyAnalytics", "path": "analytics.so"}
+		},
+		"checksum": "deadbeef",
+		"signature": ""
+	}`)
+
+	require.NoError(t, ts.Gw.loadBundleWithFs(spec, memFs))
+
+	// Hooks from A still merged as before.
+	require.Len(t, spec.CustomMiddleware.Pre, 1)
+	assert.Equal(t, "PreA", spec.CustomMiddleware.Pre[0].Name)
+
+	// Analytics plugin from B enabled, path inside B's subdirectory.
+	assert.True(t, spec.AnalyticsPlugin.Enabled)
+	assert.Equal(t, "ModifyAnalytics", spec.AnalyticsPlugin.FuncName)
+	assert.Equal(t, filepath.Join(subdirB, "analytics.so"), spec.AnalyticsPlugin.PluginPath)
+	assert.Equal(t, filepath.Join(subdirB, "analytics.so"), spec.CustomMiddleware.TrafficLogs.Path)
+}
+
+// TestLoadBundleWithFs_CommaSeparatedDuplicateTrafficLogs asserts that two
+// composed bundles both declaring an active traffic_logs hook make the API
+// fail to load with an error naming the conflict (TT-18097).
+func TestLoadBundleWithFs_CommaSeparatedDuplicateTrafficLogs(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.BundleBaseURL = "http://bundles.local/"
+		globalConf.SkipVerifyExistingPluginBundle = true
+	})
+	defer ts.Close()
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID:                  "multi-bundle-dup-traffic-logs",
+			CustomMiddlewareBundle: "bundle-a.zip,bundle-b.zip",
+		},
+	}
+
+	rootPath := ts.Gw.getBundleDestPath(spec)
+	memFs := afero.NewMemMapFs()
+	for _, name := range []string{"bundle-a.zip", "bundle-b.zip"} {
+		subdir := bundleSubdirName(name)
+		require.NoError(t, memFs.MkdirAll(filepath.Join(rootPath, subdir), 0755))
+		f, err := memFs.Create(filepath.Join(rootPath, subdir, "manifest.json"))
+		require.NoError(t, err)
+		_, err = f.WriteString(`{
+			"file_list": ["analytics.so"],
+			"custom_middleware": {
+				"driver": "goplugin",
+				"traffic_logs": {"name": "ModifyAnalytics", "path": "analytics.so"}
+			},
+			"checksum": "deadbeef",
+			"signature": ""
+		}`)
+		require.NoError(t, err)
+		require.NoError(t, f.Close())
+	}
+
+	err := ts.Gw.loadBundleWithFs(spec, memFs)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "traffic_logs")
+	assert.Contains(t, err.Error(), "bundle-b.zip")
+}
