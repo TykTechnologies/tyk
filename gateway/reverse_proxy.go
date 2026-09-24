@@ -290,8 +290,8 @@ func (gw *Gateway) resolveUpstreamTarget(req *http.Request, spec *APISpec, logge
 
 	route.target = lbRemote
 	route.query = lbRemote.RawQuery
-	if upstreamDNSDiscoveryEnabled(spec) && host != allHostsDownURL {
-		route.authorityHost = target.Host
+	if plan := spec.dnsDiscovery.Load(); plan != nil && host != allHostsDownURL {
+		route.authorityHost = plan.target.Host
 		route.discovered = true
 		route.selection = sel
 	}
@@ -941,7 +941,8 @@ func (p *ReverseProxy) h2cRoundTripper(outReq *http.Request, transport *http.Tra
 	}
 
 	p.logger.Info("Enabling h2c mode")
-	rt := newH2CRoundTripper(p.TykAPISpec, transport)
+	var dialer net.Dialer
+	rt := newH2CRoundTripper(p.TykAPISpec, transport, dialer.DialContext)
 	rt.h2cOnly = hasH2C && !hasOther
 	return rt
 }
@@ -1037,13 +1038,8 @@ type TykRoundTripper struct {
 
 const defaultH2CIdleConnTimeout = 90 * time.Second
 
-func newH2CRoundTripper(spec *APISpec, transport *http.Transport) *TykRoundTripper {
+func newH2CRoundTripper(spec *APISpec, transport *http.Transport, dial func(ctx context.Context, network, addr string) (net.Conn, error)) *TykRoundTripper {
 	rt := &TykRoundTripper{transport: transport}
-
-	dial := transport.DialContext
-	if dial == nil {
-		dial = (&net.Dialer{}).DialContext
-	}
 
 	rt.h2ctransport = newH2CTransport(func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
 		conn, err := dial(ctx, network, addr)
@@ -1081,6 +1077,7 @@ func (rt *TykRoundTripper) Retire() {
 	}
 
 	if rt.transport != nil {
+		rt.transport.DisableKeepAlives = true
 		rt.transport.CloseIdleConnections()
 	}
 	if rt.h2ctransport != nil {

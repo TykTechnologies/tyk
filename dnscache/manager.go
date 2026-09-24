@@ -111,19 +111,19 @@ func (m *DnsCacheManager) doCachedDial(d *net.Dialer, ctx context.Context, netwo
 	if m.strategy == config.NoCacheStrategy {
 		if len(ips) > 1 {
 			m.cacheStorage.Delete(host)
-			return safeDial(net.JoinHostPort(ips[0], port), "")
+			return safeDial(ips[0]+":"+port, "")
 		}
 	}
 
 	if m.strategy == config.RandomStrategy {
 		if len(ips) > 1 {
 			ip, _ := m.getRandomIp(ips)
-			return safeDial(net.JoinHostPort(ip, port), host)
+			return safeDial(ip+":"+port, host)
 		}
-		return safeDial(net.JoinHostPort(ips[0], port), host)
+		return safeDial(ips[0]+":"+port, host)
 	}
 
-	return safeDial(net.JoinHostPort(ips[0], port), host)
+	return safeDial(ips[0]+":"+port, host)
 }
 
 func (m *DnsCacheManager) getRandomIp(ips []string) (string, error) {

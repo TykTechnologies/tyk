@@ -1449,49 +1449,60 @@ type LoadBalancingTarget struct {
 func (l *LoadBalancing) Fill(api apidef.APIDefinition) {
 	if len(api.Proxy.Targets) == 0 {
 		// A DNS-sourced API has an empty list by design, so `enabled` must survive.
-		if !api.Proxy.DNSDiscovery.Enabled {
+		if api.Proxy.DNSDiscovery.Enabled {
+			l.Enabled = api.Proxy.EnableLoadBalancing
+			l.SkipUnavailableHosts = api.Proxy.CheckHostAgainstUptimeTests
 			return
 		}
 
-		l.Enabled = api.Proxy.EnableLoadBalancing
-		l.SkipUnavailableHosts = api.Proxy.CheckHostAgainstUptimeTests
+		api.Proxy.EnableLoadBalancing = false
+		api.Proxy.CheckHostAgainstUptimeTests = false
+		api.Proxy.Targets = nil
 		return
 	}
 
 	l.Enabled = api.Proxy.EnableLoadBalancing
 	l.SkipUnavailableHosts = api.Proxy.CheckHostAgainstUptimeTests
-	l.Targets = l.weighTargets(api.Proxy.Targets)
-}
 
-// weighTargets counts each target's repeats as its weight, keeping any weight=0
-// target already on the structure that the active list no longer names.
-func (l *LoadBalancing) weighTargets(active []string) []LoadBalancingTarget {
-	counter := make(map[string]*LoadBalancingTarget, len(active))
-	for _, target := range active {
-		if _, ok := counter[target]; !ok {
-			counter[target] = &LoadBalancingTarget{URL: target}
+	targetCounter := make(map[string]*LoadBalancingTarget)
+	for _, target := range api.Proxy.Targets {
+		if _, ok := targetCounter[target]; !ok {
+			targetCounter[target] = &LoadBalancingTarget{
+				URL:    target,
+				Weight: 0,
+			}
 		}
-		counter[target].Weight++
+		targetCounter[target].Weight++
 	}
 
-	for _, existing := range l.Targets {
-		if existing.Weight != 0 {
-			continue
-		}
-		if _, ok := counter[existing.URL]; !ok {
-			counter[existing.URL] = &LoadBalancingTarget{URL: existing.URL}
+	// Preserve weight=0 targets from existing OAS structure that aren't in active targets
+	if l.Targets != nil {
+		for _, existingTarget := range l.Targets {
+			if existingTarget.Weight == 0 {
+				// Only preserve if it's not already in targetCounter (not an active target)
+				if _, exists := targetCounter[existingTarget.URL]; !exists {
+					targetCounter[existingTarget.URL] = &LoadBalancingTarget{
+						URL:    existingTarget.URL,
+						Weight: 0,
+					}
+				}
+			}
 		}
 	}
 
-	targets := make([]LoadBalancingTarget, 0, len(counter))
-	for _, target := range counter {
-		targets = append(targets, *target)
+	targets := make([]LoadBalancingTarget, len(targetCounter))
+	i := 0
+	for _, target := range targetCounter {
+		targets[i] = *target
+		i++
 	}
 
-	sort.Slice(targets, func(i, j int) bool {
+	targetsSorter := func(i, j int) bool {
 		return targets[i].URL < targets[j].URL
-	})
-	return targets
+	}
+
+	sort.Slice(targets, targetsSorter)
+	l.Targets = targets
 }
 
 // ExtractTo populates an APIDefinition's proxy load balancing configuration with data from the LoadBalancing instance.

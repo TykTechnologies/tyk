@@ -1254,6 +1254,28 @@ func TestDirector_SendsTheServiceNameAsTheAuthority(t *testing.T) {
 		assertDiscoveredMark(t, req, planSelection(proxy.TykAPISpec))
 	})
 
+	t.Run("a version override target does not change the authority", func(t *testing.T) {
+		proxy := newProxy(t)
+
+		override, err := url.Parse("h2c://version.example:9001")
+		if err != nil {
+			t.Fatalf("parse override: %v", err)
+		}
+		logger := logrus.NewEntry(logrus.New())
+		logger.Logger.SetLevel(logrus.PanicLevel)
+		versioned := proxy.Gw.TykNewSingleHostReverseProxy(override, proxy.TykAPISpec, logger)
+
+		req := httptest.NewRequest(http.MethodPost, "http://gateway/greet", nil)
+		versioned.Director(req)
+
+		if req.URL.Host != "10.0.0.1:9002" {
+			t.Errorf("dialling %q, want the address resolved for the discovered hostname", req.URL.Host)
+		}
+		if req.Host != "svc:9002" {
+			t.Errorf("authority is %q, want the discovered hostname rather than the version override", req.Host)
+		}
+	})
+
 	t.Run("preserve_host_header still wins", func(t *testing.T) {
 		proxy := newProxy(t, func(spec *APISpec) { spec.Proxy.PreserveHostHeader = true })
 

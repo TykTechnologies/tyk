@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -66,7 +67,7 @@ func testRetireLetsInFlightH2CRequestsFinish(t *testing.T, discovered bool) {
 	backend := newRetirementBackend(t, finishStream)
 
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
-	rt := newH2CRoundTripper(spec, &http.Transport{})
+	rt := newH2CRoundTripper(spec, &http.Transport{}, (&net.Dialer{}).DialContext)
 	defer rt.Retire()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

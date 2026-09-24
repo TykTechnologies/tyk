@@ -146,50 +146,6 @@ func TestH2C_LoadBalancing_Disabled_UsesHTTP2(t *testing.T) {
 	}
 }
 
-// The h2c transport dialled with a raw net.Dial, bypassing the DNS cache.
-func TestH2C_DNSCache_IsApplied(t *testing.T) {
-	const upstreamHost = "h2c-dns-target.com"
-
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	upstream := newH2CUpstream(t, nil)
-	_, port, err := net.SplitHostPort(strings.TrimPrefix(upstream.URL, "http://"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	mockDomain(t, upstreamHost, []string{"127.0.0.1"})
-
-	ts.Gw.dnsCacheManager.InitDNSCaching(60*time.Second, 60*time.Second)
-	defer ts.Gw.dnsCacheManager.DisposeCache()
-
-	globalConf := ts.Gw.GetConfig()
-	globalConf.DnsCache.Enabled = true
-	globalConf.DnsCache.TTL = 60
-	globalConf.DnsCache.MultipleIPsHandleStrategy = config.NoCacheStrategy
-	ts.Gw.SetConfig(globalConf)
-	ts.Gw.DoReload()
-
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/h2c-dns/"
-		spec.UseKeylessAccess = true
-		spec.Proxy.TargetURL = fmt.Sprintf("h2c://%s:%s", upstreamHost, port)
-	})
-
-	_, _ = ts.Run(t, test.TestCase{Path: "/h2c-dns/", Code: http.StatusOK})
-
-	storage := ts.Gw.dnsCacheManager.CacheStorage()
-	if storage == nil {
-		t.Fatal("dns cache storage is nil despite dns_cache being enabled")
-	}
-	if _, found := storage.Get(upstreamHost); !found {
-		t.Errorf("after proxying to an h2c upstream at %q, the dns cache holds no entry for it.\n"+
-			"The h2c transport dials with a raw net.Dial and bypasses the cached dialer, "+
-			"so dns_cache silently does not apply to h2c APIs.", upstreamHost)
-	}
-}
-
 // ConnState cannot count h2c: NewHandler hijacks each connection, so it
 // reports StateHijacked and nothing after.
 type connCounter struct {

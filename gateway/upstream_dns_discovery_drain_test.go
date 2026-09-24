@@ -66,7 +66,7 @@ func dialTracked(t *testing.T, spec *APISpec, addr string, sel upstreamSelection
 	t.Helper()
 
 	var d net.Dialer
-	rt := newH2CRoundTripper(spec, &http.Transport{DialContext: d.DialContext})
+	rt := newH2CRoundTripper(spec, &http.Transport{}, d.DialContext)
 	c, err := rt.h2ctransport.DialTLSContext(selectionContext(sel), "tcp", addr, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -137,7 +137,7 @@ func TestH2CTransport_HealthPingsSpareQuietGRPCStreams(t *testing.T) {
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 	spec.dnsDiscovery.Store(&dnsDiscoveryPlan{})
 	var d net.Dialer
-	rt := newH2CRoundTripper(spec, &http.Transport{DialContext: d.DialContext})
+	rt := newH2CRoundTripper(spec, &http.Transport{}, d.DialContext)
 	defer rt.Retire()
 	ctx, cancel := context.WithTimeout(context.Background(), 140*time.Second)
 	defer cancel()
@@ -243,7 +243,7 @@ func TestSetupUpstreamDNSDiscovery_RepointingDrainsTheOldHostname(t *testing.T) 
 	}
 
 	var d net.Dialer
-	rt := newH2CRoundTripper(old, &http.Transport{DialContext: d.DialContext})
+	rt := newH2CRoundTripper(old, &http.Transport{}, d.DialContext)
 	if _, err := rt.h2ctransport.DialTLSContext(selectionContext(oldSelection), "tcp", "127.0.0.1:"+port, nil); !errors.Is(err, errUpstreamDeparted) {
 		t.Fatalf("a dial routed by the superseded plan was accepted after the deadline: %v", err)
 	}
@@ -270,7 +270,7 @@ func TestReleaseUpstreamDNSDiscovery_BoundsARemovedAPI(t *testing.T) {
 	}
 
 	var d net.Dialer
-	rt := newH2CRoundTripper(spec, &http.Transport{DialContext: d.DialContext})
+	rt := newH2CRoundTripper(spec, &http.Transport{}, d.DialContext)
 	if _, err := rt.h2ctransport.DialTLSContext(selectionContext(sel), "tcp", "127.0.0.1:"+port, nil); !errors.Is(err, errUpstreamDeparted) {
 		t.Fatalf("a dial after the removal deadline was accepted: %v", err)
 	}
@@ -285,7 +285,7 @@ func TestH2CDialler_RewrittenUpstreamSurvivesReconciliation(t *testing.T) {
 		var d net.Dialer
 		return d.DialContext(ctx, network, ln.Addr().String())
 	}}
-	rt := newH2CRoundTripper(spec, transport)
+	rt := newH2CRoundTripper(spec, transport, transport.DialContext)
 	c, err := rt.h2cUnowned.DialTLSContext(context.Background(), "tcp", "svc-b:"+port, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -405,7 +405,7 @@ func TestH2CDialler_DialFinishingAfterTheDepartureJoinsTheDeadline(t *testing.T)
 				<-proceed
 				return c, nil
 			}}
-			rt := newH2CRoundTripper(spec, transport)
+			rt := newH2CRoundTripper(spec, transport, transport.DialContext)
 
 			type dialed struct {
 				conn net.Conn
@@ -487,7 +487,7 @@ func TestH2CTransport_ReusedConnectionKeepsItsOwnership(t *testing.T) {
 			spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 			spec.dnsDiscovery.Store(p)
 			var d net.Dialer
-			rt := newH2CRoundTripper(spec, &http.Transport{DialContext: d.DialContext})
+			rt := newH2CRoundTripper(spec, &http.Transport{}, d.DialContext)
 			defer rt.Retire()
 
 			base := "http://127.0.0.1:" + port
