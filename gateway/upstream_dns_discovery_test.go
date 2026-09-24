@@ -215,8 +215,8 @@ func TestPlanUpstreamDNSDiscovery_Accepts(t *testing.T) {
 	if plan.interval != 10*time.Second {
 		t.Fatalf("plan interval is %s, want 10s", plan.interval)
 	}
-	if plan.drain != dnsDiscoveryDefaultDrainTimeout {
-		t.Fatalf("plan drains after %s, want the %s default", plan.drain, dnsDiscoveryDefaultDrainTimeout)
+	if plan.drain != dnsDiscoveryDrainDisabled {
+		t.Fatalf("plan drains after %s, want draining disabled by default", plan.drain)
 	}
 }
 
