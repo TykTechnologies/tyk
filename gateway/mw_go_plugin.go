@@ -324,8 +324,10 @@ func (m *GoPluginMiddleware) handleErrorResponse(
 	rw *customResponseWriter,
 	logger *logrus.Entry,
 ) (error, int) {
-	if rw.statusCodeSent == http.StatusForbidden {
-		logger.Error("Authentication error in Go-plugin middleware func")
+	err := fmt.Errorf("plugin function sent error response code: %d", rw.statusCodeSent)
+	logger = logger.WithField("status_code", rw.statusCodeSent)
+
+	fireAuthFailure := func() {
 		m.Base().FireEvent(EventAuthFailure, EventKeyFailureMeta{
 			EventMetaDefault: EventMetaDefault{
 				Message:            "Auth Failure",
@@ -337,9 +339,17 @@ func (m *GoPluginMiddleware) handleErrorResponse(
 		})
 	}
 
-	// base middleware will report this error to analytics if needed
-	err := fmt.Errorf("plugin function sent error response code: %d", rw.statusCodeSent)
-	logger.WithError(err).Error("Failed to process request with Go-plugin middleware func")
+	switch rw.statusCodeSent {
+	case http.StatusUnauthorized:
+		logger.Error("Authentication error in Go-plugin middleware func")
+		fireAuthFailure()
+	case http.StatusForbidden:
+		logger.Error("Authorization error in Go-plugin middleware func")
+		fireAuthFailure()
+	default:
+		// Non-auth errors (other 4xx/5xx): base middleware will report this error to analytics if needed
+		logger.WithError(err).Error("Failed to process request with Go-plugin middleware func")
+	}
 
 	if rw.responseSent {
 		err = fmt.Errorf("%w: %w", ErrResponseErrorSent, err)
