@@ -26,6 +26,7 @@ _Tyk Gateway_ is provided ‘Batteries-included’, with no feature lockout. Ena
 
 There are three different ways you can [try Tyk]( https://tyk.io/docs):
 
+
 <table>
   <tr>
    <td>
