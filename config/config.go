@@ -1471,6 +1471,11 @@ type Config struct {
 	// The standard characters are alphanumeric characters plus underscore (_), hyphen (-), dot (.) and tilde (~).
 	// The use of other characters in IDs can cause unpredictable behavior and is not recommended.
 	AllowUnsafePolicyIds bool `json:"allow_unsafe_policy_ids"`
+
+	// AllowUnsafeApiIds allows the use of non-standard characters in API identifiers (default: false).
+	// The standard characters are alphanumeric characters plus underscore (_), hyphen (-), dot (.) and tilde (~).
+	// The use of other characters in IDs can cause unpredictable behavior and is not recommended.
+	AllowUnsafeApiIds bool `json:"allow_unsafe_api_ids"`
 }
 
 // LabsConfig include config for streaming

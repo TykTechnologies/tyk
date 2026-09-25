@@ -1367,6 +1367,11 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 		newDef.GenerateAPIID()
 	}
 
+	if err := gw.validator.Validate(identifier.CustomApiId(newDef.APIID)); err != nil {
+		log.WithField("api_id", newDef.APIID).WithError(err).Error("Failed to validate API ID")
+		return apiError(identifier.ErrInvalidCustomApiId.Error()), http.StatusBadRequest
+	}
+
 	if err := sanitize.ValidatePathComponent(newDef.APIID); err != nil {
 		log.Errorf(errInvalidAPIIDFmt, newDef.APIID, err)
 		return apiError(errInvalidAPIID), http.StatusBadRequest
@@ -1453,6 +1458,11 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 
 	if resp, code := validateAPIIDMatch(apiID, newDef.APIID); resp != nil {
 		return resp, code
+	}
+
+	if err := gw.validator.Validate(identifier.CustomApiId(newDef.APIID)); err != nil {
+		log.WithField("api_id", newDef.APIID).WithError(err).Error("Failed to validate API ID")
+		return apiError(identifier.ErrInvalidCustomApiId.Error()), http.StatusBadRequest
 	}
 
 	if validationErr := validateAPIDef(&newDef); validationErr != nil {
