@@ -16,7 +16,7 @@
 ---
 [Documentation](https://tyk.io/docs/) | [MCP Gateway](https://tyk.io/tyk-mcp-gateway/) | [AI Gateway](https://tyk.io/tyk-ai-studio/) | [Forum](https://community.tyk.io) | [Blog](https://tyk.io/blog/) | [About](https://tyk.io)
 
-
+ 
 # Tyk API Gateway
 **Tyk Gateway** is the cloud-native, open source, enterprise-ready API and AI Gateway supporting REST, GraphQL, TCP, gRPC and MCP (Model Context Protocol).
 
