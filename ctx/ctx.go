@@ -179,6 +179,22 @@ func GetOASDefinition(r *http.Request) *oas.OAS {
 	return nil
 }
 
+// GetOASDefinitionRaw returns the OAS API definition stored in the request
+// context without cloning it. The returned *oas.OAS is the API's live spec
+// object, shared by every concurrent request routed to that API until the
+// next reload; mutating it races with other goroutines and corrupts the
+// live definition for all traffic. Call GetOASDefinition instead for a
+// mutable, request-private copy.
+func GetOASDefinitionRaw(r *http.Request) *oas.OAS {
+	if v := r.Context().Value(OASDefinition); v != nil {
+		if val, ok := v.(*oas.OAS); ok {
+			return val
+		}
+	}
+
+	return nil
+}
+
 // GetOASConfigData returns the config data of the OAS API definition valid for the request.
 // It does not deep copy the whole API definition, making it faster than GetOASDefinition.
 func GetOASConfigData(r *http.Request) (map[string]interface{}, error) {
