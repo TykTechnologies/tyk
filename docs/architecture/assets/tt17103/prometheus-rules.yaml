@@ -1,0 +1,50 @@
+groups:
+  - name: tyk-kafka-manual-acknowledgment
+    interval: 30s
+    rules:
+      - record: tyk:kafka_ack:commit_failure_ratio5m
+        expr: |
+          sum by (api, stream, component) (rate(tyk_streams_kafka_events_total{kind="commit_failures"}[5m]))
+          /
+          clamp_min(sum by (api, stream, component) (rate(tyk_streams_kafka_events_total{kind="commit_attempts"}[5m])), 0.001)
+      - record: tyk:kafka_ack:router_backlog
+        expr: sum by (api, stream, component) (tyk_streams_kafka_state{kind="router_backlog"})
+      - alert: TykKafkaCommitFailures
+        expr: increase(tyk_streams_kafka_events_total{kind="commit_failures"}[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Kafka external acknowledgment commits are failing
+          description: "API {{ $labels.api }}, stream {{ $labels.stream }}, component {{ $labels.component }} has Kafka commit failures."
+      - alert: TykKafkaResetFailures
+        expr: increase(tyk_streams_kafka_events_total{kind="reset_failures"}[10m]) > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: Kafka offset reset failed or required fenced recovery
+          description: "Inspect the reset audit for API {{ $labels.api }}, stream {{ $labels.stream }}, component {{ $labels.component }}."
+      - alert: TykKafkaPartitionsPaused
+        expr: tyk_streams_kafka_state{kind="paused_partitions"} > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Kafka partitions remain paused waiting for acknowledgment recovery
+          description: "Follow the missing-ack pause/DLQ recovery procedure for {{ $labels.api }}/{{ $labels.stream }}/{{ $labels.component }}."
+      - alert: TykKafkaRouterPendingStalled
+        expr: tyk_streams_kafka_state{kind="router_pending"} > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Distributed acknowledgment commands remain pending
+          description: "Check Redis availability and Kafka assignment ownership for {{ $labels.api }}/{{ $labels.stream }}/{{ $labels.component }}."
+      - alert: TykKafkaRouterDeadLetters
+        expr: tyk_streams_kafka_state{kind="router_dead_letters"} > 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Distributed acknowledgment commands entered the router dead-letter backlog
+          description: "Operator reconciliation is required for {{ $labels.api }}/{{ $labels.stream }}/{{ $labels.component }}."
