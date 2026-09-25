@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -139,4 +140,57 @@ func TestRequestSizeLimit(t *testing.T) {
 			assert.True(t, mw.EnabledForSpec())
 		})
 	})
+}
+
+func TestRequestSizeLimit_GlobalDisabledAtRequestTime(t *testing.T) {
+	logger, _ := logrus.NewNullLogger()
+	spec := BuildAPI(func(spec *APISpec) {
+		UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+			v.GlobalSizeLimit = 1024
+			v.GlobalSizeLimitDisabled = true
+			v.UseExtendedPaths = true
+			v.ExtendedPaths.SizeLimit = []apidef.RequestSizeMeta{
+				{Method: http.MethodPost, Path: "/get", SizeLimit: 512},
+			}
+		})
+	})[0]
+
+	// Compile path matchers the same way the loader does for SizeLimit middleware.
+	gw := &Gateway{}
+	gw.SetConfig(config.Config{})
+	loader := APIDefinitionLoader{Gw: gw}
+	vInfo := spec.VersionData.Versions["v1"]
+	urlSpecs := loader.compileRequestSizePathSpec(vInfo.ExtendedPaths.SizeLimit, RequestSizeLimit, config.Config{})
+	spec.RxPaths = map[string][]URLSpec{"v1": urlSpecs}
+
+	mw := &RequestSizeLimitMiddleware{BaseMiddleware: &BaseMiddleware{
+		Spec:   spec,
+		Gw:     gw,
+		logger: logger.WithContext(context.Background()),
+	}}
+
+	body := bytes.NewBufferString(strings.Repeat("a", 2000))
+	r := httptest.NewRequest(http.MethodPost, "/get", body)
+	r.Header.Set("Content-Length", "2000")
+
+	err, code := mw.ProcessRequest(httptest.NewRecorder(), r, nil)
+	// Global limit is disabled, and /get path limit is 512 — path limit still applies.
+	require.Error(t, err)
+	require.Equal(t, http.StatusBadRequest, code)
+
+	// Request under the path limit but over the (disabled) global limit must pass.
+	bodyOK := bytes.NewBufferString(strings.Repeat("a", 500))
+	rOK := httptest.NewRequest(http.MethodPost, "/get", bodyOK)
+	rOK.Header.Set("Content-Length", "500")
+	err, code = mw.ProcessRequest(httptest.NewRecorder(), rOK, nil)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, code)
+
+	// Unmatched path must not apply the disabled global limit.
+	bodyGlobal := bytes.NewBufferString(strings.Repeat("a", 2000))
+	rOther := httptest.NewRequest(http.MethodPost, "/other", bodyGlobal)
+	rOther.Header.Set("Content-Length", "2000")
+	err, code = mw.ProcessRequest(httptest.NewRecorder(), rOther, nil)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusOK, code)
 }
