@@ -149,6 +149,7 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 		PathParams: pathParams,
 		Route:      route,
 		Options: &openapi3filter.Options{
+			RegexCompiler: oas.ForgivingPatternCompiler,
 			AuthenticationFunc: func(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
 				return nil
 			},
@@ -229,6 +230,7 @@ func (k *ValidateRequest) validateRoute(r *http.Request, route *routers.Route, p
 		PathParams: pathParams,
 		Route:      route,
 		Options: &openapi3filter.Options{
+			RegexCompiler: oas.ForgivingPatternCompiler,
 			AuthenticationFunc: func(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
 				return nil
 			},
@@ -385,6 +387,7 @@ func (k *ValidateRequest) processRequestWithFindOperation(r *http.Request) (erro
 		PathParams: operation.pathParams,
 		Route:      operation.route,
 		Options: &openapi3filter.Options{
+			RegexCompiler: oas.ForgivingPatternCompiler,
 			AuthenticationFunc: func(ctx context.Context, input *openapi3filter.AuthenticationInput) error {
 				return nil
 			},
