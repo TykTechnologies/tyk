@@ -4,7 +4,7 @@ from os import getcwd, chdir, path
 import sys
 from gateway import TykGateway as tyk
 def except_hook(type, value, traceback):
-    tyk.log_error("{0}".format(value))
+    tyk.log("{0}".format(value), "error")
     pass
 
 sys.excepthook = except_hook
@@ -14,7 +14,7 @@ try:
   from tyk.object import TykCoProcessObject
   from tyk.event import TykEvent
 except Exception as e:
-  tyk.log_error(str(e))
+  tyk.log(str(e), "error")
   sys.exit(1)
 
 class TykDispatcher:

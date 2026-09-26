@@ -2,7 +2,7 @@ from importlib import invalidate_caches as invalidate_caches
 
 from types import ModuleType
 
-import imp, inspect, sys, os, json
+import inspect, sys, os, json, importlib.util, importlib.machinery
 from time import sleep
 
 import tyk.decorators as decorators
@@ -37,7 +37,9 @@ class TykMiddleware:
             self.loader = MiddlewareLoader(self)
             sys.meta_path.append(self.loader)
             invalidate_caches()
-            self.module = imp.load_source(filepath, self.mw_path)
+            spec = importlib.util.spec_from_file_location(filepath, self.mw_path)
+            self.module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(self.module)
             self.register_handlers()
             self.cleanup()
         except Exception as e:
