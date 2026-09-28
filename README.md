@@ -60,8 +60,9 @@ Run the open source Tyk Gateway with Docker in under 2 minutes. You need Docker 
 Follow the [Tyk Open Source Gateway quick start](https://tyk.io/docs/deployment-and-operations/tyk-open-source-api-gateway/quick-start). It shows you how to:
 
 1. Create a Gateway configuration file (`tyk.conf`).
-2. Create a Docker Compose file that runs Tyk Gateway and Redis.
-3. Start the Gateway with `docker compose up -d`.
+2. Create an `apps` folder where the Gateway saves your APIs.
+3. Create a Docker Compose file that runs Tyk Gateway and Redis.
+4. Start the Gateway with `docker compose up -d`.
 
 Confirm that the Gateway runs. Send a request to the `hello` endpoint:
 ```console
