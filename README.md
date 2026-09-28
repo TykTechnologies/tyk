@@ -84,7 +84,7 @@ cd ../getting-started
 bash start.sh
 ```
 
-For the full steps, see the [Tyk Self-Managed quick start](https://tyk.io/docs/getting-started/quick-start). Tyk Install also has Helm-based Kubernetes deployments.
+For the full steps, see the [Tyk Self-Managed quick start](https://tyk.io/docs/getting-started/quick-start).
 
 ---
 
