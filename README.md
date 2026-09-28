@@ -96,7 +96,7 @@ Other Installations are available:
 1. [Docker](https://tyk.io/docs/deployment-and-operations/tyk-open-source-api-gateway/quick-start)
 2. [Kubernetes with Helm](https://tyk.io/docs/apim/open-source/installation#quick-start-with-helm-chart) (`tyk-oss` chart from [Tyk Charts](https://github.com/TykTechnologies/tyk-charts))
 3. [Ansible](https://tyk.io/docs/apim/open-source/installation#install-tyk-gateway-with-ansible)
-4. [Red Hat and CentOS](https://tyk.io/docs/apim/open-source/installation#install-tyk-gateway-through-shell)
+4. [Red Hat and CentOS](https://tyk.io/docs/apim/open-source/installation#install-tyk-gateway-on-red-hat-rhel-%2F-centos)
 5. [Ubuntu](https://tyk.io/docs/apim/open-source/installation#install-tyk-gateway-with-ubuntu)
 6. [Compile Tyk from Source](#compiling-tyk-gateway)
 
