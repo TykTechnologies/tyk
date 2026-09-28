@@ -18,9 +18,8 @@
 
 
 # Tyk API Gateway
-**Tyk Gateway** is the cloud-native, open source, enterprise-ready API and AI Gateway supporting REST, GraphQL, TCP, gRPC and MCP (Model Context Protocol).
 
-Built from the ground up, as the [fastest API Gateway](https://tyk.io/performance-benchmarks/) on the planet since 2014.
+**Tyk Gateway** is the cloud-native, open source, enterprise-ready API and AI Gateway supporting REST, GraphQL, TCP, gRPC and MCP (Model Context Protocol). Built from the ground up, as the [fastest API Gateway](https://tyk.io/performance-benchmarks/) on the planet since 2014.
 
 There are three different ways you can [try Tyk]( https://tyk.io/docs):
 
