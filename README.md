@@ -19,7 +19,11 @@
 
 # Tyk API Gateway
 
-**Tyk Gateway** is the cloud-native, open source, enterprise-ready API and AI Gateway supporting REST, GraphQL, TCP, gRPC and MCP (Model Context Protocol). Built from the ground up, as the [fastest API Gateway](https://tyk.io/performance-benchmarks/) on the planet since 2014.
+**Tyk Gateway** is the cloud-native, open source, enterprise-ready API and AI Gateway supporting REST, GraphQL, TCP, gRPC and MCP (Model Context Protocol).
+
+Built from the ground up, as the [fastest API Gateway](https://tyk.io/performance-benchmarks/) on the planet since 2014.
+
+_Tyk Gateway_ is provided ‘Batteries-included’, with no feature lockout. Enabling your organization to rate limit, auth, gather analytics, apply microservice patterns [and more](#open-source-api-gateway-features) with ease.
 
 There are three different ways you can [try Tyk]( https://tyk.io/docs):
 
@@ -84,6 +88,19 @@ bash start.sh
 
 For the full steps, see the [Tyk Self-Managed quick start](https://tyk.io/docs/getting-started/quick-start).
 
+---
+
+Other Installations are available:
+
+1. [Docker](https://tyk.io/docs/tyk-oss/ce-docker/)
+2. [Kubernetes-Native ](https://github.com/TykTechnologies/tyk-oss-k8s-deployment)
+3. [Kubernetes-Helm](https://github.com/TykTechnologies/tyk-helm-chart#install-tyk-community-edition)
+4. [Ansible](https://tyk.io/docs/tyk-oss/ce-ansible/)
+5. [Red Hat](https://tyk.io/docs/tyk-oss/ce-redhat/)
+6. [Ubuntu](https://tyk.io/docs/tyk-oss/ce-ubuntu/)
+7. [CentOS](https://tyk.io/docs/tyk-oss/ce-centos/)
+8. [Compile Tyk from Source](#compiling-tyk-gateway)
+9. 
 ### Getting started with AI Gateway for LLM and MCP
 
 Tyk Gateway governs MCP traffic from AI agents, applying authentication, rate limiting and per-tool access control to every JSON-RPC call. [Tyk AI Studio](https://tyk.io/tyk-ai-studio/) handles LLM management, with model routing, budgets and guardrails across providers. Start at the [AI management overview](https://tyk.io/docs/ai-management/overview).
