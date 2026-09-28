@@ -74,7 +74,7 @@ Next, [create your first API](https://tyk.io/docs/api-management/gateway-config-
 
 ### Try the full Tyk Self-Managed stack
 
-To evaluate the full Tyk stack, use [Tyk Install](https://github.com/TykTechnologies/tyk-install). It runs Tyk Gateway, Tyk Dashboard, the Developer Portal, Tyk Pump, Redis and PostgreSQL with Docker Compose, and preloads sample APIs and policies. You need a trial licence from [tyk.io/sign-up](https://tyk.io/sign-up/).
+To evaluate the full Tyk stack, use [Tyk Install](https://github.com/TykTechnologies/tyk-install). It runs Tyk Gateway, Tyk Dashboard, the Developer Portal, Tyk Pump, Redis and PostgreSQL with Docker Compose, and preloads sample APIs and policies. You need a licence. To get one, [request a Tyk Self-Managed trial](https://tyk.io/self-managed-trial/).
 
 ```console
 git clone https://github.com/TykTechnologies/tyk-install
