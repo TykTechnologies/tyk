@@ -2,10 +2,15 @@ package gateway
 
 import (
 	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/textproto"
 	"strings"
+
+	"github.com/tidwall/gjson"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -72,8 +77,8 @@ type accessConditionGroup struct {
 }
 
 // conditionGroups returns a condition's option groups in the order they should
-// be evaluated: cheapest first, with the payload last, because matching against
-// it reads the whole request body into memory.
+// be evaluated: cheapest first, with the body field and payload matches last,
+// because matching against them reads the whole request body into memory.
 func (m *GranularAccessMiddleware) conditionGroups(r *http.Request, condition user.AccessCondition) []accessConditionGroup {
 	options := condition.Options
 	checkAny := condition.On == apidef.Any
@@ -98,6 +103,10 @@ func (m *GranularAccessMiddleware) conditionGroups(r *http.Request, condition us
 		{
 			configured: len(options.RequestContextMatches) > 0,
 			match:      func() bool { return matchRequestContext(r, options.RequestContextMatches, checkAny) },
+		},
+		{
+			configured: len(options.BodyFieldMatches) > 0,
+			match:      func() bool { return m.matchBodyFields(r, options.BodyFieldMatches, checkAny) },
 		},
 		{
 			configured: options.PayloadMatches.MatchPattern != "",
@@ -226,6 +235,193 @@ func (m *GranularAccessMiddleware) matchPayload(r *http.Request, option apidef.S
 	}
 
 	return matchValues(option, []string{body}, true, matchAnyValue)
+}
+
+// maxBodyFieldDepth caps how deeply a request body may nest before a body field
+// condition refuses it. It is far beyond what a real payload needs, and keeps
+// the path lookup that follows on bounded input.
+const maxBodyFieldDepth = 512
+
+// matchBodyFields evaluates the matches against fields of a JSON request body,
+// each addressed by its path in gjson syntax, e.g. "customer.id".
+//
+// A field that holds an array supplies each element as a value, so every
+// element has to match, just as every value of a repeated query parameter does.
+// Nested arrays are flattened, so an element cannot hide a value from the
+// pattern by wrapping it in another array. Any other field supplies a single
+// value: a scalar as its text, null as "null", and an object as its raw JSON.
+// An empty body supplies no fields at all.
+//
+// A body that cannot be read, or that checkBodyForFieldMatching refuses, fails
+// the match rather than being read as supplying no fields. Otherwise a caller
+// could satisfy a "must be absent" rule simply by sending a body the Gateway
+// reads differently from the upstream.
+func (m *GranularAccessMiddleware) matchBodyFields(r *http.Request, options map[string]apidef.StringRegexMap, checkAny bool) bool {
+	body, err := readRequestBody(r)
+	if err != nil {
+		m.Logger().WithError(err).Error("Could not read request body to evaluate access condition")
+		return false
+	}
+
+	if strings.TrimSpace(body) != "" {
+		if err := checkBodyForFieldMatching(body); err != nil {
+			m.Logger().WithError(err).Debug("Request body refused by body field access condition")
+			return false
+		}
+	}
+
+	return matchNamedValues(options, checkAny, func(path string) ([]string, bool) {
+		result := gjson.Get(body, path)
+		if !result.Exists() {
+			return nil, false
+		}
+
+		return bodyFieldValues(result), true
+	})
+}
+
+var (
+	errBodyNotJSON       = errors.New("request body is not a single valid JSON value")
+	errBodyTooDeep       = fmt.Errorf("request body nests deeper than %d levels", maxBodyFieldDepth)
+	errBodyDuplicatedKey = errors.New("request body repeats a key within an object")
+)
+
+// checkBodyForFieldMatching refuses a body that body field conditions cannot
+// read the way the upstream will.
+//
+// It walks the body token by token rather than recursively, so a deeply nested
+// body is refused instead of exhausting the stack. It also refuses an object
+// that repeats a key, including one repeated in a different case. The path
+// lookup takes the first of two duplicate keys while most JSON decoders take
+// the last, and Go's decoder matches keys to struct fields without regard to
+// case, so either would let a caller show the Gateway one value and the
+// upstream another.
+func checkBodyForFieldMatching(body string) error {
+	decoder := json.NewDecoder(strings.NewReader(body))
+	decoder.UseNumber()
+
+	// One entry per open container: the keys seen so far for an object, nil
+	// for an array.
+	var stack []map[string]struct{}
+
+	// expectKey is true where the next token inside an object is a key.
+	expectKey := false
+
+	// The decoder reads a stream of values, so a second top level value is
+	// not an error to it. It is to us, since the path lookup reads only the
+	// first.
+	topLevelValues := 0
+
+	for {
+		token, err := decoder.Token()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+
+		if err != nil {
+			return fmt.Errorf("%w: %v", errBodyNotJSON, err)
+		}
+
+		if delim, ok := token.(json.Delim); ok {
+			switch delim {
+			case '{', '[':
+				if len(stack) >= maxBodyFieldDepth {
+					return errBodyTooDeep
+				}
+
+				var keys map[string]struct{}
+				if delim == '{' {
+					keys = map[string]struct{}{}
+				}
+
+				stack = append(stack, keys)
+				expectKey = delim == '{'
+			case '}', ']':
+				stack = stack[:len(stack)-1]
+				expectKey = len(stack) > 0 && stack[len(stack)-1] != nil
+
+				if len(stack) == 0 {
+					topLevelValues++
+				}
+			}
+
+			continue
+		}
+
+		if expectKey {
+			key := strings.ToLower(token.(string))
+
+			keys := stack[len(stack)-1]
+			if _, seen := keys[key]; seen {
+				return errBodyDuplicatedKey
+			}
+
+			keys[key] = struct{}{}
+			expectKey = false
+
+			continue
+		}
+
+		// A value: inside an object, the next token is a key again.
+		expectKey = len(stack) > 0 && stack[len(stack)-1] != nil
+
+		if len(stack) == 0 {
+			topLevelValues++
+		}
+	}
+
+	// The decoder can report the end of input inside an unfinished container.
+	if len(stack) != 0 || topLevelValues != 1 {
+		return errBodyNotJSON
+	}
+
+	return nil
+}
+
+// bodyFieldValues returns the values a body field supplies: every scalar in an
+// array, however deeply nested, and otherwise the field itself. Objects and
+// empty arrays are supplied as their raw JSON, so they satisfy "must be
+// present" but not a pattern written for a scalar value.
+func bodyFieldValues(result gjson.Result) []string {
+	if !result.IsArray() {
+		return []string{bodyFieldValue(result)}
+	}
+
+	var values []string
+
+	var flatten func(gjson.Result)
+	flatten = func(item gjson.Result) {
+		if !item.IsArray() {
+			values = append(values, bodyFieldValue(item))
+			return
+		}
+
+		for _, element := range item.Array() {
+			flatten(element)
+		}
+	}
+
+	flatten(result)
+
+	if len(values) == 0 {
+		return []string{result.Raw}
+	}
+
+	return values
+}
+
+// bodyFieldValue is the text a single value is matched as. null is matched as
+// "null" rather than as an empty string, so a pattern that happens to accept
+// the empty string does not accept a null.
+func bodyFieldValue(result gjson.Result) string {
+	switch result.Type {
+	case gjson.Null:
+		return "null"
+	case gjson.JSON:
+		return result.Raw
+	default:
+		return result.String()
+	}
 }
 
 // valueLookup returns the values supplied for a name and whether the name was

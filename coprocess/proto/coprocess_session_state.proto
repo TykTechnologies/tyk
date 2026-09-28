@@ -38,6 +38,9 @@ message RoutingTriggerOptions {
 
   // PayloadMatches is the rule to apply to the request body. Unlike the fields above it is a single rule, not a map.
   StringRegexMap payload_matches = 6;
+
+  // BodyFieldMatches holds the rules to apply to fields of a JSON request body, keyed by the field's path in gjson syntax, e.g. "customer.id".
+  map<string, StringRegexMap> body_field_matches = 7;
 }
 
 // AccessCondition is an additional constraint a request has to satisfy before

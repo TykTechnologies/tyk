@@ -169,9 +169,11 @@ func TestGranularAccessMiddleware_Conditions(t *testing.T) {
 	queryCondition := func(param, pattern string) user.AccessCondition {
 		return user.AccessCondition{
 			On: apidef.All,
-			Options: apidef.RoutingTriggerOptions{
-				QueryValMatches: map[string]apidef.StringRegexMap{
-					param: {MatchPattern: pattern},
+			Options: user.AccessConditionOptions{
+				RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+					QueryValMatches: map[string]apidef.StringRegexMap{
+						param: {MatchPattern: pattern},
+					},
 				},
 			},
 		}
@@ -217,9 +219,11 @@ func TestGranularAccessMiddleware_Conditions(t *testing.T) {
 			name: "reversed query match denies on match",
 			conditions: []user.AccessCondition{{
 				On: apidef.All,
-				Options: apidef.RoutingTriggerOptions{
-					QueryValMatches: map[string]apidef.StringRegexMap{
-						"role": {MatchPattern: "^admin$", Reverse: true},
+				Options: user.AccessConditionOptions{
+					RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+						QueryValMatches: map[string]apidef.StringRegexMap{
+							"role": {MatchPattern: "^admin$", Reverse: true},
+						},
 					},
 				},
 			}},
@@ -231,9 +235,11 @@ func TestGranularAccessMiddleware_Conditions(t *testing.T) {
 			name: "header matches",
 			conditions: []user.AccessCondition{{
 				On: apidef.All,
-				Options: apidef.RoutingTriggerOptions{
-					HeaderMatches: map[string]apidef.StringRegexMap{
-						"X-Tenant": {MatchPattern: "^acme$"},
+				Options: user.AccessConditionOptions{
+					RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+						HeaderMatches: map[string]apidef.StringRegexMap{
+							"X-Tenant": {MatchPattern: "^acme$"},
+						},
 					},
 				},
 			}},
@@ -246,9 +252,11 @@ func TestGranularAccessMiddleware_Conditions(t *testing.T) {
 			name: "header does not match",
 			conditions: []user.AccessCondition{{
 				On: apidef.All,
-				Options: apidef.RoutingTriggerOptions{
-					HeaderMatches: map[string]apidef.StringRegexMap{
-						"X-Tenant": {MatchPattern: "^acme$"},
+				Options: user.AccessConditionOptions{
+					RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+						HeaderMatches: map[string]apidef.StringRegexMap{
+							"X-Tenant": {MatchPattern: "^acme$"},
+						},
 					},
 				},
 			}},
@@ -261,8 +269,10 @@ func TestGranularAccessMiddleware_Conditions(t *testing.T) {
 			name: "payload matches",
 			conditions: []user.AccessCondition{{
 				On: apidef.All,
-				Options: apidef.RoutingTriggerOptions{
-					PayloadMatches: apidef.StringRegexMap{MatchPattern: `"tenant":\s*"acme"`},
+				Options: user.AccessConditionOptions{
+					RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+						PayloadMatches: apidef.StringRegexMap{MatchPattern: `"tenant":\s*"acme"`},
+					},
 				},
 			}},
 			path:   "/test/orders",
@@ -274,8 +284,10 @@ func TestGranularAccessMiddleware_Conditions(t *testing.T) {
 			name: "payload does not match",
 			conditions: []user.AccessCondition{{
 				On: apidef.All,
-				Options: apidef.RoutingTriggerOptions{
-					PayloadMatches: apidef.StringRegexMap{MatchPattern: `"tenant":\s*"acme"`},
+				Options: user.AccessConditionOptions{
+					RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+						PayloadMatches: apidef.StringRegexMap{MatchPattern: `"tenant":\s*"acme"`},
+					},
 				},
 			}},
 			path:   "/test/orders",
@@ -287,12 +299,14 @@ func TestGranularAccessMiddleware_Conditions(t *testing.T) {
 			name: "on all requires every option to match",
 			conditions: []user.AccessCondition{{
 				On: apidef.All,
-				Options: apidef.RoutingTriggerOptions{
-					QueryValMatches: map[string]apidef.StringRegexMap{
-						"customer_id": {MatchPattern: "^123$"},
-					},
-					HeaderMatches: map[string]apidef.StringRegexMap{
-						"X-Tenant": {MatchPattern: "^acme$"},
+				Options: user.AccessConditionOptions{
+					RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+						QueryValMatches: map[string]apidef.StringRegexMap{
+							"customer_id": {MatchPattern: "^123$"},
+						},
+						HeaderMatches: map[string]apidef.StringRegexMap{
+							"X-Tenant": {MatchPattern: "^acme$"},
+						},
 					},
 				},
 			}},
@@ -304,12 +318,14 @@ func TestGranularAccessMiddleware_Conditions(t *testing.T) {
 			name: "on all with every option matching",
 			conditions: []user.AccessCondition{{
 				On: apidef.All,
-				Options: apidef.RoutingTriggerOptions{
-					QueryValMatches: map[string]apidef.StringRegexMap{
-						"customer_id": {MatchPattern: "^123$"},
-					},
-					HeaderMatches: map[string]apidef.StringRegexMap{
-						"X-Tenant": {MatchPattern: "^acme$"},
+				Options: user.AccessConditionOptions{
+					RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+						QueryValMatches: map[string]apidef.StringRegexMap{
+							"customer_id": {MatchPattern: "^123$"},
+						},
+						HeaderMatches: map[string]apidef.StringRegexMap{
+							"X-Tenant": {MatchPattern: "^acme$"},
+						},
 					},
 				},
 			}},
@@ -322,12 +338,14 @@ func TestGranularAccessMiddleware_Conditions(t *testing.T) {
 			name: "on any needs only one option to match",
 			conditions: []user.AccessCondition{{
 				On: apidef.Any,
-				Options: apidef.RoutingTriggerOptions{
-					QueryValMatches: map[string]apidef.StringRegexMap{
-						"customer_id": {MatchPattern: "^123$"},
-					},
-					HeaderMatches: map[string]apidef.StringRegexMap{
-						"X-Tenant": {MatchPattern: "^acme$"},
+				Options: user.AccessConditionOptions{
+					RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+						QueryValMatches: map[string]apidef.StringRegexMap{
+							"customer_id": {MatchPattern: "^123$"},
+						},
+						HeaderMatches: map[string]apidef.StringRegexMap{
+							"X-Tenant": {MatchPattern: "^acme$"},
+						},
 					},
 				},
 			}},
@@ -339,12 +357,14 @@ func TestGranularAccessMiddleware_Conditions(t *testing.T) {
 			name: "on any with no option matching",
 			conditions: []user.AccessCondition{{
 				On: apidef.Any,
-				Options: apidef.RoutingTriggerOptions{
-					QueryValMatches: map[string]apidef.StringRegexMap{
-						"customer_id": {MatchPattern: "^123$"},
-					},
-					HeaderMatches: map[string]apidef.StringRegexMap{
-						"X-Tenant": {MatchPattern: "^acme$"},
+				Options: user.AccessConditionOptions{
+					RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+						QueryValMatches: map[string]apidef.StringRegexMap{
+							"customer_id": {MatchPattern: "^123$"},
+						},
+						HeaderMatches: map[string]apidef.StringRegexMap{
+							"X-Tenant": {MatchPattern: "^acme$"},
+						},
 					},
 				},
 			}},
@@ -370,6 +390,36 @@ func TestGranularAccessMiddleware_Conditions(t *testing.T) {
 			},
 			path:   "/test/orders?customer_id=123&region=us",
 			method: http.MethodGet,
+			code:   http.StatusForbidden,
+		},
+		{
+			name: "body field matches",
+			conditions: []user.AccessCondition{{
+				On: apidef.All,
+				Options: user.AccessConditionOptions{
+					BodyFieldMatches: map[string]apidef.StringRegexMap{
+						"customer.id": {MatchPattern: "^123$"},
+					},
+				},
+			}},
+			path:   "/test/orders",
+			method: http.MethodGet,
+			body:   `{"customer": {"id": "123"}}`,
+			code:   http.StatusOK,
+		},
+		{
+			name: "body field does not match",
+			conditions: []user.AccessCondition{{
+				On: apidef.All,
+				Options: user.AccessConditionOptions{
+					BodyFieldMatches: map[string]apidef.StringRegexMap{
+						"customer.id": {MatchPattern: "^123$"},
+					},
+				},
+			}},
+			path:   "/test/orders",
+			method: http.MethodGet,
+			body:   `{"customer": {"id": "456"}}`,
 			code:   http.StatusForbidden,
 		},
 	}
@@ -449,11 +499,13 @@ func TestGranularAccessMiddleware_RequireParameterAbsent(t *testing.T) {
 					Methods: []string{http.MethodGet},
 					Conditions: []user.AccessCondition{{
 						On: apidef.All,
-						Options: apidef.RoutingTriggerOptions{
-							QueryValMatches: map[string]apidef.StringRegexMap{
-								"persnbr":  mustBeAbsent,
-								"agreenbr": mustBeAbsent,
-								"account":  mustBeAbsent,
+						Options: user.AccessConditionOptions{
+							RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+								QueryValMatches: map[string]apidef.StringRegexMap{
+									"persnbr":  mustBeAbsent,
+									"agreenbr": mustBeAbsent,
+									"account":  mustBeAbsent,
+								},
 							},
 						},
 					}},
@@ -505,8 +557,10 @@ func TestGranularAccessMiddleware_UnconditionalGrantWins(t *testing.T) {
 		Methods: []string{http.MethodGet},
 		Conditions: []user.AccessCondition{{
 			On: apidef.All,
-			Options: apidef.RoutingTriggerOptions{
-				QueryValMatches: map[string]apidef.StringRegexMap{"customer_id": {MatchPattern: "^123$"}},
+			Options: user.AccessConditionOptions{
+				RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+					QueryValMatches: map[string]apidef.StringRegexMap{"customer_id": {MatchPattern: "^123$"}},
+				},
 			},
 		}},
 	}
@@ -566,8 +620,10 @@ func TestGranularAccessMiddleware_StoredUncompilablePatternDenies(t *testing.T) 
 				Methods: []string{http.MethodGet},
 				Conditions: []user.AccessCondition{{
 					On: apidef.All,
-					Options: apidef.RoutingTriggerOptions{
-						QueryValMatches: map[string]apidef.StringRegexMap{"customer_id": {MatchPattern: "["}},
+					Options: user.AccessConditionOptions{
+						RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+							QueryValMatches: map[string]apidef.StringRegexMap{"customer_id": {MatchPattern: "["}},
+						},
 					},
 				}},
 			}},
@@ -605,10 +661,12 @@ func TestGranularAccessMiddleware_ConditionsAreAuthAgnostic(t *testing.T) {
 		Methods: []string{http.MethodGet},
 		Conditions: []user.AccessCondition{{
 			On: apidef.All,
-			Options: apidef.RoutingTriggerOptions{
-				QueryValMatches: map[string]apidef.StringRegexMap{
-					// Present and all digits, or the request is refused.
-					"persnbr": {MatchPattern: "^[0-9]+$"},
+			Options: user.AccessConditionOptions{
+				RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+					QueryValMatches: map[string]apidef.StringRegexMap{
+						// Present and all digits, or the request is refused.
+						"persnbr": {MatchPattern: "^[0-9]+$"},
+					},
 				},
 			},
 		}},

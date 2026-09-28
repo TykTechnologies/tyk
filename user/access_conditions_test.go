@@ -1,6 +1,7 @@
 package user
 
 import (
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -11,7 +12,7 @@ import (
 func queryCondition(on apidef.RoutingTriggerOnType, matches map[string]apidef.StringRegexMap) AccessCondition {
 	return AccessCondition{
 		On:      on,
-		Options: apidef.RoutingTriggerOptions{QueryValMatches: matches},
+		Options: AccessConditionOptions{RoutingTriggerOptions: apidef.RoutingTriggerOptions{QueryValMatches: matches}},
 	}
 }
 
@@ -73,7 +74,7 @@ func TestAccessConditionValidate(t *testing.T) {
 			name: "uncompilable header pattern is rejected",
 			condition: AccessCondition{
 				On:      apidef.All,
-				Options: apidef.RoutingTriggerOptions{HeaderMatches: map[string]apidef.StringRegexMap{"X-Role": {MatchPattern: "("}}},
+				Options: AccessConditionOptions{RoutingTriggerOptions: apidef.RoutingTriggerOptions{HeaderMatches: map[string]apidef.StringRegexMap{"X-Role": {MatchPattern: "("}}}},
 			},
 			wantMsg: "header_matches.X-Role",
 		},
@@ -81,15 +82,38 @@ func TestAccessConditionValidate(t *testing.T) {
 			name: "uncompilable payload pattern is rejected",
 			condition: AccessCondition{
 				On:      apidef.All,
-				Options: apidef.RoutingTriggerOptions{PayloadMatches: apidef.StringRegexMap{MatchPattern: "("}},
+				Options: AccessConditionOptions{RoutingTriggerOptions: apidef.RoutingTriggerOptions{PayloadMatches: apidef.StringRegexMap{MatchPattern: "("}}},
 			},
 			wantMsg: "payload_matches",
+		},
+		{
+			name: "body field matches on their own count as configured",
+			condition: AccessCondition{
+				On:      apidef.All,
+				Options: AccessConditionOptions{BodyFieldMatches: map[string]apidef.StringRegexMap{"customer.id": {}}},
+			},
+		},
+		{
+			name: "body field match with an empty path is rejected",
+			condition: AccessCondition{
+				On:      apidef.All,
+				Options: AccessConditionOptions{BodyFieldMatches: map[string]apidef.StringRegexMap{"": {MatchPattern: ".+"}}},
+			},
+			wantErr: ErrAccessConditionBodyFieldPath,
+		},
+		{
+			name: "uncompilable body field pattern is rejected",
+			condition: AccessCondition{
+				On:      apidef.All,
+				Options: AccessConditionOptions{BodyFieldMatches: map[string]apidef.StringRegexMap{"customer.id": {MatchPattern: "("}}},
+			},
+			wantMsg: "body_field_matches.customer.id",
 		},
 		{
 			name: "payload matches on its own counts as configured",
 			condition: AccessCondition{
 				On:      apidef.All,
-				Options: apidef.RoutingTriggerOptions{PayloadMatches: apidef.StringRegexMap{MatchPattern: "ok"}},
+				Options: AccessConditionOptions{RoutingTriggerOptions: apidef.RoutingTriggerOptions{PayloadMatches: apidef.StringRegexMap{MatchPattern: "ok"}}},
 			},
 		},
 	}
@@ -125,7 +149,7 @@ func TestValidateAccessSpecs(t *testing.T) {
 		}
 	})
 
-	t.Run("the error names the URL and the condition index", func(t *testing.T) {
+	t.Run("the error names the spec index, its URL and the condition index", func(t *testing.T) {
 		specs := []AccessSpec{
 			{URL: "/fine", Conditions: []AccessCondition{queryCondition(apidef.All, map[string]apidef.StringRegexMap{"a": {MatchPattern: ".+"}})}},
 			{
@@ -142,10 +166,52 @@ func TestValidateAccessSpecs(t *testing.T) {
 			t.Fatal("got no error, want one")
 		}
 
-		for _, want := range []string{`"/broken"`, "conditions[1]", "query_val_matches.b"} {
+		for _, want := range []string{`allowed_urls[1] ("/broken")`, "conditions[1]", "query_val_matches.b"} {
 			if !strings.Contains(err.Error(), want) {
 				t.Fatalf("got %v, want it to mention %q", err, want)
 			}
 		}
 	})
+}
+
+// The URL Rewrite options serialise inline beside body_field_matches, so a
+// condition keeps the flat shape the Dashboard and the API documentation use.
+func TestAccessConditionOptionsJSON(t *testing.T) {
+	raw := `{"on":"all","options":{"query_val_matches":{"persnbr":{"match_rx":"","reverse":true}},` +
+		`"body_field_matches":{"customer.id":{"match_rx":"^[0-9]+$","reverse":false}}}}`
+
+	var condition AccessCondition
+	if err := json.Unmarshal([]byte(raw), &condition); err != nil {
+		t.Fatal(err)
+	}
+
+	if !condition.Options.QueryValMatches["persnbr"].Reverse {
+		t.Fatal("query_val_matches did not decode inline")
+	}
+
+	if condition.Options.BodyFieldMatches["customer.id"].MatchPattern != "^[0-9]+$" {
+		t.Fatal("body_field_matches did not decode")
+	}
+
+	encoded, err := json.Marshal(condition)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var shape struct {
+		Options map[string]json.RawMessage `json:"options"`
+	}
+	if err := json.Unmarshal(encoded, &shape); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, key := range []string{"query_val_matches", "header_matches", "payload_matches", "body_field_matches"} {
+		if _, ok := shape.Options[key]; !ok {
+			t.Errorf("options.%s missing from %s", key, encoded)
+		}
+	}
+
+	if _, ok := shape.Options["RoutingTriggerOptions"]; ok {
+		t.Errorf("the embedded options were nested rather than inlined: %s", encoded)
+	}
 }

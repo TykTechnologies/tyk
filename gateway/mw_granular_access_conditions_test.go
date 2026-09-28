@@ -44,7 +44,7 @@ func evalCondition(t *testing.T, condition user.AccessCondition, target string, 
 }
 
 func queryCond(on apidef.RoutingTriggerOnType, matches map[string]apidef.StringRegexMap) user.AccessCondition {
-	return user.AccessCondition{On: on, Options: apidef.RoutingTriggerOptions{QueryValMatches: matches}}
+	return user.AccessCondition{On: on, Options: user.AccessConditionOptions{RoutingTriggerOptions: apidef.RoutingTriggerOptions{QueryValMatches: matches}}}
 }
 
 // A query parameter can be required to be absent, which is what lets a policy
@@ -136,10 +136,12 @@ func TestAccessConditions_EveryValueMustMatch(t *testing.T) {
 func TestAccessConditions_RepeatedHeaderCannotSatisfyAnother(t *testing.T) {
 	condition := user.AccessCondition{
 		On: apidef.All,
-		Options: apidef.RoutingTriggerOptions{
-			HeaderMatches: map[string]apidef.StringRegexMap{
-				"X-Tenant": {MatchPattern: "^acme$"},
-				"X-Region": {MatchPattern: "^eu$"},
+		Options: user.AccessConditionOptions{
+			RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+				HeaderMatches: map[string]apidef.StringRegexMap{
+					"X-Tenant": {MatchPattern: "^acme$"},
+					"X-Region": {MatchPattern: "^eu$"},
+				},
 			},
 		},
 	}
@@ -161,9 +163,11 @@ func TestAccessConditions_RepeatedHeaderCannotSatisfyAnother(t *testing.T) {
 func TestAccessConditions_RequireHeaderAbsent(t *testing.T) {
 	condition := user.AccessCondition{
 		On: apidef.All,
-		Options: apidef.RoutingTriggerOptions{
-			HeaderMatches: map[string]apidef.StringRegexMap{
-				"X-Impersonate": {MatchPattern: ".*", Reverse: true},
+		Options: user.AccessConditionOptions{
+			RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+				HeaderMatches: map[string]apidef.StringRegexMap{
+					"X-Impersonate": {MatchPattern: ".*", Reverse: true},
+				},
 			},
 		},
 	}
@@ -196,9 +200,11 @@ func TestAccessConditions_FailClosed(t *testing.T) {
 	t.Run("session meta condition without a session denies", func(t *testing.T) {
 		condition := user.AccessCondition{
 			On: apidef.All,
-			Options: apidef.RoutingTriggerOptions{
-				SessionMetaMatches: map[string]apidef.StringRegexMap{
-					"role": {MatchPattern: "^admin$"},
+			Options: user.AccessConditionOptions{
+				RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+					SessionMetaMatches: map[string]apidef.StringRegexMap{
+						"role": {MatchPattern: "^admin$"},
+					},
 				},
 			},
 		}
@@ -208,9 +214,11 @@ func TestAccessConditions_FailClosed(t *testing.T) {
 
 // on:any is satisfied by one group, on:all needs them all.
 func TestAccessConditions_AnyAll(t *testing.T) {
-	options := apidef.RoutingTriggerOptions{
-		QueryValMatches: map[string]apidef.StringRegexMap{"persnbr": {MatchPattern: "^[0-9]+$"}},
-		HeaderMatches:   map[string]apidef.StringRegexMap{"X-Tenant": {MatchPattern: "^acme$"}},
+	options := user.AccessConditionOptions{
+		RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+			QueryValMatches: map[string]apidef.StringRegexMap{"persnbr": {MatchPattern: "^[0-9]+$"}},
+			HeaderMatches:   map[string]apidef.StringRegexMap{"X-Tenant": {MatchPattern: "^acme$"}},
+		},
 	}
 
 	all := user.AccessCondition{On: apidef.All, Options: options}
@@ -271,8 +279,10 @@ func TestAccessConditions_MultipleConditionsAreAnded(t *testing.T) {
 func TestAccessConditions_Payload(t *testing.T) {
 	condition := user.AccessCondition{
 		On: apidef.All,
-		Options: apidef.RoutingTriggerOptions{
-			PayloadMatches: apidef.StringRegexMap{MatchPattern: `"tenant":\s*"acme"`},
+		Options: user.AccessConditionOptions{
+			RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+				PayloadMatches: apidef.StringRegexMap{MatchPattern: `"tenant":\s*"acme"`},
+			},
 		},
 	}
 
@@ -281,8 +291,10 @@ func TestAccessConditions_Payload(t *testing.T) {
 
 	reverse := user.AccessCondition{
 		On: apidef.All,
-		Options: apidef.RoutingTriggerOptions{
-			PayloadMatches: apidef.StringRegexMap{MatchPattern: `"admin":\s*true`, Reverse: true},
+		Options: user.AccessConditionOptions{
+			RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+				PayloadMatches: apidef.StringRegexMap{MatchPattern: `"admin":\s*true`, Reverse: true},
+			},
 		},
 	}
 	assert.True(t, evalCondition(t, reverse, "http://x/connections", nil, `{"admin": false}`))
@@ -304,9 +316,11 @@ func TestAccessConditions_Payload(t *testing.T) {
 func TestAccessConditions_PathParts(t *testing.T) {
 	condition := user.AccessCondition{
 		On: apidef.All,
-		Options: apidef.RoutingTriggerOptions{
-			PathPartMatches: map[string]apidef.StringRegexMap{
-				"segment": {MatchPattern: "^admin$"},
+		Options: user.AccessConditionOptions{
+			RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+				PathPartMatches: map[string]apidef.StringRegexMap{
+					"segment": {MatchPattern: "^admin$"},
+				},
 			},
 		},
 	}
@@ -316,9 +330,11 @@ func TestAccessConditions_PathParts(t *testing.T) {
 
 	reverse := user.AccessCondition{
 		On: apidef.All,
-		Options: apidef.RoutingTriggerOptions{
-			PathPartMatches: map[string]apidef.StringRegexMap{
-				"segment": {MatchPattern: "^admin$", Reverse: true},
+		Options: user.AccessConditionOptions{
+			RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+				PathPartMatches: map[string]apidef.StringRegexMap{
+					"segment": {MatchPattern: "^admin$", Reverse: true},
+				},
 			},
 		},
 	}
@@ -326,14 +342,161 @@ func TestAccessConditions_PathParts(t *testing.T) {
 	assert.True(t, evalCondition(t, reverse, "http://x/public/connections", nil, ""))
 }
 
+func bodyFieldCond(on apidef.RoutingTriggerOnType, matches map[string]apidef.StringRegexMap) user.AccessCondition {
+	return user.AccessCondition{On: on, Options: user.AccessConditionOptions{BodyFieldMatches: matches}}
+}
+
+// Body field matches address a field of a JSON body by its gjson path, and
+// follow the same present / absent / every-value rules as the named matchers.
+func TestAccessConditions_BodyFields(t *testing.T) {
+	const target = "http://x/connections"
+
+	t.Run("must be present", func(t *testing.T) {
+		condition := bodyFieldCond(apidef.All, map[string]apidef.StringRegexMap{"customer.id": {}})
+
+		assert.True(t, evalCondition(t, condition, target, nil, `{"customer": {"id": "42"}}`))
+		assert.True(t, evalCondition(t, condition, target, nil, `{"customer": {"id": 42}}`), "numbers are matched as text")
+		assert.False(t, evalCondition(t, condition, target, nil, `{"customer": {"name": "x"}}`))
+		assert.False(t, evalCondition(t, condition, target, nil, ""), "an empty body has no fields")
+	})
+
+	t.Run("must match", func(t *testing.T) {
+		condition := bodyFieldCond(apidef.All, map[string]apidef.StringRegexMap{"customer.id": {MatchPattern: "^[0-9]+$"}})
+
+		assert.True(t, evalCondition(t, condition, target, nil, `{"customer": {"id": "42"}}`))
+		assert.False(t, evalCondition(t, condition, target, nil, `{"customer": {"id": "abc"}}`))
+		assert.False(t, evalCondition(t, condition, target, nil, `{}`))
+	})
+
+	t.Run("must be absent", func(t *testing.T) {
+		condition := bodyFieldCond(apidef.All, map[string]apidef.StringRegexMap{"customer.id": {Reverse: true}})
+
+		assert.True(t, evalCondition(t, condition, target, nil, `{"customer": {}}`))
+		assert.True(t, evalCondition(t, condition, target, nil, ""), "an empty body has no fields")
+		assert.False(t, evalCondition(t, condition, target, nil, `{"customer": {"id": "42"}}`))
+	})
+
+	t.Run("must not match", func(t *testing.T) {
+		condition := bodyFieldCond(apidef.All, map[string]apidef.StringRegexMap{"role": {MatchPattern: "^admin$", Reverse: true}})
+
+		assert.True(t, evalCondition(t, condition, target, nil, `{"role": "reader"}`))
+		assert.True(t, evalCondition(t, condition, target, nil, `{}`))
+		assert.False(t, evalCondition(t, condition, target, nil, `{"role": "admin"}`))
+	})
+
+	t.Run("every element of an array has to match", func(t *testing.T) {
+		condition := bodyFieldCond(apidef.All, map[string]apidef.StringRegexMap{"items.#.sku": {MatchPattern: "^A-"}})
+
+		assert.True(t, evalCondition(t, condition, target, nil, `{"items": [{"sku": "A-1"}, {"sku": "A-2"}]}`))
+		assert.False(t, evalCondition(t, condition, target, nil, `{"items": [{"sku": "A-1"}, {"sku": "B-2"}]}`),
+			"one bad element must not be excused by a good one")
+	})
+
+	t.Run("a body that is not JSON is refused, even for must be absent", func(t *testing.T) {
+		absent := bodyFieldCond(apidef.All, map[string]apidef.StringRegexMap{"customer.id": {Reverse: true}})
+
+		assert.False(t, evalCondition(t, absent, target, nil, `{"customer": {"id": "42"`))
+		assert.False(t, evalCondition(t, absent, target, nil, `customer.id=42`))
+	})
+
+	t.Run("a repeated key is refused, since the upstream may read the other one", func(t *testing.T) {
+		notAdmin := bodyFieldCond(apidef.All, map[string]apidef.StringRegexMap{"role": {MatchPattern: "^admin$", Reverse: true}})
+		absent := bodyFieldCond(apidef.All, map[string]apidef.StringRegexMap{"a.role": {Reverse: true}})
+
+		// The path lookup takes the first key, most decoders take the last.
+		assert.False(t, evalCondition(t, notAdmin, target, nil, `{"role":"user","role":"admin"}`))
+		assert.False(t, evalCondition(t, absent, target, nil, `{"a":{"x":1},"a":{"role":"admin"}}`))
+		// Go's decoder fills a struct field from a key in any case.
+		assert.False(t, evalCondition(t, notAdmin, target, nil, `{"role":"user","Role":"admin"}`))
+		// The same key in sibling objects is not a repeat.
+		assert.True(t, evalCondition(t, notAdmin, target, nil, `{"role":"user","items":[{"role":"a"},{"role":"b"}]}`))
+	})
+
+	t.Run("a body nested too deeply is refused without exhausting the stack", func(t *testing.T) {
+		condition := bodyFieldCond(apidef.All, map[string]apidef.StringRegexMap{"customer.id": {Reverse: true}})
+
+		deep := strings.Repeat("[", 1_000_000) + strings.Repeat("]", 1_000_000)
+		assert.False(t, evalCondition(t, condition, target, nil, deep))
+
+		fine := strings.Repeat(`{"a":`, 100) + "1" + strings.Repeat("}", 100)
+		assert.True(t, evalCondition(t, condition, target, nil, fine))
+	})
+
+	t.Run("more than one top level value is refused", func(t *testing.T) {
+		absent := bodyFieldCond(apidef.All, map[string]apidef.StringRegexMap{"role": {Reverse: true}})
+
+		assert.False(t, evalCondition(t, absent, target, nil, `{} {"role":"admin"}`))
+		assert.False(t, evalCondition(t, absent, target, nil, `{"a":1`))
+	})
+
+	t.Run("null is matched as null, not as an empty value", func(t *testing.T) {
+		digits := bodyFieldCond(apidef.All, map[string]apidef.StringRegexMap{"id": {MatchPattern: "^[0-9]*$"}})
+		present := bodyFieldCond(apidef.All, map[string]apidef.StringRegexMap{"id": {}})
+
+		assert.False(t, evalCondition(t, digits, target, nil, `{"id":null}`))
+		assert.True(t, evalCondition(t, present, target, nil, `{"id":null}`))
+	})
+
+	t.Run("nested arrays cannot hide a value from the pattern", func(t *testing.T) {
+		notAdmin := bodyFieldCond(apidef.All, map[string]apidef.StringRegexMap{"roles": {MatchPattern: "^admin$", Reverse: true}})
+
+		assert.False(t, evalCondition(t, notAdmin, target, nil, `{"roles":[["admin"]]}`))
+		assert.True(t, evalCondition(t, notAdmin, target, nil, `{"roles":[["reader"],"writer"]}`))
+	})
+
+	t.Run("objects and empty arrays are present, but match no scalar pattern", func(t *testing.T) {
+		present := bodyFieldCond(apidef.All, map[string]apidef.StringRegexMap{"customer": {}})
+		digits := bodyFieldCond(apidef.All, map[string]apidef.StringRegexMap{"customer": {MatchPattern: "^[0-9]+$"}})
+
+		assert.True(t, evalCondition(t, present, target, nil, `{"customer":{"id":1}}`))
+		assert.True(t, evalCondition(t, present, target, nil, `{"customer":[]}`))
+		assert.False(t, evalCondition(t, digits, target, nil, `{"customer":{"id":1}}`))
+		assert.False(t, evalCondition(t, digits, target, nil, `{"customer":[]}`))
+	})
+
+	t.Run("an unreadable body fails a body field group under any, too", func(t *testing.T) {
+		condition := bodyFieldCond(apidef.Any, map[string]apidef.StringRegexMap{"a": {Reverse: true}, "b": {Reverse: true}})
+
+		assert.False(t, evalCondition(t, condition, target, nil, `not json`))
+	})
+
+	t.Run("all and any", func(t *testing.T) {
+		matches := map[string]apidef.StringRegexMap{
+			"tenant": {MatchPattern: "^acme$"},
+			"scope":  {MatchPattern: "^read$"},
+		}
+
+		assert.False(t, evalCondition(t, bodyFieldCond(apidef.All, matches), target, nil, `{"tenant": "acme"}`))
+		assert.True(t, evalCondition(t, bodyFieldCond(apidef.All, matches), target, nil, `{"tenant": "acme", "scope": "read"}`))
+		assert.True(t, evalCondition(t, bodyFieldCond(apidef.Any, matches), target, nil, `{"tenant": "acme"}`))
+		assert.False(t, evalCondition(t, bodyFieldCond(apidef.Any, matches), target, nil, `{"tenant": "globex"}`))
+	})
+
+	t.Run("the body is still readable downstream", func(t *testing.T) {
+		const body = `{"customer": {"id": "42"}}`
+
+		r, err := http.NewRequest(http.MethodPost, target, strings.NewReader(body))
+		require.NoError(t, err)
+
+		m := &GranularAccessMiddleware{BaseMiddleware: &BaseMiddleware{}}
+		condition := bodyFieldCond(apidef.All, map[string]apidef.StringRegexMap{"customer.id": {}})
+		assert.True(t, m.conditionsMatch(r, user.AccessSpec{Conditions: []user.AccessCondition{condition}}))
+
+		remaining, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+		assert.Equal(t, body, string(remaining))
+	})
+}
+
 // TestAccessConditions_EveryTriggerOptionIsEvaluated guards the coupling
-// between access conditions and apidef.RoutingTriggerOptions, which access
-// conditions borrow as their configuration shape.
+// between access conditions and their options: apidef.RoutingTriggerOptions,
+// which access conditions borrow from URL Rewrite, plus the fields
+// user.AccessConditionOptions adds on top.
 //
 // An option the evaluator does not know about is not merely unimplemented: the
 // condition would be accepted, appear to constrain the request, and then be
 // ignored, granting access the operator believed they had restricted. So a
-// field added here for URL Rewrite's benefit has to be handled here too, or
+// field added for URL Rewrite's benefit has to be handled here too, or
 // deliberately rejected at validation.
 func TestAccessConditions_EveryTriggerOptionIsEvaluated(t *testing.T) {
 	evaluated := map[string]bool{
@@ -343,14 +506,31 @@ func TestAccessConditions_EveryTriggerOptionIsEvaluated(t *testing.T) {
 		"SessionMetaMatches":    true,
 		"RequestContextMatches": true,
 		"PayloadMatches":        true,
+		"BodyFieldMatches":      true,
 	}
 
-	optionsType := reflect.TypeOf(apidef.RoutingTriggerOptions{})
+	var fields []reflect.StructField
+
+	optionsType := reflect.TypeOf(user.AccessConditionOptions{})
 	for i := 0; i < optionsType.NumField(); i++ {
-		name := optionsType.Field(i).Name
+		field := optionsType.Field(i)
+
+		if field.Anonymous {
+			for j := 0; j < field.Type.NumField(); j++ {
+				fields = append(fields, field.Type.Field(j))
+			}
+
+			continue
+		}
+
+		fields = append(fields, field)
+	}
+
+	for _, field := range fields {
+		name := field.Name
 
 		if !evaluated[name] {
-			t.Errorf("apidef.RoutingTriggerOptions gained field %q, which the access condition evaluator ignores. "+
+			t.Errorf("the access condition options gained field %q, which the access condition evaluator ignores. "+
 				"Either evaluate it in conditionMatch or reject it in AccessCondition.Validate, "+
 				"then add it here.", name)
 
@@ -379,7 +559,7 @@ func TestAccessConditions_AbsenceSpellings(t *testing.T) {
 		t.Run(spelling.name, func(t *testing.T) {
 			condition := user.AccessCondition{
 				On:      apidef.All,
-				Options: apidef.RoutingTriggerOptions{QueryValMatches: map[string]apidef.StringRegexMap{"persnbr": spelling.option}},
+				Options: user.AccessConditionOptions{RoutingTriggerOptions: apidef.RoutingTriggerOptions{QueryValMatches: map[string]apidef.StringRegexMap{"persnbr": spelling.option}}},
 			}
 
 			for _, tc := range []struct {
@@ -442,10 +622,12 @@ func TestAccessConditions_PayloadNotReadWhenAlreadyDecided(t *testing.T) {
 
 		spec := user.AccessSpec{Conditions: []user.AccessCondition{{
 			On: apidef.All,
-			Options: apidef.RoutingTriggerOptions{
-				// Not satisfied, so the condition is already decided.
-				QueryValMatches: map[string]apidef.StringRegexMap{"persnbr": {MatchPattern: "^nope$"}},
-				PayloadMatches:  payload,
+			Options: user.AccessConditionOptions{
+				RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+					// Not satisfied, so the condition is already decided.
+					QueryValMatches: map[string]apidef.StringRegexMap{"persnbr": {MatchPattern: "^nope$"}},
+					PayloadMatches:  payload,
+				},
 			},
 		}}}
 
@@ -458,9 +640,11 @@ func TestAccessConditions_PayloadNotReadWhenAlreadyDecided(t *testing.T) {
 
 		spec := user.AccessSpec{Conditions: []user.AccessCondition{{
 			On: apidef.Any,
-			Options: apidef.RoutingTriggerOptions{
-				QueryValMatches: map[string]apidef.StringRegexMap{"persnbr": {MatchPattern: "^[0-9]+$"}},
-				PayloadMatches:  payload,
+			Options: user.AccessConditionOptions{
+				RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+					QueryValMatches: map[string]apidef.StringRegexMap{"persnbr": {MatchPattern: "^[0-9]+$"}},
+					PayloadMatches:  payload,
+				},
 			},
 		}}}
 
@@ -473,9 +657,11 @@ func TestAccessConditions_PayloadNotReadWhenAlreadyDecided(t *testing.T) {
 
 		spec := user.AccessSpec{Conditions: []user.AccessCondition{{
 			On: apidef.All,
-			Options: apidef.RoutingTriggerOptions{
-				QueryValMatches: map[string]apidef.StringRegexMap{"persnbr": {MatchPattern: "^[0-9]+$"}},
-				PayloadMatches:  payload,
+			Options: user.AccessConditionOptions{
+				RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+					QueryValMatches: map[string]apidef.StringRegexMap{"persnbr": {MatchPattern: "^[0-9]+$"}},
+					PayloadMatches:  payload,
+				},
 			},
 		}}}
 
@@ -501,7 +687,7 @@ func TestAccessConditions_RequestContextWithoutData(t *testing.T) {
 	contextCondition := func(option apidef.StringRegexMap) user.AccessCondition {
 		return user.AccessCondition{
 			On:      apidef.All,
-			Options: apidef.RoutingTriggerOptions{RequestContextMatches: map[string]apidef.StringRegexMap{"tenant": option}},
+			Options: user.AccessConditionOptions{RoutingTriggerOptions: apidef.RoutingTriggerOptions{RequestContextMatches: map[string]apidef.StringRegexMap{"tenant": option}}},
 		}
 	}
 

@@ -101,7 +101,7 @@ func validateAccessConditions(accessRights map[string]user.AccessDefinition) err
 
 	for _, apiID := range apiIDs {
 		if err := user.ValidateAccessSpecs(accessRights[apiID].AllowedURLs); err != nil {
-			return fmt.Errorf("access_rights[%q]: %w", apiID, err)
+			return fmt.Errorf("access_rights[%q].%w", apiID, err)
 		}
 	}
 

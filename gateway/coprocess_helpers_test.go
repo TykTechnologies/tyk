@@ -68,15 +68,20 @@ func TestCoprocessSessionState_AllowedURLs_RoundTrip(t *testing.T) {
 						Conditions: []user.AccessCondition{
 							{
 								On: apidef.All,
-								Options: apidef.RoutingTriggerOptions{
-									QueryValMatches: map[string]apidef.StringRegexMap{
-										"persnbr": {Reverse: true},
-										"account": {MatchPattern: "^[0-9]+$"},
+								Options: user.AccessConditionOptions{
+									RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+										QueryValMatches: map[string]apidef.StringRegexMap{
+											"persnbr": {Reverse: true},
+											"account": {MatchPattern: "^[0-9]+$"},
+										},
+										HeaderMatches: map[string]apidef.StringRegexMap{
+											"X-Role": {MatchPattern: "^admin$"},
+										},
+										PayloadMatches: apidef.StringRegexMap{MatchPattern: "ok"},
 									},
-									HeaderMatches: map[string]apidef.StringRegexMap{
-										"X-Role": {MatchPattern: "^admin$"},
+									BodyFieldMatches: map[string]apidef.StringRegexMap{
+										"customer.id": {MatchPattern: "^[0-9]+$"},
 									},
-									PayloadMatches: apidef.StringRegexMap{MatchPattern: "ok"},
 								},
 							},
 						},
