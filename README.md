@@ -52,52 +52,51 @@ There are three different ways you can [try Tyk]( https://tyk.io/docs):
 
 ## Get Started
 
-We’ll install Tyk, add auth, analytics, quotas and rate limiting to your API in under 5 minutes.
+Run the open source Tyk Gateway with Docker in under 2 minutes. You need Docker and Docker Compose.
 
-We recommend [Tyk Gateway Docker](https://github.com/TykTechnologies/tyk-gateway-docker#start-up-the-deployment) as the quickest way to get started now. Later, you can move to one of our other [supported distributions](https://tyk.io/docs/apim/open-source/installation/) if you prefer.
+Follow the [Tyk Open Source Gateway quick start](https://tyk.io/docs/deployment-and-operations/tyk-open-source-api-gateway/quick-start). It shows you how to:
 
-#### Step 1 - Clone the docker-compose repository
-```console
-git clone https://github.com/TykTechnologies/tyk-gateway-docker
-```
+1. Create a Gateway configuration file (`tyk.conf`).
+2. Create a Docker Compose file that runs Tyk Gateway and Redis.
+3. Start the Gateway with `docker compose up -d`.
 
-#### Step 2 - Change to the new directory
-```console
-cd tyk-gateway-docker
-```
-
-#### Step 3 - Deploy Tyk Gateway and Redis
-```console
-docker-compose up
-```
-
-You can run this in detach mode using the `-d` flag: `docker-compose up -d`
-
-**Congratulations, you’re done!**
-
-Your Tyk Gateway is now configured and ready to use. Confirm this by checking against the ‘hello’ endpoint:
+Confirm that the Gateway runs. Send a request to the `hello` endpoint:
 ```console
 curl localhost:8080/hello
 ```
 Output:
 ```json
-{"status": "pass", "version": "v3.2.1", "description": "Tyk GW"}
+{"status": "pass", "version": "v5.x.x", "description": "Tyk GW"}
 ```
 
-Next, visit [adding your first API](https://tyk.io/docs/getting-started/create-api/) to Tyk and follow the Open Source instructions.
+Next, [create your first API](https://tyk.io/docs/api-management/gateway-config-managing-oas#creating-an-api) with the Tyk Gateway API.
+
+To try the full Tyk stack (Gateway, Dashboard, Developer Portal and Pump), see [Try the full Tyk Self-Managed stack](#try-the-full-tyk-self-managed-stack).
+
+### Try the full Tyk Self-Managed stack
+
+To evaluate the full Tyk stack, use [Tyk Install](https://github.com/TykTechnologies/tyk-install). It runs Tyk Gateway, Tyk Dashboard, the Developer Portal, Tyk Pump, Redis and PostgreSQL with Docker Compose, and preloads sample APIs and policies. You need a trial licence from [tyk.io/sign-up](https://tyk.io/sign-up/).
+
+```console
+git clone https://github.com/TykTechnologies/tyk-install
+cd tyk-install/docker/self-managed
+cp .env.example .env   # add your licence keys to .env
+cd ../getting-started
+bash start.sh
+```
+
+For the full steps, see the [Tyk Self-Managed quick start](https://tyk.io/docs/getting-started/quick-start). Tyk Install also has Helm-based Kubernetes deployments.
 
 ---
 
 Other Installations are available:
 
-1. [Docker](https://tyk.io/docs/tyk-oss/ce-docker/)
-2. [Kubernetes-Native ](https://github.com/TykTechnologies/tyk-oss-k8s-deployment)
-3. [Kubernetes-Helm](https://github.com/TykTechnologies/tyk-helm-chart#install-tyk-community-edition)
-4. [Ansible](https://tyk.io/docs/tyk-oss/ce-ansible/)
-5. [Red Hat](https://tyk.io/docs/tyk-oss/ce-redhat/)
-6. [Ubuntu](https://tyk.io/docs/tyk-oss/ce-ubuntu/)
-7. [CentOS](https://tyk.io/docs/tyk-oss/ce-centos/)
-8. [Compile Tyk from Source](#compiling-tyk-gateway)
+1. [Docker](https://tyk.io/docs/deployment-and-operations/tyk-open-source-api-gateway/quick-start)
+2. [Kubernetes with Helm](https://tyk.io/docs/apim/open-source/installation#quick-start-with-helm-chart) (`tyk-oss` chart from [Tyk Charts](https://github.com/TykTechnologies/tyk-charts))
+3. [Ansible](https://tyk.io/docs/apim/open-source/installation#install-tyk-gateway-with-ansible)
+4. [Red Hat and CentOS](https://tyk.io/docs/apim/open-source/installation#install-tyk-gateway-through-shell)
+5. [Ubuntu](https://tyk.io/docs/apim/open-source/installation#install-tyk-gateway-with-ubuntu)
+6. [Compile Tyk from Source](#compiling-tyk-gateway)
 
 ### Getting started with AI Gateway for LLM and MCP
 
@@ -114,7 +113,7 @@ Industry Standard Authentication: [JWT,](https://tyk.io/docs/basic-config-and-se
 
 [Open API Standards:](https://tyk.io/docs/getting-started/using-oas-definitions/import-an-oas-api/) Import your Swagger and OpenAPI Documents (OAS 2.X and OAS 3.0.1) to scaffold APIs in Tyk.
 
-[Ultra performant](https://tyk.io/performance-tuning-your-tyk-api-gateway/): Low latency, and thousands of rps with just a single CPU, horizontally and vertically scalable.
+[Ultra performant](https://tyk.io/blog/performance-tuning-your-tyk-api-gateway/): Low latency, and thousands of rps with just a single CPU, horizontally and vertically scalable.
 
 [Content mediation](https://tyk.io/docs/advanced-configuration/transform-traffic/): Transform all the things, from request or response headers to converting between SOAP and GraphQL.
 
@@ -126,19 +125,19 @@ Industry Standard Authentication: [JWT,](https://tyk.io/docs/basic-config-and-se
 
 [Granular Access Control](https://tyk.io/docs/security/security-policies/secure-apis-method-path/) - Grant access to one or more APIs on a per version and operation basis.
 
-[Blocklist](https://tyk.io/docs/advanced-configuration/transform-traffic/endpoint-designer/#blocklist)/[Allowlist](https://tyk.io/docs/advanced-configuration/transform-traffic/endpoint-designer/#allowlist)/[Ignore](https://tyk.io/docs/advanced-configuration/transform-traffic/endpoint-designer/#ignore) endpoint access - Enforce strict security models on a version-by-version basis to your access points.
+[Blocklist](https://tyk.io/docs/api-management/traffic-transformation/block-list)/[Allowlist](https://tyk.io/docs/api-management/traffic-transformation/allow-list)/[Ignore](https://tyk.io/docs/api-management/traffic-transformation/ignore-authentication) endpoint access - Enforce strict security models on a version-by-version basis to your access points.
 
 Analytics logging - Record detailed usage data on who is using your APIs (raw data only)
 
-[CORS](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/cors/) - Enable CORS for certain APIs so users can make browser-based requests
+[CORS](https://tyk.io/docs/api-management/security-features#cross-origin-resource-sharing-cors) - Enable CORS for certain APIs so users can make browser-based requests
 
 [Webhooks](https://tyk.io/docs/basic-config-and-security/report-monitor-trigger-events/webhooks/) - Trigger webhooks against events such as Quota Violations and Authentication failures
 
-[IP AllowListing](https://tyk.io/docs/tyk-apis/tyk-gateway-api/api-definition-objects/ip-whitelisting/) - Block access to non-trusted IP addresses for more secure interactions
+[IP AllowListing](https://tyk.io/docs/api-management/gateway-config-tyk-oas#ipaccesscontrol) - Block access to non-trusted IP addresses for more secure interactions
 
-[Hitless reloads](https://tyk.io/docs/tyk-configuration-reference/hot-restart-tyk-gateway-process/) - Tyk configurations can be altered dynamically and the service restarted without affecting any active request
+[Hitless reloads](https://tyk.io/docs/api-reference/hot-reload/hot-reload-a-single-node) - Tyk configurations can be altered dynamically and the service restarted without affecting any active request
 
-[Kubernetes native](https://tyk.io/docs/tyk-oss/ce-helm-chart/) declarative API: using Open Source [Tyk Operator](https://github.com/TykTechnologies/tyk-operator) (more info in OSS section)
+[Kubernetes native](https://tyk.io/docs/apim/open-source/installation#quick-start-with-helm-chart) declarative API: using [Tyk Operator](https://tyk.io/docs/api-management/automations/operator) (requires a licence)
 ![OpenSourceAPIGateway-Diagram](https://github.com/TykTechnologies/tyk/assets/8012032/7466be3f-fb81-4a95-88ac-3b09254c815d)
 
 Tyk Technologies uses the same API Gateway for all it’s applications. Protecting, securing, and processing APIs for thousands of organizations and businesses around the world. Ideal for Open Banking, building software in the clouds as well as exposing APIs to teams, partners & consumers.
@@ -155,8 +154,6 @@ Tyk Technologies maintains other Open Source Software which can be used in conju
 
 [Tyk Identity Broker](https://github.com/TykTechnologies/tyk-identity-broker) - Tyk Authentication Proxy for third-party login
 
-[Tyk Sync ](https://tyk.io/docs/tyk-sync/)- Command line tool and library to manage and synchronise a Tyk installation with your version control system (VCS).
-
 [Tyk Mserv](https://github.com/TykTechnologies/mserv) - Asset Server and gRPC host
 
 
@@ -168,7 +165,6 @@ All the documentation for Tyk Gateway and other OSS-related topics can be found 
 * [Tyk Community Board](https://community.tyk.io/) - Technical support from the Tyk Community
 * [Write a GitHub Issue](https://github.com/TykTechnologies/tyk/issues/new/choose) - Feature requests & bug reports welcome
 * [Technical blog](https://tyk.io/blog/) - Tyk announcements and updates
-* [Newsletters ](https://pages.tyk.io/newsletter)- Subscribe to our GraphQL & API newsletters
 * If you are using Tyk give us a star ⭐️
 
 ## Licensing
@@ -186,7 +182,7 @@ Compile from Source
 git clone https://github.com/TykTechnologies/tyk
 go build
 ```
-Go version 1.22 is required to build `master`, the current development version. Tyk is officially supported on `Linux/amd64`, `Linux/i386` and `Linux/arm64`.
+Use the Go version in [`go.mod`](go.mod) to build `master`, the current development version. Tyk is officially supported on `Linux/amd64`, `Linux/i386` and `Linux/arm64`.
 
 To run tests locally use the following command:
 ```console
