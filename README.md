@@ -72,6 +72,10 @@ Output:
 Next, [create your first API](https://tyk.io/docs/api-management/gateway-config-managing-oas#creating-an-api) with the Tyk Gateway API.
 
 
+### Try Tyk Cloud
+
+Tyk Cloud is the easiest way to set up Tyk. Tyk hosts and manages the full stack for you, so you do not install anything. To start a free trial, [create a Tyk Cloud account](https://tyk.io/docs/getting-started/create-account).
+
 ### Try the full Tyk Self-Managed stack
 
 To evaluate the full Tyk stack, use [Tyk Install](https://github.com/TykTechnologies/tyk-install). It runs Tyk Gateway, Tyk Dashboard, the Developer Portal, Tyk Pump, Redis and PostgreSQL with Docker Compose, and preloads sample APIs and policies. You need a licence. To get one, [request a Tyk Self-Managed trial](https://tyk.io/self-managed-trial/).
