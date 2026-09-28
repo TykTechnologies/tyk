@@ -71,7 +71,6 @@ Output:
 
 Next, [create your first API](https://tyk.io/docs/api-management/gateway-config-managing-oas#creating-an-api) with the Tyk Gateway API.
 
-To try the full Tyk stack (Gateway, Dashboard, Developer Portal and Pump), see [Try the full Tyk Self-Managed stack](#try-the-full-tyk-self-managed-stack).
 
 ### Try the full Tyk Self-Managed stack
 
