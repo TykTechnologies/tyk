@@ -167,6 +167,7 @@ All the documentation for Tyk Gateway and other OSS-related topics can be found 
 * [Tyk Community Board](https://community.tyk.io/) - Technical support from the Tyk Community
 * [Write a GitHub Issue](https://github.com/TykTechnologies/tyk/issues/new/choose) - Feature requests & bug reports welcome
 * [Technical blog](https://tyk.io/blog/) - Tyk announcements and updates
+* [Newsletter](https://share.hsforms.com/1tJmtTKY7RhSyTaHtFLBehQ3ifmg) - Subscribe to the Tyk newsletter
 * If you are using Tyk give us a star ⭐️
 
 ## Licensing
