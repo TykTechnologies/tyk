@@ -48,7 +48,9 @@ There are three different ways you can [try Tyk]( https://tyk.io/docs):
 
 ---
 
-## Get Started
+## Getting Started
+
+Tyk Cloud is the easiest way to set up Tyk. Tyk hosts and manages the full stack for you, so you do not install anything. You can [sign up for a free trial of Tyk Cloud](https://tyk.io/docs/getting-started/create-account) and get started in minutes. If not, you can follow the instructions below to get started with Tyk on your own infrastructure.
 
 Run the open source Tyk Gateway with Docker in under 2 minutes. You need Docker and Docker Compose.
 
@@ -69,14 +71,9 @@ Output:
 
 Next, [create your first API](https://tyk.io/docs/api-management/gateway-config-managing-oas#creating-an-api) with the Tyk Gateway API.
 
+### Try full API Management Lifecyle
 
-### Try Tyk Cloud
-
-Tyk Cloud is the easiest way to set up Tyk. Tyk hosts and manages the full stack for you, so you do not install anything. To start a free trial, [create a Tyk Cloud account](https://tyk.io/docs/getting-started/create-account).
-
-### Try the full Tyk Self-Managed stack
-
-To evaluate the full Tyk stack, use [Tyk Install](https://github.com/TykTechnologies/tyk-install). It runs Tyk Gateway, Tyk Dashboard, the Developer Portal, Tyk Pump, Redis and PostgreSQL with Docker Compose, and preloads sample APIs and policies. You need a licence. To get one, [request a Tyk Self-Managed trial](https://tyk.io/self-managed-trial/).
+To evaluate the enterprise API management platform on your infrastructure full, use [Tyk Install](https://github.com/TykTechnologies/tyk-install). It runs Tyk Gateway, Tyk Dashboard, the Developer Portal, Tyk Pump, Redis and PostgreSQL with Docker Compose, and preloads sample APIs and policies. You need a licence. To get one, [request a Tyk Self-Managed trial](https://tyk.io/self-managed-trial/).
 
 ```console
 git clone https://github.com/TykTechnologies/tyk-install
