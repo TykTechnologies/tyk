@@ -70,7 +70,7 @@ Output:
 
 Next, [create your first API](https://tyk.io/docs/api-management/gateway-config-managing-oas#creating-an-api) with the Tyk Gateway API.
 
-### Try full API Management Lifecyle
+### Try full API Management Lifecycle
 
 To evaluate the enterprise API management platform on your infrastructure, use [Tyk Install](https://github.com/TykTechnologies/tyk-install). It runs Tyk Gateway, Tyk Dashboard, the Developer Portal, Tyk Pump, Redis and PostgreSQL with Docker Compose, and preloads sample APIs and policies. You need a licence. To get one, [request a Tyk Self-Managed trial](https://tyk.io/self-managed-trial/).
 
