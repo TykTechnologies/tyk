@@ -69,7 +69,7 @@ curl localhost:8080/hello
 ```
 Output:
 ```json
-{"status": "pass", "version": "v5.x.x", "description": "Tyk GW"}
+{"status":"pass","version":"5.x.x","description":"Tyk GW"}
 ```
 
 Next, [create your first API](https://tyk.io/docs/api-management/gateway-config-managing-oas#creating-an-api) with the Tyk Gateway API.
