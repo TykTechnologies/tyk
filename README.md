@@ -35,13 +35,13 @@ There are three different ways you can [try Tyk]( https://tyk.io/docs):
      <center>
      </center>
      </br>The Enterprise API Management platform: Management Control Plane with GUI & Developer Portal.
-     </br><a href="https://tyk.io/docs/tyk-self-managed/">Tyk Self Managed</a>
+     </br><a href="https://tyk.io/docs/getting-started/quick-start">Tyk Self Managed</a>
    </td>
    <td>
      <center>
      </center>
      </br>The Enterprise API Management SaaS platform: hosted Management Control Plane with GUI & Developer Portal.
-     </br><a href="https://tyk.io/docs/deployment-and-operations/tyk-cloud-platform/quick-start">Tyk Cloud </a>
+     </br><a href="https://tyk.io/docs/getting-started/create-account">Tyk Cloud </a>
    </td>
   </tr>
 </table>
@@ -73,7 +73,7 @@ Next, [create your first API](https://tyk.io/docs/api-management/gateway-config-
 
 ### Try full API Management Lifecyle
 
-To evaluate the enterprise API management platform on your infrastructure full, use [Tyk Install](https://github.com/TykTechnologies/tyk-install). It runs Tyk Gateway, Tyk Dashboard, the Developer Portal, Tyk Pump, Redis and PostgreSQL with Docker Compose, and preloads sample APIs and policies. You need a licence. To get one, [request a Tyk Self-Managed trial](https://tyk.io/self-managed-trial/).
+To evaluate the enterprise API management platform on your infrastructure, use [Tyk Install](https://github.com/TykTechnologies/tyk-install). It runs Tyk Gateway, Tyk Dashboard, the Developer Portal, Tyk Pump, Redis and PostgreSQL with Docker Compose, and preloads sample APIs and policies. You need a licence. To get one, [request a Tyk Self-Managed trial](https://tyk.io/self-managed-trial/).
 
 ```console
 git clone https://github.com/TykTechnologies/tyk-install
@@ -84,17 +84,6 @@ bash start.sh
 ```
 
 For the full steps, see the [Tyk Self-Managed quick start](https://tyk.io/docs/getting-started/quick-start).
-
----
-
-Other Installations are available:
-
-1. [Docker](https://tyk.io/docs/deployment-and-operations/tyk-open-source-api-gateway/quick-start)
-2. [Kubernetes with Helm](https://tyk.io/docs/apim/open-source/installation#quick-start-with-helm-chart) (`tyk-oss` chart from [Tyk Charts](https://github.com/TykTechnologies/tyk-charts))
-3. [Ansible](https://tyk.io/docs/apim/open-source/installation#install-tyk-gateway-with-ansible)
-4. [Red Hat and CentOS](https://tyk.io/docs/apim/open-source/installation#install-tyk-gateway-through-shell)
-5. [Ubuntu](https://tyk.io/docs/apim/open-source/installation#install-tyk-gateway-with-ubuntu)
-6. [Compile Tyk from Source](#compiling-tyk-gateway)
 
 ### Getting started with AI Gateway for LLM and MCP
 
