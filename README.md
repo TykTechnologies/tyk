@@ -22,8 +22,6 @@
 
 Built from the ground up, as the [fastest API Gateway](https://tyk.io/performance-benchmarks/) on the planet since 2014.
 
-_Tyk Gateway_ is provided ‘Batteries-included’, with no feature lockout. Enabling your organization to rate limit, auth, gather analytics, apply microservice patterns [and more](#open-source-api-gateway-features) with ease.
-
 There are three different ways you can [try Tyk]( https://tyk.io/docs):
 
 <table>
