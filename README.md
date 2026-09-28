@@ -93,15 +93,13 @@ For the full steps, see the [Tyk Self-Managed quick start](https://tyk.io/docs/g
 
 Other Installations are available:
 
-1. [Docker](https://tyk.io/docs/tyk-oss/ce-docker/)
-2. [Kubernetes-Native ](https://github.com/TykTechnologies/tyk-oss-k8s-deployment)
-3. [Kubernetes-Helm](https://github.com/TykTechnologies/tyk-helm-chart#install-tyk-community-edition)
-4. [Ansible](https://tyk.io/docs/tyk-oss/ce-ansible/)
-5. [Red Hat](https://tyk.io/docs/tyk-oss/ce-redhat/)
-6. [Ubuntu](https://tyk.io/docs/tyk-oss/ce-ubuntu/)
-7. [CentOS](https://tyk.io/docs/tyk-oss/ce-centos/)
-8. [Compile Tyk from Source](#compiling-tyk-gateway)
-9. 
+1. [Docker](https://tyk.io/docs/deployment-and-operations/tyk-open-source-api-gateway/quick-start)
+2. [Kubernetes with Helm](https://tyk.io/docs/apim/open-source/installation#quick-start-with-helm-chart) (`tyk-oss` chart from [Tyk Charts](https://github.com/TykTechnologies/tyk-charts))
+3. [Ansible](https://tyk.io/docs/apim/open-source/installation#install-tyk-gateway-with-ansible)
+4. [Red Hat and CentOS](https://tyk.io/docs/apim/open-source/installation#install-tyk-gateway-on-red-hat-rhel-%2F-centos)
+5. [Ubuntu](https://tyk.io/docs/apim/open-source/installation#install-tyk-gateway-with-ubuntu)
+6. [Compile Tyk from Source](#compiling-tyk-gateway)
+
 ### Getting started with AI Gateway for LLM and MCP
 
 Tyk Gateway governs MCP traffic from AI agents, applying authentication, rate limiting and per-tool access control to every JSON-RPC call. [Tyk AI Studio](https://tyk.io/tyk-ai-studio/) handles LLM management, with model routing, budgets and guardrails across providers. Start at the [AI management overview](https://tyk.io/docs/ai-management/overview).
@@ -169,6 +167,7 @@ All the documentation for Tyk Gateway and other OSS-related topics can be found 
 * [Tyk Community Board](https://community.tyk.io/) - Technical support from the Tyk Community
 * [Write a GitHub Issue](https://github.com/TykTechnologies/tyk/issues/new/choose) - Feature requests & bug reports welcome
 * [Technical blog](https://tyk.io/blog/) - Tyk announcements and updates
+* [Newsletter](https://share.hsforms.com/1tJmtTKY7RhSyTaHtFLBehQ3ifmg) - Subscribe to the Tyk newsletter
 * If you are using Tyk give us a star ⭐️
 
 ## Licensing
