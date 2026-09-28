@@ -1530,6 +1530,58 @@
             "loadBalancing"
           ]
         }
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "loadBalancing": {
+                "properties": {
+                  "enabled": {
+                    "const": true
+                  }
+                },
+                "required": [
+                  "enabled"
+                ]
+              }
+            },
+            "required": [
+              "loadBalancing"
+            ],
+            "not": {
+              "properties": {
+                "dnsDiscovery": {
+                  "properties": {
+                    "enabled": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ]
+                }
+              },
+              "required": [
+                "dnsDiscovery"
+              ]
+            }
+          },
+          "then": {
+            "properties": {
+              "loadBalancing": {
+                "properties": {
+                  "targets": {
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "targets"
+                ]
+              }
+            }
+          }
+        }
       ]
     },
     "X-Tyk-State": {
@@ -2957,27 +3009,6 @@
       },
       "required": [
         "enabled"
-      ],
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "enabled": {
-                "const": true
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "targets": {
-                "minItems": 1
-              }
-            },
-            "required": [
-              "targets"
-            ]
-          }
-        }
       ]
     },
     "X-Tyk-TLSTransport": {
