@@ -104,7 +104,7 @@ require (
 	github.com/coder/websocket v1.8.13
 	github.com/dop251/goja v0.0.0-20241024094426-79f3a7efcdbd
 	github.com/eclipse/paho.mqtt.golang v1.5.1
-	github.com/getkin/kin-openapi v0.133.0
+	github.com/getkin/kin-openapi v0.149.0
 	github.com/go-playground/validator/v10 v10.30.1
 	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/goccy/go-json v0.10.5
