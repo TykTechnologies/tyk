@@ -335,7 +335,7 @@ func checkBodyForFieldMatching(body string) error {
 		}
 
 		if err != nil {
-			return fmt.Errorf("%w: %v", errBodyNotJSON, err)
+			return fmt.Errorf("%w: %w", errBodyNotJSON, err)
 		}
 
 		if delim, ok := token.(json.Delim); ok {
@@ -365,7 +365,14 @@ func checkBodyForFieldMatching(body string) error {
 		}
 
 		if expectKey {
-			key := strings.ToLower(token.(string))
+			// The decoder only returns a string where an object key belongs, but
+			// a body this check cannot read is refused rather than trusted.
+			rawKey, ok := token.(string)
+			if !ok {
+				return errBodyNotJSON
+			}
+
+			key := strings.ToLower(rawKey)
 
 			keys := stack[len(stack)-1]
 			if _, seen := keys[key]; seen {
