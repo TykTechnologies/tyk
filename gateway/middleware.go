@@ -193,8 +193,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 					writeResponse = false
 				}
 
-				handler := ErrorHandler{mw.Base()}
-				handler.HandleError(w, r, err.Error(), errCode, writeResponse)
+				(&ErrorHandler{mw.Base()}).handleErrorExtended(w, r, err, errCode, writeResponse)
 
 				meta["error"] = err.Error()
 
