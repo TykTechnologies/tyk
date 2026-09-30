@@ -1067,14 +1067,14 @@ func (a APIDefinitionLoader) filterSprigFuncs() texttemplate.FuncMap {
 // resolveTemplatePath returns the body transform template path the gateway will read.
 // By default the path is confined to the configured TemplatePath root via the
 // gateway's osutil.Root, which also resolves symlinks and relative segments. When
-// AllowUnsafeEndpointTemplatePaths is set the path is returned verbatim, without
+// AllowUnsafeBodyTransformTemplatePaths is set the path is returned verbatim, without
 // any validation.
 func (a APIDefinitionLoader) resolveTemplatePath(path string) (string, error) {
 	if a.Gw == nil {
 		return "", errors.New("gateway is not initialized")
 	}
 
-	if a.Gw.GetConfig().AllowUnsafeEndpointTemplatePaths {
+	if a.Gw.GetConfig().AllowUnsafeBodyTransformTemplatePaths {
 		return path, nil
 	}
 

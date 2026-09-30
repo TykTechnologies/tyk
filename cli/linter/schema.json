@@ -1723,7 +1723,7 @@
       "type": ["boolean", "null"],
       "additionalProperties": false
     },
-    "allow_unsafe_endpoint_template_paths": {
+    "allow_unsafe_body_transform_template_paths": {
       "type": ["boolean", "null"],
       "additionalProperties": false
     },
