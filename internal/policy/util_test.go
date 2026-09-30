@@ -111,7 +111,9 @@ func TestMergeAllowedURLs_BodyFieldConditions(t *testing.T) {
 		return []user.AccessCondition{{
 			On: apidef.All,
 			Options: user.AccessConditionOptions{
-				BodyFieldMatches: map[string]apidef.StringRegexMap{"customer.id": {MatchPattern: pattern}},
+				BodyFieldMatches: []user.BodyFieldMatch{
+					{Path: "customer.id", StringRegexMap: apidef.StringRegexMap{MatchPattern: pattern}},
+				},
 			},
 		}}
 	}

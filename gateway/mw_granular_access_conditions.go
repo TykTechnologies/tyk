@@ -256,7 +256,7 @@ const maxBodyFieldDepth = 512
 // the match rather than being read as supplying no fields. Otherwise a caller
 // could satisfy a "must be absent" rule simply by sending a body the Gateway
 // reads differently from the upstream.
-func (m *GranularAccessMiddleware) matchBodyFields(r *http.Request, options map[string]apidef.StringRegexMap, checkAny bool) bool {
+func (m *GranularAccessMiddleware) matchBodyFields(r *http.Request, matches []user.BodyFieldMatch, checkAny bool) bool {
 	body, err := readRequestBody(r)
 	if err != nil {
 		m.Logger().WithError(err).Error("Could not read request body to evaluate access condition")
@@ -270,14 +270,30 @@ func (m *GranularAccessMiddleware) matchBodyFields(r *http.Request, options map[
 		}
 	}
 
-	return matchNamedValues(options, checkAny, func(path string) ([]string, bool) {
-		result := gjson.Get(body, path)
-		if !result.Exists() {
-			return nil, false
+	// A list, so one path can carry several rules. Each is its own matcher,
+	// combined under checkAny exactly as the named matchers are.
+	for _, match := range matches {
+		result := gjson.Get(body, match.Path)
+
+		var values []string
+		if result.Exists() {
+			values = bodyFieldValues(result)
 		}
 
-		return bodyFieldValues(result), true
-	})
+		if matchValues(match.StringRegexMap, values, result.Exists()) {
+			if checkAny {
+				return true
+			}
+
+			continue
+		}
+
+		if !checkAny {
+			return false
+		}
+	}
+
+	return !checkAny
 }
 
 var (

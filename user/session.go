@@ -64,15 +64,27 @@ type AccessCondition struct {
 type AccessConditionOptions struct {
 	apidef.RoutingTriggerOptions `bson:",inline"`
 	// BodyFieldMatches holds the rules to apply to fields of a JSON request
-	// body, keyed by the field's path in gjson syntax, e.g. "customer.id".
-	// This is the same path syntax error overrides use for body_field.
+	// body. Each names the field by its path in gjson syntax, e.g.
+	// "customer.id", the same path syntax error overrides use for body_field.
+	//
+	// A list rather than a map keyed by path, because paths contain dots and
+	// a map key is stored as a field name, which some databases refuse to
+	// store. It also lets one path carry more than one rule.
 	//
 	// Paths are case sensitive. A body that repeats a key, in any case, or that
 	// is not valid JSON fails the match. A path through an array such as
 	// "items.#.sku" checks the elements that have the field and skips those
 	// that do not, so pair it with a match on the field being present where
 	// every element has to carry it.
-	BodyFieldMatches map[string]apidef.StringRegexMap `bson:"body_field_matches,omitempty" json:"body_field_matches,omitempty" msg:"body_field_matches"`
+	BodyFieldMatches []BodyFieldMatch `bson:"body_field_matches,omitempty" json:"body_field_matches,omitempty" msg:"body_field_matches"`
+}
+
+// BodyFieldMatch is a rule applied to one field of a JSON request body.
+type BodyFieldMatch struct {
+	// Path addresses the field in gjson syntax, e.g. "customer.id".
+	Path string `bson:"path" json:"path" msg:"path"`
+	// The rule itself, serialised inline beside the path.
+	apidef.StringRegexMap `bson:",inline"`
 }
 
 // AccessSpecs define what URLS a user has access to an what methods are enabled

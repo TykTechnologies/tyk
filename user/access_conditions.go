@@ -77,13 +77,13 @@ func (c AccessCondition) Validate() error {
 	if len(c.Options.BodyFieldMatches) > 0 {
 		configured++
 
-		for _, path := range sortedKeys(c.Options.BodyFieldMatches) {
-			if path == "" {
-				return fmt.Errorf("body_field_matches: %w", ErrAccessConditionBodyFieldPath)
+		for index, match := range c.Options.BodyFieldMatches {
+			if match.Path == "" {
+				return fmt.Errorf("body_field_matches[%d]: %w", index, ErrAccessConditionBodyFieldPath)
 			}
 
-			if err := validatePattern(c.Options.BodyFieldMatches[path].MatchPattern); err != nil {
-				return fmt.Errorf("body_field_matches.%s: %w", path, err)
+			if err := validatePattern(match.MatchPattern); err != nil {
+				return fmt.Errorf("body_field_matches[%d] (%q): %w", index, match.Path, err)
 			}
 		}
 	}

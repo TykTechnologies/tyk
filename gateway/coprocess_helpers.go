@@ -242,7 +242,7 @@ func tykTriggerOptions(protoOptions *coprocess.RoutingTriggerOptions) user.Acces
 			RequestContextMatches: tykStringRegexMaps(protoOptions.RequestContextMatches),
 			PayloadMatches:        tykStringRegexMap(protoOptions.PayloadMatches),
 		},
-		BodyFieldMatches: tykStringRegexMaps(protoOptions.BodyFieldMatches),
+		BodyFieldMatches: tykBodyFieldMatches(protoOptions.BodyFieldMatches),
 	}
 }
 
@@ -296,7 +296,7 @@ func protoTriggerOptions(options user.AccessConditionOptions) *coprocess.Routing
 		SessionMetaMatches:    protoStringRegexMaps(options.SessionMetaMatches),
 		RequestContextMatches: protoStringRegexMaps(options.RequestContextMatches),
 		PayloadMatches:        protoStringRegexMap(options.PayloadMatches),
-		BodyFieldMatches:      protoStringRegexMaps(options.BodyFieldMatches),
+		BodyFieldMatches:      protoBodyFieldMatches(options.BodyFieldMatches),
 	}
 }
 
@@ -318,4 +318,41 @@ func protoStringRegexMap(in apidef.StringRegexMap) *coprocess.StringRegexMap {
 		MatchRx: in.MatchPattern,
 		Reverse: in.Reverse,
 	}
+}
+
+func tykBodyFieldMatches(in []*coprocess.BodyFieldMatch) []user.BodyFieldMatch {
+	if len(in) == 0 {
+		return nil
+	}
+
+	out := make([]user.BodyFieldMatch, 0, len(in))
+	for _, match := range in {
+		if match == nil {
+			continue
+		}
+
+		out = append(out, user.BodyFieldMatch{
+			Path:           match.Path,
+			StringRegexMap: apidef.StringRegexMap{MatchPattern: match.MatchRx, Reverse: match.Reverse},
+		})
+	}
+
+	return out
+}
+
+func protoBodyFieldMatches(in []user.BodyFieldMatch) []*coprocess.BodyFieldMatch {
+	if len(in) == 0 {
+		return nil
+	}
+
+	out := make([]*coprocess.BodyFieldMatch, 0, len(in))
+	for _, match := range in {
+		out = append(out, &coprocess.BodyFieldMatch{
+			Path:    match.Path,
+			MatchRx: match.MatchPattern,
+			Reverse: match.Reverse,
+		})
+	}
+
+	return out
 }

@@ -90,24 +90,27 @@ func TestAccessConditionValidate(t *testing.T) {
 			name: "body field matches on their own count as configured",
 			condition: AccessCondition{
 				On:      apidef.All,
-				Options: AccessConditionOptions{BodyFieldMatches: map[string]apidef.StringRegexMap{"customer.id": {}}},
+				Options: AccessConditionOptions{BodyFieldMatches: []BodyFieldMatch{{Path: "customer.id"}}},
 			},
 		},
 		{
 			name: "body field match with an empty path is rejected",
 			condition: AccessCondition{
 				On:      apidef.All,
-				Options: AccessConditionOptions{BodyFieldMatches: map[string]apidef.StringRegexMap{"": {MatchPattern: ".+"}}},
+				Options: AccessConditionOptions{BodyFieldMatches: []BodyFieldMatch{{StringRegexMap: apidef.StringRegexMap{MatchPattern: ".+"}}}},
 			},
 			wantErr: ErrAccessConditionBodyFieldPath,
 		},
 		{
 			name: "uncompilable body field pattern is rejected",
 			condition: AccessCondition{
-				On:      apidef.All,
-				Options: AccessConditionOptions{BodyFieldMatches: map[string]apidef.StringRegexMap{"customer.id": {MatchPattern: "("}}},
+				On: apidef.All,
+				Options: AccessConditionOptions{BodyFieldMatches: []BodyFieldMatch{
+					{Path: "customer.id", StringRegexMap: apidef.StringRegexMap{MatchPattern: "^[0-9]+$"}},
+					{Path: "customer.id", StringRegexMap: apidef.StringRegexMap{MatchPattern: "("}},
+				}},
 			},
-			wantMsg: "body_field_matches.customer.id",
+			wantMsg: `body_field_matches[1] ("customer.id")`,
 		},
 		{
 			name: "payload matches on its own counts as configured",
@@ -178,7 +181,7 @@ func TestValidateAccessSpecs(t *testing.T) {
 // condition keeps the flat shape the Dashboard and the API documentation use.
 func TestAccessConditionOptionsJSON(t *testing.T) {
 	raw := `{"on":"all","options":{"query_val_matches":{"persnbr":{"match_rx":"","reverse":true}},` +
-		`"body_field_matches":{"customer.id":{"match_rx":"^[0-9]+$","reverse":false}}}}`
+		`"body_field_matches":[{"path":"customer.id","match_rx":"^[0-9]+$","reverse":false}]}}`
 
 	var condition AccessCondition
 	if err := json.Unmarshal([]byte(raw), &condition); err != nil {
@@ -189,7 +192,9 @@ func TestAccessConditionOptionsJSON(t *testing.T) {
 		t.Fatal("query_val_matches did not decode inline")
 	}
 
-	if condition.Options.BodyFieldMatches["customer.id"].MatchPattern != "^[0-9]+$" {
+	if len(condition.Options.BodyFieldMatches) != 1 ||
+		condition.Options.BodyFieldMatches[0].Path != "customer.id" ||
+		condition.Options.BodyFieldMatches[0].MatchPattern != "^[0-9]+$" {
 		t.Fatal("body_field_matches did not decode")
 	}
 

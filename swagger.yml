@@ -5803,14 +5803,14 @@ components:
       description: The matches an access condition evaluates. A match with an empty match_rx and reverse set to true requires the name to be absent.
       properties:
         body_field_matches:
-          additionalProperties:
-            $ref: '#/components/schemas/StringRegexMap'
-          description: Matches on fields of a JSON request body, keyed by the field's path in gjson syntax, e.g. "customer.id". Paths are case sensitive. A body that is not valid JSON, or that repeats a key within an object (in any case), fails the match. Every element of an array field has to match; a path through an array such as "items.#.sku" skips elements that do not have the field.
+          description: Matches on fields of a JSON request body. Each names its field by path in gjson syntax, e.g. "customer.id", and one path can carry several rules. Paths are case sensitive. A body that is not valid JSON, or that repeats a key within an object (in any case), fails the match. Every element of an array field has to match; a path through an array such as "items.#.sku" skips elements that do not have the field.
           example:
-            customer.id:
-              match_rx: ^[0-9]+$
+          - match_rx: ^[0-9]+$
+            path: customer.id
+          items:
+            $ref: '#/components/schemas/BodyFieldMatch'
           nullable: true
-          type: object
+          type: array
         header_matches:
           additionalProperties:
             $ref: '#/components/schemas/StringRegexMap'
@@ -5847,6 +5847,19 @@ components:
           description: Matches on the session's metadata, keyed by metadata key.
           nullable: true
           type: object
+      type: object
+    BodyFieldMatch:
+      description: A rule applied to one field of a JSON request body.
+      properties:
+        match_rx:
+          description: The regular expression the field's values are matched against. Empty places no constraint on the value.
+          type: string
+        path:
+          description: The field's path in gjson syntax, e.g. "customer.id".
+          type: string
+        reverse:
+          description: Inverts the rule. With an empty match_rx, the field must be absent.
+          type: boolean
       type: object
     AccessSpec:
       properties:

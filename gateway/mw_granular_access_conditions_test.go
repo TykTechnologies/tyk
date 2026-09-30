@@ -342,8 +342,15 @@ func TestAccessConditions_PathParts(t *testing.T) {
 	assert.True(t, evalCondition(t, reverse, "http://x/public/connections", nil, ""))
 }
 
+// bodyFieldCond builds a body field condition from path / rule pairs. A map
+// keeps the cases short; the order of the rules does not change the outcome.
 func bodyFieldCond(on apidef.RoutingTriggerOnType, matches map[string]apidef.StringRegexMap) user.AccessCondition {
-	return user.AccessCondition{On: on, Options: user.AccessConditionOptions{BodyFieldMatches: matches}}
+	list := make([]user.BodyFieldMatch, 0, len(matches))
+	for path, match := range matches {
+		list = append(list, user.BodyFieldMatch{Path: path, StringRegexMap: match})
+	}
+
+	return user.AccessCondition{On: on, Options: user.AccessConditionOptions{BodyFieldMatches: list}}
 }
 
 // Body field matches address a field of a JSON body by its gjson path, and
@@ -470,6 +477,19 @@ func TestAccessConditions_BodyFields(t *testing.T) {
 		assert.True(t, evalCondition(t, bodyFieldCond(apidef.All, matches), target, nil, `{"tenant": "acme", "scope": "read"}`))
 		assert.True(t, evalCondition(t, bodyFieldCond(apidef.Any, matches), target, nil, `{"tenant": "acme"}`))
 		assert.False(t, evalCondition(t, bodyFieldCond(apidef.Any, matches), target, nil, `{"tenant": "globex"}`))
+	})
+
+	t.Run("one path can carry several rules, and all of them apply", func(t *testing.T) {
+		condition := user.AccessCondition{On: apidef.All, Options: user.AccessConditionOptions{
+			BodyFieldMatches: []user.BodyFieldMatch{
+				{Path: "customer.id", StringRegexMap: apidef.StringRegexMap{MatchPattern: "^[0-9]+$"}},
+				{Path: "customer.id", StringRegexMap: apidef.StringRegexMap{MatchPattern: "^0", Reverse: true}},
+			},
+		}}
+
+		assert.True(t, evalCondition(t, condition, target, nil, `{"customer": {"id": "42"}}`))
+		assert.False(t, evalCondition(t, condition, target, nil, `{"customer": {"id": "042"}}`), "the second rule must not be lost")
+		assert.False(t, evalCondition(t, condition, target, nil, `{"customer": {"id": "x"}}`))
 	})
 
 	t.Run("the body is still readable downstream", func(t *testing.T) {

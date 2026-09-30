@@ -397,8 +397,8 @@ func TestGranularAccessMiddleware_Conditions(t *testing.T) {
 			conditions: []user.AccessCondition{{
 				On: apidef.All,
 				Options: user.AccessConditionOptions{
-					BodyFieldMatches: map[string]apidef.StringRegexMap{
-						"customer.id": {MatchPattern: "^123$"},
+					BodyFieldMatches: []user.BodyFieldMatch{
+						{Path: "customer.id", StringRegexMap: apidef.StringRegexMap{MatchPattern: "^123$"}},
 					},
 				},
 			}},
@@ -412,8 +412,8 @@ func TestGranularAccessMiddleware_Conditions(t *testing.T) {
 			conditions: []user.AccessCondition{{
 				On: apidef.All,
 				Options: user.AccessConditionOptions{
-					BodyFieldMatches: map[string]apidef.StringRegexMap{
-						"customer.id": {MatchPattern: "^123$"},
+					BodyFieldMatches: []user.BodyFieldMatch{
+						{Path: "customer.id", StringRegexMap: apidef.StringRegexMap{MatchPattern: "^123$"}},
 					},
 				},
 			}},

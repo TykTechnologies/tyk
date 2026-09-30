@@ -79,8 +79,10 @@ func TestCoprocessSessionState_AllowedURLs_RoundTrip(t *testing.T) {
 										},
 										PayloadMatches: apidef.StringRegexMap{MatchPattern: "ok"},
 									},
-									BodyFieldMatches: map[string]apidef.StringRegexMap{
-										"customer.id": {MatchPattern: "^[0-9]+$"},
+									BodyFieldMatches: []user.BodyFieldMatch{
+										{Path: "customer.id", StringRegexMap: apidef.StringRegexMap{MatchPattern: "^[0-9]+$"}},
+										// One path can carry more than one rule.
+										{Path: "customer.id", StringRegexMap: apidef.StringRegexMap{MatchPattern: "^0", Reverse: true}},
 									},
 								},
 							},
