@@ -3477,8 +3477,8 @@ func TestAPIDefinitionLoader_resolveTemplatePath(t *testing.T) {
 	newLoader := func(allowUnsafe, withRoot bool) APIDefinitionLoader {
 		gw := &Gateway{}
 		gw.SetConfig(config.Config{
-			TemplatePath:                     templateRoot,
-			AllowUnsafeEndpointTemplatePaths: allowUnsafe,
+			TemplatePath:                          templateRoot,
+			AllowUnsafeBodyTransformTemplatePaths: allowUnsafe,
 		})
 		if withRoot {
 			gw.OSRoot = root
