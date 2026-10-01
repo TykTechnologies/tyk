@@ -711,39 +711,47 @@ type APIDefinition struct {
 	// CertificatePinningDisabled disables public key pinning
 	CertificatePinningDisabled bool `bson:"certificate_pinning_disabled" json:"certificate_pinning_disabled,omitempty"`
 
-	EnableJWT                            bool                   `bson:"enable_jwt" json:"enable_jwt"`
-	UseStandardAuth                      bool                   `bson:"use_standard_auth" json:"use_standard_auth"`
-	UseGoPluginAuth                      bool                   `bson:"use_go_plugin_auth" json:"use_go_plugin_auth"`       // Deprecated. Use CustomPluginAuthEnabled instead.
-	EnableCoProcessAuth                  bool                   `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"` // Deprecated. Use CustomPluginAuthEnabled instead.
-	CustomPluginAuthEnabled              bool                   `bson:"custom_plugin_auth_enabled" json:"custom_plugin_auth_enabled"`
-	JWTSigningMethod                     string                 `bson:"jwt_signing_method" json:"jwt_signing_method"`
-	JWTSource                            string                 `bson:"jwt_source" json:"jwt_source"`
-	JWTJwksURIs                          []JWK                  `bson:"jwt_jwks_uris" json:"jwt_jwks_uris"`
-	JWTIdentityBaseField                 string                 `bson:"jwt_identit_base_field" json:"jwt_identity_base_field"`
-	JWTClientIDBaseField                 string                 `bson:"jwt_client_base_field" json:"jwt_client_base_field"`
-	JWTPolicyFieldName                   string                 `bson:"jwt_policy_field_name" json:"jwt_policy_field_name"`
-	JWTDefaultPolicies                   []string               `bson:"jwt_default_policies" json:"jwt_default_policies"`
-	JWTIssuedAtValidationSkew            uint64                 `bson:"jwt_issued_at_validation_skew" json:"jwt_issued_at_validation_skew"`
-	JWTExpiresAtValidationSkew           uint64                 `bson:"jwt_expires_at_validation_skew" json:"jwt_expires_at_validation_skew"`
-	JWTNotBeforeValidationSkew           uint64                 `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
-	JWTSkipKid                           bool                   `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
-	Scopes                               Scopes                 `bson:"scopes" json:"scopes,omitempty"`
-	IDPClientIDMappingDisabled           bool                   `bson:"idp_client_id_mapping_disabled" json:"idp_client_id_mapping_disabled"`
-	JWTScopeToPolicyMapping              map[string]string      `bson:"jwt_scope_to_policy_mapping" json:"jwt_scope_to_policy_mapping"` // Deprecated: use Scopes.JWT.ScopeToPolicy or Scopes.OIDC.ScopeToPolicy
-	JWTScopeClaimName                    string                 `bson:"jwt_scope_claim_name" json:"jwt_scope_claim_name"`               // Deprecated: use Scopes.JWT.ScopeClaimName or Scopes.OIDC.ScopeClaimName
-	NotificationsDetails                 NotificationsManager   `bson:"notifications" json:"notifications"`
-	EnableSignatureChecking              bool                   `bson:"enable_signature_checking" json:"enable_signature_checking"`
-	HmacAllowedClockSkew                 float64                `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
-	HmacAllowedAlgorithms                []string               `bson:"hmac_allowed_algorithms" json:"hmac_allowed_algorithms"`
-	RequestSigning                       RequestSigningMeta     `bson:"request_signing" json:"request_signing"`
-	BaseIdentityProvidedBy               AuthTypeEnum           `bson:"base_identity_provided_by" json:"base_identity_provided_by"`
-	VersionDefinition                    VersionDefinition      `bson:"definition" json:"definition"`
-	VersionData                          VersionData            `bson:"version_data" json:"version_data"` // Deprecated. Use VersionDefinition instead.
-	UptimeTests                          UptimeTests            `bson:"uptime_tests" json:"uptime_tests"`
-	Proxy                                ProxyConfig            `bson:"proxy" json:"proxy"`
-	DisableRateLimit                     bool                   `bson:"disable_rate_limit" json:"disable_rate_limit"`
-	DisableQuota                         bool                   `bson:"disable_quota" json:"disable_quota"`
-	CustomMiddleware                     MiddlewareSection      `bson:"custom_middleware" json:"custom_middleware"`
+	EnableJWT                  bool                 `bson:"enable_jwt" json:"enable_jwt"`
+	UseStandardAuth            bool                 `bson:"use_standard_auth" json:"use_standard_auth"`
+	UseGoPluginAuth            bool                 `bson:"use_go_plugin_auth" json:"use_go_plugin_auth"`       // Deprecated. Use CustomPluginAuthEnabled instead.
+	EnableCoProcessAuth        bool                 `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"` // Deprecated. Use CustomPluginAuthEnabled instead.
+	CustomPluginAuthEnabled    bool                 `bson:"custom_plugin_auth_enabled" json:"custom_plugin_auth_enabled"`
+	JWTSigningMethod           string               `bson:"jwt_signing_method" json:"jwt_signing_method"`
+	JWTSource                  string               `bson:"jwt_source" json:"jwt_source"`
+	JWTJwksURIs                []JWK                `bson:"jwt_jwks_uris" json:"jwt_jwks_uris"`
+	JWTIdentityBaseField       string               `bson:"jwt_identit_base_field" json:"jwt_identity_base_field"`
+	JWTClientIDBaseField       string               `bson:"jwt_client_base_field" json:"jwt_client_base_field"`
+	JWTPolicyFieldName         string               `bson:"jwt_policy_field_name" json:"jwt_policy_field_name"`
+	JWTDefaultPolicies         []string             `bson:"jwt_default_policies" json:"jwt_default_policies"`
+	JWTIssuedAtValidationSkew  uint64               `bson:"jwt_issued_at_validation_skew" json:"jwt_issued_at_validation_skew"`
+	JWTExpiresAtValidationSkew uint64               `bson:"jwt_expires_at_validation_skew" json:"jwt_expires_at_validation_skew"`
+	JWTNotBeforeValidationSkew uint64               `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
+	JWTSkipKid                 bool                 `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
+	Scopes                     Scopes               `bson:"scopes" json:"scopes,omitempty"`
+	IDPClientIDMappingDisabled bool                 `bson:"idp_client_id_mapping_disabled" json:"idp_client_id_mapping_disabled"`
+	JWTScopeToPolicyMapping    map[string]string    `bson:"jwt_scope_to_policy_mapping" json:"jwt_scope_to_policy_mapping"` // Deprecated: use Scopes.JWT.ScopeToPolicy or Scopes.OIDC.ScopeToPolicy
+	JWTScopeClaimName          string               `bson:"jwt_scope_claim_name" json:"jwt_scope_claim_name"`               // Deprecated: use Scopes.JWT.ScopeClaimName or Scopes.OIDC.ScopeClaimName
+	NotificationsDetails       NotificationsManager `bson:"notifications" json:"notifications"`
+	EnableSignatureChecking    bool                 `bson:"enable_signature_checking" json:"enable_signature_checking"`
+	HmacAllowedClockSkew       float64              `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
+	HmacAllowedAlgorithms      []string             `bson:"hmac_allowed_algorithms" json:"hmac_allowed_algorithms"`
+	RequestSigning             RequestSigningMeta   `bson:"request_signing" json:"request_signing"`
+	BaseIdentityProvidedBy     AuthTypeEnum         `bson:"base_identity_provided_by" json:"base_identity_provided_by"`
+	VersionDefinition          VersionDefinition    `bson:"definition" json:"definition"`
+	VersionData                VersionData          `bson:"version_data" json:"version_data"` // Deprecated. Use VersionDefinition instead.
+	UptimeTests                UptimeTests          `bson:"uptime_tests" json:"uptime_tests"`
+	Proxy                      ProxyConfig          `bson:"proxy" json:"proxy"`
+	DisableRateLimit           bool                 `bson:"disable_rate_limit" json:"disable_rate_limit"`
+	DisableQuota               bool                 `bson:"disable_quota" json:"disable_quota"`
+	CustomMiddleware           MiddlewareSection    `bson:"custom_middleware" json:"custom_middleware"`
+	// CustomMiddlewareBundle is the bundle filename (or comma-separated list of
+	// bundle filenames) resolved against the gateway's bundle_base_url. A single
+	// name takes the legacy single-bundle load path unchanged. Two or more
+	// comma-separated names enable multi-bundle composition: each bundle is
+	// fetched into its own subdirectory under the API's bundle root, and the
+	// manifests are merged into the effective custom_middleware section in
+	// declaration order — array hooks (pre/post/post_key_auth/response)
+	// concatenate; auth_check may be set by at most one bundle.
 	CustomMiddlewareBundle               string                 `bson:"custom_middleware_bundle" json:"custom_middleware_bundle"`
 	CustomMiddlewareBundleDisabled       bool                   `bson:"custom_middleware_bundle_disabled" json:"custom_middleware_bundle_disabled"`
 	CacheOptions                         CacheOptions           `bson:"cache_options" json:"cache_options"`
