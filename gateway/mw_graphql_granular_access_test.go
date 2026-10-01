@@ -460,6 +460,32 @@ func TestGraphQL_DisableIntrospection(t *testing.T) {
 }
 
 func TestGraphQL_GranularAccess_ErrorOverride_TT_18106(t *testing.T) {
+	testCases := []struct {
+		name                 string
+		version              apidef.GraphQLConfigVersion
+		expectedOriginalBody string
+	}{
+		{
+			name:                 "engine v2",
+			version:              apidef.GraphQLConfigVersionNone,
+			expectedOriginalBody: `{"errors":[{"message":"field: secretKey is restricted on type: Account"}]}`,
+		},
+		{
+			name:                 "engine v3",
+			version:              apidef.GraphQLConfigVersion3Preview,
+			expectedOriginalBody: `{"errors":[{"message":"field: secretKey is restricted on type: Account"}],"data":null}`,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			testGraphQLGranularAccessErrorOverride(t, tc.version, tc.expectedOriginalBody)
+		})
+	}
+}
+
+func testGraphQLGranularAccessErrorOverride(t *testing.T, version apidef.GraphQLConfigVersion, expectedOriginalBody string) {
+	t.Helper()
 	g := StartTest(nil)
 	t.Cleanup(g.Close)
 
@@ -468,6 +494,7 @@ func TestGraphQL_GranularAccess_ErrorOverride_TT_18106(t *testing.T) {
 			spec.Proxy.ListenPath = "/api1"
 			spec.UseKeylessAccess = false
 			spec.GraphQL.Enabled = true
+			spec.GraphQL.Version = version
 			spec.GraphQL.Schema = `
             	type Query { accounts: [Account] }
             	type Account { id: ID! name: String secretKey: String }
@@ -487,6 +514,7 @@ func TestGraphQL_GranularAccess_ErrorOverride_TT_18106(t *testing.T) {
 			spec.Proxy.ListenPath = "/api2"
 			spec.UseKeylessAccess = false
 			spec.GraphQL.Enabled = true
+			spec.GraphQL.Version = version
 			spec.GraphQL.Schema = `
             	type Query { accounts: [Account] }
             	type Account { id: ID! name: String secretKey: String }
@@ -539,6 +567,9 @@ func TestGraphQL_GranularAccess_ErrorOverride_TT_18106(t *testing.T) {
 	})
 
 	t.Run("fetching allowed fields makes server respond 200 Ok", func(t *testing.T) {
+		if version == apidef.GraphQLConfigVersion3Preview {
+			t.Skip("the default test upstream is not a GraphQL server the v3 engine can proxy to")
+		}
 		// Proper request
 		res, _ := g.Run(t, test.TestCase{
 			Path: "/api1",
@@ -568,7 +599,7 @@ func TestGraphQL_GranularAccess_ErrorOverride_TT_18106(t *testing.T) {
 			HeadersMatch: map[string]string{},
 			BodyMatchFunc: func(bytes []byte) bool {
 				t.Logf("body=%s", string(bytes))
-				return assert.Equal(t, `{"errors":[{"message":"field: secretKey is restricted on type: Account"}]}`, string(bytes))
+				return assert.Equal(t, expectedOriginalBody, string(bytes))
 			},
 		})
 	})
