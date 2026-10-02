@@ -559,12 +559,13 @@ func (s *OAS) ReplaceServers(apiURLs, oldAPIURLs []string) {
 // In addition, it validates Security Requirement section and its requirements by
 // calling OAS.validateSecurity() function.
 func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) error {
-	validationOpts := opts
+	validationOpts := make([]openapi3.ValidationOption, 0, len(opts)+2)
+	validationOpts = append(validationOpts, opts...)
+	// Pattern constraints use the ECMA-262 dialect; skip the ones the RE2
+	// engine cannot compile instead of failing the whole document.
+	validationOpts = append(validationOpts, openapi3.SetRegexCompiler(ForgivingPatternCompiler))
 	if s.T.IsOpenAPI3_1() {
-		// Create new slice to avoid modifying caller's slice
-		validationOpts = make([]openapi3.ValidationOption, len(opts)+1)
-		copy(validationOpts, opts)
-		validationOpts[len(opts)] = openapi3.EnableJSONSchema2020Validation()
+		validationOpts = append(validationOpts, openapi3.EnableJSONSchema2020Validation())
 	}
 
 	validationErr := s.T.Validate(ctx, validationOpts...)
@@ -754,11 +755,11 @@ func (s *OAS) validatePRM() error {
 // admin endpoints (e.g. POST /tyk/mcps) where the empty-mode +
 // no-resource shape resolves to mirror, not static-with-missing-resource.
 func (s *OAS) ValidateForMCP(ctx context.Context, opts ...openapi3.ValidationOption) error {
-	validationOpts := opts
+	validationOpts := make([]openapi3.ValidationOption, 0, len(opts)+2)
+	validationOpts = append(validationOpts, opts...)
+	validationOpts = append(validationOpts, openapi3.SetRegexCompiler(ForgivingPatternCompiler))
 	if s.T.IsOpenAPI3_1() {
-		validationOpts = make([]openapi3.ValidationOption, len(opts)+1)
-		copy(validationOpts, opts)
-		validationOpts[len(opts)] = openapi3.EnableJSONSchema2020Validation()
+		validationOpts = append(validationOpts, openapi3.EnableJSONSchema2020Validation())
 	}
 
 	validationErr := s.T.Validate(ctx, validationOpts...)
