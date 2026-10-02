@@ -1474,6 +1474,13 @@ type Config struct {
 
 	// AllowUnsafeWebhookTemplatePaths disables webhook template path validation. This is provided for compatibility with legacy webhook definitions containing potentially unsafe template paths (default: false).
 	AllowUnsafeWebhookTemplatePaths bool `json:"allow_unsafe_webhook_template_paths"`
+
+	// AllowUnsafeBodyTransformTemplatePaths disables body transform template path validation.
+	// This is provided for compatibility with legacy API definitions whose `template_source`
+	// points outside the configured TemplatePath root (default: false).
+	// Enabling it allows an API definition to read arbitrary files from the gateway
+	// filesystem and is strongly discouraged outside of a migration window.
+	AllowUnsafeBodyTransformTemplatePaths bool `json:"allow_unsafe_body_transform_template_paths"`
 }
 
 // LabsConfig include config for streaming

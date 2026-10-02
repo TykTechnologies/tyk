@@ -31,6 +31,7 @@ import (
 	"github.com/TykTechnologies/tyk/ee/middleware/streams"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/policy"
+	"github.com/TykTechnologies/tyk/pkg/osutil"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/test"
@@ -1306,10 +1307,27 @@ func TestAPIDefinitionLoader(t *testing.T) {
 	})
 
 	t.Run("loadFileTemplate", func(t *testing.T) {
-		temp, err := l.loadFileTemplate(testTemplatePath)
-		assert.NoError(t, err)
+		// Setup OSRoot on the Gateway
+		absRoot, err := filepath.Abs("../")
+		require.NoError(t, err)
 
+		root, err := osutil.NewRoot(absRoot)
+		require.NoError(t, err)
+
+		ts.Gw.OSRoot = root
+
+		temp, err := l.loadFileTemplate("templates/transform_test.tmpl")
+		assert.NoError(t, err)
 		executeAndAssert(t, temp)
+
+		_, err = l.loadFileTemplate("../outside.tmpl")
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "attempts to escape root directory")
+
+		ts.Gw.OSRoot = nil
+		_, err = l.loadFileTemplate("templates/transform_test.tmpl")
+		assert.Error(t, err)
+		assert.Equal(t, "OSRoot is not initialized", err.Error())
 	})
 
 	t.Run("loadBlobTemplate", func(t *testing.T) {
@@ -3436,5 +3454,106 @@ func TestAPISpec_PrepareRequestToLog_and_ShallowClone(t *testing.T) {
 		assert.NotSame(t, r, dup)
 		assert.Equal(t, "/base/get it", dup.URL.Path)
 		assert.Equal(t, "/base/get%20it", dup.URL.RawPath)
+	})
+}
+
+func TestAPIDefinitionLoader_resolveTemplatePath(t *testing.T) {
+	// Root layout: <base>/templates is the configured TemplatePath, and
+	// <base>/outside holds a file the transform must never be able to reach.
+	base := t.TempDir()
+	realBase, err := filepath.EvalSymlinks(base)
+	require.NoError(t, err)
+
+	templateRoot := filepath.Join(realBase, "templates")
+	outside := filepath.Join(realBase, "outside")
+	require.NoError(t, os.MkdirAll(templateRoot, 0o755))
+	require.NoError(t, os.MkdirAll(outside, 0o755))
+	require.NoError(t, os.WriteFile(filepath.Join(templateRoot, "transform.tmpl"), []byte(`{{.Foo}}`), 0o644))
+	require.NoError(t, os.WriteFile(filepath.Join(outside, "secret.tmpl"), []byte(`{{.Foo}}`), 0o644))
+
+	root, err := osutil.NewRoot(templateRoot)
+	require.NoError(t, err)
+
+	newLoader := func(allowUnsafe, withRoot bool) APIDefinitionLoader {
+		gw := &Gateway{}
+		gw.SetConfig(config.Config{
+			TemplatePath:                          templateRoot,
+			AllowUnsafeBodyTransformTemplatePaths: allowUnsafe,
+		})
+		if withRoot {
+			gw.OSRoot = root
+		}
+		return APIDefinitionLoader{Gw: gw}
+	}
+
+	t.Run("flag on returns the path verbatim", func(t *testing.T) {
+		// The escape hatch must not validate, even for a traversal payload.
+		loader := newLoader(true, true)
+
+		got, err := loader.resolveTemplatePath("../outside/secret.tmpl")
+
+		assert.NoError(t, err)
+		assert.Equal(t, "../outside/secret.tmpl", got)
+	})
+
+	t.Run("flag on works without an initialised root", func(t *testing.T) {
+		// Legacy deployments with an unusable TemplatePath must still load.
+		loader := newLoader(true, false)
+
+		got, err := loader.resolveTemplatePath("/etc/passwd")
+
+		assert.NoError(t, err)
+		assert.Equal(t, "/etc/passwd", got)
+	})
+
+	t.Run("flag off delegates to root validation", func(t *testing.T) {
+		loader := newLoader(false, true)
+
+		for _, path := range []string{"../outside/secret.tmpl", "/etc/passwd", "../../../../../../etc/passwd"} {
+			got, err := loader.resolveTemplatePath(path)
+
+			assert.Error(t, err, "path %q must be rejected", path)
+			assert.Contains(t, err.Error(), "attempts to escape root directory")
+			assert.Empty(t, got)
+		}
+	})
+
+	t.Run("flag off still resolves a legitimate path", func(t *testing.T) {
+		loader := newLoader(false, true)
+
+		got, err := loader.resolveTemplatePath("transform.tmpl")
+
+		assert.NoError(t, err)
+		assert.Equal(t, filepath.Join(root.RootPath(), "transform.tmpl"), got)
+	})
+
+	t.Run("flag off requires an initialised root", func(t *testing.T) {
+		loader := newLoader(false, false)
+
+		got, err := loader.resolveTemplatePath("transform.tmpl")
+
+		assert.EqualError(t, err, "OSRoot is not initialized")
+		assert.Empty(t, got)
+	})
+
+	t.Run("nil gateway is rejected", func(t *testing.T) {
+		var loader APIDefinitionLoader
+
+		got, err := loader.resolveTemplatePath("transform.tmpl")
+
+		assert.EqualError(t, err, "gateway is not initialized")
+		assert.Empty(t, got)
+	})
+
+	t.Run("loadFileTemplate honours the flag", func(t *testing.T) {
+		// End to end through the function the UseFile transform mode calls.
+		blocked := newLoader(false, true)
+		_, err := blocked.loadFileTemplate("../outside/secret.tmpl")
+		assert.Error(t, err)
+
+		allowed := newLoader(true, true)
+		tmpl, err := allowed.loadFileTemplate(filepath.Join(outside, "secret.tmpl"))
+		assert.NoError(t, err)
+		assert.NotNil(t, tmpl)
 	})
 }
