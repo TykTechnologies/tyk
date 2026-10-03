@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strings"
 
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/jsonrpc"
@@ -67,7 +66,11 @@ func parseSyntheticAdapterJSONRPC(r *http.Request) (*JSONRPCRequest, bool, error
 	if r == nil || r.Method != http.MethodPost || r.Body == nil {
 		return nil, false, nil
 	}
-	if !strings.HasPrefix(r.Header.Get(headerContentType), contentTypeJSON) {
+	// Case-insensitive media-type recognition, matching the MCP execution
+	// engine (RFC 9110 §8.3.1). A byte-exact check here would let a
+	// case-variant Content-Type (e.g. "Application/json") skip REST-as-MCP
+	// policy while the SDK adapter still executes the request.
+	if !isJSONRPCContentType(r.Header.Get(headerContentType)) {
 		return nil, false, nil
 	}
 
