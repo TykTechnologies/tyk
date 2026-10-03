@@ -134,6 +134,22 @@ func TestIPMiddlewarePass(t *testing.T) {
 	}
 }
 
+func TestIPWhiteListMiddleware_NilIPDoesNotBypass(t *testing.T) {
+	// AllowedIPs includes the invalid entry "bob". Previously nil.Equal(nil) let
+	// requests with an empty/unparseable client IP through the whitelist.
+	spec := testPrepareIPMiddlewarePass()
+	mw := &IPWhiteListMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec}}
+
+	rec := httptest.NewRecorder()
+	req := TestReq(t, "GET", "/", nil)
+	req.RemoteAddr = "not-an-ip"
+	req.Header.Del(header.XRealIP)
+	req.Header.Del(header.XForwardFor)
+
+	_, code := mw.ProcessRequest(rec, req, nil)
+	assert.Equal(t, http.StatusForbidden, code)
+}
+
 func BenchmarkIPMiddlewarePass(b *testing.B) {
 	b.ReportAllocs()
 

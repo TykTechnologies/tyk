@@ -26,6 +26,11 @@ func (i *IPBlackListMiddleware) EnabledForSpec() bool {
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (i *IPBlackListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	remoteIP := net.ParseIP(request.RealIP(r))
+	// net.IP.Equal treats two nil IPs as equal. Skip matching when the client IP or an
+	// ACL entry is unparseable so invalid config cannot blacklist every request.
+	if remoteIP == nil {
+		return nil, http.StatusOK
+	}
 
 	// Enabled, check incoming IP address
 	for _, ip := range i.Spec.BlacklistedIPs {
@@ -42,7 +47,7 @@ func (i *IPBlackListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 		}
 
 		// We parse the IP to manage IPv4 and IPv6 easily
-		if blockedIP.Equal(remoteIP) {
+		if blockedIP != nil && blockedIP.Equal(remoteIP) {
 			return i.handleError(r, remoteIP.String())
 		}
 	}

@@ -133,6 +133,22 @@ func TestIPBlacklistMiddleware(t *testing.T) {
 	}
 }
 
+func TestIPBlackListMiddleware_NilIPDoesNotMatchInvalidEntry(t *testing.T) {
+	// BlacklistedIPs includes the invalid entry "bob". Previously nil.Equal(nil)
+	// treated every unparseable client IP as blacklisted.
+	spec := testPrepareIPBlacklistMiddleware()
+	mw := &IPBlackListMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec}}
+
+	rec := httptest.NewRecorder()
+	req := TestReq(t, "GET", "/", nil)
+	req.RemoteAddr = "not-an-ip"
+	req.Header.Del(header.XRealIP)
+	req.Header.Del(header.XForwardFor)
+
+	_, code := mw.ProcessRequest(rec, req, nil)
+	assert.Equal(t, http.StatusOK, code)
+}
+
 func BenchmarkIPBlacklistMiddleware(b *testing.B) {
 	b.ReportAllocs()
 
