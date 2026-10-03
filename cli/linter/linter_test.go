@@ -92,6 +92,51 @@ var tests = []struct {
 		`Additional property typ is not allowed`,
 	},
 	{
+		"KafkaSecretsAndControls",
+		`{"secrets":{"ack-root":"01234567890123456789012345678901","reset-root":"another-secret"},"kafka_acknowledgment_signing":{"active_key_id":"active","keys":{"active":"ack-root"},"rotation_overlap_seconds":86430,"shutdown_drain_seconds":30},"kafka_offset_reset_authorization":{"secret_ref":"reset-root"},"kafka_control_rate_limits":{"acknowledgment_requests_per_second":100,"acknowledgment_burst":200,"reset_requests_per_second":1,"reset_burst":5}}`,
+		nil,
+	},
+	{
+		"KafkaSecretsRejectLegacyArray",
+		`{"secrets":["ack-root"]}`,
+		`cannot unmarshal array into Go struct field Config.secrets of type map[string]string`,
+	},
+	{
+		"KafkaSecretsRejectNonStringValue",
+		`{"secrets":{"ack-root":123}}`,
+		`cannot unmarshal number into Go struct field Config.secrets of type string`,
+	},
+	{
+		"KafkaSigningRejectUnknownField",
+		`{"kafka_acknowledgment_signing":{"active_key_id":"active","keyz":{}}}`,
+		`kafka_acknowledgment_signing: Additional property keyz is not allowed`,
+	},
+	{
+		"KafkaSigningRejectNonStringSecretReference",
+		`{"kafka_acknowledgment_signing":{"active_key_id":"active","keys":{"active":123}}}`,
+		`cannot unmarshal number into Go struct field .kafka_acknowledgment_signing.keys of type string`,
+	},
+	{
+		"KafkaResetAuthorizationRejectUnknownField",
+		`{"kafka_offset_reset_authorization":{"secret_ref":"reset-root","header":"unsafe"}}`,
+		`kafka_offset_reset_authorization: Additional property header is not allowed`,
+	},
+	{
+		"KafkaControlRateRejectUnknownField",
+		`{"kafka_control_rate_limits":{"ack_requests_per_second":10}}`,
+		`kafka_control_rate_limits: Additional property ack_requests_per_second is not allowed`,
+	},
+	{
+		"KafkaControlRateRejectNegative",
+		`{"kafka_control_rate_limits":{"reset_requests_per_second":-1}}`,
+		`kafka_control_rate_limits.reset_requests_per_second: Must be greater than or equal to 0`,
+	},
+	{
+		"KafkaControlRateRejectAboveMaximum",
+		`{"kafka_control_rate_limits":{"acknowledgment_burst":10001}}`,
+		`kafka_control_rate_limits.acknowledgment_burst: Must be less than or equal to 10000`,
+	},
+	{
 		"MalformedDnsCacheEntry", `{"dns_cache": { "enabled": true, "tttl": 10} }`,
 		`dns_cache: Additional property tttl is not allowed`,
 	},

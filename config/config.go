@@ -1398,6 +1398,33 @@ type Config struct {
 	// See more details https://tyk.io/docs/tyk-self-managed/#how-to-access-the-externally-stored-data
 	Secrets map[string]string `json:"secrets" structviewer:"obfuscate"`
 
+	KafkaAcknowledgmentSigning struct {
+		ActiveKeyID string `json:"active_key_id"`
+		// Keys maps stable key IDs to entries in Config.Secrets.
+		Keys                      map[string]string `json:"keys"`
+		RotationOverlapSeconds    int64             `json:"rotation_overlap_seconds"`
+		ShutdownDrainSeconds      int64             `json:"shutdown_drain_seconds"`
+		ForceInvalidateLiveTokens bool              `json:"force_invalidate_live_tokens"`
+	} `json:"kafka_acknowledgment_signing"`
+
+	// KafkaOffsetResetAuthorization optionally requires a second, dedicated
+	// credential in addition to the normal Gateway control API secret. SecretRef
+	// names an entry in Secrets and avoids granting offset-reset capability to
+	// every holder of the broad administrative credential.
+	KafkaOffsetResetAuthorization struct {
+		SecretRef string `json:"secret_ref"`
+	} `json:"kafka_offset_reset_authorization"`
+
+	// KafkaControlRateLimits bounds Kafka external-acknowledgment and offset-reset
+	// control traffic independently. Non-positive values use safe defaults;
+	// excessively large values are capped by the control handler.
+	KafkaControlRateLimits struct {
+		AcknowledgmentRequestsPerSecond int `json:"acknowledgment_requests_per_second"`
+		AcknowledgmentBurst             int `json:"acknowledgment_burst"`
+		ResetRequestsPerSecond          int `json:"reset_requests_per_second"`
+		ResetBurst                      int `json:"reset_burst"`
+	} `json:"kafka_control_rate_limits"`
+
 	// Override the default error code and or message returned by middleware.
 	// The following message IDs can be used to override the message and error codes:
 	//

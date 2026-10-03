@@ -59,6 +59,8 @@ type MetricInstruments struct {
 	exchangeRequests *tykmetric.Counter
 	exchangeDuration *tykmetric.Histogram
 	exchangeCacheHit *tykmetric.Counter
+	kafkaEvents      *tykmetric.Counter
+	kafkaState       *tykmetric.Gauge
 }
 
 // NewMetricInstruments creates gateway metric instruments from an existing provider.
@@ -137,6 +139,8 @@ func NewMetricInstruments(provider tykmetric.Provider, logger *logrus.Logger) *M
 		logger.Errorf("Creating exchange cache_hit counter: %s", err)
 	}
 
+	kafkaEvents, _ := provider.NewCounter("tyk.streams.kafka.events", "Kafka external acknowledgment events by bounded kind", "1")
+	kafkaState, _ := provider.NewGauge("tyk.streams.kafka.state", "Kafka external acknowledgment state by bounded kind", "1")
 	return &MetricInstruments{
 		provider:         provider,
 		requestCounter:   requestCounter,
@@ -147,7 +151,42 @@ func NewMetricInstruments(provider tykmetric.Provider, logger *logrus.Logger) *M
 		exchangeRequests: exchangeRequests,
 		exchangeDuration: exchangeDuration,
 		exchangeCacheHit: exchangeCacheHit,
+		kafkaEvents:      kafkaEvents, kafkaState: kafkaState,
 	}
+}
+
+// RecordKafkaStream records deltas and current state without topic, partition,
+// group, token, or message labels. api/stream/component are configuration-
+// bounded identities; kind is a fixed enum controlled by the caller.
+func (i *MetricInstruments) RecordKafkaStream(ctx context.Context, api, stream, component string, deltas map[string]uint64, state map[string]int64) {
+	attrs := []attribute.KeyValue{attribute.String("api", api), attribute.String("stream", stream), attribute.String("component", component)}
+	for kind, value := range deltas {
+		if !allowedKafkaEventKind(kind) {
+			continue
+		}
+		i.kafkaEvents.Add(ctx, int64(value), append(attrs, attribute.String("kind", kind))...)
+	}
+	for kind, value := range state {
+		if !allowedKafkaStateKind(kind) {
+			continue
+		}
+		i.kafkaState.Record(ctx, float64(value), append(attrs, attribute.String("kind", kind))...)
+	}
+}
+
+func allowedKafkaEventKind(kind string) bool {
+	switch kind {
+	case "delivered", "ack_applied", "ack_invalid", "ack_stale", "ack_expired", "commit_attempts", "commit_failures", "router_failures", "reset_plans", "reset_executions", "reset_failures":
+		return true
+	}
+	return false
+}
+func allowedKafkaStateKind(kind string) bool {
+	switch kind {
+	case "in_flight", "in_flight_bytes", "pending_commits", "paused_partitions", "router_backlog", "router_pending", "router_dead_letters", "reset_active":
+		return true
+	}
+	return false
 }
 
 // RecordExchange records one token-exchange decision: it increments the

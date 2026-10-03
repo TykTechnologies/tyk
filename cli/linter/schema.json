@@ -1655,7 +1655,39 @@
       }
     },
     "secrets": {
-      "type": ["array", "null"]
+      "type": ["object", "null"],
+      "additionalProperties": { "type": "string" }
+    },
+    "kafka_acknowledgment_signing": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "active_key_id": { "type": "string" },
+        "keys": {
+          "type": ["object", "null"],
+          "additionalProperties": { "type": "string" }
+        },
+        "rotation_overlap_seconds": { "type": "integer", "minimum": 0 },
+        "shutdown_drain_seconds": { "type": "integer", "minimum": 0 },
+        "force_invalidate_live_tokens": { "type": "boolean" }
+      }
+    },
+    "kafka_offset_reset_authorization": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "secret_ref": { "type": "string" }
+      }
+    },
+    "kafka_control_rate_limits": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "properties": {
+        "acknowledgment_requests_per_second": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "acknowledgment_burst": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "reset_requests_per_second": { "type": "integer", "minimum": 0, "maximum": 10000 },
+        "reset_burst": { "type": "integer", "minimum": 0, "maximum": 10000 }
+      }
     },
     "liveness_check": {
       "type": ["object", "null"],
