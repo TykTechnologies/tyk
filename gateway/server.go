@@ -212,6 +212,11 @@ type Gateway struct {
 	// performedSuccessfulReload is used to know whether a successful reload happened
 	performedSuccessfulReload bool
 
+	// rpcSyncStatus tracks fingerprints of the API/policy payloads most
+	// recently fetched over RPC; reported to MDCB after each successful
+	// reload so the control plane can verify this node is in sync.
+	rpcSyncStatus rpcSyncStatus
+
 	// reloadRetryBackoff optionally returns a custom backoff strategy for
 	// DoReloadWithRetry. Production code leaves this nil (default exponential
 	// backoff is used). Tests set it to return a fast constant backoff.
@@ -1301,9 +1306,13 @@ func (gw *Gateway) idpReloadLoop(rpcKey string) {
 // DoReloadWithError performs a full reload of APIs and policies, returning any
 // sync error that prevented a successful reload. The reloadMu mutex is acquired
 // for the duration of the reload, so each call is safe to make concurrently.
-func (gw *Gateway) DoReloadWithError() error {
+func (gw *Gateway) DoReloadWithError() (err error) {
 	gw.reloadMu.Lock()
 	defer gw.reloadMu.Unlock()
+
+	// Report the outcome — success or failure — to MDCB from this single
+	// choke point rather than from each return path (see rpc_sync_status.go).
+	defer func() { gw.reportNodeSyncStatus(err == nil) }()
 
 	start := time.Now()
 
