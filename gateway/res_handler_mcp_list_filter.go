@@ -91,6 +91,7 @@ func (h *MCPListFilterResponseHandler) HandleResponse(_ http.ResponseWriter, res
 	res.Body = io.NopCloser(bytes.NewReader(newBody))
 	res.ContentLength = int64(len(newBody))
 	res.Header.Set("Content-Length", strconv.Itoa(len(newBody)))
+	markMCPResponseEdited(req)
 
 	return nil
 }

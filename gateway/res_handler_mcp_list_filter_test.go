@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -1074,6 +1075,50 @@ func TestMCPListFilterResponseHandler_HandleResponse_ContentLengthUpdated(t *tes
 		"Content-Length should match actual body size")
 	assert.Equal(t, fmt.Sprintf("%d", len(body)), res.Header.Get("Content-Length"),
 		"Content-Length header should match actual body size")
+}
+
+func TestMCPListFilterResponseHandler_CacheSafetyTracksActualEdits(t *testing.T) {
+	h := buildMCPListFilterHandler("api-1", true)
+	session := &user.SessionState{AccessRights: map[string]user.AccessDefinition{
+		"api-1": {
+			APIID: "api-1",
+			MCPAccessRights: user.MCPAccessRights{
+				Tools: user.AccessControlRules{Allowed: []string{"visible"}},
+			},
+		},
+	}}
+
+	t.Run("removed item makes result private and disables cache write", func(t *testing.T) {
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/mcp", nil)
+		httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{Method: mcp.MethodToolsList, ID: 1})
+		options := &cacheOptions{}
+		ctxSetCacheOptions(req, options)
+		res := makeHTTPResponse([]byte(`{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"visible"},{"name":"hidden"}],"nextCursor":"two","cacheScope":"public","ttlMs":5000}}`))
+
+		require.NoError(t, h.HandleResponse(httptest.NewRecorder(), res, req, session))
+		body := readResponseBody(t, res)
+		var envelope mcp.JSONRPCResponse
+		require.NoError(t, json.Unmarshal(body, &envelope))
+		var result map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(envelope.Result, &result))
+		assert.JSONEq(t, `"private"`, string(result["cacheScope"]))
+		assert.JSONEq(t, `0`, string(result["ttlMs"]))
+		assert.JSONEq(t, `"two"`, string(result["nextCursor"]))
+		assert.True(t, options.responseEdited)
+	})
+
+	t.Run("fully authorized page remains credential dependent", func(t *testing.T) {
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/mcp", nil)
+		httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{Method: mcp.MethodToolsList, ID: 1})
+		options := &cacheOptions{}
+		ctxSetCacheOptions(req, options)
+		original := []byte("{\n  \"jsonrpc\": \"2.0\", \"id\": 1, \"result\": {\"tools\": [{\"name\": \"visible\"}], \"cacheScope\": \"public\", \"ttlMs\": 5000}\n}")
+		res := makeHTTPResponse(original)
+
+		require.NoError(t, h.HandleResponse(httptest.NewRecorder(), res, req, session))
+		assert.Contains(t, string(readResponseBody(t, res)), `"cacheScope":"private"`)
+		assert.True(t, options.responseEdited)
+	})
 }
 
 func TestMCPListFilterResponseHandler_HandleResponse_WrongAPIID(t *testing.T) {

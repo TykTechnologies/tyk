@@ -157,11 +157,29 @@ func TestRESTAsMCPToolView_RewritesToolsListForCallerProxy(t *testing.T) {
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 	require.Contains(t, body, "result", "response body: %s", rec.Body.String())
 	result := body["result"].(map[string]any)
+	assert.Equal(t, "private", result["cacheScope"])
+	assert.EqualValues(t, 0, result["ttlMs"])
 	tools := result["tools"].([]any)
 	require.Len(t, tools, 1)
 	tool := tools[0].(map[string]any)
 	assert.Equal(t, "orders", tool["name"])
 	assert.Equal(t, "proxy one list", tool["description"])
+}
+
+func TestRewriteMCPToolsListResponse_PreservesUnchangedBytesAndHints(t *testing.T) {
+	view := oas.MCPToolView{Tools: []oas.DerivedTool{{
+		Name:        "orders",
+		Description: "list orders",
+		InputSchema: map[string]any{"type": "object"},
+	}}}
+	tools, err := json.Marshal(view.Tools)
+	require.NoError(t, err)
+	original := []byte("{\n  \"jsonrpc\": \"2.0\", \"id\": 1, \"result\": {\"tools\": " + string(tools) + ", \"cacheScope\": \"public\", \"ttlMs\": 5000}\n}")
+
+	rewritten, changed, err := rewriteMCPToolsListResponse(original, view)
+	require.NoError(t, err)
+	assert.False(t, changed)
+	assert.Equal(t, original, rewritten)
 }
 
 func TestWriteSyntheticMCPToolsListResponse_FailsClosedWhenRewriteFails(t *testing.T) {

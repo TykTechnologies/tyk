@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"bytes"
 	"encoding/json"
 
 	"github.com/TykTechnologies/tyk/regexp"
@@ -46,6 +47,48 @@ type JSONRPCResponse struct {
 	ID      any             `json:"id"`
 	Result  json.RawMessage `json:"result,omitempty"`
 	Error   json.RawMessage `json:"error,omitempty"`
+	fields  map[string]json.RawMessage
+}
+
+// UnmarshalJSON retains unknown envelope fields and exact JSON-RPC identifiers.
+func (r *JSONRPCResponse) UnmarshalJSON(data []byte) error {
+	type response JSONRPCResponse
+	var parsed response
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	if err := decoder.Decode(&parsed); err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, &parsed.fields); err != nil {
+		return err
+	}
+	*r = JSONRPCResponse(parsed)
+	return nil
+}
+
+// MarshalJSON changes only the result of a parsed response.
+func (r JSONRPCResponse) MarshalJSON() ([]byte, error) {
+	if r.fields == nil {
+		type response JSONRPCResponse
+		return json.Marshal(response(r))
+	}
+	fields := make(map[string]json.RawMessage, len(r.fields))
+	for key, value := range r.fields {
+		fields[key] = value
+	}
+	if r.Result != nil {
+		fields["result"] = r.Result
+	}
+	return json.Marshal(fields)
+}
+
+func hasFilterRules(ruleSets []user.AccessControlRules) bool {
+	for _, rules := range ruleSets {
+		if !rules.IsEmpty() {
+			return true
+		}
+	}
+	return false
 }
 
 // ExtractStringField extracts a string field from a JSON object.
@@ -117,9 +160,8 @@ func ReencodeEnvelope(envelope *JSONRPCResponse, result map[string]json.RawMessa
 }
 
 // FilterJSONRPCBody parses a JSON-RPC response body, filters the list items
-// according to the given config and rules, and returns the re-encoded body.
-// Returns (nil, false) when any parsing or marshalling step fails, signalling
-// that the caller should pass through the original body unmodified.
+// according to the given config and rules, and returns the re-encoded body whenever applicable rules make it private, including unchanged pages.
+// Returns (nil, false) for parse failures or absent rules, signalling that the caller must retain the original bytes.
 func FilterJSONRPCBody(body []byte, cfg *ListFilterConfig, rules user.AccessControlRules) ([]byte, bool) {
 	return FilterJSONRPCBodyWithRuleSets(body, cfg, []user.AccessControlRules{rules})
 }
@@ -147,7 +189,7 @@ func FilterJSONRPCBodyWithRuleSets(body []byte, cfg *ListFilterConfig, ruleSets 
 
 // FilterParsedJSONRPC filters items in an already-parsed JSON-RPC result and
 // re-encodes the envelope. Returns (nil, false) when the array key is missing,
-// items cannot be parsed, or re-encoding fails.
+// items cannot be parsed, no rules apply, or re-encoding fails.
 func FilterParsedJSONRPC(envelope *JSONRPCResponse, result map[string]json.RawMessage, cfg *ListFilterConfig, rules user.AccessControlRules) ([]byte, bool) {
 	return FilterParsedJSONRPCWithRuleSets(envelope, result, cfg, []user.AccessControlRules{rules})
 }
@@ -166,6 +208,11 @@ func FilterParsedJSONRPCWithRuleSets(envelope *JSONRPCResponse, result map[strin
 	}
 
 	filtered := FilterItemsWithRuleSets(items, cfg.NameField, ruleSets)
+	if !hasFilterRules(ruleSets) {
+		return nil, false
+	}
+
+	SetPrivateCacheHints(result)
 
 	newBody, err := ReencodeEnvelope(envelope, result, cfg.ArrayKey, filtered)
 	if err != nil {
@@ -173,6 +220,15 @@ func FilterParsedJSONRPCWithRuleSets(envelope *JSONRPCResponse, result map[strin
 	}
 
 	return newBody, true
+}
+
+// SetPrivateCacheHints prevents an authorization-specific MCP result from
+// being reused for a different caller. It operates on the raw result map so
+// unknown fields and pagination cursors are preserved when the envelope is
+// re-encoded.
+func SetPrivateCacheHints(result map[string]json.RawMessage) {
+	result["cacheScope"] = json.RawMessage(`"private"`)
+	result["ttlMs"] = json.RawMessage(`0`)
 }
 
 // InferListConfigFromResult determines the list type by inspecting which
@@ -244,9 +300,10 @@ func FilterInitializeCapabilitiesParsed(envelope *JSONRPCResponse, result map[st
 		}
 	}
 
-	if !changed {
+	if !changed && !hasFilterRules(ruleSets) {
 		return nil, false
 	}
+	SetPrivateCacheHints(result)
 
 	capabilitiesBytes, err := json.Marshal(capabilities)
 	if err != nil {
