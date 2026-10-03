@@ -49,6 +49,14 @@ type Server struct {
 	// Tyk classic API definition: `enable_batch_request_support`.
 	BatchProcessing *BatchProcessing `bson:"batchProcessing,omitempty" json:"batchProcessing,omitempty"`
 
+	// RequestBodyPassthrough configures whether the Gateway's reverse proxy
+	// skips its redundant copy of the request body for this API. It only takes
+	// effect when the Gateway-wide http_server_options.enable_request_body_passthrough
+	// gate is also enabled.
+	//
+	// Tyk classic API definition: `enable_request_body_passthrough`
+	RequestBodyPassthrough *RequestBodyPassthrough `bson:"requestBodyPassthrough,omitempty" json:"requestBodyPassthrough,omitempty"`
+
 	// Protocol configures the HTTP protocol used by the API.
 	// Possible values are:
 	// - "http": Standard HTTP/1.1 protocol
@@ -123,6 +131,7 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 
 	s.fillIPAccessControl(api)
 	s.fillBatchProcessing(api)
+	s.fillRequestBodyPassthrough(api)
 }
 
 // ExtractTo extracts *Server into *apidef.APIDefinition.
@@ -187,6 +196,7 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 
 	s.extractIPAccessControlTo(api)
 	s.extractBatchProcessingTo(api)
+	s.extractRequestBodyPassthroughTo(api)
 }
 
 // ListenPath is the base path on Tyk to which requests for this API
@@ -431,4 +441,45 @@ func (s *Server) extractBatchProcessingTo(api *apidef.APIDefinition) {
 	}
 
 	s.BatchProcessing.ExtractTo(api)
+}
+
+// RequestBodyPassthrough represents the configuration for enabling or disabling request body passthrough for an API.
+type RequestBodyPassthrough struct {
+	// Enabled determines whether request body passthrough is enabled or disabled for the API.
+	//
+	// Tyk classic API definition: `enable_request_body_passthrough`.
+	Enabled bool `bson:"enabled" json:"enabled"` // required
+}
+
+// Fill updates the RequestBodyPassthrough configuration based on the EnableRequestBodyPassthrough value from the given APIDefinition.
+func (r *RequestBodyPassthrough) Fill(api apidef.APIDefinition) {
+	r.Enabled = api.EnableRequestBodyPassthrough
+}
+
+// ExtractTo copies the Enabled state of RequestBodyPassthrough into the EnableRequestBodyPassthrough field of the provided APIDefinition.
+func (r *RequestBodyPassthrough) ExtractTo(api *apidef.APIDefinition) {
+	api.EnableRequestBodyPassthrough = r.Enabled
+}
+
+func (s *Server) fillRequestBodyPassthrough(api apidef.APIDefinition) {
+	if s.RequestBodyPassthrough == nil {
+		s.RequestBodyPassthrough = &RequestBodyPassthrough{}
+	}
+
+	s.RequestBodyPassthrough.Fill(api)
+
+	if ShouldOmit(s.RequestBodyPassthrough) {
+		s.RequestBodyPassthrough = nil
+	}
+}
+
+func (s *Server) extractRequestBodyPassthroughTo(api *apidef.APIDefinition) {
+	if s.RequestBodyPassthrough == nil {
+		s.RequestBodyPassthrough = &RequestBodyPassthrough{}
+		defer func() {
+			s.RequestBodyPassthrough = nil
+		}()
+	}
+
+	s.RequestBodyPassthrough.ExtractTo(api)
 }

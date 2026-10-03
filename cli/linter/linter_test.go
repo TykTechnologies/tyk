@@ -50,6 +50,16 @@ var tests = []struct {
 		"FieldTypo", `{"enable_jsvmm": true}`,
 		"Additional property enable_jsvmm is not allowed",
 	},
+	{
+		"RequestBodyPassthroughValid",
+		onDefaults(`{"http_server_options": {"enable_request_body_passthrough": true}}`),
+		nil,
+	},
+	{
+		"RequestBodyPassthroughWrongType",
+		`{"http_server_options": {"enable_request_body_passthrough": "yes"}}`,
+		"cannot unmarshal string into Go struct field HttpServerOptionsConfig.http_server_options.enable_request_body_passthrough of type bool",
+	},
 	{"Empty", `{}`, nil},
 	{"Default", onDefaults(`{}`), nil},
 	{"OldMonitor", `{"Monitor": {}}`, nil},

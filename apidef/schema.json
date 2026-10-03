@@ -405,6 +405,9 @@
     "enable_detailed_recording": {
       "type": "boolean"
     },
+    "enable_request_body_passthrough": {
+      "type": "boolean"
+    },
     "enable_signature_checking": {
       "type": "boolean"
     },
