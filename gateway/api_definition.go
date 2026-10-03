@@ -37,6 +37,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
+	"github.com/TykTechnologies/tyk/internal/pathnormalizer"
 	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 	"github.com/TykTechnologies/tyk/pkg/schema"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -1819,7 +1820,7 @@ func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, co
 			OASPath:             path,
 		}
 
-		a.generateRegex(path, &newSpec, OASMockResponse, conf)
+		a.generateRegex(a.matcherPathFor(apiSpec, path), &newSpec, OASMockResponse, conf)
 		urlSpec = append(urlSpec, newSpec)
 	}
 
@@ -1909,6 +1910,26 @@ func (a APIDefinitionLoader) findPathAndMethodForOperation(apiSpec *APISpec, ope
 	}
 
 	return "", ""
+}
+
+// matcherPathFor returns the path a URLSpec's matcher should be compiled from.
+//
+// An OAS path key carries placeholders, and PreparePathRegexp compiles every
+// placeholder to ([^/]+). Two endpoints told apart only by their regex —
+// /users/[a-z]+ and /users/[0-9]+, as a Classic migration leaves them — would
+// therefore collapse onto one matcher and stop being distinguishable. Where the
+// placeholder is one migration generated, the regex it stands for goes back into
+// the path, so the two compile to matchers of their own.
+//
+// A parameter the user named is left as it is, because Tyk Classic never applied
+// a regex written inside one either.
+func (a APIDefinitionLoader) matcherPathFor(apiSpec *APISpec, oasPath string) string {
+	pathItem := apiSpec.OAS.Paths.Value(oasPath)
+	if pathItem == nil {
+		return oasPath
+	}
+
+	return pathnormalizer.Denormalize(oasPath, pathItem.Parameters)
 }
 
 // sortURLSpecsByPathPriority sorts URLSpec entries using the same path priority
