@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -175,10 +174,6 @@ func (gw *Gateway) processSpec(
 	var coprocessLog = logger.WithFields(logrus.Fields{
 		"prefix": "coprocess",
 	})
-
-	if spec.Proxy.Transport.SSLMaxVersion > 0 {
-		spec.Proxy.Transport.SSLMaxVersion = tls.VersionTLS12
-	}
 
 	if spec.Proxy.Transport.SSLMinVersion > spec.Proxy.Transport.SSLMaxVersion {
 		spec.Proxy.Transport.SSLMaxVersion = spec.Proxy.Transport.SSLMinVersion
