@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
+	"github.com/TykTechnologies/tyk/internal/time"
 )
 
 //go:embed testdata/*-oas-template.json
@@ -711,4 +712,70 @@ func TestKVAwareFormatChecker_URIBase(t *testing.T) {
 			assert.Equal(t, tt.valid, c.IsFormat(tt.input))
 		})
 	}
+}
+
+// TestValidateOASObject_DNSDiscovery covers the rules about where an API's
+// target list comes from. They are checked in Go rather than by the schema,
+// which declares draft-04 and has no if/then.
+func TestValidateOASObject_DNSDiscovery(t *testing.T) {
+	t.Parallel()
+
+	build := func(upstream Upstream) []byte {
+		oasObject := OAS{
+			openapi3.T{
+				OpenAPI: "3.0.3",
+				Info:    &openapi3.Info{},
+				Paths:   openapi3.NewPaths(),
+			},
+		}
+		oasObject.SetTykExtension(&XTykAPIGateway{
+			Info:     Info{Name: "oas-api", State: State{Active: true}},
+			Server:   Server{ListenPath: ListenPath{Value: "/oas-api"}},
+			Upstream: upstream,
+		})
+
+		definition, err := oasObject.MarshalJSON()
+		require.NoError(t, err)
+		return definition
+	}
+
+	t.Run("DNS discovery supplies the targets load balancing would require", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(build(Upstream{
+			URL:           "h2c://my-grpc-svc:9002",
+			LoadBalancing: &LoadBalancing{Enabled: true},
+			DNSDiscovery:  &DNSDiscovery{Enabled: true, RefreshInterval: ReadableDuration(10 * time.Second)},
+		}), "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	t.Run("DNS discovery needs load balancing to distribute what it supplies", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(build(Upstream{
+			URL:          "h2c://my-grpc-svc:9002",
+			DNSDiscovery: &DNSDiscovery{Enabled: true},
+		}), "3.0.3")
+		assert.Error(t, err)
+	})
+
+	t.Run("two sources for one target list are refused", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(build(Upstream{
+			URL:              "h2c://my-grpc-svc:9002",
+			LoadBalancing:    &LoadBalancing{Enabled: true},
+			DNSDiscovery:     &DNSDiscovery{Enabled: true},
+			ServiceDiscovery: &ServiceDiscovery{Enabled: true, QueryEndpoint: "http://consul:8500/v1/catalog/service/svc"},
+		}), "3.0.3")
+		assert.Error(t, err)
+	})
+
+	t.Run("service discovery on its own is untouched", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(build(Upstream{
+			URL:              "h2c://my-grpc-svc:9002",
+			LoadBalancing:    &LoadBalancing{Enabled: true, Targets: []LoadBalancingTarget{{URL: "h2c://a:9002", Weight: 1}}},
+			ServiceDiscovery: &ServiceDiscovery{Enabled: true, QueryEndpoint: "http://consul:8500/v1/catalog/service/svc"},
+		}), "3.0.3")
+		assert.NoError(t, err)
+	})
 }

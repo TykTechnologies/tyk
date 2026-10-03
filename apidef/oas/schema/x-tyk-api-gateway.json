@@ -1500,6 +1500,9 @@
         "loadBalancing": {
           "$ref": "#/definitions/X-Tyk-LoadBalancing"
         },
+        "dnsDiscovery": {
+          "$ref": "#/definitions/X-Tyk-DNSDiscovery"
+        },
         "preserveHostHeader": {
           "$ref": "#/definitions/X-Tyk-PreserveHostHeader"
         },
@@ -1526,6 +1529,58 @@
           "required": [
             "loadBalancing"
           ]
+        }
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "loadBalancing": {
+                "properties": {
+                  "enabled": {
+                    "const": true
+                  }
+                },
+                "required": [
+                  "enabled"
+                ]
+              }
+            },
+            "required": [
+              "loadBalancing"
+            ],
+            "not": {
+              "properties": {
+                "dnsDiscovery": {
+                  "properties": {
+                    "enabled": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ]
+                }
+              },
+              "required": [
+                "dnsDiscovery"
+              ]
+            }
+          },
+          "then": {
+            "properties": {
+              "loadBalancing": {
+                "properties": {
+                  "targets": {
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "targets"
+                ]
+              }
+            }
+          }
         }
       ]
     },
@@ -2900,6 +2955,40 @@
         "enabled"
       ]
     },
+    "X-Tyk-DNSDiscovery": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "refreshInterval": {
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
+        },
+        "staleTTL": {
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
+        },
+        "connectionDraining": {
+          "$ref": "#/definitions/X-Tyk-ConnectionDraining"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "X-Tyk-ConnectionDraining": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "timeout": {
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
     "X-Tyk-LoadBalancing": {
       "type": "object",
       "properties": {
@@ -2920,27 +3009,6 @@
       },
       "required": [
         "enabled"
-      ],
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "enabled": {
-                "const": true
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "targets": {
-                "minItems": 1
-              }
-            },
-            "required": [
-              "targets"
-            ]
-          }
-        }
       ]
     },
     "X-Tyk-TLSTransport": {
