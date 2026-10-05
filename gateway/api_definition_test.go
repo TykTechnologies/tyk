@@ -1321,13 +1321,13 @@ func TestAPIDefinitionLoader(t *testing.T) {
 		executeAndAssert(t, temp)
 
 		_, err = l.loadFileTemplate("../outside.tmpl")
-		assert.Error(t, err)
+		assert.ErrorIs(t, err, errUnsafeTemplatePath)
 		assert.Contains(t, err.Error(), "attempts to escape root directory")
 
 		ts.Gw.OSRoot = nil
 		_, err = l.loadFileTemplate("templates/transform_test.tmpl")
-		assert.Error(t, err)
-		assert.Equal(t, "OSRoot is not initialized", err.Error())
+		assert.ErrorIs(t, err, errUnsafeTemplatePath)
+		assert.Contains(t, err.Error(), "OSRoot is not initialized")
 	})
 
 	t.Run("loadBlobTemplate", func(t *testing.T) {
@@ -3549,7 +3549,7 @@ func TestAPIDefinitionLoader_resolveTemplatePath(t *testing.T) {
 		// End to end through the function the UseFile transform mode calls.
 		blocked := newLoader(false, true)
 		_, err := blocked.loadFileTemplate("../outside/secret.tmpl")
-		assert.Error(t, err)
+		assert.ErrorIs(t, err, errUnsafeTemplatePath)
 
 		allowed := newLoader(true, true)
 		tmpl, err := allowed.loadFileTemplate(filepath.Join(outside, "secret.tmpl"))

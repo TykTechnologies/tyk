@@ -141,6 +141,9 @@ type EndPointCacheMeta struct {
 type TransformSpec struct {
 	apidef.TemplateMeta
 	Template *texttemplate.Template
+	// Blocked is set when the template path was rejected at load time. Matching
+	// requests fail with a generic error instead of skipping the transform.
+	Blocked bool
 }
 
 type ExtendedCircuitBreakerMeta struct {
@@ -1064,6 +1067,9 @@ func (a APIDefinitionLoader) filterSprigFuncs() texttemplate.FuncMap {
 	return texttemplate.FuncMap(tmp)
 }
 
+// errUnsafeTemplatePath marks a body transform template path rejected by resolveTemplatePath.
+var errUnsafeTemplatePath = errors.New("unsafe template path")
+
 // resolveTemplatePath returns the body transform template path the gateway will read.
 // By default the path is confined to the configured TemplatePath root via the
 // gateway's osutil.Root, which also resolves symlinks and relative segments. When
@@ -1091,7 +1097,7 @@ func (a APIDefinitionLoader) loadFileTemplate(path string) (*texttemplate.Templa
 	templatePath, err := a.resolveTemplatePath(path)
 	if err != nil {
 		log.WithError(err).Warning("Path escape detected or invalid template path")
-		return nil, err
+		return nil, fmt.Errorf("%w: %w", errUnsafeTemplatePath, err)
 	}
 
 	tmpName := filepath.Base(templatePath)
@@ -1146,10 +1152,21 @@ func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMet
 			newSpec.TransformResponseAction = newTransformSpec
 		}
 
-		if err == nil {
+		switch {
+		case err == nil:
 			urlSpec = append(urlSpec, newSpec)
 			log.Debug("-- Loaded")
-		} else {
+		case errors.Is(err, errUnsafeTemplatePath):
+			// Keep the spec so matching requests fail rather than silently
+			// passing through untransformed.
+			log.Error("Template path rejected! Requests to this path will fail: ", err)
+			if stat == Transformed {
+				newSpec.TransformAction.Blocked = true
+			} else {
+				newSpec.TransformResponseAction.Blocked = true
+			}
+			urlSpec = append(urlSpec, newSpec)
+		default:
 			log.Error("Template load failure! Skipping transformation: ", err)
 		}
 

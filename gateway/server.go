@@ -1992,6 +1992,11 @@ func (gw *Gateway) afterConfSetup() error {
 	regexp.Configure(cacheOpts)
 	httputil.ConfigurePathRegexpCache(maxEntries, conf.DisableRegexpCacheBound, mainLog.Warnf)
 
+	if conf.AllowUnsafeBodyTransformTemplatePaths {
+		mainLog.Warn("allow_unsafe_body_transform_template_paths is enabled: body transform template paths are not confined to template_path. " +
+			"Risk: API definitions can read arbitrary files from the gateway filesystem.")
+	}
+
 	if conf.HealthCheckEndpointName == "" {
 		conf.HealthCheckEndpointName = "hello"
 	}
