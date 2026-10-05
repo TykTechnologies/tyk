@@ -17,7 +17,6 @@ func TestCustomId_Validate(t *testing.T) {
 		{name: "empty is generated, not user-defined", id: ""},
 		{name: "letters and digits", id: "aZ09"},
 		{name: "allowed punctuation", id: "a.b-c_d~e"},
-		{name: "only punctuation", id: ".-_~"},
 		{name: "non-ascii letter", id: "żuk", invalid: true},
 		{name: "path separator", id: "a/b", invalid: true},
 		{name: "space", id: "a b", invalid: true},
@@ -40,6 +39,25 @@ func TestCustomId_Validate(t *testing.T) {
 			assert.ErrorIs(t, apiErr, identifier.ErrInvalidCustomApiId)
 		})
 	}
+}
+
+func TestCustomApiId_Validate_PunctuationOnly(t *testing.T) {
+	// Dot-segments ("." and "..") are normalised away by HTTP clients and servers,
+	// so an API stored under such an id could never be read, updated or deleted.
+	for _, id := range []string{".", "..", "...", "-", "_", "~", ".-_~"} {
+		t.Run(id, func(t *testing.T) {
+			assert.ErrorIs(t, identifier.CustomApiId(id).Validate(), identifier.ErrInvalidCustomApiId)
+		})
+	}
+
+	for _, id := range []string{"a.", "..1", "~x~", "v1.0"} {
+		t.Run(id, func(t *testing.T) {
+			assert.NoError(t, identifier.CustomApiId(id).Validate())
+		})
+	}
+
+	// Policy IDs keep their existing rules.
+	assert.NoError(t, identifier.CustomPolicyId(".").Validate())
 }
 
 func TestCustomId_String(t *testing.T) {

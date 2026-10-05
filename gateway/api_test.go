@@ -6471,6 +6471,15 @@ func TestHandleApi_CustomApiIdValidation(t *testing.T) {
 			assert.Equal(t, http.StatusBadRequest, statusCode)
 		})
 
+		t.Run("rejects punctuation-only create", func(t *testing.T) {
+			response, statusCode := ts.Gw.handleAddApi(apiDefRequest(t, "."), afero.NewMemMapFs(), false)
+
+			errorResponse, ok := response.(apiStatusMessage)
+			require.True(t, ok)
+			assert.Equal(t, identifier.ErrInvalidCustomApiId.Error(), errorResponse.Message)
+			assert.Equal(t, http.StatusBadRequest, statusCode)
+		})
+
 		t.Run("rejects update", func(t *testing.T) {
 			registerSpec(t, unsafeAPIID)
 
