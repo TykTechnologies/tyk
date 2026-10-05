@@ -1435,6 +1435,12 @@ type Config struct {
 
 	// AllowUnsafeWebhookTemplatePaths disables webhook template path validation. This is provided for compatibility with legacy webhook definitions containing potentially unsafe template paths (default: false).
 	AllowUnsafeWebhookTemplatePaths bool `json:"allow_unsafe_webhook_template_paths"`
+
+	// AllowUnsafeApiIds allows the use of non-standard characters in API identifiers (default: false).
+	// The standard characters are alphanumeric characters plus underscore (_), hyphen (-), dot (.) and tilde (~).
+	// A standard ID must also contain at least one letter or digit, so IDs made only of punctuation (e.g. "." or "..") are rejected.
+	// The use of other characters in IDs can cause unpredictable behavior and is not recommended.
+	AllowUnsafeApiIds bool `json:"allow_unsafe_api_ids"`
 }
 
 // LabsConfig include config for streaming
