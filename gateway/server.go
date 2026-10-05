@@ -1773,6 +1773,7 @@ func (gw *Gateway) initSystem() error {
 func (gw *Gateway) initMembers(cfg config.Config) {
 	gw.validator = validator.New(
 		validator.WithAllowUnsafePolicyIds(cfg.AllowUnsafePolicyIds),
+		validator.WithAllowUnsafeApiIds(cfg.AllowUnsafeApiIds),
 	)
 }
 
@@ -1900,6 +1901,11 @@ func (gw *Gateway) afterConfSetup() error {
 	}
 	regexp.Configure(cacheOpts)
 	httputil.ConfigurePathRegexpCache(maxEntries, conf.DisableRegexpCacheBound, mainLog.Warnf)
+
+	if conf.AllowUnsafeApiIds {
+		mainLog.Warn("allow_unsafe_api_ids is enabled: API IDs with non-standard characters will be accepted. " +
+			"This can cause unpredictable behavior and is not recommended.")
+	}
 
 	if conf.HealthCheckEndpointName == "" {
 		conf.HealthCheckEndpointName = "hello"

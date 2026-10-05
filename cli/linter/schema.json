@@ -1694,6 +1694,10 @@
       "type": ["boolean", "null"],
       "additionalProperties": false
     },
+    "allow_unsafe_api_ids": {
+      "type": ["boolean", "null"],
+      "additionalProperties": false
+    },
     "error_overrides": {
       "$ref": "#/definitions/ErrorOverrides"
     }
