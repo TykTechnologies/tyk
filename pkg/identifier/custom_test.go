@@ -21,6 +21,10 @@ func TestCustomId_Validate(t *testing.T) {
 		{name: "path separator", id: "a/b", invalid: true},
 		{name: "space", id: "a b", invalid: true},
 		{name: "percent encoding", id: "a%2Fb", invalid: true},
+		{name: "fragment", id: "a#b", invalid: true},
+		{name: "query", id: "a?b", invalid: true},
+		{name: "backslash", id: `a\b`, invalid: true},
+		{name: "at sign", id: "a@b", invalid: true},
 	}
 
 	for _, tc := range testCases {
