@@ -3,6 +3,13 @@ name: Serial MCP stack qualification
 
 on:
   workflow_call:
+    secrets:
+      PROBE_APP_ID:
+        required: true
+      PROBE_APP_PRIVATE_KEY:
+        required: true
+      DASH_LICENSE:
+        required: true
 
 permissions:
   contents: read
@@ -32,11 +39,18 @@ jobs:
     steps:
       - name: Generate GitHub App token
         id: app-token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
         with:
           app-id: ${{ secrets.PROBE_APP_ID }}
           private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
           owner: TykTechnologies
+          permission-contents: read
+          repositories: |
+            tyk
+            tyk-analytics
+            tyk-pump
+            tyk-mock-mcp-server
+            tyk-sync-internal
       - name: Resolve coordinated source revisions
         id: revisions
         env:
@@ -66,32 +80,36 @@ jobs:
             echo "$component source revision: $revision"
           done
       - name: Checkout Dashboard and owned test runner
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           repository: TykTechnologies/tyk-analytics
           ref: ${{ steps.revisions.outputs.dashboard }}
           token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: false
           path: mcp/dashboard
       - name: Checkout Gateway
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           repository: TykTechnologies/tyk
           ref: ${{ steps.revisions.outputs.gateway }}
           token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: false
           path: mcp/gateway
       - name: Checkout Pump
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           repository: TykTechnologies/tyk-pump
           ref: ${{ steps.revisions.outputs.pump }}
           token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: false
           path: mcp/pump
       - name: Checkout immutable mock fixtures
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
         with:
           repository: TykTechnologies/tyk-mock-mcp-server
           ref: 29fefa17ad1a8ce168a66ccc7680030d46cfbb13
           token: ${{ steps.app-token.outputs.token }}
+          persist-credentials: false
           path: mcp/mock
       - name: Setup Go
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
@@ -105,7 +123,10 @@ jobs:
       - name: Configure private module fetch
         env:
           ORG_GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: git config --global url."https://x-access-token:${ORG_GH_TOKEN}@github.com/".insteadOf "https://github.com/"
+        run: |
+          for repository in tyk-analytics tyk-sync-internal; do
+            git config --global url."https://x-access-token:${ORG_GH_TOKEN}@github.com/TykTechnologies/$repository".insteadOf "https://github.com/TykTechnologies/$repository"
+          done
       - name: Setup Python
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:

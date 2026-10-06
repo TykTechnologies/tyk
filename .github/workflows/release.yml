@@ -1229,7 +1229,10 @@ jobs:
     needs: dep-guard
     if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
     uses: ./.github/workflows/mcp-qualification.yml
-    secrets: inherit
+    secrets:
+      PROBE_APP_ID: ${{ secrets.PROBE_APP_ID }}
+      PROBE_APP_PRIVATE_KEY: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+      DASH_LICENSE: ${{ secrets.DASH_LICENSE }}
     permissions:
       contents: read
   aggregator-ci-test:
