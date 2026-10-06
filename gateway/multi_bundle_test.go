@@ -191,8 +191,8 @@ func TestMergeBundleManifestAppendsHooks(t *testing.T) {
 		},
 	}
 
-	require.NoError(t, mergeBundleManifest(spec, a, "bundle-a", "bundle-a.zip"))
-	require.NoError(t, mergeBundleManifest(spec, b, "bundle-b", "bundle-b.zip"))
+	require.NoError(t, mergeBundleManifest(spec, a, "bundle-a", "bundle-a.zip", config.Config{}))
+	require.NoError(t, mergeBundleManifest(spec, b, "bundle-b", "bundle-b.zip", config.Config{}))
 
 	// pre: A's two then B's one, all path-prefixed by their bundle subdir.
 	require.Len(t, spec.CustomMiddleware.Pre, 3)
@@ -249,7 +249,7 @@ func TestMergeBundleManifestPreservesInlineCode(t *testing.T) {
 		},
 	}
 
-	require.NoError(t, mergeBundleManifest(spec, manifest, "bundle-a", "bundle-a.zip"))
+	require.NoError(t, mergeBundleManifest(spec, manifest, "bundle-a", "bundle-a.zip", config.Config{}))
 
 	require.Len(t, spec.CustomMiddleware.Pre, 3)
 
@@ -287,8 +287,8 @@ func TestMergeBundleManifestRejectsDuplicateAuthCheck(t *testing.T) {
 		},
 	}
 
-	require.NoError(t, mergeBundleManifest(spec, a, "bundle-a", "bundle-a.zip"))
-	err := mergeBundleManifest(spec, b, "bundle-b", "bundle-b.zip")
+	require.NoError(t, mergeBundleManifest(spec, a, "bundle-a", "bundle-a.zip", config.Config{}))
+	err := mergeBundleManifest(spec, b, "bundle-b", "bundle-b.zip", config.Config{})
 	require.Error(t, err, "second auth_check must be rejected")
 	assert.Contains(t, err.Error(), "auth_check")
 }
@@ -305,8 +305,8 @@ func TestMergeBundleManifestRejectsDriverMismatch(t *testing.T) {
 		CustomMiddleware: apidef.MiddlewareSection{Driver: apidef.PythonDriver},
 	}
 
-	require.NoError(t, mergeBundleManifest(spec, a, "bundle-a", "bundle-a.zip"))
-	err := mergeBundleManifest(spec, b, "bundle-b", "bundle-b.zip")
+	require.NoError(t, mergeBundleManifest(spec, a, "bundle-a", "bundle-a.zip", config.Config{}))
+	err := mergeBundleManifest(spec, b, "bundle-b", "bundle-b.zip", config.Config{})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "driver")
 }
@@ -517,8 +517,8 @@ func TestMergeBundleManifestTrafficLogs(t *testing.T) {
 			},
 		}
 
-		require.NoError(t, mergeBundleManifest(spec, a, "bundle-a", "bundle-a.zip"))
-		require.NoError(t, mergeBundleManifest(spec, b, "bundle-b", "bundle-b.zip"))
+		require.NoError(t, mergeBundleManifest(spec, a, "bundle-a", "bundle-a.zip", config.Config{}))
+		require.NoError(t, mergeBundleManifest(spec, b, "bundle-b", "bundle-b.zip", config.Config{}))
 
 		assert.True(t, spec.AnalyticsPlugin.Enabled)
 		assert.Equal(t, "AnalyticsB", spec.AnalyticsPlugin.FuncName)
@@ -546,8 +546,8 @@ func TestMergeBundleManifestTrafficLogs(t *testing.T) {
 			},
 		}
 
-		require.NoError(t, mergeBundleManifest(spec, a, "bundle-a", "bundle-a.zip"))
-		err := mergeBundleManifest(spec, b, "bundle-b", "bundle-b.zip")
+		require.NoError(t, mergeBundleManifest(spec, a, "bundle-a", "bundle-a.zip", config.Config{}))
+		err := mergeBundleManifest(spec, b, "bundle-b", "bundle-b.zip", config.Config{})
 		require.Error(t, err, "second traffic_logs must be rejected")
 		assert.Contains(t, err.Error(), "traffic_logs")
 		assert.Contains(t, err.Error(), "bundle-b.zip")
@@ -568,7 +568,7 @@ func TestMergeBundleManifestTrafficLogs(t *testing.T) {
 				TrafficLogs: apidef.MiddlewareDefinition{Name: "AnalyticsOff", Path: "analytics.so", Disabled: true},
 			},
 		}
-		require.NoError(t, mergeBundleManifest(spec, disabled, "bundle-off", "bundle-off.zip"))
+		require.NoError(t, mergeBundleManifest(spec, disabled, "bundle-off", "bundle-off.zip", config.Config{}))
 		assert.False(t, spec.AnalyticsPlugin.Enabled)
 		assert.Empty(t, spec.AnalyticsPlugin.FuncName)
 		assert.Empty(t, spec.CustomMiddleware.TrafficLogs.Name)
@@ -581,10 +581,42 @@ func TestMergeBundleManifestTrafficLogs(t *testing.T) {
 				TrafficLogs: apidef.MiddlewareDefinition{Name: "AnalyticsOn", Path: "analytics.so"},
 			},
 		}
-		require.NoError(t, mergeBundleManifest(spec, active, "bundle-on", "bundle-on.zip"))
+		require.NoError(t, mergeBundleManifest(spec, active, "bundle-on", "bundle-on.zip", config.Config{}))
 		assert.True(t, spec.AnalyticsPlugin.Enabled)
 		assert.Equal(t, "AnalyticsOn", spec.AnalyticsPlugin.FuncName)
 		assert.Equal(t, filepath.Join("bundle-on", "analytics.so"), spec.AnalyticsPlugin.PluginPath)
+	})
+
+	t.Run("disable_bundled_traffic_logs ignores declarations", func(t *testing.T) {
+		spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+		cfg := config.Config{DisableBundledTrafficLogs: true}
+
+		a := &apidef.BundleManifest{
+			CustomMiddleware: apidef.MiddlewareSection{
+				Driver:      apidef.GoPluginDriver,
+				TrafficLogs: apidef.MiddlewareDefinition{Name: "AnalyticsA", Path: "analytics.so"},
+				Pre:         []apidef.MiddlewareDefinition{{Name: "preA", Path: "plugin.so"}},
+			},
+		}
+		b := &apidef.BundleManifest{
+			CustomMiddleware: apidef.MiddlewareSection{
+				Driver:      apidef.GoPluginDriver,
+				TrafficLogs: apidef.MiddlewareDefinition{Name: "AnalyticsB", Path: "analytics.so"},
+			},
+		}
+
+		// Two active declarations would be a hard error with the flag off;
+		// with it on both are ignored and the API keeps loading.
+		require.NoError(t, mergeBundleManifest(spec, a, "bundle-a", "bundle-a.zip", cfg))
+		require.NoError(t, mergeBundleManifest(spec, b, "bundle-b", "bundle-b.zip", cfg))
+
+		assert.False(t, spec.AnalyticsPlugin.Enabled)
+		assert.Equal(t, apidef.AnalyticsPluginConfig{}, spec.AnalyticsPlugin)
+		assert.Empty(t, spec.CustomMiddleware.TrafficLogs.Name)
+
+		// Other hooks still merge as usual.
+		require.Len(t, spec.CustomMiddleware.Pre, 1)
+		assert.Equal(t, "preA", spec.CustomMiddleware.Pre[0].Name)
 	})
 
 	t.Run("no declaration leaves analytics plugin untouched", func(t *testing.T) {
@@ -596,7 +628,7 @@ func TestMergeBundleManifestTrafficLogs(t *testing.T) {
 				Pre:    []apidef.MiddlewareDefinition{{Name: "preA", Path: "plugin.so"}},
 			},
 		}
-		require.NoError(t, mergeBundleManifest(spec, a, "bundle-a", "bundle-a.zip"))
+		require.NoError(t, mergeBundleManifest(spec, a, "bundle-a", "bundle-a.zip", config.Config{}))
 		assert.False(t, spec.AnalyticsPlugin.Enabled)
 		assert.Equal(t, apidef.AnalyticsPluginConfig{}, spec.AnalyticsPlugin)
 	})
@@ -712,4 +744,52 @@ func TestLoadBundleWithFs_CommaSeparatedDuplicateTrafficLogs(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "traffic_logs")
 	assert.Contains(t, err.Error(), "bundle-b.zip")
+}
+
+// TestLoadBundleWithFs_DisableBundledTrafficLogs asserts the kill switch:
+// with disable_bundled_traffic_logs set, composed bundles declaring
+// traffic_logs (even conflicting ones) load fine and the analytics plugin
+// stays off, matching the pre-fix behaviour (TT-18097).
+func TestLoadBundleWithFs_DisableBundledTrafficLogs(t *testing.T) {
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.BundleBaseURL = "http://bundles.local/"
+		globalConf.SkipVerifyExistingPluginBundle = true
+		globalConf.DisableBundledTrafficLogs = true
+	})
+	defer ts.Close()
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID:                  "multi-bundle-traffic-logs-disabled",
+			CustomMiddlewareBundle: "bundle-a.zip,bundle-b.zip",
+		},
+	}
+
+	rootPath := ts.Gw.getBundleDestPath(spec)
+	memFs := afero.NewMemMapFs()
+	for _, name := range []string{"bundle-a.zip", "bundle-b.zip"} {
+		subdir := bundleSubdirName(name)
+		require.NoError(t, memFs.MkdirAll(filepath.Join(rootPath, subdir), 0755))
+		f, err := memFs.Create(filepath.Join(rootPath, subdir, "manifest.json"))
+		require.NoError(t, err)
+		_, err = f.WriteString(`{
+			"file_list": ["analytics.so"],
+			"custom_middleware": {
+				"driver": "goplugin",
+				"pre": [{"name": "Pre", "path": "analytics.so"}],
+				"traffic_logs": {"name": "ModifyAnalytics", "path": "analytics.so"}
+			},
+			"checksum": "deadbeef",
+			"signature": ""
+		}`)
+		require.NoError(t, err)
+		require.NoError(t, f.Close())
+	}
+
+	require.NoError(t, ts.Gw.loadBundleWithFs(spec, memFs))
+
+	assert.False(t, spec.AnalyticsPlugin.Enabled)
+	assert.Empty(t, spec.CustomMiddleware.TrafficLogs.Name)
+	// The rest of the manifests is still merged.
+	require.Len(t, spec.CustomMiddleware.Pre, 2)
 }
