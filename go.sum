@@ -195,10 +195,6 @@ github.com/TykTechnologies/storage v1.5.0 h1:W4ezPleAj/toq4DFT3nb7P4V92AIpE9TcMz
 github.com/TykTechnologies/storage v1.5.0/go.mod h1:swwt7vWgv6dDG9yvNXn7kf6r/QUWzOQc9XUXnXHeOg0=
 github.com/TykTechnologies/structviewer v1.2.0 h1:wV3AyTmWCZ3n7/llp+6xuDjnS/EJ/Ct/HG2pPE9+VX8=
 github.com/TykTechnologies/structviewer v1.2.0/go.mod h1:XKJbqX8Q7n9FUrqTK58yVZUi5zWAkeRcULcPLDoWvvY=
-github.com/TykTechnologies/tyk-pump v1.17.0-rc1.0.20260916161503-78acd2200c66 h1:27XtPnbbwFuyiLWQs4LuAsDptAIYdFE7uAg80ufmyxo=
-github.com/TykTechnologies/tyk-pump v1.17.0-rc1.0.20260916161503-78acd2200c66/go.mod h1:sweZqtQ/Fys3hYcrfe0XpmrtLune3kBFo9Qm+++Cb+E=
-github.com/TykTechnologies/tyk-pump v1.17.0-rc1.0.20261006161331-7eb38c48bb5b h1:VO/ssBLbPvzJ+0FzmRq91tuUL6Gk3XgMfZhE+kjUxIk=
-github.com/TykTechnologies/tyk-pump v1.17.0-rc1.0.20261006161331-7eb38c48bb5b/go.mod h1:sweZqtQ/Fys3hYcrfe0XpmrtLune3kBFo9Qm+++Cb+E=
 github.com/TykTechnologies/tyk-pump v1.17.0-rc1.0.20261006164405-5fe0b9668fa7 h1:74QWzMg5n7hYOPVqmGEGfCrdXUj0s4UIQeKDzYtOnvo=
 github.com/TykTechnologies/tyk-pump v1.17.0-rc1.0.20261006164405-5fe0b9668fa7/go.mod h1:sweZqtQ/Fys3hYcrfe0XpmrtLune3kBFo9Qm+++Cb+E=
 github.com/agnivade/levenshtein v1.1.1 h1:QY8M92nrzkmr798gCo3kmMyqXFzdQVpxLlGPRBij0P8=
