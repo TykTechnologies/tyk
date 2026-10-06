@@ -46,9 +46,14 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		return nil, http.StatusOK
 	}
 
-	tmeta := meta.(*TransformSpec)
+	tmeta, ok := meta.(*TransformSpec)
+	if !ok {
+		return nil, http.StatusOK
+	}
+
 	if tmeta.Blocked {
 		t.Logger().Error("Body transform template path was rejected at load time")
+		//nolint:staticcheck // ST1005: the message is the client-facing response body required by the spec
 		return errors.New(msgTemplateExecutionFailed), http.StatusBadRequest
 	}
 
