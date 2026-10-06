@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -268,6 +270,44 @@ func TestBuildUpstreamRequest_DetachesFromParentCancellation(t *testing.T) {
 		t.Fatal("upstream request context should not inherit parent cancellation")
 	default:
 	}
+}
+
+func TestBuildUpstreamRequestWithContext_UsesOperationLifetimeAndCurrentValues(t *testing.T) {
+	t.Parallel()
+	type contextKey string
+	key := contextKey("caller")
+
+	parentCtx, cancelParent := context.WithCancel(context.WithValue(context.Background(), key, "current-request"))
+	parent := httptest.NewRequest(http.MethodPost, "/mcp/", nil).WithContext(parentCtx)
+	operationBase := context.WithValue(context.Background(), key, "stale-session")
+	operationDeadline, stopDeadline := context.WithTimeout(operationBase, time.Minute)
+	operationCtx, cancelOperation := context.WithCancelCause(operationDeadline)
+	t.Cleanup(stopDeadline)
+
+	req, err := BuildUpstreamRequestWithContext(parent, operationCtx, sampleTool(t, "getOrder"), "rest-1", map[string]any{"id": 42})
+	require.NoError(t, err)
+	assert.Equal(t, "current-request", req.Context().Value(key))
+	deadline, ok := req.Context().Deadline()
+	require.True(t, ok)
+	operationDeadlineValue, ok := operationCtx.Deadline()
+	require.True(t, ok)
+	assert.Equal(t, operationDeadlineValue, deadline)
+
+	cancelParent()
+	select {
+	case <-req.Context().Done():
+		t.Fatal("current HTTP request cancellation must not replace SDK operation lifetime")
+	default:
+	}
+
+	cause := errors.New("cancel one MCP operation")
+	cancelOperation(cause)
+	select {
+	case <-req.Context().Done():
+	case <-time.After(time.Second):
+		t.Fatal("source request did not inherit SDK operation cancellation")
+	}
+	assert.ErrorIs(t, context.Cause(req.Context()), cause)
 }
 
 func TestBuildUpstreamRequest_IntegerValuedFloatArgumentUsesDecimalNotation(t *testing.T) {

@@ -330,6 +330,36 @@ func TestJSONRPCMiddleware_ProcessRequest_ToolsCall_RoutesToVEM(t *testing.T) {
 	assert.True(t, httpctx.IsJsonRPCRouting(r))
 }
 
+func TestJSONRPCMiddleware_PairedMCPProxy_RoutesToCallerVEM(t *testing.T) {
+	proxy := pairedMCPProxySpec("proxy-1", "org-1", "rest-1", nil)
+	proxy.MCPPrimitives = map[string]string{
+		"tool:list_orders_source": mcp.ToolPrefix + "list_orders_source",
+	}
+	proxy.JSONRPCRouter = mcp.NewRouter()
+
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: proxy}}
+	req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{
+		"jsonrpc":"2.0",
+		"id":1,
+		"method":"tools/call",
+		"params":{"name":"list_orders_source","arguments":{}}
+	}`))
+	req.Header.Set(headerContentType, contentTypeJSON)
+	rec := httptest.NewRecorder()
+
+	err, status := mw.ProcessRequest(rec, req, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, status)
+	redirect := ctxGetURLRewriteTarget(req)
+	require.NotNil(t, redirect)
+	assert.Equal(t, jsonrpc.MethodVEMPrefix+mcp.MethodToolsCall, redirect.Path)
+	state := httpctx.GetJSONRPCRoutingState(req)
+	require.NotNil(t, state)
+	assert.Equal(t, mcp.ToolPrefix+"list_orders_source", state.NextVEM)
+	assert.Equal(t, "list_orders_source", state.PrimitiveName)
+}
+
 func TestJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{

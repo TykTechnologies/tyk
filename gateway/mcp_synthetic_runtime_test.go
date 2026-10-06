@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/sirupsen/logrus"
@@ -120,23 +122,116 @@ func TestSyntheticAdapterProcessRequest_RunsWithExistingJSONRPCRoutingState(t *t
 	assert.Contains(t, rec.Body.String(), `"result"`)
 }
 
-func TestRESTAsMCPAdapter_RejectsNonPOSTMethods(t *testing.T) {
+func TestRESTAsMCPAdapter_ProtocolSpecificGETAndDELETE(t *testing.T) {
 	adapterSpec := buildSyntheticAdapterForRuntimeTest(t)
-	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: adapterSpec}}
+	gw, _, _ := syntheticAdapterGatewayForCallTest(t)
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: adapterSpec, Gw: gw}}
 
-	for _, method := range []string{http.MethodGet, http.MethodDelete} {
-		t.Run(method, func(t *testing.T) {
-			req := httptest.NewRequest(method, "/mcp", nil)
-			req.Header.Set("Accept", "application/json, text/event-stream")
-			rec := httptest.NewRecorder()
+	t.Run("modern methods are rejected with POST allowance", func(t *testing.T) {
+		for _, method := range []string{http.MethodGet, http.MethodDelete} {
+			t.Run(method, func(t *testing.T) {
+				req := httptest.NewRequest(method, "/mcp", nil)
+				req.Header.Set("Accept", "application/json, text/event-stream")
+				req.Header.Set(mcp.HeaderProtocolVersion, mcp.ModernProtocolVersion)
+				rec := httptest.NewRecorder()
 
-			err, status := processAdmittedSyntheticForTest(t, mw, rec, req)
-			require.NoError(t, err)
-			assert.Equal(t, middleware.StatusRespond, status)
-			assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
-			assert.Equal(t, http.MethodPost, rec.Header().Get("Allow"))
-		})
+				err, status := mw.ProcessRequest(rec, req, nil)
+				require.NoError(t, err)
+				assert.Equal(t, middleware.StatusRespond, status)
+				assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+				assert.Equal(t, http.MethodPost, rec.Header().Get("Allow"))
+			})
+		}
+	})
+
+	sessionID := initializeSyntheticAdapterSession(t, mw)
+	prepareLegacy := func(method string) *http.Request {
+		req := httptest.NewRequest(method, "/mcp", nil)
+		req.Header.Set("Accept", "application/json, text/event-stream")
+		req.Header.Set(mcp.HeaderSessionID, sessionID)
+		ctxSetMCPAdapterCallerProxyID(req, "proxy-1")
+		caller := gw.apisByID["proxy-1"]
+		require.NotNil(t, caller)
+		acceptMCPOrigin(req, caller, "")
+		require.True(t, establishMCPAdapterOriginHop(req, gw, caller, adapterSpec))
+		return req
 	}
+
+	t.Run("legacy GET opens and cancellation closes the SSE stream", func(t *testing.T) {
+		req := prepareLegacy(http.MethodGet)
+		ctx, cancel := context.WithCancel(req.Context())
+		req = req.WithContext(ctx)
+		rec := newHeaderSignalRecorder()
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			_, _ = mw.ProcessRequest(rec, req, nil)
+		}()
+		select {
+		case <-rec.wroteHeader:
+		case <-time.After(2 * time.Second):
+			t.Fatal("legacy GET did not open an SSE response")
+		}
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatal("legacy GET did not stop after request cancellation")
+		}
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		require.Contains(t, rec.Header().Get("Content-Type"), "text/event-stream")
+	})
+
+	t.Run("legacy DELETE terminates the session", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		err, status := mw.ProcessRequest(rec, prepareLegacy(http.MethodDelete), nil)
+		require.NoError(t, err)
+		require.Equal(t, middleware.StatusRespond, status)
+		require.Equal(t, http.StatusNoContent, rec.Code, rec.Body.String())
+	})
+}
+
+func TestRESTAsMCPProxy_GETWithoutLegacySessionIsMethodNotAllowed(t *testing.T) {
+	proxy := pairedMCPProxySpec("proxy-1", "org-1", "rest-1", nil)
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: proxy}}
+	req := httptest.NewRequest(http.MethodGet, "/mcp", nil)
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	rec := httptest.NewRecorder()
+
+	err, status := mw.ProcessRequest(rec, req, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, middleware.StatusRespond, status)
+	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+	assert.Equal(t, http.MethodPost, rec.Header().Get("Allow"))
+}
+
+type headerSignalRecorder struct {
+	*httptest.ResponseRecorder
+	once        sync.Once
+	wroteHeader chan struct{}
+}
+
+func newHeaderSignalRecorder() *headerSignalRecorder {
+	return &headerSignalRecorder{ResponseRecorder: httptest.NewRecorder(), wroteHeader: make(chan struct{})}
+}
+
+func (r *headerSignalRecorder) signal() { r.once.Do(func() { close(r.wroteHeader) }) }
+
+func (r *headerSignalRecorder) WriteHeader(status int) {
+	r.ResponseRecorder.WriteHeader(status)
+	r.signal()
+}
+
+func (r *headerSignalRecorder) Write(body []byte) (int, error) {
+	written, err := r.ResponseRecorder.Write(body)
+	r.signal()
+	return written, err
+}
+
+func (r *headerSignalRecorder) Flush() {
+	r.ResponseRecorder.Flush()
+	r.signal()
 }
 
 func TestRESTAsMCPToolView_RewritesToolsListForCallerProxy(t *testing.T) {
@@ -329,6 +424,46 @@ func TestCallMCPAdapterTool_AliasUsesCanonicalRequest(t *testing.T) {
 	assert.Equal(t, "/orders", gotPath)
 }
 
+func TestCallMCPAdapterTool_PropagatesSDKOperationCancellationToSource(t *testing.T) {
+	gw, adapterSpec, _ := syntheticAdapterGatewayForCallTest(t)
+	started := make(chan struct{})
+	observedCause := make(chan error, 1)
+	gw.apisHandlesByID.Store("rest-1", &ChainObject{ThisHandler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(started)
+		<-r.Context().Done()
+		observedCause <- context.Cause(r.Context())
+		w.WriteHeader(http.StatusRequestTimeout)
+	})})
+
+	tool := mustAdapterTool(t, adapterSpec, "orders")
+	operationCtx, cancel := context.WithCancelCause(mcpAdapterCallContext(t, gw, adapterSpec, "proxy-1"))
+	result := make(chan error, 1)
+	go func() {
+		_, err := defaultMCPAdapterCallTool(operationCtx, &tool, map[string]any{})
+		result <- err
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("source operation did not start")
+	}
+	cause := errors.New("cancel selected MCP call")
+	cancel(cause)
+	select {
+	case got := <-observedCause:
+		assert.ErrorIs(t, got, cause)
+	case <-time.After(time.Second):
+		t.Fatal("source handler did not observe cancellation")
+	}
+	select {
+	case err := <-result:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("cancelled adapter call did not return")
+	}
+}
+
 func TestCallMCPAdapterTool_RejectsToolHiddenFromCallerProxy(t *testing.T) {
 	gw, adapterSpec, sourceCalled := syntheticAdapterGatewayForCallTest(t)
 	tool := mustAdapterTool(t, adapterSpec, "make_order")
@@ -362,7 +497,7 @@ func TestCallMCPAdapterTool_LogsToolHiddenFromCallerProxy(t *testing.T) {
 	ctxSetMCPAdapterCallerProxyID(req, "proxy-1")
 	setSessionForTest(req, &user.SessionState{KeyID: "session-key-1"})
 
-	_, err := gw.callMCPAdapterTool(req, adapterSpec, &tool, map[string]any{})
+	_, err := gw.callMCPAdapterTool(context.Background(), req, adapterSpec, &tool, map[string]any{})
 	require.Error(t, err)
 	assert.False(t, *sourceCalled)
 
