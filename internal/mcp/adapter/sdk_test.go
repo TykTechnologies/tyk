@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -137,6 +138,47 @@ func TestNewSDKServer_CallToolDispatchesDerivedTool(t *testing.T) {
 	require.Len(t, result.Content, 1)
 	assert.Equal(t, `{"ok":true}`, result.Content[0].(*mcpsdk.TextContent).Text)
 	assert.Equal(t, map[string]any{"ok": true}, result.StructuredContent)
+}
+
+func TestNewSDKServer_ForbiddenHeaderDropsUntypedValueBeforeSerialization(t *testing.T) {
+	t.Parallel()
+	called := false
+	var upstream *http.Request
+	tool := oas.DerivedTool{
+		Name: "header_guard", Method: http.MethodGet, PathTemplate: "/headers",
+		ParamLocations:   map[string]string{"region": oas.DerivedParamLocationHeader},
+		ParamSourceNames: map[string]string{"region": "Authorization"},
+		InputSchema: map[string]any{
+			"type": "object",
+			"properties": map[string]any{
+				"region": map[string]any{"type": "string"},
+			},
+			"required": []string{"region"},
+		},
+	}
+	server, err := NewSDKServer(SDKServerConfig{
+		Name: "header guard", Tools: []oas.DerivedTool{tool},
+		CallTool: func(_ context.Context, tool *oas.DerivedTool, args map[string]any) (*Recorder, error) {
+			called = true
+			var err error
+			upstream, err = BuildUpstreamRequest(httptest.NewRequest(http.MethodPost, "/mcp", nil), tool, "rest-1", args)
+			if err != nil {
+				return nil, err
+			}
+			return NewRecorder(), nil
+		},
+	})
+	require.NoError(t, err)
+	session := connectSDKServer(t, server)
+
+	result, err := session.CallTool(context.Background(), &mcpsdk.CallToolParams{
+		Name: "header_guard", Arguments: map[string]any{"region": map[string]any{"attacker": true}},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.True(t, called)
+	require.NotNil(t, upstream)
+	assert.Empty(t, upstream.Header.Get("Authorization"))
 }
 
 func TestNewSDKServer_CallToolSanitizesInternalErrors(t *testing.T) {
@@ -359,6 +401,338 @@ func TestSDKAdapter_StreamableHTTPHandlerNilOptionsReusesStatefulHandlerWithoutL
 	assertNoToolListChanged(t, changed)
 }
 
+func TestSDKAdapter_ProtocolHandlersAreCachedAndShareServer(t *testing.T) {
+	t.Parallel()
+	adapter := newProtocolTestAdapter(t, []oas.DerivedTool{protocolTestTool("one")})
+
+	stateful := adapter.ProtocolHTTPHandler(false)
+	stateless := adapter.ProtocolHTTPHandler(true)
+	require.NotNil(t, stateful)
+	require.NotNil(t, stateless)
+	assert.Same(t, stateful, adapter.ProtocolHTTPHandler(false))
+	assert.Same(t, stateless, adapter.ProtocolHTTPHandler(true))
+	assert.NotSame(t, stateful, stateless)
+
+	require.NoError(t, adapter.UpdateTools([]oas.DerivedTool{protocolTestTool("two")}))
+	assert.Same(t, stateful, adapter.ProtocolHTTPHandler(false))
+	assert.Same(t, stateless, adapter.ProtocolHTTPHandler(true))
+	adapter.mu.RLock()
+	_, hasTwo := adapter.tools["two"]
+	adapter.mu.RUnlock()
+	assert.True(t, hasTwo)
+}
+
+func TestSDKAdapter_ConcurrentMixedHandlersAndToolRefresh(t *testing.T) {
+	const (
+		modernToolsList = "tools/list"
+		modernToolsCall = "tools/call"
+	)
+	stable := protocolTestTool("stable")
+	adapter := newProtocolTestAdapter(t, []oas.DerivedTool{stable, protocolTestTool("changing-0")})
+	client := mcpsdk.NewClient(&mcpsdk.Implementation{Name: "mixed-handler-test", Version: "1"}, nil)
+	legacy, err := client.Connect(context.Background(), &mcpsdk.StreamableClientTransport{
+		Endpoint: "http://mcp.test/mcp",
+		HTTPClient: &http.Client{Transport: loopbackRoundTripper{
+			handler: adapter.ProtocolHTTPHandler(false),
+		}},
+	}, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { assert.NoError(t, legacy.Close()) })
+
+	modernCall := func(method string) ([]byte, error) {
+		params := map[string]any{
+			"_meta": map[string]any{
+				mcpsdk.MetaKeyProtocolVersion:    sdkModernProtocolVersion,
+				mcpsdk.MetaKeyClientCapabilities: map[string]any{},
+				mcpsdk.MetaKeyClientInfo:         map[string]any{"name": "mixed-handler-test", "version": "1"},
+			},
+		}
+		if method == modernToolsCall {
+			params["name"] = stable.Name
+			params["arguments"] = map[string]any{}
+		}
+		body, marshalErr := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 9007199254740993, "method": method, "params": params})
+		if marshalErr != nil {
+			return nil, marshalErr
+		}
+		req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json, text/event-stream")
+		req.Header.Set("Mcp-Protocol-Version", sdkModernProtocolVersion)
+		req.Header.Set("Mcp-Method", method)
+		if method == modernToolsCall {
+			req.Header.Set("Mcp-Name", stable.Name)
+		}
+		rec := httptest.NewRecorder()
+		adapter.ProtocolHTTPHandler(true).ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			return nil, fmt.Errorf("modern %s returned %d: %s", method, rec.Code, rec.Body.String())
+		}
+		return rec.Body.Bytes(), nil
+	}
+
+	errCh := make(chan error, 200)
+	var wg sync.WaitGroup
+	for index := 0; index < 8; index++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			for iteration := 0; iteration < 12; iteration++ {
+				if index%2 == 0 {
+					if _, callErr := legacy.ListTools(context.Background(), nil); callErr != nil {
+						errCh <- callErr
+					}
+					if _, callErr := legacy.CallTool(context.Background(), &mcpsdk.CallToolParams{Name: stable.Name, Arguments: map[string]any{}}); callErr != nil {
+						errCh <- callErr
+					}
+					continue
+				}
+				if _, callErr := modernCall(modernToolsList); callErr != nil {
+					errCh <- callErr
+				}
+				if _, callErr := modernCall(modernToolsCall); callErr != nil {
+					errCh <- callErr
+				}
+			}
+		}(index)
+	}
+	for iteration := 1; iteration <= 12; iteration++ {
+		require.NoError(t, adapter.UpdateTools([]oas.DerivedTool{stable, protocolTestTool(fmt.Sprintf("changing-%d", iteration))}))
+	}
+	wg.Wait()
+	close(errCh)
+	for callErr := range errCh {
+		require.NoError(t, callErr)
+	}
+
+	final := protocolTestTool("final")
+	require.NoError(t, adapter.UpdateTools([]oas.DerivedTool{stable, final}))
+	legacyList, err := legacy.ListTools(context.Background(), nil)
+	require.NoError(t, err)
+	require.Contains(t, toolNames(legacyList.Tools), final.Name)
+	modernList, err := modernCall(modernToolsList)
+	require.NoError(t, err)
+	require.Contains(t, string(modernList), `"name":"final"`)
+}
+
+func TestSDKAdapter_ModernCancellationIsIsolatedByExactRequest(t *testing.T) {
+	started := make(chan string, 2)
+	cancelled := make(chan string, 1)
+	releaseSuccess := make(chan struct{})
+	tool := protocolTestTool("wait")
+	tool.InputSchema = map[string]any{
+		"type":       "object",
+		"properties": map[string]any{"operation": map[string]any{"type": "string"}},
+		"required":   []string{"operation"},
+	}
+	adapter, err := NewSDKAdapter(SDKServerConfig{
+		Name: "cancellation-test", Tools: []oas.DerivedTool{tool},
+		CallTool: func(ctx context.Context, _ *oas.DerivedTool, args map[string]any) (*Recorder, error) {
+			operation := args["operation"].(string)
+			started <- operation
+			if operation == "cancel" {
+				<-ctx.Done()
+				cancelled <- operation
+				return nil, ctx.Err()
+			}
+			select {
+			case <-releaseSuccess:
+				rec := NewRecorder()
+				_, writeErr := rec.Write([]byte(`{"operation":"success"}`))
+				return rec, writeErr
+			case <-ctx.Done():
+				return nil, fmt.Errorf("unrelated operation was cancelled: %w", ctx.Err())
+			}
+		},
+	})
+	require.NoError(t, err)
+
+	serve := func(ctx context.Context, id int64, operation string) (*httptest.ResponseRecorder, <-chan struct{}) {
+		body := fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"method":"tools/call","params":{"name":"wait","arguments":{"operation":%q},"_meta":{"%s":"%s","%s":{},"%s":{"name":"cancel-test","version":"1"}}}}`,
+			id, operation, mcpsdk.MetaKeyProtocolVersion, sdkModernProtocolVersion,
+			mcpsdk.MetaKeyClientCapabilities, mcpsdk.MetaKeyClientInfo)
+		req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(body)).WithContext(ctx)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json, text/event-stream")
+		req.Header.Set("Mcp-Protocol-Version", sdkModernProtocolVersion)
+		req.Header.Set("Mcp-Method", "tools/call")
+		req.Header.Set("Mcp-Name", "wait")
+		rec := httptest.NewRecorder()
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			adapter.ProtocolHTTPHandler(true).ServeHTTP(rec, req)
+		}()
+		return rec, done
+	}
+
+	cancelCtx, cancel := context.WithCancel(context.Background())
+	cancelRec, cancelDone := serve(cancelCtx, 9007199254740993, "cancel")
+	successRec, successDone := serve(context.Background(), 9007199254740994, "success")
+	seen := map[string]bool{}
+	for len(seen) < 2 {
+		select {
+		case operation := <-started:
+			seen[operation] = true
+		case <-time.After(time.Second):
+			t.Fatal("both modern source operations did not start")
+		}
+	}
+	cancel()
+	select {
+	case operation := <-cancelled:
+		assert.Equal(t, "cancel", operation)
+	case <-time.After(time.Second):
+		t.Fatal("selected modern operation did not observe HTTP cancellation")
+	}
+	close(releaseSuccess)
+	select {
+	case <-successDone:
+	case <-time.After(time.Second):
+		t.Fatal("unrelated modern operation did not complete")
+	}
+	select {
+	case <-cancelDone:
+	case <-time.After(time.Second):
+		t.Fatal("cancelled modern HTTP handler did not return")
+	}
+	assert.Equal(t, http.StatusOK, successRec.Code, successRec.Body.String())
+	assert.Contains(t, successRec.Body.String(), `"id":9007199254740994`)
+	assert.NotContains(t, successRec.Body.String(), `9007199254740993`)
+	_ = cancelRec
+}
+
+func TestSDKAdapter_LegacyExplicitCancellationIsolatedByExactRequestID(t *testing.T) {
+	started := make(chan string, 2)
+	cancelled := make(chan string, 1)
+	releaseSuccess := make(chan struct{})
+	tool := protocolTestTool("wait")
+	tool.InputSchema = map[string]any{
+		"type":       "object",
+		"properties": map[string]any{"operation": map[string]any{"type": "string"}},
+		"required":   []string{"operation"},
+	}
+	adapter, err := NewSDKAdapter(SDKServerConfig{
+		Name: "legacy-cancellation-test", Tools: []oas.DerivedTool{tool},
+		CallTool: func(ctx context.Context, _ *oas.DerivedTool, args map[string]any) (*Recorder, error) {
+			operation := args["operation"].(string)
+			started <- operation
+			if operation == "cancel" {
+				<-ctx.Done()
+				cancelled <- operation
+				return nil, ctx.Err()
+			}
+			select {
+			case <-releaseSuccess:
+				rec := NewRecorder()
+				_, writeErr := rec.Write([]byte(`{"operation":"success"}`))
+				return rec, writeErr
+			case <-ctx.Done():
+				return nil, fmt.Errorf("unrelated legacy operation was cancelled: %w", ctx.Err())
+			}
+		},
+	})
+	require.NoError(t, err)
+	handler := adapter.ProtocolHTTPHandler(false)
+	serve := func(body, sessionID string) *httptest.ResponseRecorder {
+		req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json, text/event-stream")
+		req.Header.Set("Mcp-Protocol-Version", "2025-06-18")
+		if sessionID != "" {
+			req.Header.Set("Mcp-Session-Id", sessionID)
+		}
+		rec := httptest.NewRecorder()
+		handler.ServeHTTP(rec, req)
+		return rec
+	}
+
+	initialize := serve(`{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"cancel-test","version":"1"}}}`, "")
+	require.Equal(t, http.StatusOK, initialize.Code, initialize.Body.String())
+	sessionID := initialize.Header().Get("Mcp-Session-Id")
+	require.NotEmpty(t, sessionID)
+	initialized := serve(`{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}`, sessionID)
+	require.Contains(t, []int{http.StatusAccepted, http.StatusNoContent}, initialized.Code)
+
+	serveCall := func(id int64, operation string) (*httptest.ResponseRecorder, <-chan struct{}) {
+		body := fmt.Sprintf(`{"jsonrpc":"2.0","id":%d,"method":"tools/call","params":{"name":"wait","arguments":{"operation":%q}}}`, id, operation)
+		rec := httptest.NewRecorder()
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			request := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(body))
+			request.Header.Set("Content-Type", "application/json")
+			request.Header.Set("Accept", "application/json, text/event-stream")
+			request.Header.Set("Mcp-Protocol-Version", "2025-06-18")
+			request.Header.Set("Mcp-Session-Id", sessionID)
+			handler.ServeHTTP(rec, request)
+		}()
+		return rec, done
+	}
+
+	cancelRec, cancelDone := serveCall(9007199254740993, "cancel")
+	successRec, successDone := serveCall(9007199254740994, "success")
+	seen := map[string]bool{}
+	for len(seen) < 2 {
+		select {
+		case operation := <-started:
+			seen[operation] = true
+		case <-time.After(time.Second):
+			t.Fatal("both legacy source operations did not start")
+		}
+	}
+	cancelNotification := serve(`{"jsonrpc":"2.0","method":"notifications/cancelled","params":{"requestId":9007199254740993,"reason":"cancel selected call"}}`, sessionID)
+	require.Contains(t, []int{http.StatusAccepted, http.StatusNoContent}, cancelNotification.Code, cancelNotification.Body.String())
+	select {
+	case operation := <-cancelled:
+		assert.Equal(t, "cancel", operation)
+	case <-time.After(time.Second):
+		t.Fatal("selected legacy operation did not observe explicit cancellation")
+	}
+	close(releaseSuccess)
+	select {
+	case <-successDone:
+	case <-time.After(time.Second):
+		t.Fatal("unrelated legacy operation did not complete")
+	}
+	select {
+	case <-cancelDone:
+	case <-time.After(time.Second):
+		t.Fatal("cancelled legacy call did not return")
+	}
+	assert.Equal(t, http.StatusOK, successRec.Code, successRec.Body.String())
+	assert.Contains(t, successRec.Body.String(), `"id":9007199254740994`)
+	assert.NotContains(t, successRec.Body.String(), `9007199254740993`)
+	_ = cancelRec
+}
+
+func toolNames(tools []*mcpsdk.Tool) []string {
+	names := make([]string, 0, len(tools))
+	for _, tool := range tools {
+		names = append(names, tool.Name)
+	}
+	return names
+}
+
+func newProtocolTestAdapter(t *testing.T, tools []oas.DerivedTool) *SDKAdapter {
+	t.Helper()
+	adapter, err := NewSDKAdapter(SDKServerConfig{
+		Name: "handler-test", Tools: tools,
+		CallTool: func(context.Context, *oas.DerivedTool, map[string]any) (*Recorder, error) {
+			return NewRecorder(), nil
+		},
+	})
+	require.NoError(t, err)
+	return adapter
+}
+
+func protocolTestTool(name string) oas.DerivedTool {
+	return oas.DerivedTool{
+		Name: name, Method: http.MethodGet, PathTemplate: "/" + name,
+		InputSchema: map[string]any{"type": "object"},
+	}
+}
+
 type loopbackRoundTripper struct {
 	handler http.Handler
 }
@@ -499,6 +873,91 @@ func TestNewSDKStreamableHTTPHandler_PreservesExactNumericRequestID(t *testing.T
 	var body map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
 	assert.JSONEq(t, `9007199254740993`, string(body["id"]))
+}
+
+func TestNewSDKStreamableHTTPHandler_SourceNotFoundResultHasJSONAndSSEParity(t *testing.T) {
+	for _, tt := range []struct {
+		name         string
+		jsonResponse bool
+		contentType  string
+	}{
+		{name: "json", jsonResponse: true, contentType: "application/json"},
+		{name: "sse", jsonResponse: false, contentType: "text/event-stream"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			tool := oas.DerivedTool{
+				Name:           "get_order",
+				Method:         http.MethodGet,
+				PathTemplate:   "/orders/{id}",
+				ParamLocations: map[string]string{"id": oas.DerivedParamLocationPath},
+				InputSchema: map[string]any{
+					"type":       "object",
+					"properties": map[string]any{"id": map[string]any{"type": "string"}},
+					"required":   []string{"id"},
+				},
+			}
+			sourceCalls := 0
+			source := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				sourceCalls++
+				assert.Equal(t, "/orders/missing", r.URL.Path)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusNotFound)
+				_, err := w.Write([]byte(`{"error":"order not found"}`))
+				require.NoError(t, err)
+			})
+			parent := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+			handler, err := NewSDKStreamableHTTPHandler(SDKServerConfig{
+				Name:  "Orders [MCP adapter]",
+				Tools: []oas.DerivedTool{tool},
+				CallTool: func(_ context.Context, tool *oas.DerivedTool, args map[string]any) (*Recorder, error) {
+					upstream, err := BuildUpstreamRequest(parent, tool, "rest-orders", args)
+					if err != nil {
+						return nil, err
+					}
+					rec := NewRecorder()
+					source.ServeHTTP(rec, upstream)
+					return rec, nil
+				},
+			}, &mcpsdk.StreamableHTTPOptions{Stateless: true, JSONResponse: tt.jsonResponse})
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{
+				"jsonrpc":"2.0",
+				"id":"source-404-9007199254740993",
+				"method":"tools/call",
+				"params":{"name":"get_order","arguments":{"id":"missing"}}
+			}`))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Accept", "application/json, text/event-stream")
+			rec := httptest.NewRecorder()
+
+			handler.ServeHTTP(rec, req)
+
+			require.Equal(t, http.StatusOK, rec.Code)
+			assert.Contains(t, rec.Header().Get("Content-Type"), tt.contentType)
+			body := rec.Body.String()
+			if !tt.jsonResponse {
+				for _, line := range strings.Split(body, "\n") {
+					if strings.HasPrefix(line, "data: ") {
+						body = strings.TrimPrefix(line, "data: ")
+						break
+					}
+				}
+			}
+			var response map[string]any
+			require.NoError(t, json.Unmarshal([]byte(body), &response), "response body: %s", rec.Body.String())
+			assert.Equal(t, "source-404-9007199254740993", response["id"])
+			assert.NotContains(t, response, "error")
+			result := response["result"].(map[string]any)
+			assert.Equal(t, true, result["isError"])
+			assert.EqualValues(t, http.StatusNotFound, result["_meta"].(map[string]any)["upstreamHttpStatus"])
+			assert.Equal(t, "application/json", result["_meta"].(map[string]any)["upstreamContentType"])
+			content := result["content"].([]any)
+			require.Len(t, content, 1)
+			assert.Equal(t, `{"error":"order not found"}`, content[0].(map[string]any)["text"])
+			assert.Equal(t, 1, sourceCalls)
+		})
+	}
 }
 
 func TestNewSDKStreamableHTTPHandler_UnknownToolArgumentsReturnInvalidParams(t *testing.T) {
