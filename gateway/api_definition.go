@@ -141,6 +141,9 @@ type EndPointCacheMeta struct {
 type TransformSpec struct {
 	apidef.TemplateMeta
 	Template *texttemplate.Template
+	// Blocked is set when the template path was rejected at load time. Matching
+	// requests fail with a generic error instead of skipping the transform.
+	Blocked bool
 }
 
 type ExtendedCircuitBreakerMeta struct {
@@ -928,10 +931,64 @@ func (a APIDefinitionLoader) filterSprigFuncs() texttemplate.FuncMap {
 	return texttemplate.FuncMap(tmp)
 }
 
+// errUnsafeTemplatePath marks a body transform template path rejected by resolveTemplatePath.
+var errUnsafeTemplatePath = errors.New("unsafe template path")
+
+// resolveTemplatePath returns the body transform template path the gateway will read.
+// By default the path is confined to the configured TemplatePath root via the
+// gateway's osutil.Root, which also resolves symlinks and relative segments. A
+// relative path is tried against the root first, then against the working directory;
+// either way the result must lie inside the root. When
+// AllowUnsafeBodyTransformTemplatePaths is set the path is returned verbatim, without
+// any validation.
+func (a APIDefinitionLoader) resolveTemplatePath(path string) (string, error) {
+	if a.Gw == nil {
+		return "", errors.New("gateway is not initialized")
+	}
+
+	if a.Gw.GetConfig().AllowUnsafeBodyTransformTemplatePaths {
+		return path, nil
+	}
+
+	if a.Gw.OSRoot == nil {
+		return "", errors.New("OSRoot is not initialized")
+	}
+
+	resolved, err := a.Gw.OSRoot.Ensure(path)
+	if filepath.IsAbs(path) {
+		return resolved, err
+	}
+
+	if err == nil && fileExists(resolved) {
+		return resolved, nil
+	}
+
+	// Before paths were confined, relative paths resolved against the working
+	// directory, which is how the docs write them (templates/x.tmpl). Keep that
+	// working, but only when the file exists and lies inside the root.
+	if legacy, absErr := filepath.Abs(path); absErr == nil && fileExists(legacy) {
+		return a.Gw.OSRoot.Ensure(legacy)
+	}
+
+	return resolved, err
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
 func (a APIDefinitionLoader) loadFileTemplate(path string) (*texttemplate.Template, error) {
 	log.Debug("-- Loading template: ", path)
-	tmpName := filepath.Base(path)
-	return apidef.Template.New(tmpName).Funcs(a.filterSprigFuncs()).ParseFiles(path)
+
+	templatePath, err := a.resolveTemplatePath(path)
+	if err != nil {
+		log.WithError(err).Warning("Path escape detected or invalid template path")
+		return nil, fmt.Errorf("%w: %w", errUnsafeTemplatePath, err)
+	}
+
+	tmpName := filepath.Base(templatePath)
+	return apidef.Template.New(tmpName).Funcs(a.filterSprigFuncs()).ParseFiles(templatePath)
 }
 
 func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*texttemplate.Template, error) {
@@ -982,10 +1039,21 @@ func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMet
 			newSpec.TransformResponseAction = newTransformSpec
 		}
 
-		if err == nil {
+		switch {
+		case err == nil:
 			urlSpec = append(urlSpec, newSpec)
 			log.Debug("-- Loaded")
-		} else {
+		case errors.Is(err, errUnsafeTemplatePath):
+			// Keep the spec so matching requests fail rather than silently
+			// passing through untransformed.
+			log.Error("Template path rejected! Requests to this path will fail: ", err)
+			if stat == Transformed {
+				newSpec.TransformAction.Blocked = true
+			} else {
+				newSpec.TransformResponseAction.Blocked = true
+			}
+			urlSpec = append(urlSpec, newSpec)
+		default:
 			log.Error("Template load failure! Skipping transformation: ", err)
 		}
 

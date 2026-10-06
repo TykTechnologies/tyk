@@ -27,33 +27,30 @@ import (
 	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
-	"github.com/stretchr/testify/assert"
-
-	"github.com/TykTechnologies/tyk/apidef/oas"
-
-	"github.com/TykTechnologies/tyk/rpc"
-
 	"github.com/golang-jwt/jwt/v4"
-
 	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
-
-	"github.com/TykTechnologies/tyk/internal/httputil"
-	"github.com/TykTechnologies/tyk/internal/model"
-	"github.com/TykTechnologies/tyk/internal/reflect"
-	"github.com/TykTechnologies/tyk/internal/uuid"
+	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/reflect"
+	"github.com/TykTechnologies/tyk/internal/uuid"
+	"github.com/TykTechnologies/tyk/pkg/osutil"
+	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
-	_ "github.com/TykTechnologies/tyk/templates" // Don't delete
 	"github.com/TykTechnologies/tyk/test"
-	_ "github.com/TykTechnologies/tyk/testdata" // Don't delete
 	"github.com/TykTechnologies/tyk/user"
+
+	_ "github.com/TykTechnologies/tyk/templates" // Don't delete
+	_ "github.com/TykTechnologies/tyk/testdata"  // Don't delete
 )
 
 const jsonContentType = "application/json"
@@ -1222,6 +1219,14 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	}
 
 	gw.SetConfig(gwConfig)
+
+	// NewGateway built OSRoot from the default config above; rebuild it from
+	// the final TemplatePath so body transform templates resolve as in production.
+	if root, err := osutil.NewRoot(gwConfig.TemplatePath); err == nil {
+		gw.OSRoot = root
+	} else {
+		log.WithError(err).Error("Failed to initialize test Gateway OSRoot")
+	}
 
 	// Compile error override patterns for O(1) lookup in tests
 	// (In production, this is done in initialiseSystem() when !isRunningTests())

@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -18,6 +19,7 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -2129,4 +2131,70 @@ func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
 		"/register/node must be called exactly once — DoReloadWithRetry must not re-register")
 	assert.GreaterOrEqual(t, policyCount, succeedOnCall,
 		"policy endpoint should have been retried at least %d times", succeedOnCall)
+}
+
+func TestNewGateway_OSRootInitialization(t *testing.T) {
+	t.Run("successful initialization with valid TemplatePath", func(t *testing.T) {
+		tempDir := t.TempDir()
+
+		cfg := config.Config{
+			TemplatePath: tempDir,
+		}
+
+		gw := NewGateway(cfg, context.Background())
+
+		require.NotNil(t, gw.OSRoot, "OSRoot should be initialized when TemplatePath is valid")
+
+		safePath, err := gw.OSRoot.Ensure("test.tmpl")
+		require.NoError(t, err)
+		// OSRoot resolves symlinks, so compare against the resolved root rather
+		// than the raw TemplatePath (on macOS /var resolves to /private/var).
+		assert.Equal(t, filepath.Join(gw.OSRoot.RootPath(), "test.tmpl"), safePath)
+	})
+
+	t.Run("initialization fails with invalid TemplatePath", func(t *testing.T) {
+		cfg := config.Config{
+			TemplatePath: "/path/that/does/not/exist/12345",
+		}
+
+		gw := NewGateway(cfg, context.Background())
+
+		assert.Nil(t, gw.OSRoot, "OSRoot should be nil when TemplatePath is invalid")
+	})
+}
+
+func TestAfterConfSetup_AllowUnsafeBodyTransformTemplatePathsWarning(t *testing.T) {
+	const warning = "allow_unsafe_body_transform_template_paths is enabled"
+
+	hasWarning := func(t *testing.T, allowUnsafe bool) bool {
+		t.Helper()
+
+		// Other tests that go through StartTest drop the level to Error,
+		// which silences the Warn entries this test is checking for.
+		origLevel := log.GetLevel()
+		log.SetLevel(logrus.WarnLevel)
+		defer log.SetLevel(origLevel)
+
+		hook := &logrustest.Hook{}
+		log.AddHook(hook)
+		defer log.ReplaceHooks(make(logrus.LevelHooks))
+
+		gw := NewGateway(config.Config{AllowUnsafeBodyTransformTemplatePaths: allowUnsafe}, context.Background())
+		require.NoError(t, gw.afterConfSetup())
+
+		for _, e := range hook.AllEntries() {
+			if e.Level == logrus.WarnLevel && strings.Contains(e.Message, warning) {
+				return true
+			}
+		}
+		return false
+	}
+
+	t.Run("warns when enabled", func(t *testing.T) {
+		assert.True(t, hasWarning(t, true), "expected warning log about unsafe body transform template paths")
+	})
+
+	t.Run("does not warn when disabled", func(t *testing.T) {
+		assert.False(t, hasWarning(t, false), "unexpected warning log about unsafe body transform template paths")
+	})
 }
