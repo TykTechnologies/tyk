@@ -54,19 +54,28 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		return nil, http.StatusOK
 	}
 
-	// MCP JSON-RPC virtual endpoints are internal stages of the request that
-	// already consumed the session rate and quota on public ingress. Endpoint
-	// limits are enforced separately by RateLimitForAPI on each VEM stage.
-	if isMCPJSONRPCVirtualEndpointLoop(k.Spec, r) {
-		return nil, http.StatusOK
-	}
-
 	// Skip rate limiting and quotas for looping
 	if !ctxCheckLimits(r) {
 		return nil, http.StatusOK
 	}
 
 	session := ctxGetSession(r)
+	mcpVirtualEndpoint := isMCPJSONRPCVirtualEndpointLoop(k.Spec, r)
+	if mcpVirtualEndpoint {
+		// Public ingress already consumed the credential's global rate and
+		// quota. VEM hops must still enforce matching credential endpoint limits;
+		// RateLimitForAPI only enforces API-owned middleware limits.
+		if k.Spec.DisableRateLimit {
+			return nil, http.StatusOK
+		}
+		accessDef, _, err := GetAccessDefinitionByAPIIDOrSession(session, k.Spec)
+		if err == nil {
+			if _, matched := k.Gw.SessionLimiter.RateLimitInfo(r, k.Spec, accessDef.Endpoints); !matched {
+				return nil, http.StatusOK
+			}
+		}
+	}
+	enableQuota := !k.Spec.DisableQuota && !mcpVirtualEndpoint
 	rateLimitKey := ctxGetAuthToken(r)
 	quotaKey := ""
 
@@ -87,7 +96,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		rateLimitKey,
 		quotaKey,
 		!k.Spec.DisableRateLimit,
-		!k.Spec.DisableQuota,
+		enableQuota,
 		k.Spec,
 		false,
 		limitHeader,
@@ -125,7 +134,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 					rateLimitKey,
 					quotaKey,
 					!k.Spec.DisableRateLimit,
-					!k.Spec.DisableQuota,
+					enableQuota,
 					k.Spec,
 					true,
 					headerSender,
