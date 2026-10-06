@@ -17,7 +17,9 @@ const (
 
 // MCP JSON-RPC method names as defined in the Model Context Protocol specification.
 const (
-	MethodInitialize = "initialize"
+	MethodInitialize          = "initialize"
+	MethodServerDiscover      = "server/discover"
+	MethodSubscriptionsListen = "subscriptions/listen"
 
 	// Tool methods
 	MethodToolsCall = "tools/call"
@@ -33,7 +35,7 @@ const (
 	MethodPromptsList = "prompts/list"
 
 	// Client capability methods
-	MethodSamplingCreate = "sampling/create"
+	MethodSamplingCreateMessage = "sampling/createMessage"
 )
 
 // JSON-RPC parameter keys used across MCP methods

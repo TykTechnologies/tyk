@@ -124,6 +124,12 @@ func (e *ErrorHandler) handleErrorExtended(w http.ResponseWriter, r *http.Reques
 			response = e.writeTemplateErrorResponse(w, r, errMsg, errCode)
 		}
 	}
+	if rpcCode := ctxGetJSONRPCErrorCode(r); e.Spec.IsMCP() && rpcCode != 0 {
+		e.Logger().WithField("jsonrpc_error_code", rpcCode).
+			WithField("api_id", e.Spec.APIID).
+			WithField("path", r.URL.Path).
+			Debug("MCP request rejected")
+	}
 
 	// Calculate latency for error responses (needed for both API metrics and analytics).
 	var latency analytics.Latency
@@ -158,7 +164,11 @@ func (e *ErrorHandler) handleErrorExtended(w http.ResponseWriter, r *http.Reques
 			version = "Non Versioned"
 		}
 
-		if e.Spec.Proxy.StripListenPath {
+		// A paired MCP proxy owns the public completion record. Keep routed
+		// JSON-RPC errors on that same client-facing path, matching successful
+		// paired completions instead of exposing the stripped proxy path.
+		pairedMCPCompletion := e.Spec.IsPairedMCPAdapterProxy() && httpctx.GetJSONRPCRoutingState(r) != nil
+		if e.Spec.Proxy.StripListenPath && !pairedMCPCompletion {
 			r.URL.Path = e.Spec.StripListenPath(r.URL.Path)
 		}
 
@@ -402,9 +412,9 @@ func (e *ErrorHandler) writeJSONRPCErrorResponse(w http.ResponseWriter, r *http.
 		requestID = state.ID
 	}
 
-	ctxSetJSONRPCErrorCode(r, jsonrpcerrors.MapHTTPStatusToJSONRPCCode(httpCode))
+	rpcCode := selectAndStoreMCPJSONRPCCode(r, httpCode)
 
-	responseBody := jsonrpcerrors.WriteJSONRPCError(w, requestID, httpCode, errMsg)
+	responseBody := jsonrpcerrors.WriteJSONRPCErrorWithCode(w, requestID, httpCode, rpcCode, errMsg)
 
 	return &http.Response{
 		StatusCode: httpCode,

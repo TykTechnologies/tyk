@@ -24,6 +24,7 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil/accesslog"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -172,12 +173,27 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 			startTime := time.Now()
 			logger.WithField("ts", startTime.UnixNano()).WithField("mw", mw.Name()).Debug("Started")
 
-			if mw.Base().Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
+			// Browser preflights still require MCP Origin validation.
+			_, originGuard := actualMW.(*MCPOriginValidationMiddleware)
+			if !originGuard && mw.Base().Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
 				next.ServeHTTP(w, r)
 				return
 			}
 
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
+
+			// Direct JSON-RPC rejections have already written their response. Record
+			// them through the normal error analytics path exactly once.
+			ingress := httpctx.GetMCPProtocolContext(r)
+			protocolRejected := ingress != nil && ingress.Validation.HTTPStatus >= 400
+			if err == nil && errCode == middleware.StatusRespond && mw.Base().Spec.IsMCP() && (ctxGetJSONRPCErrorCode(r) != 0 || protocolRejected) {
+				status, message := http.StatusForbidden, "MCP request rejected"
+				if ingress := httpctx.GetMCPProtocolContext(r); ingress != nil && ingress.Validation.HTTPStatus != 0 {
+					status, message = ingress.Validation.HTTPStatus, ingress.Validation.Message
+				}
+				handler := ErrorHandler{mw.Base()}
+				handler.HandleError(w, r, message, status, false)
+			}
 
 			// Workaround
 			// ProcessRequest signature is too narrow it has to be extended to handle cases like this
@@ -204,11 +220,14 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 					job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
 				}
 
-				logger.
+				finishedLogger := logger.
 					WithError(err).
 					WithField("code", errCode).
-					WithField("ns", finishTime.Nanoseconds()).
-					Log(errpack.LogLevel(err, logrus.DebugLevel), "Finished")
+					WithField("ns", finishTime.Nanoseconds())
+				if rpcCode := ctxGetJSONRPCErrorCode(r); rpcCode != 0 {
+					finishedLogger = finishedLogger.WithField("jsonrpc_error_code", rpcCode)
+				}
+				finishedLogger.Log(errpack.LogLevel(err, logrus.DebugLevel), "Finished")
 
 				return
 			}
@@ -220,7 +239,11 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 				job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
 			}
 
-			logger.WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
+			finishedLogger := logger.WithField("code", errCode).WithField("ns", finishTime.Nanoseconds())
+			if rpcCode := ctxGetJSONRPCErrorCode(r); rpcCode != 0 {
+				finishedLogger = finishedLogger.WithField("jsonrpc_error_code", rpcCode)
+			}
+			finishedLogger.Debug("Finished")
 
 			mw.Base().UpdateRequestSession(r)
 			// Special code, bypasses all other execution
@@ -241,12 +264,7 @@ func (gw *Gateway) isDisabledForMCP(mw TykMiddleware) bool {
 		return false
 	}
 
-	switch mw.(type) {
-	case *RedisCacheMiddleware:
-		return true
-	default:
-		return false
-	}
+	return false
 }
 
 func (gw *Gateway) mwAppendEnabled(chain *[]alice.Constructor, mw TykMiddleware) bool {

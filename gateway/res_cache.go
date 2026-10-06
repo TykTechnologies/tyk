@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/TykTechnologies/tyk/storage"
@@ -66,10 +67,25 @@ func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *htt
 		return nil
 	}
 
+	if ses == nil {
+		ses = ctxGetSession(r)
+	}
+	if credentialSpecificMCPFilteringApplies(m.Spec, r, ses) {
+		return nil
+	}
+
 	// Has cache been enabled on the request?
 	options := ctxGetCacheOptions(r)
 	if options == nil {
 		m.logger().Debug("Request is not cacheable")
+		return nil
+	}
+	if options.responseEdited {
+		m.logger().Debug("Response was edited for the MCP caller and is not cacheable")
+		return nil
+	}
+	if m.Spec.IsMCP() && strings.HasPrefix(res.Header.Get("Content-Type"), "text/event-stream") {
+		m.logger().Debug("Streaming response is not cacheable")
 		return nil
 	}
 
