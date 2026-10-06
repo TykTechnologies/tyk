@@ -1,16 +1,13 @@
 package gateway
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"strings"
 
+	"github.com/TykTechnologies/tyk/ctx"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/jsonrpc"
-	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/user"
@@ -34,14 +31,11 @@ type restAsMCPPolicyContext struct {
 // prepareRESTAsMCPPolicy parses the JSON-RPC request handled by a synthetic
 // REST-as-MCP adapter and applies caller-proxy policy before SDK execution.
 func (m *JSONRPCMiddleware) prepareRESTAsMCPPolicy(w http.ResponseWriter, r *http.Request) (*restAsMCPPolicyContext, bool) {
-	rpcReq, ok, err := parseSyntheticAdapterJSONRPC(r)
-	if err != nil {
-		m.writeJSONRPCError(w, r, nil, mcp.JSONRPCParseError, mcp.ErrMsgParseError, nil)
-		return nil, true
-	}
-	if !ok {
+	ingress := httpctx.GetMCPProtocolContext(r)
+	if ingress == nil || ingress.Envelope == nil {
 		return nil, false
 	}
+	rpcReq := ingress.Envelope
 
 	route, err := m.routeSyntheticAdapterJSONRPC(rpcReq)
 	if err != nil {
@@ -63,37 +57,6 @@ func (m *JSONRPCMiddleware) prepareRESTAsMCPPolicy(w http.ResponseWriter, r *htt
 	return policyCtx, false
 }
 
-func parseSyntheticAdapterJSONRPC(r *http.Request) (*JSONRPCRequest, bool, error) {
-	if r == nil || r.Method != http.MethodPost || r.Body == nil {
-		return nil, false, nil
-	}
-	if !strings.HasPrefix(r.Header.Get(headerContentType), contentTypeJSON) {
-		return nil, false, nil
-	}
-
-	body, err := io.ReadAll(io.LimitReader(r.Body, syntheticJSONRPCMethodReadLimit+1))
-	r.Body = prefixedReadCloser{
-		Reader: io.MultiReader(bytes.NewReader(body), r.Body),
-		Closer: r.Body,
-	}
-	if err != nil {
-		return nil, false, err
-	}
-	if len(body) > syntheticJSONRPCMethodReadLimit {
-		return nil, false, fmt.Errorf("synthetic JSON-RPC request exceeds %d bytes", syntheticJSONRPCMethodReadLimit)
-	}
-
-	var rpcReq JSONRPCRequest
-	if err := json.Unmarshal(body, &rpcReq); err != nil {
-		return nil, false, err
-	}
-	if rpcReq.Method == "" {
-		return nil, false, nil
-	}
-
-	return &rpcReq, true, nil
-}
-
 func (m *JSONRPCMiddleware) routeSyntheticAdapterJSONRPC(rpcReq *JSONRPCRequest) (jsonrpc.RouteResult, error) {
 	router := m.Spec.JSONRPCRouter
 	if router == nil {
@@ -108,7 +71,7 @@ func (m *JSONRPCMiddleware) routeSyntheticAdapterJSONRPC(rpcReq *JSONRPCRequest)
 }
 
 func (c *restAsMCPPolicyContext) setJSONRPCState(r *http.Request, vemChain []string, primitiveName string) {
-	primitiveType := primitiveTypeForMethod(c.rpcReq.Method)
+	primitiveType, primitiveName := primitiveInfoForMethod(c.rpcReq.Method, primitiveName)
 	httpctx.SetJSONRPCRoutingState(r, &httpctx.JSONRPCRoutingState{
 		Method:        c.rpcReq.Method,
 		Params:        c.rpcReq.Params,
@@ -228,7 +191,7 @@ func (m *JSONRPCMiddleware) enforceRESTAsMCPEndpointRateLimit(w http.ResponseWri
 		restAsMCPRateLimitHeaderSender(m.Gw, w),
 	)
 
-	return writeRESTAsMCPRateLimitResult(w, policyCtx.rpcReq.ID, reason)
+	return writeRESTAsMCPRateLimitResult(w, r, reason)
 }
 
 func restAsMCPRateLimitRequest(r *http.Request, vemPath string) *http.Request {
@@ -255,15 +218,20 @@ func restAsMCPRateLimitHeaderSender(gw *Gateway, w http.ResponseWriter) rate.Hea
 	return gw.limitHeaderFactory(w.Header())
 }
 
-func writeRESTAsMCPRateLimitResult(w http.ResponseWriter, requestID any, reason sessionFailReason) bool {
+func writeRESTAsMCPRateLimitResult(w http.ResponseWriter, r *http.Request, reason sessionFailReason) bool {
 	switch reason {
 	case sessionFailNone:
 		return false
 	case sessionFailRateLimit:
-		jsonrpcerrors.WriteJSONRPCError(w, requestID, http.StatusTooManyRequests, jsonrpcRateLimitExceededMessage)
+		ctx.SetErrorClassification(r, tykerrors.ClassifyRateLimitError(tykerrors.ErrTypeSessionRateLimit, "RESTAsMCPPolicy"))
+		writeMCPJSONRPCError(w, r, http.StatusTooManyRequests, jsonrpcRateLimitExceededMessage)
+		return true
+	case sessionFailQuota:
+		ctx.SetErrorClassification(r, tykerrors.ClassifyQuotaExceededError("RESTAsMCPPolicy"))
+		writeMCPJSONRPCError(w, r, http.StatusForbidden, "Quota exceeded")
 		return true
 	default:
-		jsonrpcerrors.WriteJSONRPCError(w, requestID, http.StatusInternalServerError, jsonrpcInternalErrorMessage)
+		writeMCPJSONRPCError(w, r, http.StatusInternalServerError, jsonrpcInternalErrorMessage)
 		return true
 	}
 }

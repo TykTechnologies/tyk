@@ -1664,6 +1664,9 @@ func (gw *Gateway) initSystem() error {
 	defer globalMu.Unlock()
 
 	gwConfig := gw.GetConfig()
+	if err := gwConfig.HttpServerOptions.ValidateTrustedProxyCIDRs(); err != nil {
+		return fmt.Errorf("invalid http_server_options.trusted_proxy_cidrs: %w", err)
+	}
 
 	// Initialize the appropriate log formatter
 	if !gw.isRunningTests() && os.Getenv("TYK_LOGFORMAT") == "" && !*cli.DebugMode {
