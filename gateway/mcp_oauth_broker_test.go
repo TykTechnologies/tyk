@@ -2034,6 +2034,16 @@ func TestMCPOAuthBrokerRecordsAreSealedAndBoundToKey(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEqual(t, first, second, "each record must use a fresh nonce")
 	require.NotContains(t, string(first), "upstream-secret-token")
+	// Preserve the persisted version/nonce/ciphertext envelope independently
+	// of the broker's decoder, including the record-key associated data.
+	aead, err := broker.brokerAEAD()
+	require.NoError(t, err)
+	require.Equal(t, mcpOAuthBrokerSealVersion, first[0])
+	plain, err := aead.Open(nil, first[1:1+aead.NonceSize()], first[1+aead.NonceSize():], []byte("record-one"))
+	require.NoError(t, err)
+	expected, err := json.Marshal(record)
+	require.NoError(t, err)
+	require.JSONEq(t, string(expected), string(plain))
 	var opened mcpOAuthTokenGrant
 	require.NoError(t, broker.openRecord("record-one", first, &opened))
 	require.Equal(t, record.UpstreamAccessToken, opened.UpstreamAccessToken)

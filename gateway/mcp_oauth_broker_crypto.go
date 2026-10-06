@@ -50,9 +50,9 @@ func (b *mcpOAuthBroker) sealRecord(key string, value any) ([]byte, error) {
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
 		return nil, fmt.Errorf("generate OAuth broker record nonce: %w", err)
 	}
-	sealed := make([]byte, 1, 1+len(nonce)+len(plain)+aead.Overhead())
-	sealed[0] = mcpOAuthBrokerSealVersion
-	sealed = append(sealed, nonce...)
+	// Let append and AEAD.Seal allocate instead of adding an untrusted
+	// plaintext length to the prefix and authentication overhead.
+	sealed := append([]byte{mcpOAuthBrokerSealVersion}, nonce...)
 	sealed = aead.Seal(sealed, nonce, plain, []byte(key))
 	return sealed, nil
 }
