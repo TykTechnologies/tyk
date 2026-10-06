@@ -19,7 +19,6 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
-	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -559,10 +558,7 @@ func TestMCPOAuthBrokerDCRRollbackFailuresAreBoundedAndSanitized(t *testing.T) {
 			capture.mu.Lock()
 			testCase.configure(capture, upstream.URL)
 			capture.mu.Unlock()
-			logger, hook := logrustest.NewNullLogger()
-			originalLog := log
-			log = logger
-			t.Cleanup(func() { log = originalLog })
+			hook := captureGatewayLog(t, logrus.InfoLevel)
 
 			response := runMCPBrokerRegistrationWithFailedPersistence(t, ts)
 			require.Equal(t, http.StatusServiceUnavailable, response.Code)
@@ -572,10 +568,13 @@ func TestMCPOAuthBrokerDCRRollbackFailuresAreBoundedAndSanitized(t *testing.T) {
 			require.Zero(t, capture.unrelatedDeletes)
 			capture.mu.Unlock()
 			require.NotEmpty(t, hook.AllEntries())
+			rollbackWarning := false
 			for _, entry := range hook.AllEntries() {
+				rollbackWarning = rollbackWarning || entry.Message == "MCP OAuth upstream registration rollback failed"
 				require.NotContains(t, entry.Message, capture.registrationToken)
 				require.NotContains(t, fmt.Sprint(entry.Data), capture.registrationToken)
 			}
+			require.True(t, rollbackWarning, "capture the broker rollback warning specifically")
 		})
 	}
 }
