@@ -184,7 +184,9 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 
 			// Direct JSON-RPC rejections have already written their response. Record
 			// them through the normal error analytics path exactly once.
-			if err == nil && errCode == middleware.StatusRespond && mw.Base().Spec.IsMCP() && ctxGetJSONRPCErrorCode(r) != 0 {
+			ingress := httpctx.GetMCPProtocolContext(r)
+			protocolRejected := ingress != nil && ingress.Validation.HTTPStatus >= 400
+			if err == nil && errCode == middleware.StatusRespond && mw.Base().Spec.IsMCP() && (ctxGetJSONRPCErrorCode(r) != 0 || protocolRejected) {
 				status, message := http.StatusForbidden, "MCP request rejected"
 				if ingress := httpctx.GetMCPProtocolContext(r); ingress != nil && ingress.Validation.HTTPStatus != 0 {
 					status, message = ingress.Validation.HTTPStatus, ingress.Validation.Message
@@ -219,11 +221,14 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 					job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
 				}
 
-				logger.
+				finishedLogger := logger.
 					WithError(err).
 					WithField("code", errCode).
-					WithField("ns", finishTime.Nanoseconds()).
-					Log(errpack.LogLevel(err, logrus.DebugLevel), "Finished")
+					WithField("ns", finishTime.Nanoseconds())
+				if rpcCode := ctxGetJSONRPCErrorCode(r); rpcCode != 0 {
+					finishedLogger = finishedLogger.WithField("jsonrpc_error_code", rpcCode)
+				}
+				finishedLogger.Log(errpack.LogLevel(err, logrus.DebugLevel), "Finished")
 
 				return
 			}
@@ -235,7 +240,11 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 				job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
 			}
 
-			logger.WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
+			finishedLogger := logger.WithField("code", errCode).WithField("ns", finishTime.Nanoseconds())
+			if rpcCode := ctxGetJSONRPCErrorCode(r); rpcCode != 0 {
+				finishedLogger = finishedLogger.WithField("jsonrpc_error_code", rpcCode)
+			}
+			finishedLogger.Debug("Finished")
 
 			mw.Base().UpdateRequestSession(r)
 			// Special code, bypasses all other execution

@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/TykTechnologies/tyk/ctx"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/user"
@@ -48,23 +50,36 @@ func (h *MCPListFilterResponseHandler) HandleResponse(_ http.ResponseWriter, res
 	}
 
 	listCfg := h.listConfig(state.Method)
-	var filter func([]byte) ([]byte, bool)
+	discovery := state.Method == mcp.MethodServerDiscover
+	var filter func([]byte) ([]byte, bool, error)
 	switch {
 	case listCfg != nil:
 		ruleSets := effectiveMCPListRuleSets(h.Spec, ses, listCfg)
 		if len(ruleSets) == 0 {
 			return nil
 		}
-		filter = func(body []byte) ([]byte, bool) {
-			return mcp.FilterJSONRPCBodyWithRuleSets(body, listCfg, ruleSets)
+		filter = func(body []byte) ([]byte, bool, error) {
+			filtered, changed := mcp.FilterJSONRPCBodyWithRuleSets(body, listCfg, ruleSets)
+			return filtered, changed, nil
 		}
 	case state.Method == mcp.MethodInitialize:
 		ruleSets := effectiveJSONRPCMethodRuleSets(h.Spec, ses)
 		if len(ruleSets) == 0 {
 			return nil
 		}
-		filter = func(body []byte) ([]byte, bool) {
-			return mcp.FilterInitializeCapabilitiesBody(body, ruleSets)
+		filter = func(body []byte) ([]byte, bool, error) {
+			filtered, changed := mcp.FilterInitializeCapabilitiesBody(body, ruleSets)
+			return filtered, changed, nil
+		}
+	case state.Method == mcp.MethodServerDiscover:
+		globalRules, credentialRules := discoveryJSONRPCRuleSets(h.Spec, ses)
+		filter = func(body []byte) ([]byte, bool, error) {
+			filtered, changed, credentialSpecific, err := mcp.FilterDiscoveryBody(body, globalRules, credentialRules, h.Spec)
+			if credentialSpecific {
+				markMCPResponseEdited(req)
+				res.Header.Set("Cache-Control", "private, no-store")
+			}
+			return filtered, changed, err
 		}
 	default:
 		return nil
@@ -79,10 +94,21 @@ func (h *MCPListFilterResponseHandler) HandleResponse(_ http.ResponseWriter, res
 
 	body, err := readAndCloseBody(res)
 	if err != nil || len(body) == 0 {
+		if discovery {
+			replaceInvalidDiscoveryResponse(res, req)
+		}
 		return nil //nolint:nilerr // fail-open: pass through on read error
 	}
+	if discovery && !mcp.JSONRPCResponseIDMatches(body, state.ID) {
+		replaceInvalidDiscoveryResponse(res, req)
+		return nil
+	}
 
-	newBody, ok := filter(body)
+	newBody, ok, filterErr := filter(body)
+	if filterErr != nil && discovery {
+		replaceInvalidDiscoveryResponse(res, req)
+		return nil
+	}
 	if !ok {
 		res.Body = io.NopCloser(bytes.NewReader(body))
 		return nil
@@ -91,9 +117,27 @@ func (h *MCPListFilterResponseHandler) HandleResponse(_ http.ResponseWriter, res
 	res.Body = io.NopCloser(bytes.NewReader(newBody))
 	res.ContentLength = int64(len(newBody))
 	res.Header.Set("Content-Length", strconv.Itoa(len(newBody)))
-	markMCPResponseEdited(req)
+	if state.Method != mcp.MethodServerDiscover {
+		markMCPResponseEdited(req)
+	}
 
 	return nil
+}
+
+func replaceInvalidDiscoveryResponse(res *http.Response, req *http.Request) {
+	ctx.SetErrorClassification(req, tykerrors.NewErrorClassification(tykerrors.UCF, "invalid_discovery_response").WithSource("MCPDiscoveryFilter"))
+	capture := newBufferedResponseWriter()
+	body := writeMCPJSONRPCError(capture, req, http.StatusBadGateway, "upstream discovery response is invalid")
+	res.StatusCode = http.StatusBadGateway
+	res.Body = io.NopCloser(bytes.NewReader(body))
+	res.ContentLength = int64(len(body))
+	for _, name := range []string{"Age", "Content-Encoding", "ETag", "Expires", "Last-Modified", "Pragma", "Transfer-Encoding"} {
+		res.Header.Del(name)
+	}
+	res.Header.Set("Cache-Control", "no-store")
+	res.Header.Set("Content-Type", "application/json")
+	res.Header.Set("Content-Length", strconv.Itoa(len(body)))
+	markMCPResponseEdited(req)
 }
 
 // listConfig returns the filter configuration for a given JSON-RPC method,

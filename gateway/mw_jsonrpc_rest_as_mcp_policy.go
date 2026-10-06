@@ -4,9 +4,10 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/TykTechnologies/tyk/ctx"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/jsonrpc"
-	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/user"
@@ -190,7 +191,7 @@ func (m *JSONRPCMiddleware) enforceRESTAsMCPEndpointRateLimit(w http.ResponseWri
 		restAsMCPRateLimitHeaderSender(m.Gw, w),
 	)
 
-	return writeRESTAsMCPRateLimitResult(w, policyCtx.rpcReq.ID, reason)
+	return writeRESTAsMCPRateLimitResult(w, r, reason)
 }
 
 func restAsMCPRateLimitRequest(r *http.Request, vemPath string) *http.Request {
@@ -217,15 +218,20 @@ func restAsMCPRateLimitHeaderSender(gw *Gateway, w http.ResponseWriter) rate.Hea
 	return gw.limitHeaderFactory(w.Header())
 }
 
-func writeRESTAsMCPRateLimitResult(w http.ResponseWriter, requestID any, reason sessionFailReason) bool {
+func writeRESTAsMCPRateLimitResult(w http.ResponseWriter, r *http.Request, reason sessionFailReason) bool {
 	switch reason {
 	case sessionFailNone:
 		return false
 	case sessionFailRateLimit:
-		jsonrpcerrors.WriteJSONRPCError(w, requestID, http.StatusTooManyRequests, jsonrpcRateLimitExceededMessage)
+		ctx.SetErrorClassification(r, tykerrors.ClassifyRateLimitError(tykerrors.ErrTypeSessionRateLimit, "RESTAsMCPPolicy"))
+		writeMCPJSONRPCError(w, r, http.StatusTooManyRequests, jsonrpcRateLimitExceededMessage)
+		return true
+	case sessionFailQuota:
+		ctx.SetErrorClassification(r, tykerrors.ClassifyQuotaExceededError("RESTAsMCPPolicy"))
+		writeMCPJSONRPCError(w, r, http.StatusForbidden, "Quota exceeded")
 		return true
 	default:
-		jsonrpcerrors.WriteJSONRPCError(w, requestID, http.StatusInternalServerError, jsonrpcInternalErrorMessage)
+		writeMCPJSONRPCError(w, r, http.StatusInternalServerError, jsonrpcInternalErrorMessage)
 		return true
 	}
 }

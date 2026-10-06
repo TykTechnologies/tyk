@@ -10,6 +10,7 @@ import (
 	"github.com/TykTechnologies/tyk/ctx"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -59,6 +60,22 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	}
 
 	session := ctxGetSession(r)
+	mcpVirtualEndpoint := isMCPJSONRPCVirtualEndpointLoop(k.Spec, r)
+	if mcpVirtualEndpoint {
+		// Public ingress already consumed the credential's global rate and
+		// quota. VEM hops must still enforce matching credential endpoint limits;
+		// RateLimitForAPI only enforces API-owned middleware limits.
+		if k.Spec.DisableRateLimit {
+			return nil, http.StatusOK
+		}
+		accessDef, _, err := GetAccessDefinitionByAPIIDOrSession(session, k.Spec)
+		if err == nil {
+			if _, matched := k.Gw.SessionLimiter.RateLimitInfo(r, k.Spec, accessDef.Endpoints); !matched {
+				return nil, http.StatusOK
+			}
+		}
+	}
+	enableQuota := !k.Spec.DisableQuota && !mcpVirtualEndpoint
 	rateLimitKey := ctxGetAuthToken(r)
 	quotaKey := ""
 
@@ -79,7 +96,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 		rateLimitKey,
 		quotaKey,
 		!k.Spec.DisableRateLimit,
-		!k.Spec.DisableQuota,
+		enableQuota,
 		k.Spec,
 		false,
 		limitHeader,
@@ -117,7 +134,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 					rateLimitKey,
 					quotaKey,
 					!k.Spec.DisableRateLimit,
-					!k.Spec.DisableQuota,
+					enableQuota,
 					k.Spec,
 					true,
 					headerSender,
@@ -156,4 +173,8 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 
 	// Request is valid, carry on
 	return nil, http.StatusOK
+}
+
+func isMCPJSONRPCVirtualEndpointLoop(spec *APISpec, r *http.Request) bool {
+	return spec != nil && spec.IsMCP() && httpctx.IsSelfLooping(r) && httpctx.GetJSONRPCRoutingState(r) != nil
 }

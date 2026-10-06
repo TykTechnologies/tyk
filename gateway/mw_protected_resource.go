@@ -147,14 +147,18 @@ func (m *PRMMiddleware) serveMirroredPRM(w http.ResponseWriter, r *http.Request)
 		return err
 	}
 
-	// Rewrite resource to the gateway URL — what the client connected to.
-	doc.SetResource(gatewayResourceURL(r, m.Spec))
+	brokerEnabled := m.Spec.MCP != nil && m.Spec.MCP.OAuthBroker != nil && m.Spec.MCP.OAuthBroker.Enabled
+	if brokerEnabled {
+		doc.SetResource(m.Spec.MCP.OAuthBroker.PublicResource)
+		doc.Raw["authorization_servers"] = []any{m.Spec.MCP.OAuthBroker.PublicOrigin + mcpASProxyPathPrefix + m.Spec.APIID}
+	} else {
+		// Rewrite resource to the gateway URL — what the client connected to.
+		doc.SetResource(gatewayResourceURL(r, m.Spec))
 
-	// Redirect the AS to Tyk's per-API proxy so we can rewrite the
-	// `resource` parameter (RFC 8707) on its way to the upstream AS.
-	// Strict authorization servers (Notion) reject the gateway URL as
-	// `invalid_target` otherwise.
-	doc.Raw["authorization_servers"] = []any{mcpASProxyBaseURL(r, m.Spec)}
+		// Redirect the AS to Tyk's per-API proxy so we can rewrite the
+		// `resource` parameter (RFC 8707) on its way to the upstream AS.
+		doc.Raw["authorization_servers"] = []any{mcpASProxyBaseURL(r, m.Spec)}
+	}
 
 	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(http.StatusOK)
