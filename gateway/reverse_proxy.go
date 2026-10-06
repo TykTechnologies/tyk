@@ -1471,7 +1471,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		if p.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
 			hooks = append(hooks, NewLoggingSSEHook(p.logger))
 		}
-		if filterHook := NewMCPListFilterSSEHook(p.TykAPISpec, ses); filterHook != nil {
+		if filterHook := NewMCPListFilterSSEHook(p.TykAPISpec, ses, req); filterHook != nil {
 			hooks = append(hooks, filterHook)
 		}
 		res.Body = NewSSETap(res.Body, hooks...)
@@ -2037,7 +2037,8 @@ func (p *ReverseProxy) IsUpgrade(req *http.Request) (string, bool) {
 }
 
 func (p *ReverseProxy) addAuthInfo(outReq, req *http.Request) {
-	if !p.TykAPISpec.UpstreamAuth.IsEnabled() {
+	brokerEnabled := p.TykAPISpec.MCP != nil && p.TykAPISpec.MCP.OAuthBroker != nil && p.TykAPISpec.MCP.OAuthBroker.Enabled
+	if !p.TykAPISpec.UpstreamAuth.IsEnabled() && !brokerEnabled {
 		return
 	}
 
