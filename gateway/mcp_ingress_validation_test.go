@@ -33,22 +33,25 @@ func TestMCPIngressNativeAndSyntheticSupport(t *testing.T) {
 			req.Header.Set(mcp.HeaderSessionID, "ignored")
 			req.Header.Set(mcp.HeaderLastEventID, "ignored")
 			rec := httptest.NewRecorder()
-			err, status := mw.ProcessRequest(rec, req, nil)
+			var err error
+			var status int
+			if synthetic {
+				err, status = processAdmittedSyntheticForTest(t, mw, rec, req)
+			} else {
+				err, status = mw.ProcessRequest(rec, req, nil)
+			}
 			require.NoError(t, err)
 			if synthetic {
 				require.Equal(t, middleware.StatusRespond, status)
-				require.Equal(t, http.StatusBadRequest, rec.Code)
+				require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
 				var response struct {
-					ID    json.RawMessage
-					Error struct {
-						Code int
-						Data struct{ Supported []string }
-					}
+					ID     json.RawMessage
+					Result json.RawMessage
 				}
 				require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
-				require.Equal(t, mcp.CodeUnsupportedProtocolVersion, response.Error.Code)
-				require.Equal(t, mcp.LegacyProtocolVersions(), response.Error.Data.Supported)
+				require.NotEmpty(t, response.Result)
 				require.Equal(t, "9007199254740993", string(response.ID))
+				require.Empty(t, rec.Header().Get(mcp.HeaderSessionID))
 			} else {
 				require.Equal(t, http.StatusOK, status)
 				require.Empty(t, req.Header.Get(mcp.HeaderSessionID))
@@ -70,7 +73,7 @@ func TestModernMethodRejectionRetainsValidation(t *testing.T) {
 			ingress := mcp.NewProtocolContext(mcp.ModernProtocolVersion, "", nil, nil)
 			httpctx.SetMCPProtocolContext(r, ingress)
 			w := httptest.NewRecorder()
-			require.True(t, rejectModernMCPHTTPMethod(w, r))
+			require.True(t, rejectUnsupportedMCPHTTPMethod(w, r, nil))
 			require.Equal(t, http.StatusMethodNotAllowed, ingress.Validation.HTTPStatus)
 			require.Equal(t, http.StatusMethodNotAllowed, w.Code)
 			require.Equal(t, http.MethodPost, w.Header().Get("Allow"))
@@ -94,7 +97,7 @@ func TestModernMethodRejectionPreservesCORSOptionsAndLegacyVerbs(t *testing.T) {
 			ingress := mcp.NewProtocolContext(test.version, "", nil, nil)
 			httpctx.SetMCPProtocolContext(r, ingress)
 			w := httptest.NewRecorder()
-			require.False(t, rejectModernMCPHTTPMethod(w, r))
+			require.False(t, rejectUnsupportedMCPHTTPMethod(w, r, nil))
 			require.Equal(t, 200, w.Code)
 			require.False(t, ingress.Validation.Checked)
 		})

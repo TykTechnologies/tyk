@@ -243,53 +243,56 @@ func TestRewriteResourceParam(t *testing.T) {
 }
 
 func TestFetchUpstreamASMetadata_PathSuffixVariant(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/.well-known/oauth-authorization-server/tenant" {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"issuer":"https://as","token_endpoint":"https://as/t"}`)) //nolint:errcheck
+			_, _ = fmt.Fprintf(w, `{"issuer":%q,"token_endpoint":%q}`, srv.URL+"/tenant", srv.URL+"/token") //nolint:errcheck
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
-	}))
+	})
 	t.Cleanup(srv.Close)
 
 	doc, err := fetchUpstreamASMetadata(context.Background(), srv.URL+"/tenant")
 	require.NoError(t, err)
-	assert.Equal(t, "https://as", doc["issuer"])
-	assert.Equal(t, "https://as/t", doc["token_endpoint"])
+	assert.Equal(t, srv.URL+"/tenant", doc["issuer"])
+	assert.Equal(t, srv.URL+"/token", doc["token_endpoint"])
 }
 
 func TestFetchUpstreamASMetadata_PathPrefixVariant(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Only respond at the path-prefix variant; the suffix one 404s.
 		if r.URL.Path == "/tenant/.well-known/oauth-authorization-server" {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"issuer":"https://as"}`)) //nolint:errcheck
+			_, _ = fmt.Fprintf(w, `{"issuer":%q}`, srv.URL+"/tenant") //nolint:errcheck
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
-	}))
+	})
 	t.Cleanup(srv.Close)
 
 	doc, err := fetchUpstreamASMetadata(context.Background(), srv.URL+"/tenant")
 	require.NoError(t, err)
-	assert.Equal(t, "https://as", doc["issuer"])
+	assert.Equal(t, srv.URL+"/tenant", doc["issuer"])
 }
 
 func TestFetchUpstreamASMetadata_RootHostNoPath(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	srv := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	srv.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/.well-known/oauth-authorization-server" {
 			w.Header().Set("Content-Type", "application/json")
-			_, _ = w.Write([]byte(`{"issuer":"https://as"}`)) //nolint:errcheck
+			_, _ = fmt.Fprintf(w, `{"issuer":%q}`, srv.URL) //nolint:errcheck
 			return
 		}
 		w.WriteHeader(http.StatusNotFound)
-	}))
+	})
 	t.Cleanup(srv.Close)
 
 	doc, err := fetchUpstreamASMetadata(context.Background(), srv.URL)
 	require.NoError(t, err)
-	assert.Equal(t, "https://as", doc["issuer"])
+	assert.Equal(t, srv.URL, doc["issuer"])
 }
 
 func TestFetchUpstreamASMetadata_AllVariants404(t *testing.T) {
@@ -305,6 +308,30 @@ func TestFetchUpstreamASMetadata_AllVariants404(t *testing.T) {
 func TestFetchUpstreamASMetadata_BadURL(t *testing.T) {
 	_, err := fetchUpstreamASMetadata(context.Background(), "::not a url")
 	assert.Error(t, err)
+}
+
+func TestFetchUpstreamASMetadata_RejectsAmbiguousIssuer(t *testing.T) {
+	for name, document := range map[string]func(string) string{
+		"duplicate": func(serverURL string) string {
+			return fmt.Sprintf(`{"issuer":"https://evil.example","issuer":%q,"authorization_endpoint":%q,"token_endpoint":%q}`, serverURL, serverURL+"/authorize", serverURL+"/token")
+		},
+		"case alias": func(serverURL string) string {
+			return fmt.Sprintf(`{"Issuer":"https://evil.example","issuer":%q,"authorization_endpoint":%q,"token_endpoint":%q}`, serverURL, serverURL+"/authorize", serverURL+"/token")
+		},
+		"trailing": func(serverURL string) string {
+			return fmt.Sprintf(`{"issuer":%q,"authorization_endpoint":%q,"token_endpoint":%q}{}`, serverURL, serverURL+"/authorize", serverURL+"/token")
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			var server *httptest.Server
+			server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = fmt.Fprint(w, document(server.URL))
+			}))
+			defer server.Close()
+			_, err := fetchUpstreamASMetadataWithClient(context.Background(), server.Client(), server.URL, true)
+			require.Error(t, err)
+		})
+	}
 }
 
 // TestRegisterMCPPRMSuffixRoutes_EarlyReturns covers the four early-exit
