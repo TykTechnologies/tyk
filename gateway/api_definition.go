@@ -233,12 +233,21 @@ func (s *APISpec) Validate(oasConfig config.OASConfig) error {
 		}
 	}
 	if s.MCP != nil {
-		if !s.IsMCPManaged() && len(s.MCP.TrustedOrigins) > 0 {
-			return errors.New("mcp configuration is valid only for MCP APIs")
-		}
-		if s.IsMCPManaged() {
+		if !s.IsMCPManaged() {
+			if len(s.MCP.TrustedOrigins) > 0 || hasMCPOAuthBrokerConfiguration(s.MCP.OAuthBroker) {
+				return errors.New("mcp configuration is valid only for MCP APIs")
+			}
+		} else {
 			if err := s.MCP.Validate(); err != nil {
 				return err
+			}
+			if s.MCP.OAuthBroker != nil {
+				if err := s.MCP.OAuthBroker.Validate(s.Proxy.ListenPath); err != nil {
+					return err
+				}
+				if s.MCP.OAuthBroker.Enabled && s.UpstreamAuth.IsEnabled() {
+					return errors.New("MCP OAuth broker cannot be combined with generic upstream authentication")
+				}
 			}
 		}
 	}
@@ -250,6 +259,15 @@ func (s *APISpec) Validate(oasConfig config.OASConfig) error {
 	default:
 		return s.validateHTTP()
 	}
+}
+
+func hasMCPOAuthBrokerConfiguration(config *apidef.MCPOAuthBrokerConfig) bool {
+	return config != nil && (config.Enabled ||
+		config.PublicOrigin != "" ||
+		config.PublicResource != "" ||
+		config.UpstreamResource != "" ||
+		len(config.TrustedEndpointOrigins) > 0 ||
+		config.AllowInsecureLoopback)
 }
 
 func (s *APISpec) validateTCP() error {
