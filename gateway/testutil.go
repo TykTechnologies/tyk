@@ -49,6 +49,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/cli"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/pkg/osutil"
 	"github.com/TykTechnologies/tyk/storage"
 	_ "github.com/TykTechnologies/tyk/templates" // Don't delete
 	"github.com/TykTechnologies/tyk/test"
@@ -1222,6 +1223,14 @@ func (s *Test) newGateway(genConf func(globalConf *config.Config)) *Gateway {
 	}
 
 	gw.SetConfig(gwConfig)
+
+	// NewGateway built OSRoot from the default config above; rebuild it from
+	// the final TemplatePath so body transform templates resolve as in production.
+	if root, err := osutil.NewRoot(gwConfig.TemplatePath); err == nil {
+		gw.OSRoot = root
+	} else {
+		log.WithError(err).Error("Failed to initialize test Gateway OSRoot")
+	}
 
 	// Compile error override patterns for O(1) lookup in tests
 	// (In production, this is done in initialiseSystem() when !isRunningTests())
