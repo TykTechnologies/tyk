@@ -17,7 +17,7 @@ permissions:
 jobs:
   qualify:
     name: MCP ${{ matrix.serializer }} / ${{ matrix.storage }}
-    runs-on: ubuntu-22.04
+    runs-on: ${{ vars.WARP_RUNNER_8X_X64 || vars.DEFAULT_RUNNER }}
     timeout-minutes: 90
     strategy:
       fail-fast: false
@@ -37,6 +37,8 @@ jobs:
       TYK_TEST_UPSTREAM_URL: http://127.0.0.1:9879/
       MCP_REDIS_IMAGE: ${{ matrix.storage == 'postgres' && 'valkey/valkey:9' || 'redis:7' }}
     steps:
+      - name: Report available build disk capacity
+        run: df -h "$GITHUB_WORKSPACE" "$RUNNER_TEMP"
       - name: Generate GitHub App token
         id: app-token
         uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
