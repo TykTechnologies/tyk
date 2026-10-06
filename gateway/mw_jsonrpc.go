@@ -265,6 +265,12 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	if m.Spec.IsSyntheticMCPAdapter() {
 		return m.processSyntheticMCPAdapterRequest(w, r)
 	}
+	if m.Spec.IsPairedMCPAdapterProxy() && m.Spec.JSONRPCRouter == nil {
+		// Paired proxies without caller VEM routing forward validated ingress
+		// directly to their internal adapter.
+		m.bridgeMCPTraceContext(r, rpcReq, body)
+		return nil, http.StatusOK
+	}
 
 	// Route based on method
 	result, err := m.Spec.JSONRPCRouter.RouteMethod(

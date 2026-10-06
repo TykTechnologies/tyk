@@ -272,8 +272,8 @@ func TestProcessRequest_Initialize_NoPrimitiveType(t *testing.T) {
 
 	assert.Equal(t, "initialize", ctxGetMCPMethod(r))
 	assert.Equal(t, "", ctxGetMCPPrimitiveType(r))
-	// routeOperation sets PrimitiveName = method for non-primitive methods
-	assert.Equal(t, "initialize", ctxGetMCPPrimitiveName(r))
+	// Non-primitive operations have no primitive identity in analytics.
+	assert.Empty(t, ctxGetMCPPrimitiveName(r))
 }
 
 // -- ProcessRequest error paths stash error code --

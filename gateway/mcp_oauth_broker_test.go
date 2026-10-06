@@ -18,6 +18,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
 	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/require"
 
@@ -1627,10 +1628,7 @@ func TestMCPOAuthAuthenticatedInvalidGrantRevokesOnlyMappedFamily(t *testing.T) 
 
 func TestMCPOAuthBrokerCallbackTokenRuntimeAndRefresh(t *testing.T) {
 	ts, _, capture := newMCPBrokerTest(t, "/mcp/")
-	logger, hook := logrustest.NewNullLogger()
-	originalLog := log
-	log = logger
-	t.Cleanup(func() { log = originalLog })
+	hook := captureGatewayLog(t, logrus.InfoLevel)
 	redirectURI := "https://client.example/callback"
 	clientID, verifier, code := runMCPBrokerAuthorization(t, ts, redirectURI, "client-state")
 	tokens := exchangeMCPBrokerToken(t, ts, url.Values{
@@ -1906,10 +1904,7 @@ func TestMCPOAuthBrokerCallbackRejectsIssuerAndReplay(t *testing.T) {
 
 func TestMCPOAuthBrokerCallbackForwardsProviderErrorWithPublicIdentity(t *testing.T) {
 	ts, upstream, capture := newMCPBrokerTest(t, "/mcp/")
-	logger, hook := logrustest.NewNullLogger()
-	originalLog := log
-	log = logger
-	t.Cleanup(func() { log = originalLog })
+	hook := captureGatewayLog(t, logrus.InfoLevel)
 	analyticsRecord := captureAnalytics(ts)
 	redirectURI := "https://client.example/callback"
 	clientID := registerMCPBrokerClient(t, ts, redirectURI)
@@ -1984,10 +1979,7 @@ func TestMCPOAuthBrokerCallbackRequiresAdvertisedIssuerAndRejectsHybrid(t *testi
 
 func TestMCPOAuthBrokerTokenRejectsWrongVerifierAndIsolation(t *testing.T) {
 	ts, _, capture := newMCPBrokerTest(t, "/mcp/")
-	logger, hook := logrustest.NewNullLogger()
-	originalLog := log
-	log = logger
-	t.Cleanup(func() { log = originalLog })
+	hook := captureGatewayLog(t, logrus.InfoLevel)
 	analyticsRecord := captureAnalytics(ts)
 	redirectURI := "https://client.example/callback"
 	clientID, correctVerifier, code := runMCPBrokerAuthorization(t, ts, redirectURI, "client-state")

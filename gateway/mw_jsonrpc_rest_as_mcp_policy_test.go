@@ -18,6 +18,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	mcpadapter "github.com/TykTechnologies/tyk/internal/mcp/adapter"
 	"github.com/TykTechnologies/tyk/internal/middleware"
@@ -188,6 +189,46 @@ func TestRESTAsMCPPolicy_EndpointRateLimitBlocksToolCall(t *testing.T) {
 	assert.Equal(t, middleware.StatusRespond, status)
 	assert.Equal(t, http.StatusTooManyRequests, second.Code)
 	assert.Contains(t, second.Body.String(), "Rate Limit Exceeded")
+}
+
+func TestRESTAsMCPPolicy_DoesNotRecountVisitedCallerEndpoint(t *testing.T) {
+	gw, adapterSpec, _ := syntheticAdapterGatewayForCallTest(t)
+	cfg := config.Default
+	drlManager := &drl.DRL{RequestTokenValue: 1}
+	drlManager.SetCurrentTokenValue(1)
+	gw.SessionLimiter = NewSessionLimiter(t.Context(), &cfg, drlManager, &cfg.ExternalServices)
+	gw.limitHeaderFactory = rate.NewSenderFactory(cfg.RateLimitResponseHeaders)
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: adapterSpec, Gw: gw}}
+	sessionID := initializeSyntheticAdapterSession(t, mw, "proxy-1")
+	session := restAsMCPSession("proxy-1", user.AccessDefinition{
+		APIID: "proxy-1",
+		MCPPrimitives: []user.MCPPrimitiveLimit{
+			{Type: mcp.PrimitiveTypeTool, Name: "orders", Limit: user.RateLimit{Rate: 1, Per: 60}},
+		},
+	})
+	NormalizeMCPEndpoints(session)
+	req := restAsMCPPolicyRequest(t, sessionID, `{
+		"jsonrpc":"2.0", "id":2, "method":"tools/call",
+		"params":{"name":"orders","arguments":{}}
+	}`)
+	ctxSetMCPAdapterCallerProxyID(req, "proxy-1")
+	setSessionForTest(req, session)
+	endpoint := mcp.ToolPrefix + "orders"
+	proxy := gw.getApiSpec("proxy-1")
+	reason := gw.SessionLimiter.ForwardMessage(restAsMCPRateLimitRequest(req, endpoint),
+		session, session.KeyID, "", true, false, proxy, false, nil)
+	require.Equal(t, sessionFailNone, reason, "the public caller endpoint admits its first request")
+	httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{
+		VisitedVEMs: []string{endpoint},
+	})
+	rec := httptest.NewRecorder()
+	err, status := processAdmittedSyntheticForTest(t, mw, rec, req)
+	require.NoError(t, err)
+	require.Equal(t, middleware.StatusRespond, status)
+	require.Equal(t, http.StatusOK, rec.Code, "the adapter must not charge the visited caller endpoint twice")
+	reason = gw.SessionLimiter.ForwardMessage(restAsMCPRateLimitRequest(req, endpoint),
+		session, session.KeyID, "", true, false, proxy, false, nil)
+	require.Equal(t, sessionFailRateLimit, reason, "the next public request still exceeds its endpoint limit")
 }
 
 func TestRESTAsMCPPolicy_AliasUsesCallerFacingName(t *testing.T) {

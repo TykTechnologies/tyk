@@ -186,6 +186,9 @@ func TestPairedMCPProxyStrictIngressRunsBeforeInternalHop(t *testing.T) {
 		require.Equal(t, http.StatusOK, status)
 		require.Nil(t, httpctx.GetJSONRPCRoutingState(req))
 		require.Equal(t, "tools/list", ctxGetMCPMethod(req))
+		ingress := httpctx.GetMCPProtocolContext(req)
+		require.NotNil(t, ingress)
+		require.True(t, ingress.Validation.Checked)
 	})
 
 	for _, test := range []struct {
