@@ -3527,6 +3527,50 @@ func TestAPIDefinitionLoader_resolveTemplatePath(t *testing.T) {
 		assert.Equal(t, filepath.Join(root.RootPath(), "transform.tmpl"), got)
 	})
 
+	t.Run("flag off resolves a working-directory path inside the root", func(t *testing.T) {
+		// Documented form: relative to the gateway's working directory.
+		t.Chdir(realBase)
+		loader := newLoader(false, true)
+
+		for _, path := range []string{"./templates/transform.tmpl", "templates/transform.tmpl"} {
+			got, err := loader.resolveTemplatePath(path)
+
+			assert.NoError(t, err, "path %q", path)
+			assert.Equal(t, filepath.Join(templateRoot, "transform.tmpl"), got)
+		}
+	})
+
+	t.Run("flag off prefers the root over the working directory", func(t *testing.T) {
+		// A same-named file in the working directory, outside the root, is ignored.
+		require.NoError(t, os.WriteFile(filepath.Join(realBase, "transform.tmpl"), []byte(`outside`), 0o644))
+		t.Chdir(realBase)
+		loader := newLoader(false, true)
+
+		got, err := loader.resolveTemplatePath("transform.tmpl")
+
+		assert.NoError(t, err)
+		assert.Equal(t, filepath.Join(templateRoot, "transform.tmpl"), got)
+	})
+
+	t.Run("flag off rejects a working-directory path outside the root", func(t *testing.T) {
+		t.Chdir(realBase)
+		loader := newLoader(false, true)
+
+		got, err := loader.resolveTemplatePath("outside/secret.tmpl")
+
+		assert.ErrorContains(t, err, "attempts to escape root directory")
+		assert.Empty(t, got)
+	})
+
+	t.Run("flag off leaves a missing template to the loader", func(t *testing.T) {
+		loader := newLoader(false, true)
+
+		got, err := loader.resolveTemplatePath("missing.tmpl")
+
+		assert.NoError(t, err)
+		assert.Equal(t, filepath.Join(templateRoot, "missing.tmpl"), got)
+	})
+
 	t.Run("flag off requires an initialised root", func(t *testing.T) {
 		loader := newLoader(false, false)
 

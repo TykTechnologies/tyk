@@ -1072,7 +1072,9 @@ var errUnsafeTemplatePath = errors.New("unsafe template path")
 
 // resolveTemplatePath returns the body transform template path the gateway will read.
 // By default the path is confined to the configured TemplatePath root via the
-// gateway's osutil.Root, which also resolves symlinks and relative segments. When
+// gateway's osutil.Root, which also resolves symlinks and relative segments. A
+// relative path is tried against the root first, then against the working directory;
+// either way the result must lie inside the root. When
 // AllowUnsafeBodyTransformTemplatePaths is set the path is returned verbatim, without
 // any validation.
 func (a APIDefinitionLoader) resolveTemplatePath(path string) (string, error) {
@@ -1088,7 +1090,28 @@ func (a APIDefinitionLoader) resolveTemplatePath(path string) (string, error) {
 		return "", errors.New("OSRoot is not initialized")
 	}
 
-	return a.Gw.OSRoot.Ensure(path)
+	resolved, err := a.Gw.OSRoot.Ensure(path)
+	if filepath.IsAbs(path) {
+		return resolved, err
+	}
+
+	if err == nil && fileExists(resolved) {
+		return resolved, nil
+	}
+
+	// Before paths were confined, relative paths resolved against the working
+	// directory, which is how the docs write them (templates/x.tmpl). Keep that
+	// working, but only when the file exists and lies inside the root.
+	if legacy, absErr := filepath.Abs(path); absErr == nil && fileExists(legacy) {
+		return a.Gw.OSRoot.Ensure(legacy)
+	}
+
+	return resolved, err
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
 }
 
 func (a APIDefinitionLoader) loadFileTemplate(path string) (*texttemplate.Template, error) {

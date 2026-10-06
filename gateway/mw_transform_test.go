@@ -398,6 +398,37 @@ func TestTransformRequestBody(t *testing.T) {
 	})
 }
 
+func TestTransformRequestBody_LegacyWorkingDirectoryPath(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Documented form: relative to the gateway's working directory, which holds
+	// the template root.
+	t.Chdir(filepath.Dir(ts.Gw.GetConfig().TemplatePath))
+
+	body := `{"value1":"a","value2":"b","value_list":["x"]}`
+
+	for _, path := range []string{"templates/transform_test.tmpl", "./templates/transform_test.tmpl"} {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.ExtendedPaths.Transform = []apidef.TemplateMeta{{
+					Path:   "/post",
+					Method: http.MethodPost,
+					TemplateData: apidef.TemplateData{
+						Input:          apidef.RequestJSON,
+						Mode:           apidef.UseFile,
+						TemplateSource: path,
+					},
+				}}
+			})
+		})
+
+		_, _ = ts.Run(t, test.TestCase{Method: http.MethodPost, Path: "/post", Data: body,
+			BodyMatch: `transformed_list`, Code: http.StatusOK})
+	}
+}
+
 func TestTransformRequestBody_OASFileTemplatePath(t *testing.T) {
 	// A file outside the configured template root that the transform must never read.
 	secretPath := filepath.Join(t.TempDir(), "secret.tmpl")
