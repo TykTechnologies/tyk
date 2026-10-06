@@ -17,6 +17,8 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/jsonrpc"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -57,6 +59,7 @@ func TestRateLimitAndQuotaCheck_MCPSequentialRoutingCountsSessionOnce(t *testing
 		name       string
 		configure  func(*user.SessionState)
 		secondCode int
+		endpoint   string
 	}{
 		{
 			name: "quota",
@@ -75,6 +78,30 @@ func TestRateLimitAndQuotaCheck_MCPSequentialRoutingCountsSessionOnce(t *testing
 				session.Allowance = session.Rate
 				session.Per = 60
 				session.QuotaMax = -1
+			},
+			secondCode: http.StatusTooManyRequests,
+		},
+		{
+			name:     "method endpoint rate",
+			endpoint: jsonrpc.MethodVEMPrefix + "tools/call",
+			configure: func(session *user.SessionState) {
+				session.Rate = 1000
+				session.Allowance = session.Rate
+				session.Per = 60
+				session.QuotaMax = 2
+				session.QuotaRemaining = 2
+			},
+			secondCode: http.StatusTooManyRequests,
+		},
+		{
+			name:     "primitive endpoint rate",
+			endpoint: mcp.ToolPrefix + "get-weather",
+			configure: func(session *user.SessionState) {
+				session.Rate = 1000
+				session.Allowance = session.Rate
+				session.Per = 60
+				session.QuotaMax = 2
+				session.QuotaRemaining = 2
 			},
 			secondCode: http.StatusTooManyRequests,
 		},
@@ -109,6 +136,14 @@ func TestRateLimitAndQuotaCheck_MCPSequentialRoutingCountsSessionOnce(t *testing
 				testCase.configure(session)
 				session.AccessRights = map[string]user.AccessDefinition{
 					loaded.APIID: {APIID: loaded.APIID, APIName: loaded.Name},
+				}
+				if testCase.endpoint != "" {
+					rights := session.AccessRights[loaded.APIID]
+					rights.Endpoints = user.Endpoints{{
+						Path:    testCase.endpoint,
+						Methods: user.EndpointMethods{{Name: http.MethodPost, Limit: user.RateLimit{Rate: 1, Per: 60}}},
+					}}
+					session.AccessRights[loaded.APIID] = rights
 				}
 			})
 			headers := map[string]string{header.Authorization: key}
