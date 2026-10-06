@@ -96,7 +96,7 @@ func TestCtxSetMCPPrimitiveName_Roundtrip(t *testing.T) {
 func TestCtxSetJSONRPCErrorCode_Roundtrip(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
 	ctxSetJSONRPCErrorCode(r, -32601)
-	assert.Equal(t, -32601, ctxGetJSONRPCErrorCode(r))
+	assert.EqualValues(t, -32601, ctxGetJSONRPCErrorCode(r))
 }
 
 func TestCtxGetMCPMethod_EmptyWhenNotSet(t *testing.T) {
@@ -116,7 +116,7 @@ func TestCtxGetMCPPrimitiveName_EmptyWhenNotSet(t *testing.T) {
 
 func TestCtxGetJSONRPCErrorCode_ZeroWhenNotSet(t *testing.T) {
 	r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
-	assert.Equal(t, 0, ctxGetJSONRPCErrorCode(r))
+	assert.EqualValues(t, 0, ctxGetJSONRPCErrorCode(r))
 }
 
 func TestCtxSetMCPMethod_OverwritesPreviousValue(t *testing.T) {
@@ -165,7 +165,7 @@ func TestWriteJSONRPCError_StashesParseError(t *testing.T) {
 
 	m.writeJSONRPCError(w, r, 1, mcp.JSONRPCParseError, mcp.ErrMsgParseError, nil)
 
-	assert.Equal(t, mcp.JSONRPCParseError, ctxGetJSONRPCErrorCode(r))
+	assert.EqualValues(t, mcp.JSONRPCParseError, ctxGetJSONRPCErrorCode(r))
 
 	var resp JSONRPCErrorResponse
 	require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
@@ -179,7 +179,7 @@ func TestWriteJSONRPCError_StashesInvalidRequest(t *testing.T) {
 
 	m.writeJSONRPCError(w, r, 1, mcp.JSONRPCInvalidRequest, mcp.ErrMsgInvalidRequest, nil)
 
-	assert.Equal(t, mcp.JSONRPCInvalidRequest, ctxGetJSONRPCErrorCode(r))
+	assert.EqualValues(t, mcp.JSONRPCInvalidRequest, ctxGetJSONRPCErrorCode(r))
 }
 
 func TestWriteJSONRPCError_StashesInvalidParams(t *testing.T) {
@@ -189,7 +189,7 @@ func TestWriteJSONRPCError_StashesInvalidParams(t *testing.T) {
 
 	m.writeJSONRPCError(w, r, 1, mcp.JSONRPCInvalidParams, "tool not found", nil)
 
-	assert.Equal(t, mcp.JSONRPCInvalidParams, ctxGetJSONRPCErrorCode(r))
+	assert.EqualValues(t, mcp.JSONRPCInvalidParams, ctxGetJSONRPCErrorCode(r))
 }
 
 func TestWriteJSONRPCError_StashesMethodNotFound(t *testing.T) {
@@ -199,7 +199,7 @@ func TestWriteJSONRPCError_StashesMethodNotFound(t *testing.T) {
 
 	m.writeJSONRPCError(w, r, 1, mcp.JSONRPCMethodNotFound, "method not available", nil)
 
-	assert.Equal(t, mcp.JSONRPCMethodNotFound, ctxGetJSONRPCErrorCode(r))
+	assert.EqualValues(t, mcp.JSONRPCMethodNotFound, ctxGetJSONRPCErrorCode(r))
 }
 
 // -- ProcessRequest MCP context propagation --
@@ -287,7 +287,7 @@ func TestProcessRequest_InvalidJSON_StashesParseError(t *testing.T) {
 	err, _ := m.ProcessRequest(w, r, nil)
 	require.NoError(t, err)
 
-	assert.Equal(t, mcp.JSONRPCParseError, ctxGetJSONRPCErrorCode(r))
+	assert.EqualValues(t, mcp.JSONRPCParseError, ctxGetJSONRPCErrorCode(r))
 }
 
 func TestProcessRequest_MissingVersion_StashesInvalidRequest(t *testing.T) {
@@ -299,7 +299,7 @@ func TestProcessRequest_MissingVersion_StashesInvalidRequest(t *testing.T) {
 	err, _ := m.ProcessRequest(w, r, nil)
 	require.NoError(t, err)
 
-	assert.Equal(t, mcp.JSONRPCInvalidRequest, ctxGetJSONRPCErrorCode(r))
+	assert.EqualValues(t, mcp.JSONRPCInvalidRequest, ctxGetJSONRPCErrorCode(r))
 }
 
 func TestProcessRequest_EmptyMethod_StashesInvalidRequest(t *testing.T) {
@@ -311,7 +311,7 @@ func TestProcessRequest_EmptyMethod_StashesInvalidRequest(t *testing.T) {
 	err, _ := m.ProcessRequest(w, r, nil)
 	require.NoError(t, err)
 
-	assert.Equal(t, mcp.JSONRPCInvalidRequest, ctxGetJSONRPCErrorCode(r))
+	assert.EqualValues(t, mcp.JSONRPCInvalidRequest, ctxGetJSONRPCErrorCode(r))
 }
 
 // -- NeedsMCP flag detection --

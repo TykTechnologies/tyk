@@ -4,10 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"sync"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/sirupsen/logrus"
@@ -15,7 +19,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/ee/middleware/upstreambasicauth"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	mcpadapter "github.com/TykTechnologies/tyk/internal/mcp/adapter"
@@ -117,23 +123,116 @@ func TestSyntheticAdapterProcessRequest_RunsWithExistingJSONRPCRoutingState(t *t
 	assert.Contains(t, rec.Body.String(), `"result"`)
 }
 
-func TestRESTAsMCPAdapter_RejectsNonPOSTMethods(t *testing.T) {
+func TestRESTAsMCPAdapter_ProtocolSpecificGETAndDELETE(t *testing.T) {
 	adapterSpec := buildSyntheticAdapterForRuntimeTest(t)
-	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: adapterSpec}}
+	gw, _, _ := syntheticAdapterGatewayForCallTest(t)
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: adapterSpec, Gw: gw}}
 
-	for _, method := range []string{http.MethodGet, http.MethodDelete} {
-		t.Run(method, func(t *testing.T) {
-			req := httptest.NewRequest(method, "/mcp", nil)
-			req.Header.Set("Accept", "application/json, text/event-stream")
-			rec := httptest.NewRecorder()
+	t.Run("modern methods are rejected with POST allowance", func(t *testing.T) {
+		for _, method := range []string{http.MethodGet, http.MethodDelete} {
+			t.Run(method, func(t *testing.T) {
+				req := httptest.NewRequest(method, "/mcp", nil)
+				req.Header.Set("Accept", "application/json, text/event-stream")
+				req.Header.Set(mcp.HeaderProtocolVersion, mcp.ModernProtocolVersion)
+				rec := httptest.NewRecorder()
 
-			err, status := processAdmittedSyntheticForTest(t, mw, rec, req)
-			require.NoError(t, err)
-			assert.Equal(t, middleware.StatusRespond, status)
-			assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
-			assert.Equal(t, http.MethodPost, rec.Header().Get("Allow"))
-		})
+				err, status := mw.ProcessRequest(rec, req, nil)
+				require.NoError(t, err)
+				assert.Equal(t, middleware.StatusRespond, status)
+				assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+				assert.Equal(t, http.MethodPost, rec.Header().Get("Allow"))
+			})
+		}
+	})
+
+	sessionID := initializeSyntheticAdapterSession(t, mw)
+	prepareLegacy := func(method string) *http.Request {
+		req := httptest.NewRequest(method, "/mcp", nil)
+		req.Header.Set("Accept", "application/json, text/event-stream")
+		req.Header.Set(mcp.HeaderSessionID, sessionID)
+		ctxSetMCPAdapterCallerProxyID(req, "proxy-1")
+		caller := gw.apisByID["proxy-1"]
+		require.NotNil(t, caller)
+		acceptMCPOrigin(req, caller, "")
+		require.True(t, establishMCPAdapterOriginHop(req, gw, caller, adapterSpec))
+		return req
 	}
+
+	t.Run("legacy GET opens and cancellation closes the SSE stream", func(t *testing.T) {
+		req := prepareLegacy(http.MethodGet)
+		ctx, cancel := context.WithCancel(req.Context())
+		req = req.WithContext(ctx)
+		rec := newHeaderSignalRecorder()
+		done := make(chan struct{})
+		go func() {
+			defer close(done)
+			_, _ = mw.ProcessRequest(rec, req, nil)
+		}()
+		select {
+		case <-rec.wroteHeader:
+		case <-time.After(2 * time.Second):
+			t.Fatal("legacy GET did not open an SSE response")
+		}
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(2 * time.Second):
+			t.Fatal("legacy GET did not stop after request cancellation")
+		}
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		require.Contains(t, rec.Header().Get("Content-Type"), "text/event-stream")
+	})
+
+	t.Run("legacy DELETE terminates the session", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		err, status := mw.ProcessRequest(rec, prepareLegacy(http.MethodDelete), nil)
+		require.NoError(t, err)
+		require.Equal(t, middleware.StatusRespond, status)
+		require.Equal(t, http.StatusNoContent, rec.Code, rec.Body.String())
+	})
+}
+
+func TestRESTAsMCPProxy_GETWithoutLegacySessionIsMethodNotAllowed(t *testing.T) {
+	proxy := pairedMCPProxySpec("proxy-1", "org-1", "rest-1", nil)
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: proxy}}
+	req := httptest.NewRequest(http.MethodGet, "/mcp", nil)
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	rec := httptest.NewRecorder()
+
+	err, status := mw.ProcessRequest(rec, req, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, middleware.StatusRespond, status)
+	assert.Equal(t, http.StatusMethodNotAllowed, rec.Code)
+	assert.Equal(t, http.MethodPost, rec.Header().Get("Allow"))
+}
+
+type headerSignalRecorder struct {
+	*httptest.ResponseRecorder
+	once        sync.Once
+	wroteHeader chan struct{}
+}
+
+func newHeaderSignalRecorder() *headerSignalRecorder {
+	return &headerSignalRecorder{ResponseRecorder: httptest.NewRecorder(), wroteHeader: make(chan struct{})}
+}
+
+func (r *headerSignalRecorder) signal() { r.once.Do(func() { close(r.wroteHeader) }) }
+
+func (r *headerSignalRecorder) WriteHeader(status int) {
+	r.ResponseRecorder.WriteHeader(status)
+	r.signal()
+}
+
+func (r *headerSignalRecorder) Write(body []byte) (int, error) {
+	written, err := r.ResponseRecorder.Write(body)
+	r.signal()
+	return written, err
+}
+
+func (r *headerSignalRecorder) Flush() {
+	r.ResponseRecorder.Flush()
+	r.signal()
 }
 
 func TestRESTAsMCPToolView_RewritesToolsListForCallerProxy(t *testing.T) {
@@ -326,6 +425,46 @@ func TestCallMCPAdapterTool_AliasUsesCanonicalRequest(t *testing.T) {
 	assert.Equal(t, "/orders", gotPath)
 }
 
+func TestCallMCPAdapterTool_PropagatesSDKOperationCancellationToSource(t *testing.T) {
+	gw, adapterSpec, _ := syntheticAdapterGatewayForCallTest(t)
+	started := make(chan struct{})
+	observedCause := make(chan error, 1)
+	gw.apisHandlesByID.Store("rest-1", &ChainObject{ThisHandler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(started)
+		<-r.Context().Done()
+		observedCause <- context.Cause(r.Context())
+		w.WriteHeader(http.StatusRequestTimeout)
+	})})
+
+	tool := mustAdapterTool(t, adapterSpec, "orders")
+	operationCtx, cancel := context.WithCancelCause(mcpAdapterCallContext(t, gw, adapterSpec, "proxy-1"))
+	result := make(chan error, 1)
+	go func() {
+		_, err := defaultMCPAdapterCallTool(operationCtx, &tool, map[string]any{})
+		result <- err
+	}()
+
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("source operation did not start")
+	}
+	cause := errors.New("cancel selected MCP call")
+	cancel(cause)
+	select {
+	case got := <-observedCause:
+		assert.ErrorIs(t, got, cause)
+	case <-time.After(time.Second):
+		t.Fatal("source handler did not observe cancellation")
+	}
+	select {
+	case err := <-result:
+		require.NoError(t, err)
+	case <-time.After(time.Second):
+		t.Fatal("cancelled adapter call did not return")
+	}
+}
+
 func TestCallMCPAdapterTool_RejectsToolHiddenFromCallerProxy(t *testing.T) {
 	gw, adapterSpec, sourceCalled := syntheticAdapterGatewayForCallTest(t)
 	tool := mustAdapterTool(t, adapterSpec, "make_order")
@@ -341,12 +480,16 @@ func TestCallMCPAdapterTool_RejectsToolHiddenFromCallerProxy(t *testing.T) {
 }
 
 func TestCallMCPAdapterTool_LogsToolHiddenFromCallerProxy(t *testing.T) {
-	logger, hook := logrustest.NewNullLogger()
-	logger.SetLevel(logrus.WarnLevel)
-	originalLog := log
-	log = logger
+	hook := &logrustest.Hook{}
+	originalLevel := log.GetLevel()
+	originalHooks := log.ReplaceHooks(make(logrus.LevelHooks))
+	installedHooks := cloneLogrusHooks(originalHooks)
+	installedHooks.Add(hook)
+	log.ReplaceHooks(installedHooks)
+	log.SetLevel(logrus.WarnLevel)
 	t.Cleanup(func() {
-		log = originalLog
+		log.SetLevel(originalLevel)
+		log.ReplaceHooks(originalHooks)
 	})
 
 	gw, adapterSpec, sourceCalled := syntheticAdapterGatewayForCallTest(t)
@@ -355,7 +498,7 @@ func TestCallMCPAdapterTool_LogsToolHiddenFromCallerProxy(t *testing.T) {
 	ctxSetMCPAdapterCallerProxyID(req, "proxy-1")
 	setSessionForTest(req, &user.SessionState{KeyID: "session-key-1"})
 
-	_, err := gw.callMCPAdapterTool(req, adapterSpec, &tool, map[string]any{})
+	_, err := gw.callMCPAdapterTool(context.Background(), req, adapterSpec, &tool, map[string]any{})
 	require.Error(t, err)
 	assert.False(t, *sourceCalled)
 
@@ -372,6 +515,14 @@ func TestCallMCPAdapterTool_LogsToolHiddenFromCallerProxy(t *testing.T) {
 	assert.Equal(t, "rest-1", warningEntry.Data["source_rest_api_id"])
 	assert.Equal(t, adapterSpec.APIID, warningEntry.Data["adapter_api_id"])
 	assert.NotContains(t, warningEntry.Data, "session_key")
+}
+
+func cloneLogrusHooks(hooks logrus.LevelHooks) logrus.LevelHooks {
+	cloned := make(logrus.LevelHooks, len(hooks))
+	for level, levelHooks := range hooks {
+		cloned[level] = append([]logrus.Hook(nil), levelHooks...)
+	}
+	return cloned
 }
 
 func TestCallMCPAdapterTool_RunsSourceRESTMiddlewareChain(t *testing.T) {
@@ -489,6 +640,200 @@ func TestCallMCPAdapterTool_ForwardsQueryParamsThroughJSONRPC(t *testing.T) {
 	content := result["content"].([]any)
 	text := content[0].(map[string]any)["text"]
 	assert.Equal(t, `{"query":"limit=10"}`, text)
+}
+
+func TestRESTAsMCPAdapter_SourceNotFoundIsToolErrorAndSessionContinues(t *testing.T) {
+	rest := restSourceSpec("rest-orders", "org-1", true)
+	rest.OAS.Paths.Set("/orders/{id}", &openapi3.PathItem{
+		Get: &openapi3.Operation{
+			OperationID: "get_order",
+			Parameters: openapi3.Parameters{
+				&openapi3.ParameterRef{Value: &openapi3.Parameter{
+					Name:     "id",
+					In:       openapi3.ParameterInPath,
+					Required: true,
+					Schema:   openapi3.NewStringSchema().NewRef(),
+				}},
+			},
+		},
+	})
+	proxy := pairedMCPProxySpec("proxy-orders", "org-1", "rest-orders", &oas.TykMCPServer{
+		Primitives: []oas.TykMCPServerPrimitive{{
+			Source: oas.TykMCPServerSource{OperationID: "get_order"},
+			Name:   "get_order",
+			Allow:  boolPtr(true),
+		}},
+	})
+	adapterSpec, err := buildMCPAdapterSpec(rest, []*APISpec{proxy}, nil)
+	require.NoError(t, err)
+
+	var sourceCalls atomic.Int32
+	gw := &Gateway{
+		apisByID: map[string]*APISpec{
+			"rest-orders":     rest,
+			adapterSpec.APIID: adapterSpec,
+			"proxy-orders":    proxy,
+		},
+		apisHandlesByID: &sync.Map{},
+	}
+	gw.apisHandlesByID.Store("rest-orders", &ChainObject{ThisHandler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		sourceCalls.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/orders/missing" {
+			w.WriteHeader(http.StatusNotFound)
+			_, err := w.Write([]byte(`{"error":"order not found"}`))
+			require.NoError(t, err)
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, err := w.Write([]byte(`{"id":"found","status":"ready"}`))
+		require.NoError(t, err)
+	})})
+	snapshot, err := computeMCPPairing([]*APISpec{rest, proxy})
+	require.NoError(t, err)
+	gw.mcpPairingIndex.Set(snapshot)
+
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: adapterSpec, Gw: gw}}
+	sessionID := initializeSyntheticAdapterSession(t, mw, "proxy-orders")
+
+	call := func(id, orderID string) map[string]any {
+		t.Helper()
+		payload, err := json.Marshal(map[string]any{
+			"jsonrpc": "2.0",
+			"id":      id,
+			"method":  "tools/call",
+			"params": map[string]any{
+				"name":      "get_order",
+				"arguments": map[string]any{"id": orderID},
+			},
+		})
+		require.NoError(t, err)
+		req := httptest.NewRequest(http.MethodPost, "/mcp", bytes.NewReader(payload))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("Mcp-Session-Id", sessionID)
+		ctxSetMCPAdapterCallerProxyID(req, "proxy-orders")
+		rec := httptest.NewRecorder()
+
+		err, status := processAdmittedSyntheticForTest(t, mw, rec, req)
+		require.NoError(t, err)
+		require.Equal(t, middleware.StatusRespond, status)
+		require.Equal(t, http.StatusOK, rec.Code)
+		var body map[string]any
+		require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &body))
+		assert.Equal(t, id, body["id"])
+		assert.NotContains(t, body, "error", "response body: %s", rec.Body.String())
+		return body["result"].(map[string]any)
+	}
+
+	missing := call("missing-9007199254740993", "missing")
+	assert.Equal(t, true, missing["isError"])
+	assert.EqualValues(t, http.StatusNotFound, missing["_meta"].(map[string]any)["upstreamHttpStatus"])
+	assert.Equal(t, "application/json", missing["_meta"].(map[string]any)["upstreamContentType"])
+	missingContent := missing["content"].([]any)
+	require.Len(t, missingContent, 1)
+	assert.Equal(t, `{"error":"order not found"}`, missingContent[0].(map[string]any)["text"])
+	assert.NotContains(t, missing, "structuredContent")
+	assert.EqualValues(t, 1, sourceCalls.Load())
+
+	found := call("found-after-missing", "found")
+	assert.NotContains(t, found, "isError")
+	assert.EqualValues(t, http.StatusOK, found["_meta"].(map[string]any)["upstreamHttpStatus"])
+	foundContent := found["content"].([]any)
+	require.Len(t, foundContent, 1)
+	assert.Equal(t, `{"id":"found","status":"ready"}`, foundContent[0].(map[string]any)["text"])
+	assert.EqualValues(t, 2, sourceCalls.Load())
+}
+
+func TestCallMCPAdapterTool_DropsUnsafeSourceOASHeaderProjection(t *testing.T) {
+	for _, managedAuth := range []bool{false, true} {
+		t.Run(fmt.Sprintf("managed_auth_%t", managedAuth), func(t *testing.T) {
+			rest := restSourceSpec("rest-headers", "org-1", true)
+			if managedAuth {
+				rest.UpstreamAuth = apidef.UpstreamAuth{
+					Enabled: true,
+					BasicAuth: apidef.UpstreamBasicAuth{
+						Enabled:  true,
+						Username: "managed-user",
+						Password: "managed-password",
+					},
+				}
+			}
+			rest.OAS.Paths.Set("/headers", &openapi3.PathItem{
+				Get: &openapi3.Operation{
+					OperationID: "read_headers",
+					Parameters: openapi3.Parameters{
+						&openapi3.ParameterRef{Value: &openapi3.Parameter{Name: "Authorization", In: openapi3.ParameterInHeader, Schema: openapi3.NewStringSchema().NewRef()}},
+						&openapi3.ParameterRef{Value: &openapi3.Parameter{Name: "X-Region", In: openapi3.ParameterInHeader, Schema: openapi3.NewArraySchema().WithItems(openapi3.NewStringSchema()).NewRef()}},
+					},
+				},
+			})
+			proxy := pairedMCPProxySpec("proxy-headers", "org-1", "rest-headers", &oas.TykMCPServer{
+				Primitives: []oas.TykMCPServerPrimitive{{
+					Source: oas.TykMCPServerSource{OperationID: "read_headers"}, Name: "headers", Allow: boolPtr(true),
+					Parameters: []oas.TykMCPServerParameter{
+						{Param: "Authorization", Name: "region"},
+						{Param: "X-Region", Name: "Authorization"},
+					},
+				}},
+			})
+			adapterSpec, err := buildMCPAdapterSpec(rest, []*APISpec{proxy}, nil)
+			require.NoError(t, err)
+			tool := mustAdapterTool(t, adapterSpec, "headers")
+			require.Equal(t, "Authorization", tool.ParamSourceNames["region"])
+			require.Equal(t, "X-Region", tool.ParamSourceNames["Authorization"])
+
+			gw := &Gateway{
+				apisByID:        map[string]*APISpec{"rest-headers": rest, adapterSpec.APIID: adapterSpec, "proxy-headers": proxy},
+				apisHandlesByID: &sync.Map{},
+			}
+			called := false
+			terminal := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				called = true
+				assert.NotContains(t, r.Header.Values("Authorization"), "attacker-value")
+				assert.Equal(t, "eu,us", r.Header.Get("X-Region"))
+				if managedAuth {
+					username, password, ok := r.BasicAuth()
+					assert.True(t, ok)
+					assert.Equal(t, "managed-user", username)
+					assert.Equal(t, "managed-password", password)
+				} else {
+					assert.Empty(t, r.Header.Get("Authorization"))
+				}
+				w.WriteHeader(http.StatusOK)
+			})
+			var sourceChain http.Handler = terminal
+			if managedAuth {
+				base := NewBaseMiddleware(gw, rest, nil, nil)
+				authSpec := upstreambasicauth.NewAPISpec(rest.APIID, rest.Name, rest.IsOAS, rest.OAS, rest.UpstreamAuth)
+				upstreamAuth := WrapMiddleware(base, upstreambasicauth.NewMiddleware(gw, base, authSpec))
+				require.True(t, upstreamAuth.EnabledForSpec())
+				upstreamProxy := &ReverseProxy{TykAPISpec: rest, Gw: gw}
+				sourceChain = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					assert.Empty(t, r.Header.Get("Authorization"), "unsafe projection must be dropped before source auth")
+					err, status := upstreamAuth.ProcessRequest(w, r, nil)
+					require.NoError(t, err)
+					require.Equal(t, http.StatusOK, status)
+					outbound := r.Clone(r.Context())
+					upstreamProxy.addAuthInfo(outbound, r)
+					terminal.ServeHTTP(w, outbound)
+				})
+			}
+			gw.apisHandlesByID.Store("rest-headers", &ChainObject{ThisHandler: sourceChain})
+			snapshot, err := computeMCPPairing([]*APISpec{rest, proxy})
+			require.NoError(t, err)
+			gw.mcpPairingIndex.Set(snapshot)
+
+			rec, err := defaultMCPAdapterCallTool(
+				mcpAdapterCallContext(t, gw, adapterSpec, "proxy-headers"),
+				&tool,
+				map[string]any{"region": "attacker-value", "Authorization": []any{"eu", "us"}},
+			)
+			require.NoError(t, err)
+			require.True(t, called)
+			require.Equal(t, http.StatusOK, rec.Status())
+		})
+	}
 }
 
 func initializeSyntheticAdapterSession(t *testing.T, mw *JSONRPCMiddleware, callerProxyID ...string) string {

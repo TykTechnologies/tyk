@@ -5,6 +5,8 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/TykTechnologies/tyk/ctx"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -51,6 +53,7 @@ func (i *IPBlackListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 }
 
 func (i *IPBlackListMiddleware) handleError(r *http.Request, blacklistedIP string) (error, int) {
+	ctx.SetErrorClassification(r, tykerrors.NewErrorClassification(tykerrors.IPB, "ip_blocked").WithSource(i.Name()))
 
 	// Fire Authfailed Event
 	AuthFailed(i, r, blacklistedIP)

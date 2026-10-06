@@ -15,9 +15,12 @@ import (
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	tykctx "github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -191,6 +194,51 @@ func TestErrorHandler_writeJSONRPCErrorResponse_ReturnsFullResponse(t *testing.T
 
 	// Verify what was written to ResponseWriter matches returned body
 	assert.Equal(t, body, w.Body.Bytes())
+}
+
+func TestErrorHandler_ModernClassifiedCodeWireAndContextConsistency(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+	logger, hook := logrustest.NewNullLogger()
+	logger.SetLevel(logrus.DebugLevel)
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{DoNotTrack: true}}
+	spec.MarkAsMCP()
+	handler := ErrorHandler{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: ts.Gw, logger: logrus.NewEntry(logger)}}
+
+	tests := []struct {
+		name     string
+		status   int
+		flag     tykerrors.ResponseFlag
+		expected int
+	}{
+		{name: "authentication", status: http.StatusForbidden, flag: tykerrors.AKI, expected: jsonrpcerrors.CodeModernAuthRequired},
+		{name: "authorization", status: http.StatusForbidden, flag: tykerrors.ACD, expected: jsonrpcerrors.CodeModernAccessDenied},
+		{name: "quota", status: http.StatusForbidden, flag: tykerrors.QEX, expected: jsonrpcerrors.CodeModernQuotaExceeded},
+		{name: "rate limit", status: http.StatusTooManyRequests, flag: tykerrors.RLT, expected: jsonrpcerrors.CodeModernRateLimitExceeded},
+		{name: "IP", status: http.StatusForbidden, flag: tykerrors.IPB, expected: jsonrpcerrors.CodeModernIPBlocked},
+		{name: "upstream", status: http.StatusInternalServerError, flag: tykerrors.UCF, expected: jsonrpcerrors.CodeModernUpstreamError},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			hook.Reset()
+			r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+			envelope := &mcp.RequestEnvelope{JSONRPC: "2.0", Method: "tools/list", ID: tc.name}
+			httpctx.SetMCPProtocolContext(r, mcp.NewProtocolContext(mcp.ModernProtocolVersion, "", envelope, nil))
+			httpctx.SetJSONRPCRoutingState(r, &httpctx.JSONRPCRoutingState{Method: envelope.Method, ID: envelope.ID})
+			tykctx.SetErrorClassification(r, tykerrors.NewErrorClassification(tc.flag, tc.name))
+			w := httptest.NewRecorder()
+
+			handler.HandleError(w, r, tc.name, tc.status, true)
+
+			var response jsonrpcerrors.JSONRPCErrorResponse
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+			assert.Equal(t, tc.expected, response.Error.Code)
+			assert.EqualValues(t, response.Error.Code, ctxGetJSONRPCErrorCode(r))
+			require.NotNil(t, hook.LastEntry())
+			assert.EqualValues(t, response.Error.Code, hook.LastEntry().Data["jsonrpc_error_code"])
+		})
+	}
 }
 
 func TestErrorHandler_shouldWriteJSONRPCError(t *testing.T) {
@@ -769,6 +817,46 @@ func TestErrorHandler_JSONRPC_LatencyRecording(t *testing.T) {
 	assert.Equal(t, record.RequestTime, record.Latency.Total)
 	assert.Equal(t, record.Latency.Gateway, record.Latency.Total-record.Latency.Upstream)
 	assert.Zero(t, record.Latency.Upstream)
+}
+
+func TestErrorHandler_PairedMCPPolicyDenialKeepsPublicAnalyticsPath(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	conf := ts.Gw.GetConfig()
+	conf.EnableAnalytics = true
+	ts.Gw.SetConfig(conf)
+
+	spec := pairedMCPProxySpec("paired-public", "org-1", "rest-1", nil)
+	spec.Name = "Paired Public"
+	spec.DoNotTrack = false
+	spec.Proxy.StripListenPath = true
+	spec.GlobalConfig = conf
+
+	var record *analytics.AnalyticsRecord
+	ts.Gw.Analytics.mockEnabled = true
+	ts.Gw.Analytics.mockRecordHit = func(got *analytics.AnalyticsRecord) {
+		copy := *got
+		record = &copy
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/paired-public/mcp", nil)
+	ctxSetOriginalRequestPath(req, req.URL.Path)
+	httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{
+		Method:        mcp.MethodToolsCall,
+		ID:            json.Number("9007199254740993"),
+		PrimitiveType: mcp.PrimitiveTypeTool,
+		PrimitiveName: "blocked_tool",
+	})
+	recorder := httptest.NewRecorder()
+	handler := ErrorHandler{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: ts.Gw}}
+
+	handler.HandleError(recorder, req, "access denied", http.StatusForbidden, true)
+
+	require.NotNil(t, record)
+	assert.Equal(t, "/paired-public/mcp", record.Path)
+	assert.Equal(t, "/paired-public/mcp", record.RawPath)
+	assert.Equal(t, "/paired-public/mcp", record.OriginalPath)
 }
 
 func TestErrorHandler_AccessLogAndHealthUnconditional(t *testing.T) {

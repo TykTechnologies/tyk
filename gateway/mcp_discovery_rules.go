@@ -29,7 +29,20 @@ func credentialSpecificMCPFilteringApplies(spec *APISpec, req *http.Request, ses
 	if state.Method == mcp.MethodInitialize {
 		return !sessionJSONRPCMethodRules(spec, ses).IsEmpty()
 	}
+	if state.Method == mcp.MethodServerDiscover {
+		return !sessionJSONRPCMethodRules(spec, ses).IsEmpty()
+	}
 	return false
+}
+
+func discoveryJSONRPCRuleSets(spec *APISpec, ses *user.SessionState) (global, credential []user.AccessControlRules) {
+	if rules := oasJSONRPCMethodRules(spec); !rules.IsEmpty() {
+		global = append(global, rules)
+	}
+	if rules := sessionJSONRPCMethodRules(spec, ses); !rules.IsEmpty() {
+		credential = append(credential, rules)
+	}
+	return global, credential
 }
 
 func markMCPResponseEdited(req *http.Request) {
