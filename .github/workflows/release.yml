@@ -120,11 +120,14 @@ jobs:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('go.sum') }}
+          key: ${{ runner.os }}-go-tyk-goreleaser-${{ hashFiles('go.sum') }}
           # loose prefix so a changed go.sum / fresh branch gets a partial
-          # restore instead of a cold rebuild (exact key = no fallback).
+          # restore instead of a cold rebuild (exact key = no fallback). The
+          # prefix ends in a fixed -goreleaser- so it cannot swallow another
+          # cache: a bare "-go-" prefix also matched the "-go-dashboard-"
+          # entry rendered into tyk, and "-go-tyk-" would match "-go-tyk-pump-".
           restore-keys: |
-            ${{ runner.os }}-go-
+            ${{ runner.os }}-go-tyk-goreleaser-
       - name: Validate Go version
         run: |
           GO_VERSION_STR=$(docker run --rm tykio/golang-cross:${{ matrix.golang_cross }} go version 2>&1 || true)

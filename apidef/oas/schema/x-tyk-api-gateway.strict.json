@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
   "type": "object",
+  "description": "Tyk Gateway API configuration extension. Note: OAuth 2.0 security features (OAuth2ScopeCheck, OAuth2TokenExchange, OAuth2ProtectedResourceMetadata) have been moved to the security scheme level. Configure them under components.securitySchemes[<name>].x-tyk-api-gateway.oauth2 instead of the top-level extension.",
   "properties": {
     "info": {
       "$ref": "#/definitions/X-Tyk-Info"

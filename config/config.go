@@ -236,7 +236,7 @@ type NormalisedURLConfig struct {
 	// * `/ca761232-ed42-11ce-BAcd-00aa0057b223/search`
 	// * `/ca761232-ed42-11ce-BAcd-00aa0057b223/search`
 
-	// Each UUID will be replaced with a placeholder {uuid}
+	// Each UUID will be replaced with a placeholder `{uuid}`
 	NormaliseUUIDs bool `json:"normalise_uuids"`
 
 	// Set this to true to have Tyk automatically clean up ULIDs. It will match the following style:
@@ -245,7 +245,7 @@ type NormalisedURLConfig struct {
 	// * `/posts/01g9hhnkwgbhcqx7vg3jksz055/comments`
 	// * `/posts/01g9HHNKwgbhcqx7vg3JKSZ055/comments`
 
-	// Each ULID will be replaced with a placeholder {ulid}
+	// Each ULID will be replaced with a placeholder `{ulid}`
 	NormaliseULIDs bool `json:"normalise_ulids"`
 
 	// Set this to true to have Tyk automatically match for numeric IDs, it will match with a preceding slash so as not to capture actual numbers:
@@ -277,6 +277,10 @@ type AnalyticsConfigConfig struct {
 	// Please note, this will greatly increase your analytics DB size and can cause performance degradation on analytics processing by the Dashboard.
 	// This setting can be overridden with an organization flag, enabed at an API level, or on individual Key level.
 	EnableDetailedRecording bool `json:"enable_detailed_recording"`
+
+	// AllowUnsafeDetailedLogs controls whether sensitive headers (Authorization) are obfuscated when detailed recording is enabled.
+	// Setting this to true restores the legacy behavior where raw requests are captured as-is, which may expose sensitive tokens in plain text.
+	AllowUnsafeDetailedLogs bool `json:"allow_unsafe_detailed_logs"`
 
 	// Tyk can store GeoIP information based on MaxMind DB’s to enable GeoIP tracking on inbound request analytics. Set this value to `true` and assign a DB using the `geo_ip_db_path` setting.
 	EnableGeoIP bool `json:"enable_geo_ip"`
@@ -1424,8 +1428,19 @@ type Config struct {
 	// JWKS holds the configuration for Tyk JWKS functionalities
 	JWKS JWKSConfig `json:"jwks"`
 
-	// AllowUnsafePolicyIds allows unsafe policy identifiers
+	// AllowUnsafePolicyIds allows the use of non-standard characters in policy identifiers (default: false).
+	// The standard characters are alphanumeric characters plus underscore (_), hyphen (-), dot (.) and tilde (~).
+	// The use of other characters in IDs can cause unpredictable behavior and is not recommended.
 	AllowUnsafePolicyIds bool `json:"allow_unsafe_policy_ids"`
+
+	// AllowUnsafeWebhookTemplatePaths disables webhook template path validation. This is provided for compatibility with legacy webhook definitions containing potentially unsafe template paths (default: false).
+	AllowUnsafeWebhookTemplatePaths bool `json:"allow_unsafe_webhook_template_paths"`
+
+	// AllowUnsafeApiIds allows the use of non-standard characters in API identifiers (default: false).
+	// The standard characters are alphanumeric characters plus underscore (_), hyphen (-), dot (.) and tilde (~).
+	// A standard ID must also contain at least one letter or digit, so IDs made only of punctuation (e.g. "." or "..") are rejected.
+	// The use of other characters in IDs can cause unpredictable behavior and is not recommended.
+	AllowUnsafeApiIds bool `json:"allow_unsafe_api_ids"`
 }
 
 // LabsConfig include config for streaming

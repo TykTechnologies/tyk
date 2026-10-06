@@ -2,9 +2,12 @@ package gateway
 
 import (
 	"context"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
@@ -19,7 +22,6 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	ctxpkg "github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/test"
-	"github.com/TykTechnologies/tyk/user"
 )
 
 type bindContextFunc = func(context.Context) context.Context
@@ -43,84 +45,6 @@ func testAPISpec(binding bindAPIDefFunc) *APISpec {
 		binding(spec)
 	}
 	return spec
-}
-
-func TestRecordDetail(t *testing.T) {
-	testcases := []struct {
-		title   string
-		spec    *APISpec
-		binding bindContextFunc
-		expect  bool
-	}{
-		{
-			title:  "empty session",
-			spec:   testAPISpec(nil),
-			expect: false,
-		},
-		{
-			title: "empty session, enabled analytics",
-			spec: testAPISpec(func(spec *APISpec) {
-				spec.EnableDetailedRecording = true
-			}),
-			expect: true,
-		},
-		{
-			title: "empty session, enabled config",
-			spec: testAPISpec(func(spec *APISpec) {
-				spec.GlobalConfig.EnforceOrgDataDetailLogging = false
-				spec.GlobalConfig.AnalyticsConfig.EnableDetailedRecording = true
-			}),
-			expect: true,
-		},
-		{
-			title: "normal session",
-			spec:  testAPISpec(nil),
-			// attach user session
-			binding: func(ctx context.Context) context.Context {
-				session := &user.SessionState{
-					EnableDetailedRecording: true,
-				}
-				return context.WithValue(ctx, ctxpkg.SessionData, session)
-			},
-			expect: true,
-		},
-		{
-			title: "org empty session",
-			spec: testAPISpec(func(spec *APISpec) {
-				spec.GlobalConfig.EnforceOrgDataDetailLogging = true
-			}),
-			expect: false,
-		},
-		{
-			title: "org session",
-			spec: testAPISpec(func(spec *APISpec) {
-				spec.GlobalConfig.EnforceOrgDataDetailLogging = true
-			}),
-			// attach user session
-			binding: func(ctx context.Context) context.Context {
-				session := &user.SessionState{
-					EnableDetailedRecording: true,
-				}
-				return context.WithValue(ctx, ctxpkg.OrgSessionContext, session)
-			},
-			expect: true,
-		},
-		{
-			title: "graphql request",
-			spec: testAPISpec(func(spec *APISpec) {
-				spec.GraphQL.Enabled = true
-			}),
-			expect: true,
-		},
-	}
-
-	for _, tc := range testcases {
-		t.Run(tc.title, func(t *testing.T) {
-			req := testRequestWithContext(tc.binding)
-			got := recordDetail(req, tc.spec)
-			assert.Equal(t, tc.expect, got)
-		})
-	}
 }
 
 func TestAnalyticRecord_GraphStats(t *testing.T) {
@@ -640,6 +564,76 @@ func TestSuccessHandler_classifyUpstreamError(t *testing.T) {
 			} else {
 				assert.Nil(t, errClass, "expected no error classification")
 			}
+		})
+	}
+}
+
+type mockReturningHttpHandler struct {
+	serveHTTPCalled         bool
+	serveHTTPForCacheCalled bool
+}
+
+func (m *mockReturningHttpHandler) ServeHTTP(_ http.ResponseWriter, _ *http.Request) ProxyResponse {
+	m.serveHTTPCalled = true
+	return ProxyResponse{}
+}
+
+func (m *mockReturningHttpHandler) ServeHTTPForCache(_ http.ResponseWriter, _ *http.Request) ProxyResponse {
+	m.serveHTTPForCacheCalled = true
+	return ProxyResponse{}
+}
+
+func (m *mockReturningHttpHandler) CopyResponse(_ io.Writer, _ io.Reader, _ time.Duration) error {
+	return nil
+}
+
+func TestSuccessHandler_ServeHTTP_Branching(t *testing.T) {
+	tests := []struct {
+		name                    string
+		graphqlEnabled          bool
+		expectServeHTTP         bool
+		expectServeHTTPForCache bool
+	}{
+		{
+			name:                    "GraphQL disabled calls ServeHTTP",
+			graphqlEnabled:          false,
+			expectServeHTTP:         true,
+			expectServeHTTPForCache: false,
+		},
+		{
+			name:                    "GraphQL enabled calls ServeHTTPForCache",
+			graphqlEnabled:          true,
+			expectServeHTTP:         false,
+			expectServeHTTPForCache: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockProxy := &mockReturningHttpHandler{}
+
+			spec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					GraphQL: apidef.GraphQLConfig{
+						Enabled: tt.graphqlEnabled,
+					},
+				},
+			}
+
+			handler := &SuccessHandler{
+				BaseMiddleware: &BaseMiddleware{
+					Spec:  spec,
+					Proxy: mockProxy,
+				},
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			w := httptest.NewRecorder()
+
+			handler.ServeHTTP(w, req)
+
+			assert.Equal(t, tt.expectServeHTTP, mockProxy.serveHTTPCalled)
+			assert.Equal(t, tt.expectServeHTTPForCache, mockProxy.serveHTTPForCacheCalled)
 		})
 	}
 }

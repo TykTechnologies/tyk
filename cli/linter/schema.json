@@ -506,6 +506,9 @@
         "enable_detailed_recording": {
           "type": "boolean"
         },
+        "allow_unsafe_detailed_logs": {
+          "type": "boolean"
+        },
         "purge_interval": {
           "type": "number"
         },
@@ -1684,6 +1687,14 @@
       "default": "quotas"
     },
     "allow_unsafe_policy_ids": {
+      "type": ["boolean", "null"],
+      "additionalProperties": false
+    },
+    "allow_unsafe_webhook_template_paths": {
+      "type": ["boolean", "null"],
+      "additionalProperties": false
+    },
+    "allow_unsafe_api_ids": {
       "type": ["boolean", "null"],
       "additionalProperties": false
     },
