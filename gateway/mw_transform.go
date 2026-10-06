@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -44,7 +45,19 @@ func (t *TransformMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	if !found {
 		return nil, http.StatusOK
 	}
-	err := transformBody(r, meta.(*TransformSpec), t)
+
+	tmeta, ok := meta.(*TransformSpec)
+	if !ok {
+		return nil, http.StatusOK
+	}
+
+	if tmeta.Blocked {
+		t.Logger().Error("Body transform template path was rejected at load time")
+		//nolint:staticcheck // ST1005: the message is the client-facing response body required by the spec
+		return errors.New(msgTemplateExecutionFailed), http.StatusBadRequest
+	}
+
+	err := transformBody(r, tmeta, t)
 
 	if err != nil {
 		t.Logger().WithError(err).Error("Body transform failure")

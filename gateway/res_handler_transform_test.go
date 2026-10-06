@@ -6,6 +6,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -209,6 +212,41 @@ func TestTransformResponseBody(t *testing.T) {
 			Path: "/transform", Code: 200, BodyNotMatch: `{"http_method":"GET"}`,
 		})
 	})
+}
+
+func TestTransformResponseBody_UnsafeFileTemplatePath(t *testing.T) {
+	// A file outside the configured template root that the transform must never read.
+	secretPath := filepath.Join(t.TempDir(), "secret.tmpl")
+	require.NoError(t, os.WriteFile(secretPath, []byte("TOPSECRET"), 0o644))
+
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	relSecret, err := filepath.Rel(ts.Gw.GetConfig().TemplatePath, secretPath)
+	require.NoError(t, err)
+
+	for _, path := range []string{secretPath, relSecret} {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.ExtendedPaths.TransformResponse = []apidef.TemplateMeta{{
+					Path:   "/transform",
+					Method: http.MethodGet,
+					TemplateData: apidef.TemplateData{
+						Mode:           apidef.UseFile,
+						TemplateSource: path,
+					},
+				}}
+			})
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Path: "/transform", Code: http.StatusBadRequest,
+			BodyMatch:    `{"error": "Template execution failed"}`,
+			BodyNotMatch: "TOPSECRET",
+			HeadersMatch: map[string]string{header.ContentType: header.ApplicationJSON},
+		})
+	}
 }
 
 func TestResponseTransformMiddleware_Enabled(t *testing.T) {
