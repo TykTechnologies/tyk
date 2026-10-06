@@ -27,6 +27,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/sanitize"
 )
 
@@ -678,7 +679,7 @@ func (gw *Gateway) loadOneBundleForMerge(spec *APISpec, bundleFs afero.Fs, rootP
 		}
 	}
 
-	if err := mergeBundleManifest(spec, &bundle.Manifest, subdir, bundleName); err != nil {
+	if err := mergeBundleManifest(spec, &bundle.Manifest, subdir, bundleName, gw.GetConfig()); err != nil {
 		return bundleError(spec, err, fmt.Sprintf("Couldn't merge bundle %q", bundleName))
 	}
 
@@ -735,7 +736,7 @@ func loadBundleManifestNamed(bundleFs afero.Fs, bundle *Bundle, bundleName strin
 //   - pre/post/post_key_auth/response: append in declaration order
 //   - auth_check: at most one bundle may set this; merging a second is an error
 //   - driver: must be uniform; mismatch is an error
-func mergeBundleManifest(spec *APISpec, manifest *apidef.BundleManifest, subdir, bundleName string) error {
+func mergeBundleManifest(spec *APISpec, manifest *apidef.BundleManifest, subdir, bundleName string, cfg config.Config) error {
 	src := manifest.CustomMiddleware
 
 	// Driver consistency
@@ -767,8 +768,20 @@ func mergeBundleManifest(spec *APISpec, manifest *apidef.BundleManifest, subdir,
 	// `disabled`, and project the hook onto spec.AnalyticsPlugin so
 	// api_loader picks it up. A second active declaration is a hard error,
 	// the same rule auth_check follows.
-	// todo: add feature flag !cfg.DisabledBudledTrafficLogs
-	if !src.TrafficLogs.Disabled && src.TrafficLogs.Name != "" {
+	//
+	// disable_bundled_traffic_logs is the escape hatch for deployments that
+	// relied on the pre-fix behaviour (traffic_logs silently ignored in
+	// multi-bundle mode): with it set the hook is still ignored, but loudly.
+	trafficLogsActive := !src.TrafficLogs.Disabled && src.TrafficLogs.Name != ""
+	if cfg.DisableBundledTrafficLogs && trafficLogsActive {
+		log.WithFields(logrus.Fields{
+			"prefix":  "main",
+			"api_id":  spec.APIID,
+			"bundle":  bundleName,
+			"hook":    src.TrafficLogs.Name,
+			"setting": "disable_bundled_traffic_logs",
+		}).Warning("Ignoring traffic_logs hook declared in bundle manifest: bundled traffic logs are disabled in the gateway config")
+	} else if trafficLogsActive {
 		if spec.CustomMiddleware.TrafficLogs.Name != "" {
 			return fmt.Errorf("bundle %q declares a traffic_logs hook but another bundle has already set one (%q)", bundleName, spec.CustomMiddleware.TrafficLogs.Name)
 		}
