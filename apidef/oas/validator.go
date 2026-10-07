@@ -10,6 +10,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/buger/jsonparser"
 	"github.com/hashicorp/go-multierror"
@@ -17,6 +18,7 @@ import (
 
 	"github.com/TykTechnologies/storage/kv/resolver"
 
+	"github.com/TykTechnologies/tyk/internal/dnsdiscovery"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 	logger "github.com/TykTechnologies/tyk/log"
@@ -181,6 +183,9 @@ var (
 
 	errDNSDiscoveryRequiresLoadBalancing = errors.New(
 		"upstream.dnsDiscovery supplies the target list but does not distribute across it; upstream.loadBalancing must be enabled too")
+
+	errDNSDiscoveryInvalidRefreshInterval = errors.New(
+		"upstream.dnsDiscovery.refreshInterval must be empty for the 30s default, or at least 5s")
 )
 
 func validateTykExtension(documentBody []byte) error {
@@ -225,6 +230,10 @@ func (r *ruleUpstreamSources) Validate(x *XTykAPIGateway) error {
 
 	if upstream.LoadBalancing == nil || !upstream.LoadBalancing.Enabled {
 		combinedErr = multierror.Append(combinedErr, errDNSDiscoveryRequiresLoadBalancing)
+	}
+
+	if interval := time.Duration(upstream.DNSDiscovery.RefreshInterval); interval < 0 || (interval > 0 && interval < dnsdiscovery.MinInterval) {
+		combinedErr = multierror.Append(combinedErr, errDNSDiscoveryInvalidRefreshInterval)
 	}
 
 	return combinedErr.ErrorOrNil()

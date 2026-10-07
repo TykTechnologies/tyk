@@ -139,6 +139,17 @@ func TestDNSDiscovery_OASEndpointRefusesTheTwoCombinations(t *testing.T) {
 		})
 	})
 
+	t.Run("refresh interval under the minimum names the OAS field", func(t *testing.T) {
+		document := dnsDiscoveryOASAPI("dns-oas-fast", "/dns-oas-fast/", true, false)
+		document.GetTykExtension().Upstream.DNSDiscovery.RefreshInterval = tyktime.ReadableDuration(time.Second)
+
+		_, _ = ts.Run(t, test.TestCase{
+			AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis/oas", Data: document,
+			BodyMatch: `upstream.dnsDiscovery.refreshInterval must be empty for the 30s default, or at least 5s`,
+			Code:      http.StatusBadRequest,
+		})
+	})
+
 	// The conversion used to drop loadBalancing.enabled with no targets under
 	// it, so the API loaded with discovery switched back off.
 	t.Run("accepted, and keeps load balancing through the conversion", func(t *testing.T) {
