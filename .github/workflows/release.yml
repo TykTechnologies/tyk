@@ -1228,7 +1228,7 @@ jobs:
     name: Coordinated MCP qualification
     needs: dep-guard
     if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
-    uses: ./.github/workflows/mcp-qualification.yml
+    uses: TykTechnologies/github-actions/.github/workflows/mcp-qualification.yml@b2a86bbd65a78ecaf161ae381098be226606cd1f
     secrets:
       PROBE_APP_ID: ${{ secrets.PROBE_APP_ID }}
       PROBE_APP_PRIVATE_KEY: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
