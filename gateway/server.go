@@ -69,6 +69,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	tyklog "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/pkg/osutil"
 	"github.com/TykTechnologies/tyk/pkg/validator"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
@@ -280,6 +281,9 @@ type Gateway struct {
 	// shims and new-syntax references share one code path. Guaranteed non-nil
 	// after construction, alongside kvRegistry.
 	kvResolver resolver.Resolver
+
+	// manage safe file paths
+	OSRoot *osutil.Root
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
@@ -349,6 +353,13 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	// cannot even build its local stores is unusable.
 	if err := gw.ensureKVRegistry(config); err != nil {
 		log.WithError(err).Fatal("could not initialize KV registry")
+	}
+
+	// Initialize the OSRoot with your desired base path
+	if root, err := osutil.NewRoot(config.TemplatePath); err == nil {
+		gw.OSRoot = root
+	} else {
+		log.WithError(err).Error("Failed to initialize Gateway OSRoot")
 	}
 
 	return gw
@@ -1858,6 +1869,7 @@ func (gw *Gateway) initSystem() error {
 func (gw *Gateway) initMembers(cfg config.Config) {
 	gw.validator = validator.New(
 		validator.WithAllowUnsafePolicyIds(cfg.AllowUnsafePolicyIds),
+		validator.WithAllowUnsafeApiIds(cfg.AllowUnsafeApiIds),
 	)
 }
 
@@ -1985,6 +1997,16 @@ func (gw *Gateway) afterConfSetup() error {
 	}
 	regexp.Configure(cacheOpts)
 	httputil.ConfigurePathRegexpCache(maxEntries, conf.DisableRegexpCacheBound, mainLog.Warnf)
+
+	if conf.AllowUnsafeApiIds {
+		mainLog.Warn("allow_unsafe_api_ids is enabled: API IDs with non-standard characters will be accepted. " +
+			"This can cause unpredictable behavior and is not recommended.")
+	}
+
+	if conf.AllowUnsafeBodyTransformTemplatePaths {
+		mainLog.Warn("allow_unsafe_body_transform_template_paths is enabled: body transform template paths are not confined to template_path. " +
+			"Risk: API definitions can read arbitrary files from the gateway filesystem.")
+	}
 
 	if conf.HealthCheckEndpointName == "" {
 		conf.HealthCheckEndpointName = "hello"

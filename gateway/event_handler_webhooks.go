@@ -130,6 +130,25 @@ func (w *WebHookHandler) WasHookFired(checksum string) bool {
 	return true
 }
 
+// resolveTemplatePath returns the template path the gateway will read.
+// By default the path is confined to the configured TemplatePath root via
+// osutil.Root, which also resolves symlinks and relative segments. When
+// AllowUnsafeWebhookTemplatePaths is set the path is returned verbatim,
+// without any validation.
+func (w *WebHookHandler) resolveTemplatePath(path string) (string, error) {
+	cfg := w.Gw.GetConfig()
+
+	if cfg.AllowUnsafeWebhookTemplatePaths {
+		return path, nil
+	}
+
+	templateRoot, err := osutil.NewRoot(cfg.TemplatePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to initialize template root: %w", err)
+	}
+	return templateRoot.Ensure(path)
+}
+
 func (w *WebHookHandler) preLoadCustomTemplate() {
 	if w.conf.TemplatePath == "" {
 		return
@@ -137,22 +156,16 @@ func (w *WebHookHandler) preLoadCustomTemplate() {
 
 	log := log.WithField("target", w.conf.TargetPath).WithField("prefix", "webhooks")
 
-	templateRoot, err := osutil.NewRoot(w.Gw.GetConfig().TemplatePath)
-	if err != nil {
-		log.WithError(err).Warning("Failed to initialize template root, using default.")
-		return
-	}
-
-	safePath, err := templateRoot.Ensure(w.conf.TemplatePath)
+	templatePath, err := w.resolveTemplatePath(w.conf.TemplatePath)
 	if err != nil {
 		log.WithError(err).Warning("Invalid template path, using default.")
 		return
 	}
 
-	w.template, err = htmltemplate.ParseFiles(safePath)
+	w.template, err = htmltemplate.ParseFiles(templatePath)
 	if err != nil {
 		log.WithError(err).
-			WithField("path", safePath).
+			WithField("path", templatePath).
 			Warning("Custom template load failure, using default.")
 		return
 	}

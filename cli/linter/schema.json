@@ -1719,6 +1719,18 @@
       "type": ["boolean", "null"],
       "additionalProperties": false
     },
+    "allow_unsafe_webhook_template_paths": {
+      "type": ["boolean", "null"],
+      "additionalProperties": false
+    },
+    "allow_unsafe_api_ids": {
+      "type": ["boolean", "null"],
+      "additionalProperties": false
+    },
+    "allow_unsafe_body_transform_template_paths": {
+      "type": ["boolean", "null"],
+      "additionalProperties": false
+    },
     "error_overrides": {
       "$ref": "#/definitions/ErrorOverrides"
     }
