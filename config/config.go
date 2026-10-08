@@ -1258,6 +1258,13 @@ type Config struct {
 	// In trusted environments, this reverification may be unnecessary and can be skipped using this option, reducing the API load time.
 	SkipVerifyExistingPluginBundle bool `bson:"skip_verify_existing_plugin_bundle" json:"skip_verify_existing_plugin_bundle"`
 
+	// DisableBundledTrafficLogs disables the `traffic_logs` (analytics plugin) hook declared in plugin bundle manifests when an API composes several bundles via a comma-separated `custom_middleware_bundle`.
+	//
+	// By default the gateway wires the `traffic_logs` hook from the bundle manifests into the API, and fails to load the API when more than one bundle declares it. Set this to `true` to restore the previous behaviour, where `traffic_logs` entries in composed bundles were ignored; the gateway then logs a warning for every ignored entry instead of failing the API load.
+	//
+	// This option only affects APIs composing multiple bundles. Single-bundle APIs and `analytics_plugin` configured directly in the API definition are unaffected.
+	DisableBundledTrafficLogs bool `bson:"disable_bundled_traffic_logs" json:"disable_bundled_traffic_logs"`
+
 	// Set to true if you are using JSVM custom middleware or virtual endpoints.
 	EnableJSVM bool `json:"enable_jsvm"`
 
