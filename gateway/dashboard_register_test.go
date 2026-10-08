@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -13,6 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/header"
 )
 
 func Test_BuildDashboardConnStr(t *testing.T) {
@@ -37,20 +41,34 @@ func Test_BuildDashboardConnStr(t *testing.T) {
 
 func newTestDashboardHandler(t *testing.T, serverURL string) (*HTTPDashboardHandler, func()) {
 	t.Helper()
-	conf := func(c *config.Config) {
+	h, ts := newTestDashboardFixture(t, serverURL, nil)
+	return h, ts.Close
+}
+
+// newTestDashboardFixture starts a test gateway wired to a stub Dashboard at
+// serverURL and returns both the handler and the *Test so callers can load
+// APIs/policies between requests. extraConf runs after the fixture defaults.
+func newTestDashboardFixture(t *testing.T, serverURL string, extraConf func(c *config.Config)) (*HTTPDashboardHandler, *Test) {
+	t.Helper()
+	g := StartTest(func(c *config.Config) {
 		c.UseDBAppConfigs = false
 		c.NodeSecret = "test-secret"
 		c.DBAppConfOptions.ConnectionTimeout = 2
 		c.DisableDashboardZeroConf = true
-	}
-	g := StartTest(conf)
+		if extraConf != nil {
+			extraConf(c)
+		}
+	})
 	handler := &HTTPDashboardHandler{
-		Gw:                   g.Gw,
-		Secret:               "test-secret",
-		RegistrationEndpoint: serverURL + "/register/node",
+		Gw:                      g.Gw,
+		Secret:                  "test-secret",
+		RegistrationEndpoint:    serverURL + "/register/node",
+		HeartBeatEndpoint:       serverURL + "/register/ping",
+		DeRegistrationEndpoint:  serverURL + "/system/node",
+		KeyQuotaTriggerEndpoint: serverURL + "/system/key/quota_trigger",
 	}
 	g.Gw.DashService = handler
-	return handler, g.Close
+	return handler, g
 }
 
 func writeJSON(t *testing.T, w http.ResponseWriter, v interface{}) {
@@ -304,7 +322,6 @@ func TestSendHeartBeat_Forbidden_ReRegisters(t *testing.T) {
 
 	h, closeFn := newTestDashboardHandler(t, srv.URL)
 	defer closeFn()
-	h.HeartBeatEndpoint = srv.URL + "/register/ping"
 
 	err := h.sendHeartBeat(
 		h.newRequest(http.MethodGet, h.HeartBeatEndpoint),
@@ -331,7 +348,6 @@ func TestPing_HeartbeatOK_UpdatesNonce(t *testing.T) {
 
 	h, closeFn := newTestDashboardHandler(t, srv.URL)
 	defer closeFn()
-	h.HeartBeatEndpoint = srv.URL + "/register/ping"
 
 	require.NoError(t, h.Ping())
 
@@ -351,7 +367,6 @@ func TestPing_NilGatewayContext_DoesNotPanic(t *testing.T) {
 
 	h, closeFn := newTestDashboardHandler(t, srv.URL)
 	defer closeFn()
-	h.HeartBeatEndpoint = srv.URL + "/register/ping"
 
 	oldCtx := h.Gw.ctx
 	h.Gw.ctx = nil
@@ -369,7 +384,6 @@ func TestPing_DashboardUnreachable_Fails(t *testing.T) {
 
 	h, closeFn := newTestDashboardHandler(t, srv.URL)
 	defer closeFn()
-	h.HeartBeatEndpoint = srv.URL + "/register/ping"
 
 	err := h.Ping()
 	require.Error(t, err)
@@ -402,7 +416,6 @@ func TestPing_RedisDownDashboardUp_DoesNotBlockOrReRegister(t *testing.T) {
 
 	h, closeFn := newTestDashboardHandler(t, srv.URL)
 	defer closeFn()
-	h.HeartBeatEndpoint = srv.URL + "/register/ping"
 
 	done := make(chan error, 1)
 	go func() {
@@ -484,4 +497,135 @@ func Test_DashboardLifecycle(t *testing.T) {
 
 	handler.StopBeating()
 	assert.True(t, handler.isHeartBeatStopped())
+}
+
+// dashboardStub is an httptest Dashboard that answers every call with a 200
+// NodeResponse and records the last request headers it saw, per path.
+type dashboardStub struct {
+	URL  string
+	mu   sync.Mutex
+	seen map[string]http.Header
+}
+
+func newDashboardStub(t *testing.T) *dashboardStub {
+	t.Helper()
+	s := &dashboardStub{seen: map[string]http.Header{}}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		s.mu.Lock()
+		s.seen[r.URL.Path] = r.Header.Clone()
+		s.mu.Unlock()
+		w.Header().Set("Content-Type", "application/json")
+		writeJSON(t, w, okResponse("node-meta", "nonce-meta"))
+	}))
+	t.Cleanup(srv.Close)
+	s.URL = srv.URL
+	return s
+}
+
+func (s *dashboardStub) headers(t *testing.T, path string) http.Header {
+	t.Helper()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	require.Contains(t, s.seen, path, "no request captured for %s", path)
+	return s.seen[path]
+}
+
+func assertNodeMetadataHeaders(t *testing.T, gw *Gateway, got http.Header, wantSegmented, wantTags, wantAPIs, wantPolicies string) {
+	t.Helper()
+	assert.Equal(t, VERSION, got.Get(header.XTykNodeVersion))
+	assert.Equal(t, wantSegmented, got.Get(header.XTykNodeSegmented))
+	if wantTags == "" {
+		assert.NotContains(t, got, http.CanonicalHeaderKey(header.XTykNodeTags))
+	} else {
+		assert.Equal(t, wantTags, got.Get(header.XTykNodeTags))
+	}
+	assert.Equal(t, wantAPIs, got.Get(header.XTykAPIsCount))
+	assert.Equal(t, wantPolicies, got.Get(header.XTykPoliciesCount))
+	assert.Equal(t, strconv.Itoa(gw.hostDetails.PID), got.Get(header.XTykNodePID))
+	assert.Equal(t, gw.hostDetails.Address, got.Get(header.XTykNodeAddress))
+}
+
+// TestRegister_SendsNodeMetadataHeaders: GET /register/node carries the node metadata.
+func TestRegister_SendsNodeMetadataHeaders(t *testing.T) {
+	dash := newDashboardStub(t)
+	h, ts := newTestDashboardFixture(t, dash.URL, func(c *config.Config) {
+		c.DBAppConfOptions.NodeIsSegmented = true
+		c.DBAppConfOptions.Tags = []string{"reg-a", "reg-b"}
+	})
+	defer ts.Close()
+
+	require.NoError(t, h.Register(context.Background()))
+	assertNodeMetadataHeaders(t, ts.Gw, dash.headers(t, "/register/node"), "true", "reg-a,reg-b", "0", "0")
+}
+
+// TestHeartBeat_NodeMetadataHeadersRefreshOnReusedRequest: StartBeating builds
+// one request and reuses it; every send must carry current counts. Ping() goes
+// through the same path.
+func TestHeartBeat_NodeMetadataHeadersRefreshOnReusedRequest(t *testing.T) {
+	dash := newDashboardStub(t)
+	h, ts := newTestDashboardFixture(t, dash.URL, nil)
+	defer ts.Close()
+
+	req := h.newRequest(http.MethodGet, h.HeartBeatEndpoint)
+	client := h.Gw.initialiseClient()
+
+	require.NoError(t, h.doHeartBeat(req, client))
+	assertNodeMetadataHeaders(t, ts.Gw, dash.headers(t, "/register/ping"), "false", "", "0", "0")
+
+	ts.Gw.BuildAndLoadAPI(
+		func(spec *APISpec) { spec.Proxy.ListenPath = "/hb1/" },
+		func(spec *APISpec) { spec.Proxy.ListenPath = "/hb2/" },
+	)
+	ts.CreatePolicy()
+
+	require.NoError(t, h.doHeartBeat(req, client))
+	assertNodeMetadataHeaders(t, ts.Gw, dash.headers(t, "/register/ping"), "false", "", "2", "1")
+
+	require.NoError(t, h.Ping())
+	assertNodeMetadataHeaders(t, ts.Gw, dash.headers(t, "/register/ping"), "false", "", "2", "1")
+}
+
+// TestDashboardRequests_OnlyKnownTykHeaders: register and heartbeat carry no
+// x-tyk-* header beyond the known set, and never the MDCB api key.
+func TestDashboardRequests_OnlyKnownTykHeaders(t *testing.T) {
+	const mdcbKey = "mdcb-api-key-sentinel"
+	dash := newDashboardStub(t)
+	h, ts := newTestDashboardFixture(t, dash.URL, func(c *config.Config) {
+		c.SlaveOptions.APIKey = mdcbKey
+	})
+	defer ts.Close()
+
+	require.NoError(t, h.Register(context.Background()))
+	require.NoError(t, h.Ping())
+
+	allowed := append([]string{header.XTykNodeID, header.XTykSessionID, header.XTykNonce, header.XTykHostname}, nodeMetadataHeaderNames...)
+	for _, path := range []string{"/register/node", "/register/ping"} {
+		for name, values := range dash.headers(t, path) {
+			if lower := strings.ToLower(name); strings.HasPrefix(lower, "x-tyk-") {
+				assert.Contains(t, allowed, lower, "%s: unexpected header %q", path, name)
+			}
+			assert.NotContains(t, values, mdcbKey, "%s: header %q leaks the MDCB api key", path, name)
+		}
+	}
+}
+
+// TestDeRegisterAndQuotaTrigger_NoNodeMetadataHeaders: the headers are limited to register and heartbeat.
+func TestDeRegisterAndQuotaTrigger_NoNodeMetadataHeaders(t *testing.T) {
+	dash := newDashboardStub(t)
+	h, ts := newTestDashboardFixture(t, dash.URL, func(c *config.Config) {
+		c.DBAppConfOptions.Tags = []string{"never-sent"}
+	})
+	defer ts.Close()
+
+	require.NoError(t, h.DeRegister())
+	require.NoError(t, h.NotifyDashboardOfEvent(EventTriggerExceededMeta{
+		OrgID: "default", Key: "k", TriggerLimit: 1, UsagePercentage: 100,
+	}))
+
+	for _, path := range []string{"/system/node", "/system/key/quota_trigger"} {
+		got := dash.headers(t, path)
+		for _, name := range nodeMetadataHeaderNames {
+			assert.NotContains(t, got, http.CanonicalHeaderKey(name), "%s must not carry %s", path, name)
+		}
+	}
 }
