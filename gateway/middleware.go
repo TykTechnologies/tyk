@@ -82,7 +82,7 @@ func (tr TraceMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request,
 
 			span := otel.SpanFromContext(r.Context())
 			err, i := tr.TykMiddleware.ProcessRequest(w, r, conf)
-			if err != nil && span != nil {
+			if err != nil && span != nil && !errors.Is(err, ErrResponseSucceed) {
 				span.SetStatus(otel.SPAN_STATUS_ERROR, err.Error())
 			}
 
