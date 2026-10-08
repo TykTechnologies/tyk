@@ -1757,8 +1757,10 @@ func TestValidateAccessConditions(t *testing.T) {
 	queryCondition := func(pattern string) user.AccessCondition {
 		return user.AccessCondition{
 			On: apidef.All,
-			Options: apidef.RoutingTriggerOptions{
-				QueryValMatches: map[string]apidef.StringRegexMap{"customer_id": {MatchPattern: pattern}},
+			Options: user.AccessConditionOptions{
+				RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+					QueryValMatches: map[string]apidef.StringRegexMap{"customer_id": {MatchPattern: pattern}},
+				},
 			},
 		}
 	}
@@ -1838,8 +1840,10 @@ func TestKeyHandler_RejectsInvalidAccessConditions(t *testing.T) {
 					Methods: []string{"GET"},
 					Conditions: []user.AccessCondition{{
 						On: apidef.All,
-						Options: apidef.RoutingTriggerOptions{
-							QueryValMatches: map[string]apidef.StringRegexMap{"customer_id": {MatchPattern: pattern}},
+						Options: user.AccessConditionOptions{
+							RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+								QueryValMatches: map[string]apidef.StringRegexMap{"customer_id": {MatchPattern: pattern}},
+							},
 						},
 					}},
 				}},
