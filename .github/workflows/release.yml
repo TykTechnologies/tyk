@@ -16,7 +16,7 @@ on:
   schedule:
     - cron: "0 0 * * 1"
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
   push:
     branches:
       - master
