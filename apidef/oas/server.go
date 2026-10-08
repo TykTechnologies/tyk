@@ -237,12 +237,18 @@ type MCP struct {
 // MCPOAuthBroker contains the fixed public and upstream identities used by
 // the MCP OAuth authorization broker.
 type MCPOAuthBroker struct {
-	Enabled                bool     `bson:"enabled" json:"enabled"`
-	PublicOrigin           string   `bson:"publicOrigin,omitempty" json:"publicOrigin,omitempty"`
-	PublicResource         string   `bson:"publicResource,omitempty" json:"publicResource,omitempty"`
-	UpstreamResource       string   `bson:"upstreamResource,omitempty" json:"upstreamResource,omitempty"`
+	// Enabled activates the Gateway-owned OAuth authorization broker for this MCP mirror.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// PublicOrigin is the fixed externally visible origin used to construct the broker issuer and callback URLs.
+	PublicOrigin string `bson:"publicOrigin,omitempty" json:"publicOrigin,omitempty"`
+	// PublicResource identifies the MCP resource requested by downstream OAuth clients.
+	PublicResource string `bson:"publicResource,omitempty" json:"publicResource,omitempty"`
+	// UpstreamResource identifies the upstream MCP resource used in authorization and token requests.
+	UpstreamResource string `bson:"upstreamResource,omitempty" json:"upstreamResource,omitempty"`
+	// TrustedEndpointOrigins lists additional origins permitted for upstream OAuth endpoints outside the issuer origin.
 	TrustedEndpointOrigins []string `bson:"trustedEndpointOrigins,omitempty" json:"trustedEndpointOrigins,omitempty"`
-	AllowInsecureLoopback  bool     `bson:"allowInsecureLoopback,omitempty" json:"allowInsecureLoopback,omitempty"`
+	// AllowInsecureLoopback permits HTTP loopback OAuth endpoints for local development.
+	AllowInsecureLoopback bool `bson:"allowInsecureLoopback,omitempty" json:"allowInsecureLoopback,omitempty"`
 }
 
 // ListenPath is the base path on Tyk to which requests for this API

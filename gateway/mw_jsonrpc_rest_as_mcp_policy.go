@@ -3,6 +3,7 @@ package gateway
 import (
 	"fmt"
 	"net/http"
+	"slices"
 
 	"github.com/TykTechnologies/tyk/ctx"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
@@ -19,13 +20,14 @@ const (
 )
 
 type restAsMCPPolicyContext struct {
-	proxyAPIID string
-	proxySpec  *APISpec
-	session    *user.SessionState
-	accessDef  user.AccessDefinition
-	hasAccess  bool
-	rpcReq     *JSONRPCRequest
-	listConfig *mcp.ListFilterConfig
+	proxyAPIID        string
+	proxySpec         *APISpec
+	session           *user.SessionState
+	accessDef         user.AccessDefinition
+	hasAccess         bool
+	rpcReq            *JSONRPCRequest
+	listConfig        *mcp.ListFilterConfig
+	callerVisitedVEMs []string
 }
 
 // prepareRESTAsMCPPolicy parses the JSON-RPC request handled by a synthetic
@@ -46,6 +48,9 @@ func (m *JSONRPCMiddleware) prepareRESTAsMCPPolicy(w http.ResponseWriter, r *htt
 	policyCtx := &restAsMCPPolicyContext{
 		rpcReq:     rpcReq,
 		listConfig: listConfigForMCPMethod(rpcReq.Method),
+	}
+	if state := httpctx.GetJSONRPCRoutingState(r); state != nil {
+		policyCtx.callerVisitedVEMs = slices.Clone(state.VisitedVEMs)
 	}
 	policyCtx.setJSONRPCState(r, route.VEMChain, route.PrimitiveName)
 	m.loadRESTAsMCPPolicyCaller(r, policyCtx)
@@ -162,6 +167,11 @@ func (m *JSONRPCMiddleware) enforceRESTAsMCPEndpointRateLimits(w http.ResponseWr
 	}
 
 	for _, vemPath := range state.VEMChain {
+		// The public caller's completed VEM stages already enforced these
+		// credential endpoint limits. Only charge stages not visited there.
+		if slices.Contains(policyCtx.callerVisitedVEMs, vemPath) {
+			continue
+		}
 		if m.enforceRESTAsMCPEndpointRateLimit(w, r, policyCtx, vemPath) {
 			return true
 		}

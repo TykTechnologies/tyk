@@ -14,7 +14,6 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
-	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -776,13 +775,7 @@ func TestValidatePairedMCPAdapterUpstream(t *testing.T) {
 }
 
 func TestValidatePairedMCPAdapterUpstream_LogsDeriveWarnings(t *testing.T) {
-	logger, hook := logrustest.NewNullLogger()
-	logger.SetLevel(logrus.WarnLevel)
-	originalLog := log
-	log = logger
-	t.Cleanup(func() {
-		log = originalLog
-	})
+	hook := captureGatewayLog(t, logrus.WarnLevel)
 
 	rest := restSourceSpec("rest-1", "org-1", true)
 	rest.OAS.Paths = openapi3.NewPaths(

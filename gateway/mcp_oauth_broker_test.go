@@ -18,7 +18,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gorilla/mux"
-	logrustest "github.com/sirupsen/logrus/hooks/test"
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -558,10 +558,7 @@ func TestMCPOAuthBrokerDCRRollbackFailuresAreBoundedAndSanitized(t *testing.T) {
 			capture.mu.Lock()
 			testCase.configure(capture, upstream.URL)
 			capture.mu.Unlock()
-			logger, hook := logrustest.NewNullLogger()
-			originalLog := log
-			log = logger
-			t.Cleanup(func() { log = originalLog })
+			hook := captureGatewayLog(t, logrus.InfoLevel)
 
 			response := runMCPBrokerRegistrationWithFailedPersistence(t, ts)
 			require.Equal(t, http.StatusServiceUnavailable, response.Code)
@@ -571,10 +568,13 @@ func TestMCPOAuthBrokerDCRRollbackFailuresAreBoundedAndSanitized(t *testing.T) {
 			require.Zero(t, capture.unrelatedDeletes)
 			capture.mu.Unlock()
 			require.NotEmpty(t, hook.AllEntries())
+			rollbackWarning := false
 			for _, entry := range hook.AllEntries() {
+				rollbackWarning = rollbackWarning || entry.Message == "MCP OAuth upstream registration rollback failed"
 				require.NotContains(t, entry.Message, capture.registrationToken)
 				require.NotContains(t, fmt.Sprint(entry.Data), capture.registrationToken)
 			}
+			require.True(t, rollbackWarning, "capture the broker rollback warning specifically")
 		})
 	}
 }
@@ -1627,10 +1627,7 @@ func TestMCPOAuthAuthenticatedInvalidGrantRevokesOnlyMappedFamily(t *testing.T) 
 
 func TestMCPOAuthBrokerCallbackTokenRuntimeAndRefresh(t *testing.T) {
 	ts, _, capture := newMCPBrokerTest(t, "/mcp/")
-	logger, hook := logrustest.NewNullLogger()
-	originalLog := log
-	log = logger
-	t.Cleanup(func() { log = originalLog })
+	hook := captureGatewayLog(t, logrus.InfoLevel)
 	redirectURI := "https://client.example/callback"
 	clientID, verifier, code := runMCPBrokerAuthorization(t, ts, redirectURI, "client-state")
 	tokens := exchangeMCPBrokerToken(t, ts, url.Values{
@@ -1906,10 +1903,7 @@ func TestMCPOAuthBrokerCallbackRejectsIssuerAndReplay(t *testing.T) {
 
 func TestMCPOAuthBrokerCallbackForwardsProviderErrorWithPublicIdentity(t *testing.T) {
 	ts, upstream, capture := newMCPBrokerTest(t, "/mcp/")
-	logger, hook := logrustest.NewNullLogger()
-	originalLog := log
-	log = logger
-	t.Cleanup(func() { log = originalLog })
+	hook := captureGatewayLog(t, logrus.InfoLevel)
 	analyticsRecord := captureAnalytics(ts)
 	redirectURI := "https://client.example/callback"
 	clientID := registerMCPBrokerClient(t, ts, redirectURI)
@@ -1984,10 +1978,7 @@ func TestMCPOAuthBrokerCallbackRequiresAdvertisedIssuerAndRejectsHybrid(t *testi
 
 func TestMCPOAuthBrokerTokenRejectsWrongVerifierAndIsolation(t *testing.T) {
 	ts, _, capture := newMCPBrokerTest(t, "/mcp/")
-	logger, hook := logrustest.NewNullLogger()
-	originalLog := log
-	log = logger
-	t.Cleanup(func() { log = originalLog })
+	hook := captureGatewayLog(t, logrus.InfoLevel)
 	analyticsRecord := captureAnalytics(ts)
 	redirectURI := "https://client.example/callback"
 	clientID, correctVerifier, code := runMCPBrokerAuthorization(t, ts, redirectURI, "client-state")
@@ -2042,6 +2033,16 @@ func TestMCPOAuthBrokerRecordsAreSealedAndBoundToKey(t *testing.T) {
 	require.NoError(t, err)
 	require.NotEqual(t, first, second, "each record must use a fresh nonce")
 	require.NotContains(t, string(first), "upstream-secret-token")
+	// Preserve the persisted version/nonce/ciphertext envelope independently
+	// of the broker's decoder, including the record-key associated data.
+	aead, err := broker.brokerAEAD()
+	require.NoError(t, err)
+	require.Equal(t, mcpOAuthBrokerSealVersion, first[0])
+	plain, err := aead.Open(nil, first[1:1+aead.NonceSize()], first[1+aead.NonceSize():], []byte("record-one"))
+	require.NoError(t, err)
+	expected, err := json.Marshal(record)
+	require.NoError(t, err)
+	require.JSONEq(t, string(expected), string(plain))
 	var opened mcpOAuthTokenGrant
 	require.NoError(t, broker.openRecord("record-one", first, &opened))
 	require.Equal(t, record.UpstreamAccessToken, opened.UpstreamAccessToken)

@@ -196,15 +196,20 @@ func installKVSetter(t *testing.T, gw *Gateway, storeName string) *recordingSett
 	return rec
 }
 
-func captureGatewayLog(t *testing.T) *logrustest.Hook {
+func captureGatewayLog(t *testing.T, level logrus.Level) *logrustest.Hook {
 	t.Helper()
 
-	logger, hook := logrustest.NewNullLogger()
-	logger.SetLevel(logrus.DebugLevel)
-
-	orig := log
-	log = logger
-	t.Cleanup(func() { log = orig })
+	hook := &logrustest.Hook{}
+	originalLevel := log.GetLevel()
+	originalHooks := log.ReplaceHooks(make(logrus.LevelHooks))
+	installedHooks := cloneLogrusHooks(originalHooks)
+	installedHooks.Add(hook)
+	log.ReplaceHooks(installedHooks)
+	log.SetLevel(level)
+	t.Cleanup(func() {
+		log.SetLevel(originalLevel)
+		log.ReplaceHooks(originalHooks)
+	})
 
 	return hook
 }
@@ -280,7 +285,7 @@ func TestUpdateKeyInStore_WritesThroughRegistry(t *testing.T) {
 func TestUpdateKeyInStore_UnknownStoreWarnsAndDoesNotWrite(t *testing.T) {
 	gw := NewGateway(config.Config{}, t.Context())
 	rec := installKVSetter(t, gw, "vault")
-	hook := captureGatewayLog(t)
+	hook := captureGatewayLog(t, logrus.DebugLevel)
 
 	gw.updateKeyInStore("kv://absent/some/key", "NEWKEY")
 
@@ -295,7 +300,7 @@ func TestUpdateKeyInStore_NonWritableStoreWarns(t *testing.T) {
 	installFakeKVStores(t, gw, map[string]map[string]string{
 		"vault": {"secret/tyk-apis": `{"api_key":"OLD"}`},
 	})
-	hook := captureGatewayLog(t)
+	hook := captureGatewayLog(t, logrus.DebugLevel)
 
 	gw.updateKeyInStore("vault://secret/tyk-apis.api_key", "NEWKEY")
 
@@ -307,7 +312,7 @@ func TestUpdateKeyInStore_SetErrorIsLogged(t *testing.T) {
 	gw := NewGateway(config.Config{}, t.Context())
 	rec := installKVSetter(t, gw, "vault")
 	rec.setErr = errors.New("backend down")
-	hook := captureGatewayLog(t)
+	hook := captureGatewayLog(t, logrus.DebugLevel)
 
 	gw.updateKeyInStore("kv://vault/secret/tyk-apis#api_key", "NEWKEY")
 
@@ -318,7 +323,7 @@ func TestUpdateKeyInStore_SetErrorIsLogged(t *testing.T) {
 func TestUpdateKeyInStore_MalformedKVReferenceWarns(t *testing.T) {
 	gw := NewGateway(config.Config{}, t.Context())
 	rec := installKVSetter(t, gw, "vault")
-	hook := captureGatewayLog(t)
+	hook := captureGatewayLog(t, logrus.DebugLevel)
 
 	gw.updateKeyInStore("kv://no-path-separator", "NEWKEY")
 
@@ -345,7 +350,7 @@ func TestUpdateKeyInStore_SilentNoOps(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			gw := NewGateway(config.Config{}, t.Context())
 			rec := installKVSetter(t, gw, "vault")
-			hook := captureGatewayLog(t)
+			hook := captureGatewayLog(t, logrus.DebugLevel)
 
 			gw.updateKeyInStore(tt.keyPath, "NEWKEY")
 
