@@ -34,6 +34,9 @@ type Server struct {
 	// Tyk classic API definition: `detailed_tracing`
 	DetailedTracing *DetailedTracing `bson:"detailedTracing,omitempty" json:"detailedTracing,omitempty"`
 
+	// MCP contains request-security settings for MCP APIs.
+	MCP *MCP `bson:"mcp,omitempty" json:"mcp,omitempty"`
+
 	// EventHandlers contains the configuration related to Tyk Events.
 	//
 	// Tyk classic API definition: `event_handlers`
@@ -113,6 +116,21 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 		s.DetailedTracing = nil
 	}
 
+	s.MCP = nil
+	if api.MCP != nil {
+		s.MCP = &MCP{TrustedOrigins: append([]string(nil), api.MCP.TrustedOrigins...)}
+		if api.MCP.OAuthBroker != nil {
+			s.MCP.OAuthBroker = &MCPOAuthBroker{
+				Enabled:                api.MCP.OAuthBroker.Enabled,
+				PublicOrigin:           api.MCP.OAuthBroker.PublicOrigin,
+				PublicResource:         api.MCP.OAuthBroker.PublicResource,
+				UpstreamResource:       api.MCP.OAuthBroker.UpstreamResource,
+				TrustedEndpointOrigins: append([]string(nil), api.MCP.OAuthBroker.TrustedEndpointOrigins...),
+				AllowInsecureLoopback:  api.MCP.OAuthBroker.AllowInsecureLoopback,
+			}
+		}
+	}
+
 	if s.EventHandlers == nil {
 		s.EventHandlers = EventHandlers{}
 	}
@@ -176,6 +194,21 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 
 	s.DetailedTracing.ExtractTo(api)
 
+	api.MCP = nil
+	if s.MCP != nil {
+		api.MCP = &apidef.MCPConfig{TrustedOrigins: append([]string(nil), s.MCP.TrustedOrigins...)}
+		if s.MCP.OAuthBroker != nil {
+			api.MCP.OAuthBroker = &apidef.MCPOAuthBrokerConfig{
+				Enabled:                s.MCP.OAuthBroker.Enabled,
+				PublicOrigin:           s.MCP.OAuthBroker.PublicOrigin,
+				PublicResource:         s.MCP.OAuthBroker.PublicResource,
+				UpstreamResource:       s.MCP.OAuthBroker.UpstreamResource,
+				TrustedEndpointOrigins: append([]string(nil), s.MCP.OAuthBroker.TrustedEndpointOrigins...),
+				AllowInsecureLoopback:  s.MCP.OAuthBroker.AllowInsecureLoopback,
+			}
+		}
+	}
+
 	if s.EventHandlers == nil {
 		s.EventHandlers = EventHandlers{}
 		defer func() {
@@ -187,6 +220,35 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 
 	s.extractIPAccessControlTo(api)
 	s.extractBatchProcessingTo(api)
+}
+
+// MCP contains MCP request-security settings.
+type MCP struct {
+	// TrustedOrigins contains concrete HTTP(S) origins allowed to send MCP
+	// requests in addition to the API's own externally visible origin.
+	//
+	// Tyk classic API definition: `mcp.trusted_origins`.
+	TrustedOrigins []string `bson:"trustedOrigins,omitempty" json:"trustedOrigins,omitempty"`
+
+	// OAuthBroker configures a Gateway-owned OAuth identity for an MCP mirror.
+	OAuthBroker *MCPOAuthBroker `bson:"oauthBroker,omitempty" json:"oauthBroker,omitempty"`
+}
+
+// MCPOAuthBroker contains the fixed public and upstream identities used by
+// the MCP OAuth authorization broker.
+type MCPOAuthBroker struct {
+	// Enabled activates the Gateway-owned OAuth authorization broker for this MCP mirror.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// PublicOrigin is the fixed externally visible origin used to construct the broker issuer and callback URLs.
+	PublicOrigin string `bson:"publicOrigin,omitempty" json:"publicOrigin,omitempty"`
+	// PublicResource identifies the MCP resource requested by downstream OAuth clients.
+	PublicResource string `bson:"publicResource,omitempty" json:"publicResource,omitempty"`
+	// UpstreamResource identifies the upstream MCP resource used in authorization and token requests.
+	UpstreamResource string `bson:"upstreamResource,omitempty" json:"upstreamResource,omitempty"`
+	// TrustedEndpointOrigins lists additional origins permitted for upstream OAuth endpoints outside the issuer origin.
+	TrustedEndpointOrigins []string `bson:"trustedEndpointOrigins,omitempty" json:"trustedEndpointOrigins,omitempty"`
+	// AllowInsecureLoopback permits HTTP loopback OAuth endpoints for local development.
+	AllowInsecureLoopback bool `bson:"allowInsecureLoopback,omitempty" json:"allowInsecureLoopback,omitempty"`
 }
 
 // ListenPath is the base path on Tyk to which requests for this API

@@ -80,15 +80,26 @@ func (gw *Gateway) currentSyntheticMCPAdapterSpecs() map[string]*APISpec {
 
 func (gw *Gateway) findInternalHTTPHandlerForLoop(apiNameOrID string, caller *APISpec, r *http.Request) (handler http.Handler, targetAPI *APISpec, ok bool) {
 	targetName := apiNameOrID
-	if caller != nil && caller.APIDefinition != nil && caller.IsPairedMCPAdapterProxy() {
-		if _, restAPIID, paired := pairedMCPAdapterTarget(caller.Proxy.TargetURL); paired {
-			targetName = pairing.CanonicalAdapterAPIID(restAPIID)
-			if r != nil {
-				ctxSetMCPAdapterCallerProxyID(r, caller.APIID)
-			}
+	if caller == nil || caller.APIDefinition == nil || !caller.IsPairedMCPAdapterProxy() {
+		if r != nil {
+			// An unrelated internal loop must not reuse an earlier adapter hop.
+			setCtxValue(r, mcpOriginHopKey, mcpOriginHop{})
 		}
+		return gw.findInternalHttpHandlerByNameOrID(targetName)
 	}
-	return gw.findInternalHttpHandlerByNameOrID(targetName)
+	_, restAPIID, paired := pairedMCPAdapterTarget(caller.Proxy.TargetURL)
+	if !paired {
+		return nil, nil, false
+	}
+	targetName = pairing.CanonicalAdapterAPIID(restAPIID)
+	handler, targetAPI, ok = gw.findInternalHttpHandlerByNameOrID(targetName)
+	if !ok || r == nil || !establishMCPAdapterOriginHop(r, gw, caller, targetAPI) {
+		// Keep denial local and before any adapter body parsing or SDK work.
+		return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		}), targetAPI, true
+	}
+	return handler, targetAPI, true
 }
 
 func computeMCPPairing(specs []*APISpec) (pairing.Snapshot, error) {
@@ -169,10 +180,11 @@ func buildMCPAdapterSpec(rest *APISpec, proxies []*APISpec, existing *APISpec) (
 	}
 	if sdkAdapter == nil {
 		sdkAdapter, err = restmcpadapter.NewSDKAdapter(restmcpadapter.SDKServerConfig{
-			Name:     adapterID,
-			Version:  "1.0",
-			Tools:    catalogue.unionTools,
-			CallTool: defaultMCPAdapterCallTool,
+			Name:                  adapterID,
+			Version:               "1.0",
+			Tools:                 catalogue.unionTools,
+			CallTool:              defaultMCPAdapterCallTool,
+			RequireRequestBinding: true,
 		})
 		if err != nil {
 			return nil, err
@@ -195,6 +207,9 @@ func buildMCPAdapterSpec(rest *APISpec, proxies []*APISpec, existing *APISpec) (
 		Active:   true,
 		IsOAS:    true,
 		Internal: true,
+		// The public paired proxy owns MCP completion analytics. Suppress only
+		// this hidden protocol adapter; the source REST API keeps its record.
+		DoNotTrack: true,
 		// The hidden adapter is only reachable through paired MCP proxies.
 		// Caller-facing auth and policies are enforced on those proxies.
 		UseKeylessAccess: true,
@@ -346,16 +361,22 @@ func callerProxyIDs(proxies []*APISpec) []string {
 }
 
 func defaultMCPAdapterCallTool(ctx context.Context, tool *oas.DerivedTool, args map[string]any) (*restmcpadapter.Recorder, error) {
+	operationCtx := ctx
+	current, ok := restmcpadapter.CurrentRequestContext(ctx)
+	if !ok {
+		return nil, fmt.Errorf("REST-as-MCP current request binding is missing")
+	}
+	ctx = current
 	gw := mcpAdapterGatewayFromContext(ctx)
 	adapterSpec := mcpAdapterSpecFromContext(ctx)
 	parentReq := mcpAdapterParentRequestFromContext(ctx)
 	if gw == nil || adapterSpec == nil || parentReq == nil {
 		return nil, fmt.Errorf("REST-as-MCP adapter callback is not installed")
 	}
-	return gw.callMCPAdapterTool(parentReq, adapterSpec, tool, args)
+	return gw.callMCPAdapterTool(operationCtx, parentReq, adapterSpec, tool, args)
 }
 
-func (gw *Gateway) callMCPAdapterTool(parentReq *http.Request, adapterSpec *APISpec, tool *oas.DerivedTool, args map[string]any) (*restmcpadapter.Recorder, error) {
+func (gw *Gateway) callMCPAdapterTool(operationCtx context.Context, parentReq *http.Request, adapterSpec *APISpec, tool *oas.DerivedTool, args map[string]any) (*restmcpadapter.Recorder, error) {
 	if gw == nil {
 		return nil, fmt.Errorf("gateway is nil")
 	}
@@ -388,7 +409,7 @@ func (gw *Gateway) callMCPAdapterTool(parentReq *http.Request, adapterSpec *APIS
 	}
 
 	sourceRESTAPIID := adapterSpec.MCPAdapter.SourceRESTAPIID
-	upstreamReq, err := restmcpadapter.BuildUpstreamRequest(parentReq, &callerTool, sourceRESTAPIID, args)
+	upstreamReq, err := restmcpadapter.BuildUpstreamRequestWithContext(parentReq, operationCtx, &callerTool, sourceRESTAPIID, args)
 	if err != nil {
 		return nil, err
 	}

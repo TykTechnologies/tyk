@@ -16,7 +16,7 @@ on:
   schedule:
     - cron: "0 0 * * 1"
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
   push:
     branches:
       - master
@@ -1210,6 +1210,8 @@ jobs:
         id: test_execution
         with:
           user_api_secret: ${{ steps.env_up.outputs.USER_API_SECRET }}
+          # MCP coverage runs serially against coordinated sources in the mandatory job below.
+          api_markers: (${{ matrix.envfiles.apimarkers }}) and not mcp
       - name: Generate test reports and collect logs
         uses: TykTechnologies/github-actions/.github/actions/tests/reporting@production
         if: always() && (steps.test_execution.conclusion != 'skipped')
@@ -1222,11 +1224,22 @@ jobs:
         with:
           report_xml: 'true'
           execution_status: ${{ steps.test_execution.outcome }}
+  mcp-qualification:
+    name: Coordinated MCP qualification
+    needs: dep-guard
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    uses: TykTechnologies/github-actions/.github/workflows/mcp-qualification.yml@aee08ff727a05046f05ab8236c57b2947a037834
+    secrets:
+      PROBE_APP_ID: ${{ secrets.PROBE_APP_ID }}
+      PROBE_APP_PRIVATE_KEY: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+      DASH_LICENSE: ${{ secrets.DASH_LICENSE }}
+    permissions:
+      contents: read
   aggregator-ci-test:
     name: Aggregated CI Status
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     # Dynamically determine which jobs to depend on based on repository configuration
-    needs: [dep-guard, goreleaser, api-tests]
+    needs: [dep-guard, goreleaser, api-tests, mcp-qualification]
     if: ${{ always() && github.event_name == 'pull_request' }}
     steps:
       - name: Aggregate results
