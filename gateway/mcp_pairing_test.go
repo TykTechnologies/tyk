@@ -7,7 +7,6 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/sirupsen/logrus"
-	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -120,13 +119,7 @@ func TestDeriveMCPAdapterCatalogue_BuildsProxySpecificToolViewsAndUnion(t *testi
 }
 
 func TestDeriveMCPAdapterCatalogue_SkipsStaleOverrideAndLogsWarning(t *testing.T) {
-	logger, hook := logrustest.NewNullLogger()
-	logger.SetLevel(logrus.WarnLevel)
-	originalLog := log
-	log = logger
-	t.Cleanup(func() {
-		log = originalLog
-	})
+	hook := log.GetTestHook(t)
 
 	rest := restSourceSpec("rest-1", "org-1", true)
 	proxy := pairedMCPProxySpec("proxy-1", "org-1", "rest-1", &oas.TykMCPServer{

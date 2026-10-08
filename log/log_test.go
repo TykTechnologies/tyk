@@ -1,6 +1,7 @@
 package log
 
 import (
+	"encoding/json"
 	"errors"
 	"io"
 	"testing"
@@ -29,89 +30,6 @@ func TestNewFormatter(t *testing.T) {
 	assert.Equal(t, LegacyTimestampFormat, legacyFormatter.TimestampFormat)
 	assert.True(t, legacyFormatter.FullTimestamp)
 	assert.True(t, legacyFormatter.DisableColors)
-	assert.True(t, IsLegacyFormatter(legacyFormatter))
-}
-
-func Test_SetupFormatter(t *testing.T) {
-	resetLogger := func(t *testing.T) {
-		t.Helper()
-
-		tykFormatter := log.Formatter
-		globalFormatter := logrus.StandardLogger().Formatter
-
-		log.Formatter = nil
-		logrus.StandardLogger().Formatter = nil
-
-		t.Cleanup(func() {
-			log.Formatter = tykFormatter
-			logrus.StandardLogger().Formatter = globalFormatter
-		})
-	}
-
-	type Formatters struct {
-		tyk logrus.Formatter
-		std logrus.Formatter
-	}
-
-	formatters := func(t *testing.T) Formatters {
-		t.Helper()
-
-		return Formatters{
-			std: logrus.StandardLogger().Formatter,
-			tyk: log.Formatter,
-		}
-	}
-
-	t.Run("empty or unknown or text value sets default text formatter; global tyk and global logrus formatters", func(t *testing.T) {
-		t.Run("empty", func(t *testing.T) {
-			resetLogger(t)
-			SetupFormatter("")
-			f := formatters(t)
-			assert.Same(t, f.tyk, f.std)
-			assert.NotNil(t, f.std)
-			assert.NotNil(t, f.tyk)
-			assert.Equal(t, newFormatterText(), f.tyk)
-		})
-
-		t.Run("any other", func(t *testing.T) {
-			resetLogger(t)
-			SetupFormatter("hwdp")
-			f := formatters(t)
-			assert.Same(t, f.tyk, f.std)
-			assert.NotNil(t, f.std)
-			assert.NotNil(t, f.tyk)
-			assert.Equal(t, newFormatterText(), f.tyk)
-		})
-
-		t.Run("text", func(t *testing.T) {
-			resetLogger(t)
-			SetupFormatter(FormatText)
-			f := formatters(t)
-			assert.Same(t, f.tyk, f.std)
-			assert.NotNil(t, f.std)
-			assert.NotNil(t, f.tyk)
-			assert.Equal(t, newFormatterText(), f.tyk)
-		})
-	})
-
-	t.Run("json formatter", func(t *testing.T) {
-		resetLogger(t)
-		SetupFormatter(FormatJson)
-		f := formatters(t)
-		assert.Same(t, f.tyk, f.std)
-		assert.NotNil(t, f.std)
-		assert.NotNil(t, f.tyk)
-		assert.Equal(t, newFormatterJson(), f.tyk)
-	})
-
-	t.Run("legacy formatter does not modify std logrus formatter", func(t *testing.T) {
-		resetLogger(t)
-		SetupFormatter(FormatLegacy)
-		f := formatters(t)
-		assert.Nil(t, f.std)    // does not set formatter for std logger
-		assert.NotNil(t, f.tyk) // does not set formatter for std logger
-		assert.Equal(t, newFormatterLegacy(), f.tyk)
-	})
 }
 
 type testFormatter struct{}
@@ -121,6 +39,23 @@ func (*testFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 }
 
 func BenchmarkFormatter(b *testing.B) {
+	benchmarkFormatter := func(b *testing.B, formatter logrus.Formatter) {
+		b.Helper()
+
+		logger := logrus.New()
+		logger.Out = io.Discard
+		logger.Formatter = formatter
+
+		err := errors.New("Test error value")
+
+		b.ReportAllocs()
+		b.ResetTimer()
+
+		for i := 0; i <= b.N; i++ {
+			logger.WithError(err).WithField("prefix", "test").Info("This is a typical log message")
+		}
+	}
+
 	b.Run("json", func(b *testing.B) {
 		benchmarkFormatter(b, newFormatterJson())
 	})
@@ -133,21 +68,6 @@ func BenchmarkFormatter(b *testing.B) {
 	b.Run("none", func(b *testing.B) {
 		benchmarkFormatter(b, &testFormatter{})
 	})
-}
-
-func benchmarkFormatter(b *testing.B, formatter logrus.Formatter) {
-	logger := logrus.New()
-	logger.Out = io.Discard
-	logger.Formatter = formatter
-
-	err := errors.New("Test error value")
-
-	b.ReportAllocs()
-	b.ResetTimer()
-
-	for i := 0; i <= b.N; i++ {
-		logger.WithError(err).WithField("prefix", "test").Info("This is a typical log message")
-	}
 }
 
 func TestJSONFormatterErrorHandling(t *testing.T) {
@@ -196,5 +116,53 @@ func TestJSONFormatterErrorHandling(t *testing.T) {
 		output, err := formatter.Format(entry)
 		assert.NoError(t, err)
 		assert.NotContains(t, string(output), "logrus_error")
+	})
+}
+
+func TestGetAndGetRaw(t *testing.T) {
+	logger := Get()
+	assert.NotNil(t, logger)
+	assert.Equal(t, log, logger)
+
+	rawLogger := GetRaw()
+	assert.NotNil(t, rawLogger)
+	assert.Equal(t, rawLog, rawLogger)
+}
+
+func Test_Logger_IsLegacyFormatter(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		format         Format
+		expectedResult bool
+	}{
+		{"text", FormatText, false},
+		{"json", FormatJson, false},
+		{"legacy", FormatLegacy, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			lgr := New()
+			lgr.Setup(func(b *Builder) {
+				b.SetLogformat(tc.format)
+			})
+
+			assert.Equal(t, tc.expectedResult, lgr.IsLegacyFormatterEnabled())
+		})
+	}
+}
+
+func Test_MakeFormatter(t *testing.T) {
+	t.Run("does not fail with raw message", func(t *testing.T) {
+		_, err := MakeFormatter(FormatText, json.RawMessage(""))
+		assert.NoError(t, err)
+	})
+
+	t.Run("maps snake_case json into camel case properties", func(t *testing.T) {
+		formatter, err := MakeFormatter(FormatText, json.RawMessage(`{"field_map":{"msg":"my_message"}, "force_colors": true}`))
+		assert.NoError(t, err)
+		textFormatter, ok := formatter.(*logrus.TextFormatter)
+		assert.True(t, ok)
+		assert.Equal(t, logrus.FieldMap{"msg": "my_message"}, textFormatter.FieldMap)
+		assert.True(t, textFormatter.ForceColors, "force colors modified by options")
+		assert.False(t, textFormatter.DisableSorting, "disable colors has default value")
 	})
 }
