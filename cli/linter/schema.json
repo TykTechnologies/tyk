@@ -732,9 +732,6 @@
     "skip_verify_existing_plugin_bundle": {
       "type": "boolean"
     },
-    "disable_bundled_traffic_logs": {
-      "type": "boolean"
-    },
     "enable_config_inspection": {
       "type": "boolean"
     },
