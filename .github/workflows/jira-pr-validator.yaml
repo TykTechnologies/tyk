@@ -12,6 +12,10 @@ jobs:
   validate:
     if: ${{ !github.event.pull_request.draft }}
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write       # Assume the ECR role that pulls the linter image
+      pull-requests: write  # Post and delete the sticky comment
+      contents: read
     steps:
       - name: Validate Jira ticket
         uses: TykTechnologies/github-actions/jira-linter@production
