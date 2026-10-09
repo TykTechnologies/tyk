@@ -6,6 +6,9 @@ import (
 	"net"
 	"sort"
 	"strings"
+	"time"
+
+	"github.com/TykTechnologies/tyk/internal/dnsdiscovery"
 )
 
 type ValidationResult struct {
@@ -60,6 +63,7 @@ var DefaultValidationRuleSet = ValidationRuleSet{
 	&RuleValidateEnforceTimeout{},
 	&RuleUpstreamAuth{},
 	&RuleLoadBalancingTargets{},
+	&RuleDNSDiscovery{},
 }
 
 func Validate(definition *APIDefinition, ruleSet ValidationRuleSet) ValidationResult {
@@ -217,6 +221,7 @@ func (r *RuleValidateEnforceTimeout) Validate(apiDef *APIDefinition, validationR
 	}
 }
 
+// Validation errors returned by the rules in this package.
 var (
 	// ErrMultipleUpstreamAuthEnabled is the error to be returned when multiple upstream authentication modes are configured.
 	ErrMultipleUpstreamAuthEnabled = errors.New("multiple upstream authentication modes not allowed")
@@ -229,7 +234,12 @@ var (
 	// ErrInvalidUpstreamOAuthClientAuthMethod is the error to return when the configured upstream OAuth client authentication method is invalid.
 	ErrInvalidUpstreamOAuthClientAuthMethod = errors.New("invalid upstream OAuth client authentication method, valid values are: client_secret_basic, client_secret_post")
 	// ErrAllLoadBalancingTargetsZeroWeight is the error to return when all load balancing targets have weight 0.
-	ErrAllLoadBalancingTargetsZeroWeight = errors.New("all load balancing targets have weight 0, at least one target must have weight > 0")
+	ErrAllLoadBalancingTargetsZeroWeight  = errors.New("all load balancing targets have weight 0, at least one target must have weight > 0")
+	ErrDNSDiscoveryRequiresLoadBalancing  = errors.New("proxy.dns_discovery supplies the target list but does not distribute across it; proxy.enable_load_balancing must be enabled too")
+	ErrDNSDiscoveryWithServiceDiscovery   = errors.New("proxy.dns_discovery and proxy.service_discovery both supply the target list and cannot be enabled together")
+	ErrDNSDiscoveryInvalidRefreshInterval = errors.New("proxy.dns_discovery.refresh_interval must be empty for the 30s default, or at least 5s")
+	ErrDNSDiscoveryNegativeStaleTTL       = errors.New("proxy.dns_discovery.stale_ttl must not be negative; empty keeps the last known addresses until the resolver answers")
+	ErrDNSDiscoveryNegativeDrainTimeout   = errors.New("proxy.dns_discovery.connection_draining.timeout must not be negative; empty applies the 30s default")
 )
 
 // RuleUpstreamAuth implements validations for upstream authentication configurations.
@@ -288,10 +298,52 @@ func (r *RuleLoadBalancingTargets) Validate(apiDef *APIDefinition, validationRes
 		return
 	}
 
+	// The list is resolved at runtime, so an empty one is expected here.
+	if apiDef.Proxy.DNSDiscovery.Enabled {
+		return
+	}
+
 	// In Tyk's internal representation, targets with weight N are repeated N times in Proxy.Targets
 	// If all weights are 0, the targets list will be empty, which is invalid for load balancing
 	if len(apiDef.Proxy.Targets) == 0 {
 		validationResult.IsValid = false
 		validationResult.AppendError(ErrAllLoadBalancingTargetsZeroWeight)
+	}
+}
+
+// RuleDNSDiscovery validates how proxy.dns_discovery combines with the other sources of a target list.
+type RuleDNSDiscovery struct{}
+
+// Validate validates api definition DNS discovery configuration.
+func (r *RuleDNSDiscovery) Validate(apiDef *APIDefinition, validationResult *ValidationResult) {
+	if !apiDef.Proxy.DNSDiscovery.Enabled {
+		return
+	}
+
+	if !apiDef.Proxy.EnableLoadBalancing {
+		validationResult.IsValid = false
+		validationResult.AppendError(ErrDNSDiscoveryRequiresLoadBalancing)
+	}
+
+	if apiDef.Proxy.ServiceDiscovery.UseDiscoveryService {
+		validationResult.IsValid = false
+		validationResult.AppendError(ErrDNSDiscoveryWithServiceDiscovery)
+	}
+
+	conf := apiDef.Proxy.DNSDiscovery
+
+	if conf.RefreshInterval < 0 || (conf.RefreshInterval > 0 && time.Duration(conf.RefreshInterval) < dnsdiscovery.MinInterval) {
+		validationResult.IsValid = false
+		validationResult.AppendError(ErrDNSDiscoveryInvalidRefreshInterval)
+	}
+
+	if conf.StaleTTL < 0 {
+		validationResult.IsValid = false
+		validationResult.AppendError(ErrDNSDiscoveryNegativeStaleTTL)
+	}
+
+	if conf.ConnectionDraining != nil && conf.ConnectionDraining.Timeout < 0 {
+		validationResult.IsValid = false
+		validationResult.AppendError(ErrDNSDiscoveryNegativeDrainTimeout)
 	}
 }

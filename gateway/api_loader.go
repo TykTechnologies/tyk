@@ -59,6 +59,9 @@ type ChainObject struct {
 // ProcessSpecOptions represents options for processSpec method
 type ProcessSpecOptions struct {
 	quotaKey string
+
+	// skipUpstreamDNSDiscovery leaves the scheduler untouched; subscriptions are keyed on APIID.
+	skipUpstreamDNSDiscovery bool
 }
 
 func (gw *Gateway) prepareStorage() generalStores {
@@ -236,6 +239,10 @@ func (gw *Gateway) processSpec(
 	if spec.Proxy.EnableLoadBalancing {
 		sl := apidef.NewHostListFromList(spec.Proxy.Targets)
 		spec.Proxy.StructuredTargetList = sl
+	}
+
+	if !options.skipUpstreamDNSDiscovery {
+		gw.setupUpstreamDNSDiscovery(spec, logger)
 	}
 
 	// Initialise the auth and session managers (use Redis for now)
@@ -1459,8 +1466,8 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 				tmpSpecRegister[spec.APIID] = spec
 			}
 
-			switch spec.Protocol {
-			case "", "http", "https", "h2c":
+			switch {
+			case httpProtocol(spec.Protocol):
 				if shouldTrace {
 					// opentracing works only with http services.
 					err := trace.AddTracer("", spec.Name)
@@ -1476,7 +1483,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 					return
 				}
 				tmpSpecHandles.Store(spec.APIID, tmpSpecHandle)
-			case "tcp", "tls":
+			case spec.Protocol == "tcp" || spec.Protocol == "tls":
 				gw.loadTCPService(spec, &gs, muxer)
 			}
 
@@ -1484,6 +1491,8 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 			spec.VersionDefinition.BaseID = ""
 		}()
 	}
+
+	gw.warmUpstreamDNS()
 
 	gw.DefaultProxyMux.swap(muxer, gw)
 
@@ -1495,6 +1504,9 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 		curSpec, ok := gw.apisByID[spec.APIID]
 		if ok && curSpec != nil && shouldReloadSpec(curSpec, spec) {
 			mainLog.Debugf("Spec %s has changed and needs to be reloaded", curSpec.APIID)
+			if !httpProtocol(spec.Protocol) {
+				gw.releaseUpstreamDNSDiscovery(curSpec)
+			}
 			specsToUnload = append(specsToUnload, curSpec)
 		}
 
@@ -1509,6 +1521,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	// Find the removed specs to unload them
 	for apiID, curSpec := range gw.apisByID {
 		if _, ok := tmpSpecRegister[apiID]; !ok {
+			gw.releaseUpstreamDNSDiscovery(curSpec)
 			specsToUnload = append(specsToUnload, curSpec)
 		}
 	}
@@ -1627,5 +1640,21 @@ func collectAllMiddleware(authCheck apidef.MiddlewareDefinition, slices ...[]api
 func WithQuotaKey(key string) option.Option[ProcessSpecOptions] {
 	return func(p *ProcessSpecOptions) {
 		p.quotaKey = key
+	}
+}
+
+// WithoutUpstreamDNSDiscovery is for callers assembling a throwaway spec with a live APIID.
+func WithoutUpstreamDNSDiscovery() option.Option[ProcessSpecOptions] {
+	return func(p *ProcessSpecOptions) {
+		p.skipUpstreamDNSDiscovery = true
+	}
+}
+
+func httpProtocol(protocol string) bool {
+	switch protocol {
+	case "", "http", "https", "h2c":
+		return true
+	default:
+		return false
 	}
 }

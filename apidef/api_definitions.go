@@ -642,6 +642,36 @@ type ResponseProcessor struct {
 	Options interface{} `bson:"options" json:"options"`
 }
 
+// DNSDiscoveryConfig is used with gRPC upstreams (`h2c://` only) to resolve the upstream hostname
+// and set the load balancing target list to the returned addresses.
+// It requires `enable_load_balancing` and cannot be combined with
+// `service_discovery`.
+type DNSDiscoveryConfig struct {
+	// Enabled determines if DNS discovery is active.
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// RefreshInterval is how often the hostname is resolved. Defaults to 30s, minimum 5s.
+	RefreshInterval tyktime.ReadableDuration `bson:"refresh_interval" json:"refresh_interval"`
+
+	// StaleTTL is how long the last known good addresses keep being used if the resolver becomes unreachable. Set as human-readable format; (e.g. `300s`).
+	// Empty or `0` means that known addresses will continue to be used until a lookup succeeds. Once expired, requests fail with 503.
+	StaleTTL tyktime.ReadableDuration `bson:"stale_ttl" json:"stale_ttl"`
+
+	// ConnectionDraining controls the behaviour when an address is no longer returned by the DNS resolver.
+	// Disabled by default.
+	ConnectionDraining *ConnectionDrainingConfig `bson:"connection_draining,omitempty" json:"connection_draining,omitempty"`
+}
+
+// ConnectionDrainingConfig controls the behaviour when an address is no longer returned by the DNS resolver.
+type ConnectionDrainingConfig struct {
+	// Enabled maintains connections for the `timeout` period after they are no longer returned by the DNS resolver. Default: false.
+	// When disabled, connections close once idle.
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// Timeout is how long connections to a removed address stay open. Set as human-readable format; default: 30s (when enabled).
+	Timeout tyktime.ReadableDuration `bson:"timeout" json:"timeout"`
+}
+
 type ServiceDiscoveryConfiguration struct {
 	UseDiscoveryService bool   `bson:"use_discovery_service" json:"use_discovery_service"`
 	QueryEndpoint       string `bson:"query_endpoint" json:"query_endpoint"`
@@ -1140,7 +1170,9 @@ type ProxyConfig struct {
 	StructuredTargetList        *HostList                     `bson:"-" json:"-"`
 	CheckHostAgainstUptimeTests bool                          `bson:"check_host_against_uptime_tests" json:"check_host_against_uptime_tests"`
 	ServiceDiscovery            ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
-	Transport                   struct {
+	// DNSDiscovery contains the configuration related to DNS discovery.
+	DNSDiscovery DNSDiscoveryConfig `bson:"dns_discovery" json:"dns_discovery"`
+	Transport    struct {
 		SSLInsecureSkipVerify   bool     `bson:"ssl_insecure_skip_verify" json:"ssl_insecure_skip_verify"`
 		SSLCipherSuites         []string `bson:"ssl_ciphers" json:"ssl_ciphers"`
 		SSLMinVersion           uint16   `bson:"ssl_min_version" json:"ssl_min_version"`
