@@ -354,8 +354,7 @@ func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 	return value.(int64), nil
 }
 
-// GetRawExp returns the TTL of keyName in the management layer storage. Unlike GetExp, keyName is
-// used as is, without the handler prefix or hashing.
+// GetRawExp returns the management layer TTL of keyName, without prefixing or hashing it.
 func (r *RPCStorageHandler) GetRawExp(keyName string) (int64, error) {
 	if rpc.IsEmergencyMode() {
 		return 0, storage.ErrMDCBConnectionLost

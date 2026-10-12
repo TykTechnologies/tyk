@@ -944,10 +944,7 @@ func (gw *Gateway) feedKeyListingWorkers(c context.Context, keys []string, jobs 
 	}
 }
 
-// syncedKeyLifetime calculates the lifetime of a key pulled from the management layer. When none of the
-// key's APIs are loaded on this gateway (e.g. a sharded data plane), the API level session lifetime can't
-// be calculated locally, so the TTL the key has in the management layer is used instead. If that TTL is
-// unavailable, it falls back to the key level and global session lifetime settings.
+// syncedKeyLifetime returns the lifetime of a synced key, using the management layer TTL when none of its APIs are loaded.
 func (gw *Gateway) syncedKeyLifetime(sess *user.SessionState, remoteTTL func() (int64, error)) int64 {
 	if len(sess.AccessRights) == 0 || len(gw.GetApiSpecsFromAccessRights(sess)) > 0 {
 		return gw.ApplyLifetime(sess, nil)
