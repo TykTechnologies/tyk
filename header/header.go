@@ -47,6 +47,7 @@ const (
 	XTykAuthorization     = "X-Tyk-Authorization"
 	XTykAcceptExampleName = "X-Tyk-Accept-Example-Name"
 	XTykAcceptExampleCode = "X-Tyk-Accept-Example-Code"
+	XTykSessionKeyId      = "X-Tyk-Session-Key-Id"
 )
 
 // Node metadata the gateway sends to the Dashboard on every register

@@ -27,10 +27,12 @@ import (
 
 	"github.com/TykTechnologies/storage/persistent/model"
 	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/header"
 	internalmodel "github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/pkg/identifier"
@@ -38,6 +40,20 @@ import (
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
+
+// mockSessionManagerEmptyKeyID wraps the SessionHandler to return a session with an empty KeyID
+type mockSessionManagerEmptyKeyID struct {
+	SessionHandler
+}
+
+func (m *mockSessionManagerEmptyKeyID) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
+	session, ok := m.SessionHandler.SessionDetail(orgID, keyName, hashed)
+	if ok {
+		// Explicitly clear the KeyID to test the negative condition
+		session.KeyID = ""
+	}
+	return session, ok
+}
 
 func getStrPointer(str string) *string {
 	return &str
@@ -508,9 +524,34 @@ func TestKeyHandler(t *testing.T) {
 	t.Run("Get key", func(t *testing.T) {
 		_, _ = ts.Run(t, []test.TestCase{
 			{Method: "GET", Path: "/tyk/keys/unknown", AdminAuth: true, Code: 404},
-			{Method: "GET", Path: "/tyk/keys/" + knownKey, AdminAuth: true, Code: 200},
-			{Method: "GET", Path: "/tyk/keys/" + knownKey + "?api_id=test", AdminAuth: true, Code: 200},
-			{Method: "GET", Path: "/tyk/keys/" + knownKey + "?api_id=unknown", AdminAuth: true, Code: 200},
+			{
+				Method: "GET", Path: "/tyk/keys/" + knownKey, AdminAuth: true, Code: 200,
+				HeadersMatch: map[string]string{header.XTykSessionKeyId: knownKey},
+			},
+			{
+				Method: "GET", Path: "/tyk/keys/" + knownKey + "?api_id=test", AdminAuth: true, Code: 200,
+				HeadersMatch: map[string]string{header.XTykSessionKeyId: knownKey},
+			},
+			{
+				Method: "GET", Path: "/tyk/keys/" + knownKey + "?api_id=unknown", AdminAuth: true, Code: 200,
+				HeadersMatch: map[string]string{header.XTykSessionKeyId: knownKey},
+			},
+		}...)
+	})
+
+	t.Run("Get key with empty KeyID", func(t *testing.T) {
+		originalManager := ts.Gw.GlobalSessionManager
+		defer func() { ts.Gw.GlobalSessionManager = originalManager }()
+
+		ts.Gw.GlobalSessionManager = &mockSessionManagerEmptyKeyID{
+			SessionHandler: originalManager,
+		}
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{
+				Method: "GET", Path: "/tyk/keys/" + knownKey, AdminAuth: true, Code: 200,
+				HeadersMatch: map[string]string{header.XTykSessionKeyId: ""},
+			},
 		}...)
 	})
 
