@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1443,6 +1444,7 @@ func TestGetRawExp(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 		rpc.SetEmergencyMode(t, true)
+		defer rpc.SetEmergencyMode(t, false)
 
 		rpcListener := RPCStorageHandler{
 			KeyPrefix:        "rpc.listener.",
@@ -1454,21 +1456,42 @@ func TestGetRawExp(t *testing.T) {
 		assert.Equal(t, storage.ErrMDCBConnectionLost, err)
 	})
 
-	var requestedKeys []string
+	var (
+		mu            sync.Mutex
+		requestedKeys []string
+	)
+	takeRequestedKeys := func() []string {
+		mu.Lock()
+		defer mu.Unlock()
+		keys := requestedKeys
+		requestedKeys = nil
+		return keys
+	}
+
 	dispatcher := newDispatcher(
+		// Re-login after a retriable error uses group login.
+		withFunc("LoginWithGroup", func(_ string, _ *model.GroupLoginRequest) bool {
+			return true
+		}),
 		withFunc("GetExp", func(_ string, keyName string) (int64, error) {
+			mu.Lock()
 			requestedKeys = append(requestedKeys, keyName)
+			mu.Unlock()
 			switch keyName {
 			case "apikey-known":
 				return 1234, nil
 			case "apikey-error":
 				return 0, errors.New("storage failure")
+			case "apikey-denied":
+				return 0, errors.New("Access Denied")
 			default:
 				return -2, nil
 			}
 		}),
 	)
 
+	// Other tests may leave the global RPC client in emergency mode.
+	rpc.ResetEmergencyMode()
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
 
@@ -1492,13 +1515,15 @@ func TestGetRawExp(t *testing.T) {
 		Gw:               g.Gw,
 	}
 	require.True(t, rpcListener.Connect(), "Failed to connect to RPC server")
+	require.Eventually(t, func() bool { return !rpc.IsEmergencyMode() }, 5*time.Second, 10*time.Millisecond,
+		"RPC client did not leave emergency mode")
 
 	t.Run("returns management layer TTL for the raw key name", func(t *testing.T) {
-		requestedKeys = nil
+		takeRequestedKeys()
 		ttl, err := rpcListener.GetRawExp("apikey-known")
 		require.NoError(t, err)
 		assert.Equal(t, int64(1234), ttl)
-		assert.Equal(t, []string{"apikey-known"}, requestedKeys)
+		assert.Equal(t, []string{"apikey-known"}, takeRequestedKeys())
 	})
 
 	t.Run("returns -2 for a key missing in the management layer", func(t *testing.T) {
@@ -1507,9 +1532,18 @@ func TestGetRawExp(t *testing.T) {
 		assert.Equal(t, int64(-2), ttl)
 	})
 
-	t.Run("returns RPC error", func(t *testing.T) {
+	t.Run("returns non-retriable RPC error without retrying", func(t *testing.T) {
+		takeRequestedKeys()
 		_, err := rpcListener.GetRawExp("apikey-error")
 		assert.Error(t, err)
+		assert.Len(t, takeRequestedKeys(), 1)
+	})
+
+	t.Run("retries a retriable RPC error a bounded number of times", func(t *testing.T) {
+		takeRequestedKeys()
+		_, err := rpcListener.GetRawExp("apikey-denied")
+		assert.Error(t, err)
+		assert.Len(t, takeRequestedKeys(), getRawExpMaxAttempts)
 	})
 }
 
@@ -1530,6 +1564,9 @@ func TestGetSessionAndCreate_UsesManagementLayerTTL(t *testing.T) {
 	require.NoError(t, err)
 
 	dispatcher := newDispatcher(
+		withFunc("LoginWithGroup", func(_ string, _ *model.GroupLoginRequest) bool {
+			return true
+		}),
 		withFunc("GetKey", func(_ string, keyName string) (string, error) {
 			if keyName == "apikey-"+keyHash {
 				return string(sessionJSON), nil
@@ -1544,6 +1581,8 @@ func TestGetSessionAndCreate_UsesManagementLayerTTL(t *testing.T) {
 		}),
 	)
 
+	// Other tests may leave the global RPC client in emergency mode.
+	rpc.ResetEmergencyMode()
 	rpcMock, connectionString := startRPCMock(dispatcher)
 	defer stopRPCMock(rpcMock)
 
@@ -1568,6 +1607,8 @@ func TestGetSessionAndCreate_UsesManagementLayerTTL(t *testing.T) {
 		Gw:               g.Gw,
 	}
 	require.True(t, rpcListener.Connect(), "Failed to connect to RPC server")
+	require.Eventually(t, func() bool { return !rpc.IsEmergencyMode() }, 5*time.Second, 10*time.Millisecond,
+		"RPC client did not leave emergency mode")
 
 	g.Gw.getSessionAndCreate(keyHash, &rpcListener, true, orgID)
 

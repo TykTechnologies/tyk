@@ -354,31 +354,38 @@ func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 	return value.(int64), nil
 }
 
+// getRawExpMaxAttempts bounds GetRawExp retries; callers fall back to local lifetime on failure.
+const getRawExpMaxAttempts = 2
+
 // GetRawExp returns the management layer TTL of keyName, without prefixing or hashing it.
 func (r *RPCStorageHandler) GetRawExp(keyName string) (int64, error) {
-	if rpc.IsEmergencyMode() {
-		return 0, storage.ErrMDCBConnectionLost
-	}
+	var err error
+	for attempt := 0; attempt < getRawExpMaxAttempts; attempt++ {
+		if rpc.IsEmergencyMode() {
+			return 0, storage.ErrMDCBConnectionLost
+		}
 
-	value, err := rpc.FuncClientSingleton("GetExp", keyName)
-	if err != nil {
+		var value interface{}
+		value, err = rpc.FuncClientSingleton("GetExp", keyName)
+		if err == nil {
+			ttl, ok := value.(int64)
+			if !ok {
+				return 0, fmt.Errorf("unexpected GetExp response type %T", value)
+			}
+			return ttl, nil
+		}
+
 		rpc.EmitErrorEventKv(
 			rpc.FuncClientSingletonCall,
 			"GetExp",
 			err,
 			map[string]string{"keyName": keyName},
 		)
-		if r.IsRetriableError(err) && rpc.Login() {
-			return r.GetRawExp(keyName)
+		if !r.IsRetriableError(err) || !rpc.Login() {
+			break
 		}
-		return 0, err
 	}
-
-	ttl, ok := value.(int64)
-	if !ok {
-		return 0, fmt.Errorf("unexpected GetExp response type %T", value)
-	}
-	return ttl, nil
+	return 0, err
 }
 
 func (r *RPCStorageHandler) SetExp(keyName string, timeout int64) error {

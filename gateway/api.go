@@ -955,7 +955,8 @@ func (gw *Gateway) syncedKeyLifetime(sess *user.SessionState, remoteTTL func() (
 		ttl, err := remoteTTL()
 		switch {
 		case err != nil:
-			log.WithError(err).Warning("Failed to get key TTL from management layer, using local session lifetime")
+			log.Warning("Failed to get key TTL from management layer, using local session lifetime")
+			log.WithError(err).Debug("Management layer key TTL lookup error")
 		case ttl > 0 || ttl == -1:
 			// -1 means the key has no expiry in the management layer
 			return ttl

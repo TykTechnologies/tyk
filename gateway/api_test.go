@@ -4387,8 +4387,7 @@ func TestHandleAddKey_SetsTTLWhenAPINotLoaded(t *testing.T) {
 
 	ttl, err := ts.Gw.GlobalSessionManager.Store().GetExp(keyName)
 	require.NoError(t, err)
-	assert.Greater(t, ttl, int64(0))
-	assert.LessOrEqual(t, ttl, int64(3600))
+	assert.InDelta(t, 3600, ttl, 5)
 }
 
 func TestApplyLifetime_PostExpiry(t *testing.T) {
