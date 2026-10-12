@@ -694,3 +694,37 @@ func TestRequestSigning_isRequestSigningConfigValid(t *testing.T) {
 		assert.Equal(t, tc.expected, rs.isRequestSigningConfigValid())
 	}
 }
+
+func TestGenerateHeaderList(t *testing.T) {
+	contains := func(list []string, v string) bool {
+		for _, s := range list {
+			if s == v {
+				return true
+			}
+		}
+		return false
+	}
+
+	t.Run("adds Date header when listed but absent from the request", func(t *testing.T) {
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		r.Header.Set("x-example", "value")
+
+		result := generateHeaderList(r, []string{"(request-target)", "x-example", "date"})
+
+		assert.True(t, contains(result, "date"), "date should be part of the signed header list")
+		assert.NotEmpty(t, r.Header.Get("date"), "a Date header should have been added to the request")
+		assert.True(t, contains(result, "(request-target)"), "(request-target) should always be included")
+		assert.True(t, contains(result, "x-example"))
+	})
+
+	t.Run("does not override an existing Date header", func(t *testing.T) {
+		r := httptest.NewRequest(http.MethodGet, "/", nil)
+		existing := "Mon, 02 Jan 2006 15:04:05 MST"
+		r.Header.Set("date", existing)
+
+		result := generateHeaderList(r, []string{"date"})
+
+		assert.Equal(t, existing, r.Header.Get("date"))
+		assert.True(t, contains(result, "date"))
+	})
+}
