@@ -354,6 +354,34 @@ func (r *RPCStorageHandler) GetExp(keyName string) (int64, error) {
 	return value.(int64), nil
 }
 
+// GetRawExp returns the TTL of keyName in the management layer storage. Unlike GetExp, keyName is
+// used as is, without the handler prefix or hashing.
+func (r *RPCStorageHandler) GetRawExp(keyName string) (int64, error) {
+	if rpc.IsEmergencyMode() {
+		return 0, storage.ErrMDCBConnectionLost
+	}
+
+	value, err := rpc.FuncClientSingleton("GetExp", keyName)
+	if err != nil {
+		rpc.EmitErrorEventKv(
+			rpc.FuncClientSingletonCall,
+			"GetExp",
+			err,
+			map[string]string{"keyName": keyName},
+		)
+		if r.IsRetriableError(err) && rpc.Login() {
+			return r.GetRawExp(keyName)
+		}
+		return 0, err
+	}
+
+	ttl, ok := value.(int64)
+	if !ok {
+		return 0, fmt.Errorf("unexpected GetExp response type %T", value)
+	}
+	return ttl, nil
+}
+
 func (r *RPCStorageHandler) SetExp(keyName string, timeout int64) error {
 	log.Error("RPCStorageHandler.SetExp - Not Implemented")
 	return nil
@@ -1033,7 +1061,9 @@ func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isH
 	if err != nil {
 		log.Error("Key not found in master - skipping")
 	} else {
-		gw.handleAddKey(key, sessionString, orgId)
+		gw.handleAddKey(key, sessionString, orgId, func() (int64, error) {
+			return r.GetRawExp("apikey-" + key)
+		})
 	}
 }
 

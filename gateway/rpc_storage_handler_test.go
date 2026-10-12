@@ -1437,3 +1437,142 @@ func TestRPCStorageHandler_BuildNodeInfo_GoldenWireShape(t *testing.T) {
 	assert.ElementsMatch(t, []string{"apis_count", "policies_count"}, keysOf(got["stats"]))
 	assert.ElementsMatch(t, []string{"Hostname", "PID", "Address"}, keysOf(got["host_details"]))
 }
+
+func TestGetRawExp(t *testing.T) {
+	t.Run("MDCB down, return mdcb lost connection err", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+		rpc.SetEmergencyMode(t, true)
+
+		rpcListener := RPCStorageHandler{
+			KeyPrefix:        "rpc.listener.",
+			SuppressRegister: true,
+			Gw:               ts.Gw,
+		}
+
+		_, err := rpcListener.GetRawExp("apikey-any")
+		assert.Equal(t, storage.ErrMDCBConnectionLost, err)
+	})
+
+	var requestedKeys []string
+	dispatcher := newDispatcher(
+		withFunc("GetExp", func(_ string, keyName string) (int64, error) {
+			requestedKeys = append(requestedKeys, keyName)
+			switch keyName {
+			case "apikey-known":
+				return 1234, nil
+			case "apikey-error":
+				return 0, errors.New("storage failure")
+			default:
+				return -2, nil
+			}
+		}),
+	)
+
+	rpcMock, connectionString := startRPCMock(dispatcher)
+	defer stopRPCMock(rpcMock)
+
+	g := StartTest(func(globalConf *config.Config) {
+		globalConf.SlaveOptions.UseRPC = true
+		globalConf.SlaveOptions.RPCKey = "test_org"
+		globalConf.SlaveOptions.APIKey = "key"
+		globalConf.SlaveOptions.ConnectionString = connectionString
+		globalConf.SlaveOptions.CallTimeout = 1
+		globalConf.SlaveOptions.RPCPoolSize = 2
+		globalConf.SlaveOptions.DisableKeySpaceSync = true
+	})
+	require.NoError(t, g.Gw.afterConfSetup())
+	defer g.Close()
+
+	// Prefix and hashing are set to check that GetRawExp does not apply them.
+	rpcListener := RPCStorageHandler{
+		KeyPrefix:        "rpc.listener.",
+		SuppressRegister: true,
+		HashKeys:         true,
+		Gw:               g.Gw,
+	}
+	require.True(t, rpcListener.Connect(), "Failed to connect to RPC server")
+
+	t.Run("returns management layer TTL for the raw key name", func(t *testing.T) {
+		requestedKeys = nil
+		ttl, err := rpcListener.GetRawExp("apikey-known")
+		require.NoError(t, err)
+		assert.Equal(t, int64(1234), ttl)
+		assert.Equal(t, []string{"apikey-known"}, requestedKeys)
+	})
+
+	t.Run("returns -2 for a key missing in the management layer", func(t *testing.T) {
+		ttl, err := rpcListener.GetRawExp("apikey-missing")
+		require.NoError(t, err)
+		assert.Equal(t, int64(-2), ttl)
+	})
+
+	t.Run("returns RPC error", func(t *testing.T) {
+		_, err := rpcListener.GetRawExp("apikey-error")
+		assert.Error(t, err)
+	})
+}
+
+func TestGetSessionAndCreate_UsesManagementLayerTTL(t *testing.T) {
+	const (
+		orgID     = "test_org"
+		keyHash   = "synced-key-hash"
+		remoteTTL = int64(4321)
+	)
+
+	session := user.SessionState{
+		OrgID: orgID,
+		AccessRights: map[string]user.AccessDefinition{
+			"api-not-loaded": {APIID: "api-not-loaded", Versions: []string{"Default"}},
+		},
+	}
+	sessionJSON, err := json.Marshal(session)
+	require.NoError(t, err)
+
+	dispatcher := newDispatcher(
+		withFunc("GetKey", func(_ string, keyName string) (string, error) {
+			if keyName == "apikey-"+keyHash {
+				return string(sessionJSON), nil
+			}
+			return "", storage.ErrKeyNotFound
+		}),
+		withFunc("GetExp", func(_ string, keyName string) (int64, error) {
+			if keyName == "apikey-"+keyHash {
+				return remoteTTL, nil
+			}
+			return -2, nil
+		}),
+	)
+
+	rpcMock, connectionString := startRPCMock(dispatcher)
+	defer stopRPCMock(rpcMock)
+
+	g := StartTest(func(globalConf *config.Config) {
+		globalConf.SlaveOptions.UseRPC = true
+		globalConf.SlaveOptions.RPCKey = orgID
+		globalConf.SlaveOptions.APIKey = "key"
+		globalConf.SlaveOptions.ConnectionString = connectionString
+		globalConf.SlaveOptions.CallTimeout = 1
+		globalConf.SlaveOptions.RPCPoolSize = 2
+		globalConf.SlaveOptions.DisableKeySpaceSync = true
+		globalConf.SlaveOptions.SynchroniserEnabled = true
+		globalConf.HashKeys = true
+	})
+	require.NoError(t, g.Gw.afterConfSetup())
+	defer g.Close()
+
+	rpcListener := RPCStorageHandler{
+		KeyPrefix:        "rpc.listener.",
+		SuppressRegister: true,
+		HashKeys:         true,
+		Gw:               g.Gw,
+	}
+	require.True(t, rpcListener.Connect(), "Failed to connect to RPC server")
+
+	g.Gw.getSessionAndCreate(keyHash, &rpcListener, true, orgID)
+
+	localStore := &storage.RedisCluster{KeyPrefix: "apikey-", ConnectionHandler: g.Gw.StorageConnectionHandler}
+	ttl, err := localStore.GetExp(keyHash)
+	require.NoError(t, err)
+	assert.InDelta(t, remoteTTL, ttl, 5)
+}
