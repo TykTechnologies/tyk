@@ -3,15 +3,10 @@ name: Visor
 on:
   pull_request:
     types: [opened, synchronize]
-  issues:
-    types: [opened]
-  issue_comment:
-    types: [created]
 
 permissions:
   contents: read
   pull-requests: write
-  issues: write
   checks: write
 
 jobs:
