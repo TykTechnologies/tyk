@@ -355,6 +355,17 @@ func TestCustomCertsDataDecoder(t *testing.T) {
 	assert.Equal(t, "testCerts", c.HttpServerOptions.Certificates[0].Name, "TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES domain_name should be equals to testCerts")
 }
 
+func TestTrustedProxyCIDRsEnvironmentAndValidation(t *testing.T) {
+	var c Config
+	t.Setenv("TYK_GW_HTTPSERVEROPTIONS_TRUSTEDPROXYCIDRS", "10.0.0.0/8,2001:db8::/32")
+	require.NoError(t, envconfig.Process("TYK_GW", &c))
+	assert.Equal(t, []string{"10.0.0.0/8", "2001:db8::/32"}, c.HttpServerOptions.TrustedProxyCIDRs)
+	require.NoError(t, c.HttpServerOptions.ValidateTrustedProxyCIDRs())
+
+	c.HttpServerOptions.TrustedProxyCIDRs = []string{"not-a-cidr"}
+	assert.Error(t, c.HttpServerOptions.ValidateTrustedProxyCIDRs())
+}
+
 // TestSecretsDecoder tests env variable decoding for TYK_GW_SECRETS.
 // It confirms that key pairs should be provided as a comma separated
 // list of keys and values, additionally separated by `:` (colon).

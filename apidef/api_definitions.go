@@ -18,6 +18,7 @@ import (
 	"github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/TykTechnologies/tyk/internal/event"
+	internalhttputil "github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/mcpadapter"
 
 	"github.com/TykTechnologies/tyk/internal/reflect"
@@ -727,14 +728,17 @@ type APIDefinition struct {
 	EnableProxyProtocol bool           `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
 	JsonRpcVersion      string         `bson:"json_rpc_version,omitempty" json:"json_rpc_version,omitempty"`
 	ApplicationProtocol string         `bson:"application_protocol,omitempty" json:"application_protocol,omitempty"`
-	APIID               string         `bson:"api_id" json:"api_id"`
-	OrgID               string         `bson:"org_id" json:"org_id"`
-	UseKeylessAccess    bool           `bson:"use_keyless" json:"use_keyless"`
-	UseOauth2           bool           `bson:"use_oauth2" json:"use_oauth2"`
-	ExternalOAuth       ExternalOAuth  `bson:"external_oauth" json:"external_oauth"`
-	UseOpenID           bool           `bson:"use_openid" json:"use_openid"`
-	OpenIDOptions       OpenIDOptions  `bson:"openid_options" json:"openid_options"`
-	Oauth2Meta          struct {
+	// MCP must serialize nil as BSON null: Dashboard updates use $set, so
+	// omitting it would retain a previously stored Origin configuration.
+	MCP              *MCPConfig    `bson:"mcp" json:"mcp,omitempty"`
+	APIID            string        `bson:"api_id" json:"api_id"`
+	OrgID            string        `bson:"org_id" json:"org_id"`
+	UseKeylessAccess bool          `bson:"use_keyless" json:"use_keyless"`
+	UseOauth2        bool          `bson:"use_oauth2" json:"use_oauth2"`
+	ExternalOAuth    ExternalOAuth `bson:"external_oauth" json:"external_oauth"`
+	UseOpenID        bool          `bson:"use_openid" json:"use_openid"`
+	OpenIDOptions    OpenIDOptions `bson:"openid_options" json:"openid_options"`
+	Oauth2Meta       struct {
 		AllowedAccessTypes     []osin.AccessRequestType    `bson:"allowed_access_types" json:"allowed_access_types"`
 		AllowedAuthorizeTypes  []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
 		AuthorizeLoginRedirect string                      `bson:"auth_login_redirect" json:"auth_login_redirect"`
@@ -875,6 +879,45 @@ type APIDefinition struct {
 	// ErrorOverrides contains the configurations for error response customization.
 	ErrorOverrides         ErrorOverridesMap `bson:"error_overrides" json:"error_overrides"`
 	ErrorOverridesDisabled bool              `bson:"error_overrides_disabled" json:"error_overrides_disabled" `
+}
+
+// MCPConfig contains request-security settings shared by Classic and OAS MCP
+// APIs.
+type MCPConfig struct {
+	// TrustedOrigins contains concrete HTTP(S) origins allowed to send MCP
+	// requests in addition to the API's own externally visible origin.
+	TrustedOrigins []string `bson:"trusted_origins,omitempty" json:"trusted_origins,omitempty"`
+
+	// OAuthBroker enables the Gateway-owned OAuth authorization-server identity
+	// for an MCP mirror API. It is opt-in so existing direct/static OAuth flows
+	// retain their current contract.
+	OAuthBroker *MCPOAuthBrokerConfig `bson:"oauth_broker,omitempty" json:"oauth_broker,omitempty"`
+}
+
+// MCPOAuthBrokerConfig fixes the public and upstream resource identities used
+// by the MCP OAuth broker. PublicOrigin is an origin without a path;
+// PublicResource must equal PublicOrigin plus the API listen path.
+type MCPOAuthBrokerConfig struct {
+	Enabled                bool     `bson:"enabled" json:"enabled"`
+	PublicOrigin           string   `bson:"public_origin,omitempty" json:"public_origin,omitempty"`
+	PublicResource         string   `bson:"public_resource,omitempty" json:"public_resource,omitempty"`
+	UpstreamResource       string   `bson:"upstream_resource,omitempty" json:"upstream_resource,omitempty"`
+	TrustedEndpointOrigins []string `bson:"trusted_endpoint_origins,omitempty" json:"trusted_endpoint_origins,omitempty"`
+	AllowInsecureLoopback  bool     `bson:"allow_insecure_loopback,omitempty" json:"allow_insecure_loopback,omitempty"`
+}
+
+// Validate validates MCP request-security configuration.
+func (m *MCPConfig) Validate() error {
+	if m == nil {
+		return nil
+	}
+	if _, err := internalhttputil.CanonicalOrigins(m.TrustedOrigins); err != nil {
+		return err
+	}
+	if m.OAuthBroker == nil || !m.OAuthBroker.Enabled {
+		return nil
+	}
+	return m.OAuthBroker.Validate("")
 }
 
 type JWK struct {

@@ -957,6 +957,12 @@
         },
         "xff_depth": {
           "type": "integer"
+        },
+        "trusted_proxy_cidrs": {
+          "type": ["array", "null"],
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
