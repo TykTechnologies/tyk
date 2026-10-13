@@ -18,6 +18,7 @@ import (
 	"github.com/TykTechnologies/storage/kv"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	logger "github.com/TykTechnologies/tyk/log"
 )
 
 func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
@@ -767,4 +768,64 @@ func TestOpenTelemetryConfig(t *testing.T) {
 		assert.True(t, c.OpenTelemetry.Enabled)
 		assert.True(t, c.OpenTelemetry.TracesEnabled())
 	})
+}
+
+func TestLoad_logSettingsFromConfFile(t *testing.T) {
+	unsetEnv(t, "TYK_GW_LOGLEVEL", "TYK_GW_LOGFORMAT")
+
+	t.Run("log_level and log_format are read from the file", func(t *testing.T) {
+		path := writeConfFile(t, `{"log_level":"debug","log_format":"json"}`)
+
+		var c Config
+		require.NoError(t, Load([]string{path}, &c))
+
+		assert.Equal(t, logger.Level("debug"), c.LogLevel)
+		format, ok := c.LogFormat.Format()
+		assert.True(t, ok)
+		assert.Equal(t, logger.FormatJson, format)
+	})
+
+	t.Run("first existing path is used", func(t *testing.T) {
+		path := writeConfFile(t, `{"log_level":"debug"}`)
+		missing := filepath.Join(t.TempDir(), "missing.conf")
+
+		var c Config
+		require.NoError(t, Load([]string{missing, path}, &c))
+
+		assert.Equal(t, logger.Level("debug"), c.LogLevel)
+		assert.Equal(t, path, c.Private.OriginalPath)
+	})
+
+	t.Run("TYK_GW_LOGLEVEL overrides log_level from the file", func(t *testing.T) {
+		t.Setenv("TYK_GW_LOGLEVEL", "debug")
+		path := writeConfFile(t, `{"log_level":"info"}`)
+
+		var c Config
+		require.NoError(t, Load([]string{path}, &c))
+
+		assert.Equal(t, logger.Level("debug"), c.LogLevel)
+	})
+}
+
+// writeConfFile writes content to a temporary config file and returns its path.
+func writeConfFile(t *testing.T, content string) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "custom_tyk.conf")
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+
+	return path
+}
+
+// unsetEnv removes variables for the test duration; t.Setenv("", ...) would
+// still be seen as set by envconfig.
+func unsetEnv(t *testing.T, names ...string) {
+	t.Helper()
+
+	for _, name := range names {
+		if value, ok := os.LookupEnv(name); ok {
+			require.NoError(t, os.Unsetenv(name))
+			t.Cleanup(func() { _ = os.Setenv(name, value) })
+		}
+	}
 }

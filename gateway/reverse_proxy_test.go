@@ -263,7 +263,10 @@ func TestReverseProxyDnsCache(t *testing.T) {
 	)
 
 	ts := StartTest(nil)
-	ts.MockHandle, _ = test.InitDNSMock(etcHostsMap, nil)
+
+	mock, err := test.InitDNSMock(etcHostsMap, nil)
+	assert.NoError(t, err)
+	ts.MockHandle = mock
 	defer ts.Close()
 	defer func() {
 		_ = ts.MockHandle.ShutdownDnsMock()

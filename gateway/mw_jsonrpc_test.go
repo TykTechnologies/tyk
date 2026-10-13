@@ -92,7 +92,7 @@ func TestSyntheticJSONRPCMethod_LimitsFallbackBodyReadAndPreservesBody(t *testin
 	body := `{"jsonrpc":"2.0","method":"tools/list","params":{"padding":"` +
 		strings.Repeat("x", syntheticJSONRPCMethodReadLimit+1) +
 		`"}}`
-	r := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(body))
+	r := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/mcp", strings.NewReader(body))
 
 	assert.Equal(t, "", syntheticJSONRPCMethod(r))
 
