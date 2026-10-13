@@ -165,4 +165,13 @@ func Test_MakeFormatter(t *testing.T) {
 		assert.True(t, textFormatter.ForceColors, "force colors modified by options")
 		assert.False(t, textFormatter.DisableSorting, "disable colors has default value")
 	})
+
+	t.Run("json formatter keeps default field map when options add fields", func(t *testing.T) {
+		formatter, err := MakeFormatter(FormatJson, json.RawMessage(`{"field_map":{"time":"@timestamp"}}`))
+		assert.NoError(t, err)
+		jsonFormatter, ok := formatter.(*JSONFormatter)
+		assert.True(t, ok)
+		assert.Equal(t, "message", jsonFormatter.FieldMap.Resolve(logrus.FieldKeyMsg))
+		assert.Equal(t, "@timestamp", jsonFormatter.FieldMap.Resolve(logrus.FieldKeyTime))
+	})
 }

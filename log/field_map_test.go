@@ -35,30 +35,60 @@ func TestFieldMap_Resolve(t *testing.T) {
 }
 
 func TestFieldMap_UnmarshalJSON(t *testing.T) {
-	tests := []struct {
-		name        string
-		input       string
-		expectError bool
-		expectedMap map[string]string
-	}{
-		{"valid_json", `{"time":"@timestamp"}`, false, map[string]string{"time": "@timestamp"}},
-		{"null_string", `null`, false, nil},
-		{"invalid_json", `{"broken": json}`, true, nil},
-	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			var fm FieldMap
-			err := fm.UnmarshalJSON([]byte(tt.input))
+	t.Run("base cases", func(t *testing.T) {
+		tests := []struct {
+			name        string
+			input       string
+			expectError bool
+			expectedMap map[string]string
+		}{
+			{"valid_json", `{"time":"@timestamp"}`, false, map[string]string{"time": "@timestamp"}},
+			{"null_string", `null`, false, nil},
+			{"invalid_json", `{"broken": json}`, true, nil},
+		}
 
-			if tt.expectError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				var fm FieldMap
+				err := fm.UnmarshalJSON([]byte(tt.input))
+
+				if tt.expectError {
+					assert.Error(t, err)
+				} else {
+					assert.NoError(t, err)
+					assert.Equal(t, tt.expectedMap, fm.fields)
+				}
+			})
+		}
+	})
+
+	t.Run("merges into existing fields", func(t *testing.T) {
+		tests := []struct {
+			name        string
+			input       string
+			expectedMap map[string]string
+		}{
+			{"adds_new_key", `{"time":"@timestamp"}`, map[string]string{"msg": "message", "time": "@timestamp"}},
+			{"overrides_existing_key", `{"msg":"text"}`, map[string]string{"msg": "text"}},
+			{"empty_object_keeps_defaults", `{}`, map[string]string{"msg": "message"}},
+			{"null_keeps_defaults", `null`, map[string]string{"msg": "message"}},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				fm := NewFieldMap(defaultFieldMap())
+				assert.NoError(t, fm.UnmarshalJSON([]byte(tt.input)))
 				assert.Equal(t, tt.expectedMap, fm.fields)
-			}
-		})
-	}
+			})
+		}
+	})
+
+	t.Run("does not mutate existing fields on error", func(t *testing.T) {
+		fm := NewFieldMap(defaultFieldMap())
+		assert.Error(t, fm.UnmarshalJSON([]byte(`{"broken": json}`)))
+		assert.Equal(t, map[string]string{"msg": "message"}, fm.fields)
+	})
 }
 
 func TestFieldMap_MarshalJSON(t *testing.T) {
