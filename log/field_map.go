@@ -2,6 +2,7 @@ package log
 
 import (
 	"encoding/json"
+	"maps"
 
 	"github.com/sirupsen/logrus"
 )
@@ -37,7 +38,7 @@ func (f *FieldMap) UnmarshalJSON(data []byte) error {
 		return nil
 	}
 
-	var m map[string]string
+	m := maps.Clone(f.fields)
 	if err := json.Unmarshal(data, &m); err != nil {
 		return err
 	}
