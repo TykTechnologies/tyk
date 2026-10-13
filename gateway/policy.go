@@ -3,12 +3,10 @@ package gateway
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
-	"sort"
 
 	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
@@ -32,10 +30,7 @@ type DBPolicy = keys.DBPolicy
 
 // hasMCPFields returns true if the access definition contains any MCP-specific fields.
 func hasMCPFields(ar user.AccessDefinition) bool {
-	return len(ar.JSONRPCMethods) > 0 ||
-		!ar.JSONRPCMethodsAccessRights.IsEmpty() ||
-		len(ar.MCPPrimitives) > 0 ||
-		!ar.MCPAccessRights.IsEmpty()
+	return keys.HasMCPFields(ar)
 }
 
 // validateMCPFieldsInAccessRights returns an error if any MCP-specific fields are set
@@ -47,71 +42,23 @@ func hasMCPFields(ar user.AccessDefinition) bool {
 // otherwise have granted; reporting it here turns a silent outage on live
 // traffic into an error at the point the key or policy is written.
 func validateAccessConditions(accessRights map[string]user.AccessDefinition) error {
-	// Sorted so that a payload with several bad entries always reports the
-	// same one, rather than whichever the map iteration reached first.
-	apiIDs := make([]string, 0, len(accessRights))
-	for apiID := range accessRights {
-		apiIDs = append(apiIDs, apiID)
-	}
-	sort.Strings(apiIDs)
-
-	for _, apiID := range apiIDs {
-		if err := user.ValidateAccessSpecs(accessRights[apiID].AllowedURLs); err != nil {
-			return fmt.Errorf("access_rights[%q].%w", apiID, err)
-		}
-	}
-
-	return nil
+	return keys.ValidateAccessConditions(accessRights)
 }
 
 func (gw *Gateway) validateMCPFieldsInAccessRights(accessRights map[string]user.AccessDefinition) error {
-	for apiID, ar := range accessRights {
-		if !hasMCPFields(ar) {
-			continue
-		}
-		spec := gw.getApiSpec(apiID)
-		if spec == nil {
-			continue
-		}
-		if !mcpProxy(spec) {
-			return fmt.Errorf("MCP fields can only be configured on MCP Proxies, API %q is not an MCP Proxy", apiID)
-		}
-		for _, p := range ar.MCPPrimitives {
-			if err := p.Validate(); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
+	return gw.controlPlaneKeys().ValidateMCPFieldsInAccessRights(accessRights)
 }
 
 // hasNonMCPFields returns true if the access definition contains any HTTP/REST or
 // GraphQL fields that have no meaning in the MCP (JSON-RPC) protocol.
 func hasNonMCPFields(ar user.AccessDefinition) bool {
-	return len(ar.AllowedURLs) > 0 ||
-		len(ar.Endpoints) > 0 ||
-		len(ar.RestrictedTypes) > 0 ||
-		len(ar.AllowedTypes) > 0 ||
-		ar.DisableIntrospection ||
-		len(ar.FieldAccessRights) > 0
+	return keys.HasNonMCPFields(ar)
 }
 
 // validateNonMCPFieldsOnMCPProxy returns an error if HTTP/REST or GraphQL access-right
 // fields are set on a known MCP Proxy. Unknown APIs are skipped (fail-open).
 func (gw *Gateway) validateNonMCPFieldsOnMCPProxy(accessRights map[string]user.AccessDefinition) error {
-	for apiID, ar := range accessRights {
-		if !hasNonMCPFields(ar) {
-			continue
-		}
-		spec := gw.getApiSpec(apiID)
-		if spec == nil {
-			continue
-		}
-		if mcpProxy(spec) {
-			return fmt.Errorf("HTTP/REST and GraphQL fields cannot be configured on MCP Proxies, API %q is an MCP Proxy", apiID)
-		}
-	}
-	return nil
+	return gw.controlPlaneKeys().ValidateNonMCPFieldsOnMCPProxy(accessRights)
 }
 
 func LoadPoliciesFromFile(filePath string) ([]user.Policy, error) {
