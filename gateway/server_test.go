@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -2320,4 +2321,106 @@ func Test_GW_setupLogger(t *testing.T) {
 		// Sentry + Syslog + GrayLog + Logstash + Redis
 		assert.Equal(t, 5, len(l.Hooks[logrus.PanicLevel]), "Expected hooks to be added")
 	})
+}
+
+func Test_GW_setupLogger_logSettingsFromConfFile(t *testing.T) {
+	unsetEnv(t, tyklog.EnvTykLoglevel, tyklog.EnvTykGwLoglevel, tyklog.EnvTykLogformat, tyklog.EnvTykGwLogformat)
+
+	t.Run("log_level=debug from the file is applied", func(t *testing.T) {
+		cfg := loadConfFile(t, `{"log_level":"debug"}`)
+
+		out := logWithConfig(t, cfg, func(l *tyklog.Logger) {
+			l.Debug("debug-from-file")
+		})
+
+		assert.Contains(t, out, "debug-from-file")
+	})
+
+	t.Run("log_level=error from the file drops lower levels", func(t *testing.T) {
+		cfg := loadConfFile(t, `{"log_level":"error"}`)
+
+		out := logWithConfig(t, cfg, func(l *tyklog.Logger) {
+			l.Info("info-from-file")
+			l.Error("error-from-file")
+		})
+
+		assert.NotContains(t, out, "info-from-file")
+		assert.Contains(t, out, "error-from-file")
+	})
+
+	t.Run("log_format=json from the file is applied", func(t *testing.T) {
+		cfg := loadConfFile(t, `{"log_format":"json"}`)
+
+		out := logWithConfig(t, cfg, func(l *tyklog.Logger) {
+			l.Info("json-from-file")
+		})
+
+		assert.Contains(t, out, `"message":"json-from-file"`)
+		assert.True(t, json.Valid([]byte(strings.TrimSpace(out))), "expected a JSON line, got: %s", out)
+	})
+
+	t.Run("env variables override the file", func(t *testing.T) {
+		t.Setenv(tyklog.EnvTykGwLoglevel, "debug")
+		t.Setenv(tyklog.EnvTykLogformat, "text")
+		cfg := loadConfFile(t, `{"log_level":"info","log_format":"json"}`)
+
+		out := logWithConfig(t, cfg, func(l *tyklog.Logger) {
+			l.Debug("debug-from-env")
+		})
+
+		assert.Contains(t, out, "level=debug message=debug-from-env")
+		assert.False(t, json.Valid([]byte(strings.TrimSpace(out))), "expected a text line, got: %s", out)
+	})
+}
+
+// loadConfFile writes content to a temporary config file and loads it the way
+// the --conf flag does.
+func loadConfFile(t *testing.T, content string) config.Config {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), "custom_tyk.conf")
+	require.NoError(t, os.WriteFile(path, []byte(content), 0o600))
+
+	var cfg config.Config
+	require.NoError(t, config.Load([]string{path}, &cfg))
+
+	return cfg
+}
+
+// logWithConfig builds the logger from cfg, runs emit and returns what reached stderr.
+func logWithConfig(t *testing.T, cfg config.Config, emit func(l *tyklog.Logger)) string {
+	t.Helper()
+
+	cli.InitTest(t, nil)
+	gw := NewGateway(cfg, t.Context())
+	gw.setTestMode(false)
+
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+
+	origStderr := os.Stderr
+	os.Stderr = w
+	defer func() { os.Stderr = origStderr }()
+
+	emit(tyklog.Build(gw.setupLogger))
+
+	require.NoError(t, w.Close())
+	out, err := io.ReadAll(r)
+	require.NoError(t, err)
+	require.NoError(t, r.Close())
+
+	return string(out)
+}
+
+// unsetEnv removes variables for the test duration; t.Setenv("", ...) would
+// still be seen as set by envconfig.
+func unsetEnv(t *testing.T, names ...string) {
+	t.Helper()
+
+	for _, name := range names {
+		if value, ok := os.LookupEnv(name); ok {
+			require.NoError(t, os.Unsetenv(name))
+			t.Cleanup(func() { _ = os.Setenv(name, value) })
+		}
+	}
 }

@@ -35,7 +35,6 @@ func TestFieldMap_Resolve(t *testing.T) {
 }
 
 func TestFieldMap_UnmarshalJSON(t *testing.T) {
-
 	t.Run("base cases", func(t *testing.T) {
 		tests := []struct {
 			name        string
