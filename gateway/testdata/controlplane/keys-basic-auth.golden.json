@@ -1,0 +1,225 @@
+[
+  {
+    "name": "create-basic",
+    "status": 200,
+    "body": {
+      "action": "added",
+      "key": "",
+      "key_hash": "c97f558c16e639ac",
+      "status": "ok"
+    },
+    "redis": [
+      {
+        "key": "apikey-c97f558c16e639ac",
+        "type": "string",
+        "ttl": 600,
+        "value": {
+          "access_rights": {
+            "api-a": {
+              "limit": {
+                "per": 60,
+                "quota_max": 10,
+                "quota_renewal_rate": 3600,
+                "rate": 100
+              }
+            },
+            "api-b": {
+              "limit": {
+                "per": 60,
+                "quota_max": 10,
+                "quota_renewal_rate": 3600,
+                "rate": 100
+              }
+            }
+          },
+          "alias": "parity",
+          "apply_policies": [
+            "pol-a"
+          ],
+          "basic_auth_data": {
+            "hash_type": "bcrypt",
+            "password": "\u003cpassword-hash\u003e"
+          },
+          "date_created": "\u003cts\u003e",
+          "last_updated": "\u003cts\u003e",
+          "meta_data": {
+            "m": "v"
+          },
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 10,
+          "quota_renewal_rate": 3600,
+          "quota_renews": "\u003cts\u003e",
+          "rate": 100,
+          "tags": [
+            "parity"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "detail-basic-by-username",
+    "status": 200,
+    "body": {
+      "access_rights": {
+        "api-a": {
+          "limit": {
+            "per": 60,
+            "quota_max": 10,
+            "quota_remaining": 10,
+            "quota_renewal_rate": 3600,
+            "rate": 100
+          }
+        },
+        "api-b": {
+          "limit": {
+            "per": 60,
+            "quota_max": 10,
+            "quota_remaining": 10,
+            "quota_renewal_rate": 3600,
+            "rate": 100
+          }
+        }
+      },
+      "alias": "parity",
+      "apply_policies": [
+        "pol-a"
+      ],
+      "basic_auth_data": {
+        "hash_type": "bcrypt"
+      },
+      "date_created": "\u003cts\u003e",
+      "last_updated": "\u003cts\u003e",
+      "meta_data": {
+        "m": "v"
+      },
+      "org_id": "default",
+      "per": 60,
+      "quota_max": 10,
+      "quota_renewal_rate": 3600,
+      "quota_renews": "\u003cts\u003e",
+      "rate": 100,
+      "tags": [
+        "parity"
+      ]
+    },
+    "redis": [
+      {
+        "key": "apikey-c97f558c16e639ac",
+        "type": "string",
+        "ttl": 600,
+        "value": {
+          "access_rights": {
+            "api-a": {
+              "limit": {
+                "per": 60,
+                "quota_max": 10,
+                "quota_renewal_rate": 3600,
+                "rate": 100
+              }
+            },
+            "api-b": {
+              "limit": {
+                "per": 60,
+                "quota_max": 10,
+                "quota_renewal_rate": 3600,
+                "rate": 100
+              }
+            }
+          },
+          "alias": "parity",
+          "apply_policies": [
+            "pol-a"
+          ],
+          "basic_auth_data": {
+            "hash_type": "bcrypt",
+            "password": "\u003cpassword-hash\u003e"
+          },
+          "date_created": "\u003cts\u003e",
+          "last_updated": "\u003cts\u003e",
+          "meta_data": {
+            "m": "v"
+          },
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 10,
+          "quota_renewal_rate": 3600,
+          "quota_renews": "\u003cts\u003e",
+          "rate": 100,
+          "tags": [
+            "parity"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "update-basic",
+    "status": 200,
+    "body": {
+      "action": "modified",
+      "key": "eyJvcmciOiJkZWZhdWx0IiwiaWQiOiJwd3VzZXIiLCJoIjoibXVybXVyNjQifQ==",
+      "status": "ok"
+    },
+    "redis": [
+      {
+        "key": "apikey-c97f558c16e639ac",
+        "type": "string",
+        "ttl": 600,
+        "value": {
+          "access_rights": {
+            "api-a": {
+              "limit": {
+                "per": 60,
+                "quota_max": 10,
+                "quota_renewal_rate": 3600,
+                "rate": 100
+              }
+            },
+            "api-b": {
+              "limit": {
+                "per": 60,
+                "quota_max": 10,
+                "quota_renewal_rate": 3600,
+                "rate": 100
+              }
+            }
+          },
+          "alias": "pw-updated",
+          "apply_policies": [
+            "pol-a"
+          ],
+          "basic_auth_data": {
+            "hash_type": "bcrypt",
+            "password": "\u003cpassword-hash\u003e"
+          },
+          "date_created": "\u003cts\u003e",
+          "last_updated": "\u003cts\u003e",
+          "meta_data": {
+            "m": "v"
+          },
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 10,
+          "quota_renewal_rate": 3600,
+          "quota_renews": "\u003cts\u003e",
+          "rate": 100,
+          "tags": [
+            "parity"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "delete-basic",
+    "status": 200,
+    "body": {
+      "action": "deleted",
+      "key": "eyJvcmciOiJkZWZhdWx0IiwiaWQiOiJwd3VzZXIiLCJoIjoibXVybXVyNjQifQ==",
+      "status": "ok"
+    },
+    "redis": []
+  }
+]

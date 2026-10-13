@@ -1,0 +1,153 @@
+[
+  {
+    "name": "org-create",
+    "status": 200,
+    "body": {
+      "action": "added",
+      "key": "default",
+      "status": "ok"
+    },
+    "redis": [
+      {
+        "key": "orgkey.default",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "alias": "parity",
+          "last_updated": "\u003cts\u003e",
+          "meta_data": {
+            "m": "v"
+          },
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 1000,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "org-get",
+    "status": 200,
+    "body": {
+      "alias": "parity",
+      "last_updated": "\u003cts\u003e",
+      "meta_data": {
+        "m": "v"
+      },
+      "org_id": "default",
+      "per": 60,
+      "quota_max": 1000,
+      "quota_remaining": 100,
+      "quota_renewal_rate": 3600,
+      "rate": 10,
+      "tags": [
+        "parity"
+      ]
+    },
+    "redis": [
+      {
+        "key": "orgkey.default",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "alias": "parity",
+          "last_updated": "\u003cts\u003e",
+          "meta_data": {
+            "m": "v"
+          },
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 1000,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "org-update-reset-quota",
+    "status": 200,
+    "body": {
+      "action": "modified",
+      "key": "default",
+      "status": "ok"
+    },
+    "redis": [
+      {
+        "key": "orgkey.default",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "alias": "parity",
+          "last_updated": "\u003cts\u003e",
+          "meta_data": {
+            "m": "v"
+          },
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 2000,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "quota_renews": "\u003cts\u003e",
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "org-list",
+    "status": 200,
+    "body": {
+      "keys": [
+        "default"
+      ]
+    },
+    "redis": [
+      {
+        "key": "orgkey.default",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "alias": "parity",
+          "last_updated": "\u003cts\u003e",
+          "meta_data": {
+            "m": "v"
+          },
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 2000,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "quota_renews": "\u003cts\u003e",
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "org-delete",
+    "status": 200,
+    "body": {
+      "action": "deleted",
+      "key": "default",
+      "status": "ok"
+    },
+    "redis": []
+  }
+]
