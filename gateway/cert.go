@@ -1,7 +1,6 @@
 package gateway
 
 import (
-	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
@@ -21,6 +20,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/config"
+	cpcerts "github.com/TykTechnologies/tyk/pkg/controlplane/certs"
 
 	"github.com/TykTechnologies/tyk/internal/cache"
 )
@@ -603,6 +603,7 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 
 func (gw *Gateway) certHandler(w http.ResponseWriter, r *http.Request) {
 	certID := mux.Vars(r)["certID"]
+	svc := cpcerts.New(gw.CertificateManager)
 
 	switch r.Method {
 	case "POST":
@@ -614,7 +615,7 @@ func (gw *Gateway) certHandler(w http.ResponseWriter, r *http.Request) {
 
 		orgID := r.URL.Query().Get("org_id")
 		var certID string
-		if certID, err = gw.CertificateManager.Add(content, orgID); err != nil {
+		if certID, err = svc.Add(content, orgID); err != nil {
 			doJSONWrite(w, http.StatusForbidden, apiError(err.Error()))
 			return
 		}
@@ -624,52 +625,29 @@ func (gw *Gateway) certHandler(w http.ResponseWriter, r *http.Request) {
 		if certID == "" {
 			orgID := r.URL.Query().Get("org_id")
 			mode := r.URL.Query().Get("mode")
-			certIDs := gw.CertificateManager.ListAllIds(orgID)
 			if mode == ListDetailed {
-				var certificateBasics = make([]*certs.CertificateBasics, len(certIDs))
-				certificates := gw.CertificateManager.List(certIDs, certs.CertificateAny)
-				for ci, certificate := range certificates {
-					certificateBasics[ci] = certs.ExtractCertificateBasics(certificate, certIDs[ci])
-				}
-
-				doJSONWrite(w, http.StatusOK, &APIAllCertificateBasics{Certs: certificateBasics})
+				doJSONWrite(w, http.StatusOK, &APIAllCertificateBasics{Certs: svc.Basics(orgID)})
 				return
 			}
 
-			doJSONWrite(w, http.StatusOK, &APIAllCertificates{certIDs})
+			doJSONWrite(w, http.StatusOK, &APIAllCertificates{svc.ListIDs(orgID)})
 			return
 		}
 
-		certIDs := strings.Split(certID, ",")
-		certificates := gw.CertificateManager.List(certIDs, certs.CertificateAny)
-
+		certIDs := cpcerts.SplitIDs(certID)
 		if len(certIDs) == 1 {
-			if certificates[0] == nil {
-				doJSONWrite(w, http.StatusNotFound, apiError("Certificate with given SHA256 fingerprint not found"))
+			meta, err := svc.Meta(certIDs[0])
+			if err != nil {
+				doJSONWrite(w, http.StatusNotFound, apiError(err.Error()))
 				return
 			}
-
-			doJSONWrite(w, http.StatusOK, certs.ExtractCertificateMeta(certificates[0], certIDs[0]))
-			return
-		} else {
-			var meta []*certs.CertificateMeta
-			for ci, cert := range certificates {
-				if cert != nil {
-					meta = append(meta, certs.ExtractCertificateMeta(cert, certIDs[ci]))
-				} else {
-					meta = append(meta, nil)
-				}
-			}
-
 			doJSONWrite(w, http.StatusOK, meta)
 			return
 		}
+
+		doJSONWrite(w, http.StatusOK, svc.Metas(certIDs))
 	case "DELETE":
-		orgID := r.URL.Query().Get("org_id")
-		if orgID == "" && len(certID) >= sha256.Size*2 {
-			orgID = certID[:len(certID)-sha256.Size*2]
-		}
-		gw.CertificateManager.Delete(certID, orgID)
+		svc.Delete(certID, r.URL.Query().Get("org_id"))
 		doJSONWrite(w, http.StatusOK, &apiStatusMessage{"ok", "removed"})
 	}
 }

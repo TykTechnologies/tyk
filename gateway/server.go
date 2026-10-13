@@ -69,6 +69,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	tyklog "github.com/TykTechnologies/tyk/log"
+	cpcerts "github.com/TykTechnologies/tyk/pkg/controlplane/certs"
 	"github.com/TykTechnologies/tyk/pkg/osutil"
 	"github.com/TykTechnologies/tyk/pkg/validator"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -656,12 +657,9 @@ func (gw *Gateway) setupGlobals() {
 		gw.SetConfig(conf)
 	}
 
-	certificateSecret := gw.GetConfig().Secret
-	if gw.GetConfig().Security.PrivateCertificateEncodingSecret != "" {
-		certificateSecret = gw.GetConfig().Security.PrivateCertificateEncodingSecret
-	}
+	certificateSecret := cpcerts.EncodingSecret(gw.GetConfig().Security.PrivateCertificateEncodingSecret, gw.GetConfig().Secret)
 
-	storeCert := &storage.RedisCluster{KeyPrefix: "cert-", HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
+	storeCert := cpcerts.NewStore(gw.StorageConnectionHandler)
 	storeCert.Connect()
 
 	conf := gw.GetConfig()
