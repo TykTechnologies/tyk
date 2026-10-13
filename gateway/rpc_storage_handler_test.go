@@ -1515,8 +1515,13 @@ func TestGetRawExp(t *testing.T) {
 		Gw:               g.Gw,
 	}
 	require.True(t, rpcListener.Connect(), "Failed to connect to RPC server")
-	require.Eventually(t, func() bool { return !rpc.IsEmergencyMode() }, 5*time.Second, 10*time.Millisecond,
-		"RPC client did not leave emergency mode")
+	require.Eventually(t, func() bool {
+		// A successful login clears emergency mode left by other tests.
+		if rpc.IsEmergencyMode() {
+			rpc.Login()
+		}
+		return !rpc.IsEmergencyMode()
+	}, 5*time.Second, 50*time.Millisecond, "RPC client did not leave emergency mode")
 
 	t.Run("returns management layer TTL for the raw key name", func(t *testing.T) {
 		takeRequestedKeys()
@@ -1607,8 +1612,13 @@ func TestGetSessionAndCreate_UsesManagementLayerTTL(t *testing.T) {
 		Gw:               g.Gw,
 	}
 	require.True(t, rpcListener.Connect(), "Failed to connect to RPC server")
-	require.Eventually(t, func() bool { return !rpc.IsEmergencyMode() }, 5*time.Second, 10*time.Millisecond,
-		"RPC client did not leave emergency mode")
+	require.Eventually(t, func() bool {
+		// A successful login clears emergency mode left by other tests.
+		if rpc.IsEmergencyMode() {
+			rpc.Login()
+		}
+		return !rpc.IsEmergencyMode()
+	}, 5*time.Second, 50*time.Millisecond, "RPC client did not leave emergency mode")
 
 	g.Gw.getSessionAndCreate(keyHash, &rpcListener, true, orgID)
 

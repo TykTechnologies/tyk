@@ -4285,6 +4285,7 @@ func TestSyncedKeyLifetime(t *testing.T) {
 		remoteTTL        func() (int64, error)
 		expectRemoteCall bool
 		expectedLifetime int64
+		expectSkip       bool
 	}{
 		{
 			name:             "API not loaded, management layer TTL is used",
@@ -4308,11 +4309,12 @@ func TestSyncedKeyLifetime(t *testing.T) {
 			expectedLifetime: 3600,
 		},
 		{
-			name:             "API not loaded, key missing in management layer falls back to key session lifetime",
+			name:             "API not loaded, key missing in management layer is skipped",
 			session:          user.SessionState{SessionLifetime: 3600, AccessRights: notLoaded},
 			remoteTTL:        remote(-2, nil),
 			expectRemoteCall: true,
-			expectedLifetime: 3600,
+			expectedLifetime: 0,
+			expectSkip:       true,
 		},
 		{
 			name:             "API not loaded, no management layer lookup falls back to key session lifetime",
@@ -4359,7 +4361,9 @@ func TestSyncedKeyLifetime(t *testing.T) {
 			}
 
 			session := tc.session
-			assert.Equal(t, tc.expectedLifetime, ts.Gw.syncedKeyLifetime(&session, remoteTTL))
+			lifetime, exists := ts.Gw.syncedKeyLifetime(&session, remoteTTL)
+			assert.Equal(t, tc.expectedLifetime, lifetime)
+			assert.Equal(t, !tc.expectSkip, exists)
 			assert.Equal(t, tc.expectRemoteCall, remoteCalled)
 		})
 	}
@@ -4388,6 +4392,30 @@ func TestHandleAddKey_SetsTTLWhenAPINotLoaded(t *testing.T) {
 	ttl, err := ts.Gw.GlobalSessionManager.Store().GetExp(keyName)
 	require.NoError(t, err)
 	assert.InDelta(t, 3600, ttl, 5)
+}
+
+func TestHandleAddKey_SkipsKeyRemovedFromManagementLayer(t *testing.T) {
+	ts := StartTest(func(c *config.Config) {
+		c.HashKeys = false
+	})
+	defer ts.Close()
+
+	const keyName = "synced-key-removed-upstream"
+	sess := user.SessionState{
+		OrgID: "default",
+		AccessRights: map[string]user.AccessDefinition{
+			"not-loaded": {APIID: "not-loaded", APIName: "not-loaded", Versions: []string{"Default"}},
+		},
+	}
+	sessionJSON, err := json.Marshal(sess)
+	require.NoError(t, err)
+
+	ts.Gw.handleAddKey(keyName, string(sessionJSON), "default", func() (int64, error) {
+		return -2, nil
+	})
+
+	_, err = ts.Gw.GlobalSessionManager.Store().GetKey(keyName)
+	assert.ErrorIs(t, err, storage.ErrKeyNotFound)
 }
 
 func TestApplyLifetime_PostExpiry(t *testing.T) {
