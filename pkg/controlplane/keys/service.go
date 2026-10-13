@@ -3,6 +3,7 @@ package keys
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
@@ -35,6 +36,20 @@ type APIInfo struct {
 	// IsMCP reports an MCP proxy (not a synthetic adapter), which constrains
 	// which access-right fields are allowed.
 	IsMCP bool
+
+	// UseOAuth2 and EnableJWT gate OAuth client administration.
+	UseOAuth2 bool
+	EnableJWT bool
+	// OAuth carries the API's oauth_meta, used to build the OAuth server.
+	OAuth OAuthMeta
+}
+
+// OAuthMeta mirrors apidef.APIDefinition.Oauth2Meta without the osin
+// dependency; the values are osin.AccessRequestType / AuthorizeRequestType.
+type OAuthMeta struct {
+	AllowedAccessTypes     []string
+	AllowedAuthorizeTypes  []string
+	AuthorizeLoginRedirect string
 }
 
 // APIInfoProvider resolves APIs for the key logic. A false second return
@@ -399,4 +414,79 @@ func nonScopedPolicyID(id string) model.PolicyID {
 // write step shared by Create, CreateOrUpdate and the JSVM key API.
 func (s *Service) AddOrUpdate(keyName string, session *user.SessionState, suppressReset bool, isHashed bool) error {
 	return s.doAddOrUpdate(keyName, session, suppressReset, isHashed)
+}
+
+// GenerateToken builds a token for orgID and keyID with the configured
+// hash function (the gateway's generateToken).
+func (s *Service) GenerateToken(orgID, keyID string) string {
+	return s.generateToken(orgID, keyID)
+}
+
+// LifetimeFor returns the session TTL for one API, ignoring the session's
+// access rights (used by the OAuth password flow and the JWT middleware).
+func (s *Service) LifetimeFor(sess *user.SessionState, api *APIInfo) int64 {
+	cfg := s.cfg()
+	if api == nil {
+		return sess.Lifetime(cfg.SessionLifetimeRespectsKeyExpiration, 0, cfg.ForceGlobalSessionLifetime, cfg.GlobalSessionLifetime)
+	}
+	respects := cfg.SessionLifetimeRespectsKeyExpiration || api.SessionLifetimeRespectsKeyExpiration
+	return sess.Lifetime(respects, api.SessionLifetime, cfg.ForceGlobalSessionLifetime, cfg.GlobalSessionLifetime)
+}
+
+// SessionFromPolicy builds a session from a policy (the JWT middleware's
+// generateSessionFromPolicy). With enforceOrg the policy must belong to
+// orgID; otherwise the policy's org is used.
+func (s *Service) SessionFromPolicy(policyID, orgID string, enforceOrg bool) (user.SessionState, error) {
+	var polID model.PolicyID
+	if enforceOrg {
+		polID = model.NewScopedCustomPolicyId(orgID, policyID)
+	} else {
+		polID = model.NonScopedLastInsertedPolicyId(policyID)
+	}
+
+	pol, ok := s.d.Policies.PolicyByID(polID)
+	session := user.SessionState{}
+
+	if !ok {
+		return session.Clone(), errors.New("Policy not found")
+	}
+	// Check ownership, policy org owner must be the same as API,
+	// otherwise you could overwrite a session key with a policy from a different org!
+	if enforceOrg {
+		if pol.OrgID != orgID {
+			s.log.Error("Attempting to apply policy from different organisation to key, skipping")
+			return session.Clone(), errors.New("Key not authorized: no matching policy")
+		}
+	} else {
+		// Org isn't enforced, so lets use the policy baseline
+		orgID = pol.OrgID
+	}
+
+	session.SetPolicies(policyID)
+	session.OrgID = orgID
+	session.Allowance = pol.Rate // legacy, kept so output is consistent
+	session.Rate = pol.Rate
+	session.Per = pol.Per
+	session.ThrottleInterval = pol.ThrottleInterval
+	session.ThrottleRetryLimit = pol.ThrottleRetryLimit
+	session.MaxQueryDepth = pol.MaxQueryDepth
+	session.QuotaMax = pol.QuotaMax
+	session.QuotaRenewalRate = pol.QuotaRenewalRate
+	session.AccessRights = make(map[string]user.AccessDefinition)
+	for apiID, access := range pol.AccessRights {
+		session.AccessRights[apiID] = access
+	}
+	session.HMACEnabled = pol.HMACEnabled
+	session.EnableHTTPSignatureValidation = pol.EnableHTTPSignatureValidation
+	session.IsInactive = pol.IsInactive
+	session.Tags = pol.Tags
+
+	if pol.KeyExpiresIn > 0 {
+		session.Expires = time.Now().Unix() + pol.KeyExpiresIn
+	}
+
+	session.PostExpiryAction = pol.PostExpiryAction
+	session.PostExpiryGracePeriod = pol.PostExpiryGracePeriod
+
+	return session.Clone(), nil
 }

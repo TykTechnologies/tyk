@@ -3,8 +3,11 @@ package gateway
 import (
 	"net/http"
 
+	"github.com/lonelycode/osin"
+
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/pkg/controlplane/keys"
+	"github.com/TykTechnologies/tyk/pkg/controlplane/oauth"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -26,7 +29,30 @@ func apiInfoFromSpec(spec *APISpec) keys.APIInfo {
 		SessionLifetimeRespectsKeyExpiration: spec.SessionLifetimeRespectsKeyExpiration,
 		DontSetQuotasOnCreate:                spec.DontSetQuotasOnCreate,
 		IsMCP:                                mcpProxy(spec),
+		UseOAuth2:                            spec.UseOauth2,
+		EnableJWT:                            spec.EnableJWT,
+		OAuth: keys.OAuthMeta{
+			AllowedAccessTypes:     accessTypesToStrings(spec.Oauth2Meta.AllowedAccessTypes),
+			AllowedAuthorizeTypes:  authorizeTypesToStrings(spec.Oauth2Meta.AllowedAuthorizeTypes),
+			AuthorizeLoginRedirect: spec.Oauth2Meta.AuthorizeLoginRedirect,
+		},
 	}
+}
+
+func accessTypesToStrings(in []osin.AccessRequestType) []string {
+	out := make([]string, 0, len(in))
+	for _, t := range in {
+		out = append(out, string(t))
+	}
+	return out
+}
+
+func authorizeTypesToStrings(in []osin.AuthorizeRequestType) []string {
+	out := make([]string, 0, len(in))
+	for _, t := range in {
+		out = append(out, string(t))
+	}
+	return out
 }
 
 func (a gwAPIInfo) APIByID(apiID string) (keys.APIInfo, bool) {
@@ -161,4 +187,120 @@ func (gw *Gateway) controlPlaneOrgKeys() *keys.OrgService {
 			Log:      log,
 		},
 	)
+}
+
+// ---------------------------------------------------------------------------
+// OAuth
+
+func oauthConfigFromGateway(c config.Config) oauth.Config {
+	return oauth.Config{
+		HashKeys:                      c.HashKeys,
+		OAuthTokenExpire:              c.OauthTokenExpire,
+		OAuthRefreshExpire:            c.OauthRefreshExpire,
+		OAuthTokenExpiredRetainPeriod: c.OauthTokenExpiredRetainPeriod,
+		OAuthRedirectURISeparator:     c.OauthRedirectUriSeparator,
+		OAuthErrorStatusCode:          c.OauthErrorStatusCode,
+		EnableCluster:                 c.Storage.EnableCluster,
+		UseRPC:                        c.SlaveOptions.UseRPC,
+	}
+}
+
+func (gw *Gateway) oauthConfig() oauth.Config {
+	return oauthConfigFromGateway(gw.GetConfig())
+}
+
+// newOAuthStorage builds the per-API OAuth storage: an MDCB-aware store for
+// clients and tokens and a local Redis store for the token index.
+func (gw *Gateway) newOAuthStorage(apiID, orgID string) *oauth.Storage {
+	prefix := generateOAuthPrefix(apiID)
+	storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
+	storageManager.Connect()
+
+	storageDriver := &storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
+	storageDriver.Connect()
+
+	return oauth.NewStorage(storageManager, storageDriver, gwSessions{gw}, orgID, gw.oauthConfig, gw.controlPlaneKeys(), log)
+}
+
+// ensureOAuthManager lazily attaches an OAuth manager (storage only, no
+// grant configuration) to a spec that is not an OAuth API but needs client
+// lookups, e.g. for JWT client ID mapping or policy-driven client creation.
+func (gw *Gateway) ensureOAuthManager(spec *APISpec) OAuthManagerInterface {
+	if spec.OAuthManager == nil {
+		spec.OAuthManager = &OAuthManager{
+			OsinServer: gw.TykOsinNewServer(&osin.ServerConfig{}, gw.newOAuthStorage(spec.APIID, spec.OrgID)),
+			Gw:         gw,
+		}
+	}
+	return spec.OAuthManager
+}
+
+// osinServerOf returns the osin server behind a spec's OAuth manager, or
+// one built over its storage when the manager is not the gateway's type.
+func (gw *Gateway) osinServerOf(m OAuthManagerInterface) *oauth.Server {
+	if om, ok := m.(*OAuthManager); ok && om.OsinServer != nil {
+		return om.OsinServer
+	}
+	return gw.TykOsinNewServer(&osin.ServerConfig{}, m.Storage())
+}
+
+// oauthManagerFor binds a spec and osin server to the library manager.
+func (gw *Gateway) oauthManagerFor(spec *APISpec, server *oauth.Server) *oauth.Manager {
+	var api keys.APIInfo
+	if spec != nil {
+		api = apiInfoFromSpec(spec)
+	}
+	return &oauth.Manager{
+		API:      api,
+		Server:   server,
+		Sessions: gwSessions{gw},
+		Keys:     gw.controlPlaneKeys(),
+		Cfg:      gw.oauthConfig,
+		Log:      log,
+	}
+}
+
+// gwOAuthResolver resolves per-spec OAuth managers for the library.
+type gwOAuthResolver struct{ gw *Gateway }
+
+func (o gwOAuthResolver) StorageFor(apiID string, createIfMissing bool) (oauth.ExtendedOsinStorageInterface, oauth.Resolution) {
+	spec := o.gw.getApiSpec(apiID)
+	if spec == nil {
+		return nil, oauth.APINotFound
+	}
+	if spec.OAuthManager == nil {
+		if !createIfMissing {
+			return nil, oauth.NoManager
+		}
+		o.gw.ensureOAuthManager(spec)
+	}
+	return spec.OAuthManager.Storage(), oauth.Found
+}
+
+func (o gwOAuthResolver) ManagerFor(apiID string, createIfMissing bool) (*oauth.Manager, oauth.Resolution) {
+	spec := o.gw.getApiSpec(apiID)
+	if spec == nil {
+		return nil, oauth.APINotFound
+	}
+	if spec.OAuthManager == nil {
+		if !createIfMissing {
+			return nil, oauth.NoManager
+		}
+		o.gw.ensureOAuthManager(spec)
+	}
+	return o.gw.oauthManagerFor(spec, o.gw.osinServerOf(spec.OAuthManager)), oauth.Found
+}
+
+// controlPlaneOAuth returns the OAuth administration service bound to this gateway.
+func (gw *Gateway) controlPlaneOAuth() *oauth.Service {
+	purge := &storage.RedisCluster{KeyPrefix: "", HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
+	purge.Connect()
+	return oauth.New(gw.oauthConfig, oauth.Deps{
+		Resolver:  gwOAuthResolver{gw},
+		APIs:      gwAPIInfo{gw},
+		Policies:  gw.policies,
+		NewSecret: func() string { return createOauthClientSecret() },
+		Purge:     purge,
+		Log:       log,
+	})
 }

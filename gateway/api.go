@@ -45,7 +45,6 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gorilla/mux"
-	"github.com/lonelycode/osin"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 
@@ -63,10 +62,10 @@ import (
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	lib "github.com/TykTechnologies/tyk/lib/apidef"
 	"github.com/TykTechnologies/tyk/pkg/controlplane/keys"
+	"github.com/TykTechnologies/tyk/pkg/controlplane/oauth"
 	"github.com/TykTechnologies/tyk/pkg/identifier"
 	"github.com/TykTechnologies/tyk/pkg/osutil"
 	"github.com/TykTechnologies/tyk/pkg/schema"
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -125,16 +124,9 @@ func getNewCertIDs(originalCerts, newCerts []string) []string {
 }
 
 // paginationStatus provides more information about a paginated data set
-type paginationStatus struct {
-	PageNum   int `json:"page_num"`
-	PageTotal int `json:"page_total"`
-	PageSize  int `json:"page_size"`
-}
+type paginationStatus = oauth.PaginationStatus
 
-type paginatedOAuthClientTokens struct {
-	Pagination paginationStatus
-	Tokens     []OAuthClientToken
-}
+type paginatedOAuthClientTokens = oauth.PaginatedClientTokens
 
 type VersionMetas struct {
 	Status string        `json:"status"`
@@ -1471,19 +1463,7 @@ func (gw *Gateway) previewKeyHandler(w http.ResponseWriter, r *http.Request) {
 // NewClientRequest is an outward facing JSON object translated from osin OAuthClients
 //
 // swagger:model NewClientRequest
-type NewClientRequest struct {
-	ClientID          string      `json:"client_id"`
-	ClientRedirectURI string      `json:"redirect_uri"`
-	APIID             string      `json:"api_id,omitempty"`
-	PolicyID          string      `json:"policy_id,omitempty"`
-	ClientSecret      string      `json:"secret"`
-	MetaData          interface{} `json:"meta_data"`
-	Description       string      `json:"description"`
-}
-
-func oauthClientStorageID(clientID string) string {
-	return prefixClient + clientID
-}
+type NewClientRequest = oauth.ClientRequest
 
 func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 	var newOauthClient NewClientRequest
@@ -1497,213 +1477,16 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Allow the client ID to be set
-	clientID := newOauthClient.ClientID
-
-	if newOauthClient.ClientID == "" {
-		clientID = uuid.NewHex()
-	}
-
-	// Allow the secret to be set
-	secret := newOauthClient.ClientSecret
-	if newOauthClient.ClientSecret == "" {
-		secret = createOauthClientSecret()
-	}
-
-	newClient := OAuthClient{
-		ClientID:          clientID,
-		ClientRedirectURI: newOauthClient.ClientRedirectURI,
-		ClientSecret:      secret,
-		PolicyID:          newOauthClient.PolicyID,
-		MetaData:          newOauthClient.MetaData,
-		Description:       newOauthClient.Description,
-	}
-
-	storageID := oauthClientStorageID(newClient.GetId())
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
-	}).Debug("Created storage ID: ", storageID)
-
-	if newOauthClient.APIID != "" {
-		// set client only for passed API ID
-		apiSpec := gw.getApiSpec(newOauthClient.APIID)
-		if apiSpec == nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "api",
-				"apiID":  newOauthClient.APIID,
-				"status": "fail",
-				"err":    "API doesn't exist",
-			}).Error("Failed to create OAuth client")
-			doJSONWrite(w, http.StatusBadRequest, apiError("API doesn't exist"))
-			return
-		}
-
-		if !apiSpec.UseOauth2 {
-			doJSONWrite(w, http.StatusBadRequest,
-				apiError("API is not OAuth2"))
-			return
-		}
-
-		err := apiSpec.OAuthManager.Storage().SetClient(storageID, apiSpec.OrgID, &newClient, true)
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "api",
-				"apiID":  newOauthClient.APIID,
-				"status": "fail",
-				"err":    err,
-			}).Error("Failed to create OAuth client")
-			doJSONWrite(w, http.StatusInternalServerError, apiError("Failure in storing client data."))
-			return
-		}
-	} else {
-		// set client for all APIs from the given policy
-		policy, ok := gw.policies.PolicyByID(model.NonScopedLastInsertedPolicyId(newClient.PolicyID))
-		if !ok {
-			log.WithFields(logrus.Fields{
-				"prefix":   "api",
-				"policyID": newClient.PolicyID,
-				"status":   "fail",
-				"err":      "Policy doesn't exist",
-			}).Error("Failed to create OAuth client")
-			doJSONWrite(w, http.StatusBadRequest, apiError("Policy doesn't exist"))
-			return
-		}
-
-		oauth2 := false
-		// iterate over APIs and set client for each of them
-		for apiID := range policy.AccessRights {
-			apiSpec := gw.getApiSpec(apiID)
-			if apiSpec == nil {
-				log.WithFields(logrus.Fields{
-					"prefix": "api",
-					"apiID":  apiID,
-					"status": "fail",
-					"err":    "API doesn't exist",
-				}).Error("Failed to create OAuth client")
-				doJSONWrite(w, http.StatusBadRequest, apiError("API doesn't exist"))
-				return
-			}
-			// set oauth client if it is oauth API
-			if apiSpec.UseOauth2 || apiSpec.EnableJWT {
-				oauth2 = true
-				if apiSpec.OAuthManager == nil {
-
-					prefix := generateOAuthPrefix(apiSpec.APIID)
-					storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
-					storageManager.Connect()
-
-					storageDriver := &storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
-					storageDriver.Connect()
-
-					apiSpec.OAuthManager = &OAuthManager{
-						OsinServer: gw.TykOsinNewServer(
-							&osin.ServerConfig{},
-							&RedisOsinStorageInterface{
-								storageManager,
-								gw.GlobalSessionManager,
-								storageDriver,
-								apiSpec.OrgID,
-								gw,
-							}),
-					}
-				}
-				err := apiSpec.OAuthManager.Storage().SetClient(storageID, apiSpec.APIDefinition.OrgID, &newClient, true)
-				if err != nil {
-					log.WithFields(logrus.Fields{
-						"prefix": "api",
-						"apiID":  apiID,
-						"status": "fail",
-						"err":    err,
-					}).Error("Failed to create OAuth client")
-					doJSONWrite(w, http.StatusInternalServerError, apiError("Failure in storing client data."))
-					return
-				}
-			}
-		}
-
-		if !oauth2 {
-			doJSONWrite(w, http.StatusBadRequest,
-				apiError("API is not OAuth2"))
-			return
-		}
-	}
-
-	clientData := NewClientRequest{
-		ClientID:          newClient.GetId(),
-		ClientSecret:      newClient.GetSecret(),
-		ClientRedirectURI: newClient.GetRedirectUri(),
-		PolicyID:          newClient.GetPolicyID(),
-		MetaData:          newClient.GetUserData(),
-		Description:       newClient.GetDescription(),
-	}
-
-	log.WithFields(logrus.Fields{
-		"prefix":            "api",
-		"apiID":             newOauthClient.APIID,
-		"clientID":          clientData.ClientID,
-		"clientRedirectURI": clientData.ClientRedirectURI,
-		"policyID":          clientData.PolicyID,
-		"description":       clientData.Description,
-		"status":            "ok",
-	}).Info("Created OAuth client")
-
-	doJSONWrite(w, http.StatusOK, clientData)
+	obj, code := cpResponse(gw.controlPlaneOAuth().CreateClient(newOauthClient))
+	doJSONWrite(w, code, obj)
 }
 
 func (gw *Gateway) rotateOauthClient(keyName, apiID string) (interface{}, int) {
-	// check API
-	apiSpec := gw.getApiSpec(apiID)
-	if apiSpec == nil {
-		return apiError("API doesn't exist"), http.StatusNotFound
-	}
-
-	// get existing version of oauth-client
-	storageID := oauthClientStorageID(keyName)
-	client, err := apiSpec.OAuthManager.Storage().GetExtendedClientNoPrefix(storageID)
-	if err != nil {
-		return apiError("OAuth Client ID not found"), http.StatusNotFound
-	}
-
-	// update client
-	updatedClient := OAuthClient{
-		ClientID:          client.GetId(),
-		ClientSecret:      createOauthClientSecret(),
-		ClientRedirectURI: client.GetRedirectUri(),
-		PolicyID:          client.GetPolicyID(),
-		MetaData:          client.GetUserData(),
-		Description:       client.GetDescription(),
-	}
-
-	err = apiSpec.OAuthManager.Storage().SetClient(storageID, apiSpec.OrgID, &updatedClient, true)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "fail",
-			"err":    err,
-		}).Error("Failed to update OAuth client")
-		return apiError("Failure in storing client data"), http.StatusInternalServerError
-	}
-
-	// invalidate tokens if we had a new policy
-	invalidateTokens(client, updatedClient, apiSpec.OAuthManager)
-
-	// convert to outbound format
-	replyData := NewClientRequest{
-		ClientID:          updatedClient.GetId(),
-		ClientSecret:      updatedClient.ClientSecret,
-		ClientRedirectURI: updatedClient.GetRedirectUri(),
-		PolicyID:          updatedClient.GetPolicyID(),
-		MetaData:          updatedClient.GetUserData(),
-		Description:       updatedClient.GetDescription(),
-	}
-
-	return replyData, http.StatusOK
+	return cpResponse(gw.controlPlaneOAuth().RotateClientSecret(apiID, keyName))
 }
 
 // Update Client
 func (gw *Gateway) updateOauthClient(keyName, apiID string, r *http.Request) (interface{}, int) {
-	// read payload
 	var updateClientData NewClientRequest
 	if err := json.NewDecoder(r.Body).Decode(&updateClientData); err != nil {
 		log.WithFields(logrus.Fields{
@@ -1714,133 +1497,14 @@ func (gw *Gateway) updateOauthClient(keyName, apiID string, r *http.Request) (in
 		return apiError("Unmarshalling failed"), http.StatusInternalServerError
 	}
 
-	// check API
-	apiSpec := gw.getApiSpec(apiID)
-	if apiSpec == nil {
-		return apiError("API doesn't exist"), http.StatusNotFound
-	}
-
-	// check policy
-	if updateClientData.PolicyID != "" {
-		policy, ok := gw.policies.PolicyByID(model.NewScopedCustomPolicyId(apiSpec.OrgID, updateClientData.PolicyID))
-		if !ok {
-			return apiError("Policy doesn't exist"), http.StatusNotFound
-		}
-		if _, ok := policy.AccessRights[apiID]; !ok {
-			return apiError("Policy access rights doesn't contain API this OAuth client belongs to"),
-				http.StatusBadRequest
-		}
-	}
-
-	// get existing version of oauth-client
-	storageID := oauthClientStorageID(keyName)
-	client, err := apiSpec.OAuthManager.Storage().GetExtendedClientNoPrefix(storageID)
-	if err != nil {
-		return apiError("OAuth Client ID not found"), http.StatusNotFound
-	}
-
-	// update client
-	updatedClient := OAuthClient{
-		ClientID:          client.GetId(),
-		ClientSecret:      client.GetSecret(),
-		ClientRedirectURI: updateClientData.ClientRedirectURI, // update
-		PolicyID:          updateClientData.PolicyID,          // update
-		MetaData:          updateClientData.MetaData,          // update
-		Description:       updateClientData.Description,       // update
-	}
-
-	err = apiSpec.OAuthManager.Storage().SetClient(storageID, apiSpec.OrgID, &updatedClient, true)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "fail",
-			"err":    err,
-		}).Error("Failed to update OAuth client")
-		return apiError("Failure in storing client data"), http.StatusInternalServerError
-	}
-
-	// invalidate tokens if we had a new policy
-	invalidateTokens(client, updatedClient, apiSpec.OAuthManager)
-
-	// convert to outbound format
-	replyData := NewClientRequest{
-		ClientID:          updatedClient.GetId(),
-		ClientSecret:      updatedClient.GetSecret(),
-		ClientRedirectURI: updatedClient.GetRedirectUri(),
-		PolicyID:          updatedClient.GetPolicyID(),
-		MetaData:          updatedClient.GetUserData(),
-		Description:       updatedClient.GetDescription(),
-	}
-
-	return replyData, http.StatusOK
+	return cpResponse(gw.controlPlaneOAuth().UpdateClient(apiID, keyName, updateClientData))
 }
 
 func (gw *Gateway) invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 	apiID := r.URL.Query().Get("api_id")
-	if apiID == "" {
-		doJSONWrite(w, http.StatusBadRequest, apiError("Missing parameter api_id"))
-		return
-	}
-	apiSpec := gw.getApiSpec(apiID)
-
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
-		"apiID":  apiID,
-	}).Debug("Looking for refresh token in API Register")
-
-	if apiSpec == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "fail",
-			"err":    "API not found",
-		}).Error("Failed to invalidate refresh token")
-
-		doJSONWrite(w, http.StatusNotFound, apiError("API for this refresh token not found"))
-		return
-	}
-
-	if apiSpec.OAuthManager == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "fail",
-			"err":    "API is not OAuth",
-		}).Error("Failed to invalidate refresh token")
-
-		doJSONWrite(w, http.StatusBadRequest, apiError("OAuth is not enabled on this API"))
-		return
-	}
-
 	keyName := mux.Vars(r)["keyName"]
-	err := apiSpec.OAuthManager.Storage().RemoveRefresh(keyName)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "fail",
-			"err":    err,
-		}).Error("Failed to invalidate refresh token")
-
-		doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to invalidate refresh token"))
-		return
-	}
-
-	success := apiModifyKeySuccess{
-		Key:    keyName,
-		Status: "ok",
-		Action: "deleted",
-	}
-
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
-		"apiID":  apiID,
-		"token":  keyName,
-		"status": "ok",
-	}).Info("Invalidated refresh token")
-
-	doJSONWrite(w, http.StatusOK, success)
+	obj, code := cpResponse(gw.controlPlaneOAuth().InvalidateRefresh(apiID, keyName))
+	doJSONWrite(w, code, obj)
 }
 
 func (gw *Gateway) rotateOauthClientHandler(w http.ResponseWriter, r *http.Request) {
@@ -1854,29 +1518,9 @@ func (gw *Gateway) rotateOauthClientHandler(w http.ResponseWriter, r *http.Reque
 }
 
 func (gw *Gateway) getApisForOauthApp(w http.ResponseWriter, r *http.Request) {
-	apis := []string{}
 	appID := mux.Vars(r)["appID"]
 	orgID := r.FormValue("orgID")
-
-	//get all organization apis
-	apisIds := gw.getApisIdsForOrg(orgID)
-
-	for index := range apisIds {
-		if api := gw.getApiSpec(apisIds[index]); api != nil {
-			if api.UseOauth2 {
-				clients, _, code := gw.getApiClients(apisIds[index])
-				if code == http.StatusOK {
-					for _, client := range clients {
-						if client.GetId() == appID {
-							apis = append(apis, apisIds[index])
-						}
-					}
-				}
-			}
-		}
-	}
-
-	doJSONWrite(w, http.StatusOK, apis)
+	doJSONWrite(w, http.StatusOK, gw.controlPlaneOAuth().APIsForClient(appID, orgID))
 }
 
 func (gw *Gateway) oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
@@ -1909,19 +1553,6 @@ func (gw *Gateway) oAuthClientTokensHandler(w http.ResponseWriter, r *http.Reque
 	apiID := mux.Vars(r)["apiID"]
 	keyName := mux.Vars(r)["keyName"]
 
-	apiSpec := gw.getApiSpec(apiID)
-	if apiSpec == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "fail",
-			"client": keyName,
-			"err":    "not found",
-		}).Error("Failed to retrieve OAuth tokens")
-		doJSONWrite(w, http.StatusNotFound, apiError("OAuth Client ID not found"))
-		return
-	}
-
 	if p := r.URL.Query().Get("page"); p != "" {
 		page := 1
 
@@ -1934,89 +1565,18 @@ func (gw *Gateway) oAuthClientTokensHandler(w http.ResponseWriter, r *http.Reque
 			page = 1
 		}
 
-		tokens, totalPages, err := apiSpec.OAuthManager.Storage().GetPaginatedClientTokens(keyName, page)
-		if err != nil {
-			doJSONWrite(w, http.StatusInternalServerError, apiError("Get client tokens failed"))
-			return
-		}
-
-		doJSONWrite(w, http.StatusOK, paginatedOAuthClientTokens{
-			Pagination: paginationStatus{
-				PageSize:  100,
-				PageNum:   page,
-				PageTotal: totalPages,
-			},
-			Tokens: tokens,
-		})
-
+		obj, code := cpResponse(gw.controlPlaneOAuth().ClientTokensPage(apiID, keyName, page))
+		doJSONWrite(w, code, obj)
 		return
 	}
 
-	tokens, err := apiSpec.OAuthManager.Storage().GetClientTokens(keyName)
-	if err != nil {
-		doJSONWrite(w, http.StatusInternalServerError, apiError("Get client tokens failed"))
-		return
-	}
-
-	doJSONWrite(w, http.StatusOK, tokens)
+	obj, code := cpResponse(gw.controlPlaneOAuth().ClientTokens(apiID, keyName))
+	doJSONWrite(w, code, obj)
 }
 
 // Get client details
 func (gw *Gateway) getOauthClientDetails(keyName, apiID string) (interface{}, int) {
-	storageID := oauthClientStorageID(keyName)
-	apiSpec := gw.getApiSpec(apiID)
-	if apiSpec == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "fail",
-			"client": keyName,
-			"err":    "not found",
-		}).Error("Failed to retrieve OAuth client details")
-		return apiError("OAuth Client ID not found"), http.StatusNotFound
-	}
-
-	if apiSpec.OAuthManager == nil {
-		prefix := generateOAuthPrefix(apiSpec.APIID)
-		storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
-		storageManager.Connect()
-
-		storageDriver := &storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
-		storageDriver.Connect()
-
-		apiSpec.OAuthManager = &OAuthManager{
-			OsinServer: gw.TykOsinNewServer(&osin.ServerConfig{},
-				&RedisOsinStorageInterface{
-					storageManager,
-					gw.GlobalSessionManager,
-					storageDriver,
-					apiSpec.OrgID,
-					gw,
-				}),
-		}
-	}
-
-	clientData, err := apiSpec.OAuthManager.Storage().GetExtendedClientNoPrefix(storageID)
-	if err != nil {
-		return apiError("OAuth Client ID not found"), http.StatusNotFound
-	}
-	reportableClientData := NewClientRequest{
-		ClientID:          clientData.GetId(),
-		ClientSecret:      clientData.GetSecret(),
-		ClientRedirectURI: clientData.GetRedirectUri(),
-		PolicyID:          clientData.GetPolicyID(),
-		MetaData:          clientData.GetUserData(),
-		Description:       clientData.GetDescription(),
-	}
-
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
-		"apiID":  apiID,
-		"status": "ok",
-		"client": keyName,
-	}).Info("Retrieved OAuth client ID")
-
-	return reportableClientData, http.StatusOK
+	return cpResponse(gw.controlPlaneOAuth().GetClient(apiID, keyName))
 }
 
 func (gw *Gateway) oAuthTokensHandler(w http.ResponseWriter, r *http.Request) {
@@ -2041,44 +1601,7 @@ func (gw *Gateway) oAuthTokensHandler(w http.ResponseWriter, r *http.Request) {
 
 // Delete Client
 func (gw *Gateway) handleDeleteOAuthClient(keyName, apiID string) (interface{}, int) {
-	storageID := oauthClientStorageID(keyName)
-
-	apiSpec := gw.getApiSpec(apiID)
-	if apiSpec == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "fail",
-			"client": keyName,
-			"err":    "not found",
-		}).Error("Failed to delete OAuth client")
-
-		return apiError("OAuth Client ID not found"), http.StatusNotFound
-	}
-
-	if apiSpec.OAuthManager != nil {
-		err := apiSpec.OAuthManager.Storage().DeleteClient(storageID, apiSpec.OrgID, true)
-		if err != nil {
-			return apiError("Delete failed"), http.StatusInternalServerError
-		}
-
-		statusObj := apiModifyKeySuccess{
-			Key:    keyName,
-			Status: "ok",
-			Action: "deleted",
-		}
-
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "ok",
-			"client": keyName,
-		}).Info("Deleted OAuth client")
-
-		return statusObj, http.StatusOK
-	}
-
-	return apiError("OAuth Client ID not found"), http.StatusNotFound
+	return cpResponse(gw.controlPlaneOAuth().DeleteClient(apiID, keyName))
 }
 
 const oAuthNotPropagatedErr = "OAuth client list isn't available or hasn't been propagated yet."
@@ -2088,86 +1611,9 @@ const oauthClientSecretEmpty = "client_secret is required"
 const oauthClientSecretWrong = "client secret is wrong"
 const oauthTokenEmpty = "token is required"
 
-func (gw *Gateway) getApiClients(apiID string) ([]ExtendedOsinClientInterface, apiStatusMessage, int) {
-	var err error
-	filterID := prefixClient
-	apiSpec := gw.getApiSpec(apiID)
-
-	if apiSpec == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "fail",
-			"err":    "API not found",
-		}).Error("Failed to retrieve OAuth client list.")
-		return nil, apiError(oAuthClientNotFound), http.StatusNotFound
-	}
-
-	clientData := []ExtendedOsinClientInterface{}
-	if apiSpec.UseOauth2 {
-		clientData, err = apiSpec.OAuthManager.Storage().GetClients(filterID, apiSpec.OrgID, true)
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "api",
-				"apiID":  apiID,
-				"status": "fail",
-				"err":    err,
-			}).Error("Failed to report OAuth client list")
-
-			return nil, apiError(oAuthClientNotFound), http.StatusNotFound
-		}
-	}
-
-	return clientData, apiStatusMessage{}, http.StatusOK
-}
-
 // List Clients
 func (gw *Gateway) getOauthClients(apiID string) (interface{}, int) {
-
-	clientData, _, apiStatusCode := gw.getApiClients(apiID)
-
-	if apiStatusCode != 200 {
-		return clientData, apiStatusCode
-	}
-
-	clients := []NewClientRequest{}
-	for _, osinClient := range clientData {
-		reportableClientData := NewClientRequest{
-			ClientID:          osinClient.GetId(),
-			ClientSecret:      osinClient.GetSecret(),
-			ClientRedirectURI: osinClient.GetRedirectUri(),
-			PolicyID:          osinClient.GetPolicyID(),
-			MetaData:          osinClient.GetUserData(),
-			Description:       osinClient.GetDescription(),
-		}
-
-		clients = append(clients, reportableClientData)
-	}
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
-		"apiID":  apiID,
-		"status": "ok",
-	}).Info("Retrieved OAuth client list")
-
-	return clients, http.StatusOK
-}
-
-func (gw *Gateway) getApisForOauthClientId(oauthClientId string, orgId string) []string {
-	apis := []string{}
-	orgApis := gw.getApisIdsForOrg(orgId)
-
-	for index := range orgApis {
-		clientsData, _, status := gw.getApiClients(orgApis[index])
-		if status == http.StatusOK {
-			for _, client := range clientsData {
-				if client.GetId() == oauthClientId {
-					apis = append(apis, orgApis[index])
-				}
-			}
-		}
-	}
-
-	return apis
+	return cpResponse(gw.controlPlaneOAuth().ListClients(apiID))
 }
 
 func (gw *Gateway) healthCheckhandler(w http.ResponseWriter, r *http.Request) {
@@ -2235,9 +1681,7 @@ func (gw *Gateway) invalidateCacheHandler(w http.ResponseWriter, r *http.Request
 }
 
 func (gw *Gateway) RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseForm()
-
-	if err != nil {
+	if err := r.ParseForm(); err != nil {
 		doJSONWrite(w, http.StatusBadRequest, apiError("cannot parse form. Form malformed"))
 		return
 	}
@@ -2247,62 +1691,39 @@ func (gw *Gateway) RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
 	clientID := r.PostFormValue("client_id")
 	orgID := r.PostFormValue("org_id")
 
-	if token == "" {
-		doJSONWrite(w, http.StatusBadRequest, apiError(oauthTokenEmpty))
+	if err := gw.controlPlaneOAuth().RevokeClientToken(orgID, clientID, token, tokenTypeHint); err != nil {
+		obj, code := cpResponse(nil, err)
+		doJSONWrite(w, code, obj)
 		return
-	}
-
-	if clientID == "" {
-		doJSONWrite(w, http.StatusBadRequest, apiError(oauthClientIdEmpty))
-		return
-	}
-
-	apis := gw.getApisForOauthClientId(clientID, orgID)
-	if len(apis) == 0 {
-		doJSONWrite(w, http.StatusBadRequest, apiError("oauth client doesn't exist"))
-		return
-	}
-
-	for _, apiID := range apis {
-		storage, _, err := gw.GetStorageForApi(apiID)
-		if err == nil {
-			RevokeToken(storage, token, tokenTypeHint)
-		}
 	}
 	doJSONWrite(w, http.StatusOK, apiOk("token revoked successfully"))
 }
 
 func (gw *Gateway) GetStorageForApi(apiID string) (ExtendedOsinStorageInterface, int, error) {
-	apiSpec := gw.getApiSpec(apiID)
-	if apiSpec == nil {
+	st, res := gwOAuthResolver{gw}.StorageFor(apiID, false)
+	switch res {
+	case oauth.APINotFound:
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 			"apiID":  apiID,
 			"status": "fail",
 			"err":    "API not found",
 		}).Error("Failed to retrieve OAuth client list.")
-
 		return nil, http.StatusNotFound, errors.New(oAuthClientNotFound)
-	}
-
-	if apiSpec.OAuthManager == nil {
+	case oauth.NoManager:
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 			"apiID":  apiID,
 			"status": "fail",
 			"err":    "API not found",
 		}).Error("Failed to revoke client tokens.")
-
 		return nil, http.StatusNotFound, errors.New(oAuthNotPropagatedErr)
 	}
-
-	return apiSpec.OAuthManager.Storage(), http.StatusOK, nil
+	return st, http.StatusOK, nil
 }
 
 func (gw *Gateway) RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseForm()
-
-	if err != nil {
+	if err := r.ParseForm(); err != nil {
 		doJSONWrite(w, http.StatusBadRequest, apiError("cannot parse form. Form malformed"))
 		return
 	}
@@ -2311,30 +1732,11 @@ func (gw *Gateway) RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request
 	clientSecret := r.PostFormValue("client_secret")
 	orgId := r.PostFormValue("org_id")
 
-	if clientId == "" {
-		doJSONWrite(w, http.StatusUnauthorized, apiError(oauthClientIdEmpty))
+	tokens, err := gw.controlPlaneOAuth().RevokeAllClientTokens(orgId, clientId, clientSecret)
+	if err != nil {
+		obj, code := cpResponse(nil, err)
+		doJSONWrite(w, code, obj)
 		return
-	}
-
-	if clientSecret == "" {
-		doJSONWrite(w, http.StatusUnauthorized, apiError(oauthClientSecretEmpty))
-		return
-	}
-
-	apis := gw.getApisForOauthClientId(clientId, orgId)
-	if len(apis) == 0 {
-		//if api is 0 is because the client wasn't found
-		doJSONWrite(w, http.StatusNotFound, apiError("oauth client doesn't exist"))
-		return
-	}
-
-	tokens := []string{}
-	for _, apiId := range apis {
-		storage, _, err := gw.GetStorageForApi(apiId)
-		if err == nil {
-			_, tokensRevoked, _ := RevokeAllTokens(storage, clientId, clientSecret)
-			tokens = append(tokens, tokensRevoked...)
-		}
 	}
 
 	n := Notification{
@@ -2847,20 +2249,6 @@ var createOauthClientSecret = func() string {
 }
 
 // invalidate tokens if we had a new policy
-func invalidateTokens(prevClient ExtendedOsinClientInterface, updatedClient OAuthClient, oauthManager OAuthManagerInterface) {
-	if prevPolicy := prevClient.GetPolicyID(); prevPolicy != "" && prevPolicy != updatedClient.PolicyID {
-		tokenList, err := oauthManager.Storage().GetClientTokens(updatedClient.ClientID)
-		if err != nil {
-			log.WithError(err).Warning("Could not get list of tokens for updated OAuth client")
-		}
-
-		for _, token := range tokenList {
-			if err := oauthManager.Storage().RemoveAccess(token.Token); err != nil {
-				log.WithError(err).Warning("Could not remove token for updated OAuth client policy")
-			}
-		}
-	}
-}
 
 func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 	var oasObj oas.OAS
