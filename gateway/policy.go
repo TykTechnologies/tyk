@@ -13,9 +13,8 @@ import (
 	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/pkg/controlplane/keys"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -24,55 +23,12 @@ var (
 	ErrPoliciesFetchFailed = errors.New("fetch policies request login failure")
 )
 
-type DBAccessDefinition struct {
-	APIName              string                       `json:"api_name"`
-	APIID                string                       `json:"api_id"`
-	Versions             []string                     `json:"versions"`
-	AllowedURLs          []user.AccessSpec            `bson:"allowed_urls" json:"allowed_urls"` // mapped string MUST be a valid regex
-	RestrictedTypes      []graphql.Type               `json:"restricted_types"`
-	AllowedTypes         []graphql.Type               `json:"allowed_types"`
-	DisableIntrospection bool                         `json:"disable_introspection"`
-	FieldAccessRights    []user.FieldAccessDefinition `json:"field_access_rights"`
-	Limit                *user.APILimit               `json:"limit"`
+// DBAccessDefinition is the Dashboard access-rights shape; the type now lives
+// in pkg/controlplane/keys so the Dashboard can share the conversion.
+type DBAccessDefinition = keys.DBAccessDefinition
 
-	// Endpoints contains endpoint rate limit settings.
-	Endpoints user.Endpoints `json:"endpoints,omitempty"`
-
-	JSONRPCMethods             []user.JSONRPCMethodLimit `json:"json_rpc_methods,omitempty"`
-	JSONRPCMethodsAccessRights user.AccessControlRules   `json:"json_rpc_methods_access_rights,omitzero"`
-	MCPPrimitives              []user.MCPPrimitiveLimit  `json:"mcp_primitives,omitempty"`
-	MCPAccessRights            user.MCPAccessRights      `json:"mcp_access_rights,omitzero"`
-}
-
-func (d *DBAccessDefinition) ToRegularAD() user.AccessDefinition {
-	ad := user.AccessDefinition{
-		APIName:              d.APIName,
-		APIID:                d.APIID,
-		Versions:             d.Versions,
-		AllowedURLs:          d.AllowedURLs,
-		RestrictedTypes:      d.RestrictedTypes,
-		AllowedTypes:         d.AllowedTypes,
-		DisableIntrospection: d.DisableIntrospection,
-		FieldAccessRights:    d.FieldAccessRights,
-		Endpoints:            d.Endpoints,
-	}
-
-	if d.Limit != nil {
-		ad.Limit = *d.Limit
-	}
-
-	ad.JSONRPCMethods = d.JSONRPCMethods
-	ad.JSONRPCMethodsAccessRights = d.JSONRPCMethodsAccessRights
-	ad.MCPPrimitives = d.MCPPrimitives
-	ad.MCPAccessRights = d.MCPAccessRights
-
-	return ad
-}
-
-type DBPolicy struct {
-	user.Policy
-	AccessRights map[string]DBAccessDefinition `bson:"access_rights" json:"access_rights"`
-}
+// DBPolicy is a Dashboard policy; see pkg/controlplane/keys.DBPolicy.
+type DBPolicy = keys.DBPolicy
 
 // hasMCPFields returns true if the access definition contains any MCP-specific fields.
 func hasMCPFields(ar user.AccessDefinition) bool {
@@ -156,16 +112,6 @@ func (gw *Gateway) validateNonMCPFieldsOnMCPProxy(accessRights map[string]user.A
 		}
 	}
 	return nil
-}
-
-func (d *DBPolicy) ToRegularPolicy() user.Policy {
-	policy := d.Policy
-	policy.AccessRights = make(map[string]user.AccessDefinition)
-
-	for k, v := range d.AccessRights {
-		policy.AccessRights[k] = v.ToRegularAD()
-	}
-	return policy
 }
 
 func LoadPoliciesFromFile(filePath string) ([]user.Policy, error) {
