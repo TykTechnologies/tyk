@@ -216,7 +216,7 @@ func (e *EngineV3) ProcessRequest(ctx context.Context, w http.ResponseWriter, r 
 	}
 
 	if normalizationResult.Errors != nil && normalizationResult.Errors.Count() > 0 {
-		return writeGraphQLError(e.logger, w, normalizationResult.Errors)
+		return wrapGraphQLErrorAndLog(e.logger, normalizationResult.Errors)
 	}
 
 	validationResult, err := gqlRequest.ValidateForSchema(e.schema)
@@ -226,7 +226,7 @@ func (e *EngineV3) ProcessRequest(ctx context.Context, w http.ResponseWriter, r 
 	}
 
 	if validationResult.Errors != nil && validationResult.Errors.Count() > 0 {
-		return writeGraphQLError(e.logger, w, validationResult.Errors)
+		return wrapGraphQLErrorAndLog(e.logger, validationResult.Errors)
 	}
 
 	inputValidationResult, err := gqlRequest.ValidateInput(e.schema)
@@ -235,7 +235,7 @@ func (e *EngineV3) ProcessRequest(ctx context.Context, w http.ResponseWriter, r 
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	}
 	if inputValidationResult.Errors != nil && inputValidationResult.Errors.Count() > 0 {
-		return writeGraphQLError(e.logger, w, inputValidationResult.Errors)
+		return wrapGraphQLErrorAndLog(e.logger, inputValidationResult.Errors)
 	}
 	return nil, http.StatusOK
 }

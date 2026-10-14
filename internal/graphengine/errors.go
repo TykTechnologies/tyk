@@ -5,12 +5,13 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
+
 	"github.com/TykTechnologies/tyk/header"
 )
 
 var (
 	ProxyingRequestFailedErr     = errors.New("there was a problem proxying the request")
-	errCustomBodyResponse        = errors.New("errCustomBodyResponse")
 	GraphQLDepthLimitExceededErr = errors.New("depth limit exceeded")
 	ErrIntrospectionDisabled     = errors.New("introspection is disabled")
 	ErrUnknownReverseProxyType   = errors.New("unknown reverse proxy type")
@@ -34,6 +35,15 @@ func (e GraphQlError) Unwrap() error {
 func (e GraphQlError) WriteToResponse(w http.ResponseWriter, statusCode int) error {
 	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(statusCode)
-	_, err := e.write(w, e.err)
-	return err
+	return e.writeToResponse(w)
+}
+
+func (e GraphQlError) writeToResponse(w http.ResponseWriter) (err error) {
+	if e.write == nil {
+		_, err = graphql.RequestErrorsFromError(e.err).WriteResponse(w)
+	} else {
+		_, err = e.write(w, e.err)
+	}
+
+	return
 }

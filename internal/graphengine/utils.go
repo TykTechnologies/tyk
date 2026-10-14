@@ -53,12 +53,13 @@ func absLoggerLevel(level logrus.Level) abstractlogger.Level {
 	return abstractlogger.InfoLevel
 }
 
-func writeGraphQLError(logger abstractlogger.Logger, w http.ResponseWriter, errors graphql.Errors) (error, int) {
-	w.Header().Set(header.ContentType, header.ApplicationJSON)
-	w.WriteHeader(http.StatusBadRequest)
-	_, _ = errors.WriteResponse(w)
-	logger.Error("error while validating GraphQL request", abstractlogger.Error(errors))
-	return errCustomBodyResponse, http.StatusBadRequest
+//nolint:staticcheck // ST1008: engine ProcessRequest convention returns (error, int)
+func wrapGraphQLErrorAndLog(logger abstractlogger.Logger, gqlErrors graphql.Errors) (error, int) {
+	logger.Error("error while validating GraphQL request", abstractlogger.Error(gqlErrors))
+	return GraphQlError{
+		err:   gqlErrors,
+		write: func(w io.Writer, _ error) (int, error) { return gqlErrors.WriteResponse(w) },
+	}, http.StatusBadRequest
 }
 
 func complexityFailReasonAsHttpStatusCode(failReason ComplexityFailReason) (error, int) {
@@ -83,13 +84,7 @@ func granularAccessFailReasonAsHttpStatusCode(logger abstractlogger.Logger, resu
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	case GranularAccessFailReasonValidationError:
 		logger.Debug(restrictedFieldValidationFailedLogMsg, abstractlogger.Error(result.ValidationError))
-		write := result.writeErrorResponse
-		if write == nil {
-			write = func(w io.Writer, err error) (int, error) {
-				return graphql.RequestErrorsFromError(err).WriteResponse(w)
-			}
-		}
-		return GraphQlError{err: result.ValidationError, write: write}, http.StatusBadRequest
+		return GraphQlError{err: result.ValidationError, write: result.writeErrorResponse}, http.StatusBadRequest
 	case GranularAccessFailReasonIntrospectionDisabled:
 		w.WriteHeader(http.StatusForbidden)
 		logger.Debug("introspection disabled")

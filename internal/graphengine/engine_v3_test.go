@@ -156,12 +156,9 @@ func TestEngineV3_ProcessRequest(t *testing.T) {
 		recorder := httptest.NewRecorder()
 
 		err, statusCode := engine.ProcessRequest(context.Background(), recorder, request)
-		body := bytes.Buffer{}
-		_, _ = body.ReadFrom(recorder.Body)
-
 		assert.Error(t, err)
 		assert.Equal(t, 400, statusCode)
-		assert.Equal(t, `{"errors":[{"message":"field: goodBye not defined on type: Query","path":["query","goodBye"]}],"data":null}`, body.String())
+		assert.Equal(t, `{"errors":[{"message":"field: goodBye not defined on type: Query","path":["query","goodBye"]}],"data":null}`, renderGraphQLError(t, err, statusCode, recorder))
 	})
 
 	t.Run("should return error and 400 when input validation fails", func(t *testing.T) {
@@ -179,12 +176,9 @@ func TestEngineV3_ProcessRequest(t *testing.T) {
 		recorder := httptest.NewRecorder()
 
 		err, statusCode := engine.ProcessRequest(context.Background(), recorder, request)
-		body := bytes.Buffer{}
-		_, _ = body.ReadFrom(recorder.Body)
-
 		assert.Error(t, err)
 		assert.Equal(t, 400, statusCode)
-		assert.Equal(t, `{"errors":[{"message":"Variable \"$name\" got invalid value 123; String cannot represent a non string value: 123"}],"data":null}`, body.String())
+		assert.Equal(t, `{"errors":[{"message":"Variable \"$name\" got invalid value 123; String cannot represent a non string value: 123"}],"data":null}`, renderGraphQLError(t, err, statusCode, recorder))
 	})
 
 	t.Run("should return no error and 200 when everything passes", func(t *testing.T) {
