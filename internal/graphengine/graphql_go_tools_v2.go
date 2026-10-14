@@ -346,11 +346,7 @@ func (g *granularAccessCheckerV2) validateFieldRestrictions(gqlRequest *graphqlv
 	}
 
 	if !result.Valid || (result.Errors != nil && result.Errors.Count() > 0) {
-		return GraphQLGranularAccessResult{FailReason: GranularAccessFailReasonValidationError, ValidationError: result.Errors, writeErrorResponse: g.writeErrorResponse}
+		return GraphQLGranularAccessResult{FailReason: GranularAccessFailReasonValidationError, ValidationError: result.Errors}
 	}
 	return GraphQLGranularAccessResult{FailReason: GranularAccessFailReasonNone}
-}
-
-func (g *granularAccessCheckerV2) writeErrorResponse(w io.Writer, providedErr error) (n int, err error) {
-	return graphqlv2.RequestErrorsFromError(providedErr).WriteResponse(w)
 }

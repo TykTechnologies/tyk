@@ -5,8 +5,6 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
-
 	"github.com/TykTechnologies/tyk/header"
 )
 
@@ -17,11 +15,17 @@ var (
 	ErrUnknownReverseProxyType   = errors.New("unknown reverse proxy type")
 )
 
-// GraphQlError carries a GraphQL validation error together with the engine-specific
-// writer that renders it, so v1 and v2 errors are both serialized by their own library.
+// GraphQLErrors is what GraphQlError can render: an error that serializes itself as a
+// GraphQL error response. RequestErrors from graphql-go-tools v1 and v2 both satisfy it.
+type GraphQLErrors interface {
+	error
+	WriteResponse(w io.Writer) (int, error)
+}
+
+// GraphQlError defers writing a GraphQL validation error to the gateway error handler,
+// so error overrides can replace it, while the body is still rendered by the error's own library.
 type GraphQlError struct {
-	err   error
-	write func(w io.Writer, err error) (int, error)
+	err GraphQLErrors
 }
 
 func (e GraphQlError) Error() string {
@@ -35,15 +39,6 @@ func (e GraphQlError) Unwrap() error {
 func (e GraphQlError) WriteToResponse(w http.ResponseWriter, statusCode int) error {
 	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(statusCode)
-	return e.writeToResponse(w)
-}
-
-func (e GraphQlError) writeToResponse(w http.ResponseWriter) (err error) {
-	if e.write == nil {
-		_, err = graphql.RequestErrorsFromError(e.err).WriteResponse(w)
-	} else {
-		_, err = e.write(w, e.err)
-	}
-
-	return
+	_, err := e.err.WriteResponse(w)
+	return err
 }

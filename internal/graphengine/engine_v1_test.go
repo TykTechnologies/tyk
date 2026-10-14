@@ -159,7 +159,7 @@ func TestEngineV1_ProcessGraphQLGranularAccess(t *testing.T) {
 		mocks.granularAccessChecker.EXPECT().CheckGraphQLRequestFieldAllowance(gomock.Eq(recorder), gomock.Eq(request), gomock.Eq(accessDefinition)).
 			Return(GraphQLGranularAccessResult{
 				FailReason:      GranularAccessFailReasonValidationError,
-				ValidationError: errors.New("failed validation"),
+				ValidationError: graphql.RequestErrors{{Message: "failed validation"}},
 			})
 
 		err, statusCode := engine.ProcessGraphQLGranularAccess(recorder, request, accessDefinition)

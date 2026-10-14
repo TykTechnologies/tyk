@@ -2,7 +2,6 @@ package graphengine
 
 import (
 	"errors"
-	"io"
 	"net"
 	"net/http"
 
@@ -56,10 +55,7 @@ func absLoggerLevel(level logrus.Level) abstractlogger.Level {
 //nolint:staticcheck // ST1008: engine ProcessRequest convention returns (error, int)
 func wrapGraphQLErrorAndLog(logger abstractlogger.Logger, gqlErrors graphql.Errors) (error, int) {
 	logger.Error("error while validating GraphQL request", abstractlogger.Error(gqlErrors))
-	return GraphQlError{
-		err:   gqlErrors,
-		write: func(w io.Writer, _ error) (int, error) { return gqlErrors.WriteResponse(w) },
-	}, http.StatusBadRequest
+	return GraphQlError{err: gqlErrors}, http.StatusBadRequest
 }
 
 func complexityFailReasonAsHttpStatusCode(failReason ComplexityFailReason) (error, int) {
@@ -84,7 +80,7 @@ func granularAccessFailReasonAsHttpStatusCode(logger abstractlogger.Logger, resu
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	case GranularAccessFailReasonValidationError:
 		logger.Debug(restrictedFieldValidationFailedLogMsg, abstractlogger.Error(result.ValidationError))
-		return GraphQlError{err: result.ValidationError, write: result.writeErrorResponse}, http.StatusBadRequest
+		return GraphQlError{err: result.ValidationError}, http.StatusBadRequest
 	case GranularAccessFailReasonIntrospectionDisabled:
 		w.WriteHeader(http.StatusForbidden)
 		logger.Debug("introspection disabled")
