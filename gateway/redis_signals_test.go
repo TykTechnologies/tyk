@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	kvlib "github.com/TykTechnologies/storage/kv"
+	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
 
 	"github.com/TykTechnologies/tyk/config"
 )
@@ -196,15 +197,20 @@ func installKVSetter(t *testing.T, gw *Gateway, storeName string) *recordingSett
 	return rec
 }
 
-func captureGatewayLog(t *testing.T) *logrustest.Hook {
+func captureGatewayLog(t *testing.T, level logrus.Level) *logrustest.Hook {
 	t.Helper()
 
-	logger, hook := logrustest.NewNullLogger()
-	logger.SetLevel(logrus.DebugLevel)
-
-	orig := log
-	log = logger
-	t.Cleanup(func() { log = orig })
+	hook := &logrustest.Hook{}
+	originalLevel := log.GetLevel()
+	originalHooks := log.ReplaceHooks(make(logrus.LevelHooks))
+	installedHooks := cloneLogrusHooks(originalHooks)
+	installedHooks.Add(hook)
+	log.ReplaceHooks(installedHooks)
+	log.SetLevel(level)
+	t.Cleanup(func() {
+		log.SetLevel(originalLevel)
+		log.ReplaceHooks(originalHooks)
+	})
 
 	return hook
 }
@@ -280,7 +286,7 @@ func TestUpdateKeyInStore_WritesThroughRegistry(t *testing.T) {
 func TestUpdateKeyInStore_UnknownStoreWarnsAndDoesNotWrite(t *testing.T) {
 	gw := NewGateway(config.Config{}, t.Context())
 	rec := installKVSetter(t, gw, "vault")
-	hook := captureGatewayLog(t)
+	hook := captureGatewayLog(t, logrus.DebugLevel)
 
 	gw.updateKeyInStore("kv://absent/some/key", "NEWKEY")
 
@@ -295,7 +301,7 @@ func TestUpdateKeyInStore_NonWritableStoreWarns(t *testing.T) {
 	installFakeKVStores(t, gw, map[string]map[string]string{
 		"vault": {"secret/tyk-apis": `{"api_key":"OLD"}`},
 	})
-	hook := captureGatewayLog(t)
+	hook := captureGatewayLog(t, logrus.DebugLevel)
 
 	gw.updateKeyInStore("vault://secret/tyk-apis.api_key", "NEWKEY")
 
@@ -307,7 +313,7 @@ func TestUpdateKeyInStore_SetErrorIsLogged(t *testing.T) {
 	gw := NewGateway(config.Config{}, t.Context())
 	rec := installKVSetter(t, gw, "vault")
 	rec.setErr = errors.New("backend down")
-	hook := captureGatewayLog(t)
+	hook := captureGatewayLog(t, logrus.DebugLevel)
 
 	gw.updateKeyInStore("kv://vault/secret/tyk-apis#api_key", "NEWKEY")
 
@@ -318,7 +324,7 @@ func TestUpdateKeyInStore_SetErrorIsLogged(t *testing.T) {
 func TestUpdateKeyInStore_MalformedKVReferenceWarns(t *testing.T) {
 	gw := NewGateway(config.Config{}, t.Context())
 	rec := installKVSetter(t, gw, "vault")
-	hook := captureGatewayLog(t)
+	hook := captureGatewayLog(t, logrus.DebugLevel)
 
 	gw.updateKeyInStore("kv://no-path-separator", "NEWKEY")
 
@@ -345,7 +351,7 @@ func TestUpdateKeyInStore_SilentNoOps(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			gw := NewGateway(config.Config{}, t.Context())
 			rec := installKVSetter(t, gw, "vault")
-			hook := captureGatewayLog(t)
+			hook := captureGatewayLog(t, logrus.DebugLevel)
 
 			gw.updateKeyInStore(tt.keyPath, "NEWKEY")
 
@@ -360,9 +366,12 @@ func TestUpdateKeyInStore_SilentNoOps(t *testing.T) {
 func TestHandleRedisEvent_NoticeFragmentChanged(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
+	ts.Gw.ReloadTestCase.Enable()
+	defer ts.Gw.ReloadTestCase.Disable()
 
 	reloadCalled := false
 	var reloadedCommand NotificationCommand
+	var reloadDone sync.WaitGroup
 
 	// Mock the handled callback to track if reload was triggered
 	handled := func(cmd NotificationCommand) {
@@ -372,11 +381,14 @@ func TestHandleRedisEvent_NoticeFragmentChanged(t *testing.T) {
 	// Mock the reloaded callback
 	reloaded := func() {
 		reloadCalled = true
+		reloadDone.Done()
 	}
 
 	t.Run("NoticeFragmentChanged triggers reload", func(t *testing.T) {
+		ts.Gw.ReloadTestCase.Reset()
 		reloadCalled = false
 		reloadedCommand = ""
+		reloadDone.Add(1)
 
 		notification := Notification{
 			Command: NoticeFragmentChanged,
@@ -392,6 +404,8 @@ func TestHandleRedisEvent_NoticeFragmentChanged(t *testing.T) {
 		msg := &mockMessage{payload: string(notifJSON)}
 
 		ts.Gw.handleRedisEvent(msg, handled, reloaded)
+		ts.Gw.ReloadTestCase.TickOk(t)
+		reloadDone.Wait()
 
 		// Verify that the handled callback was called with NoticeFragmentChanged
 		assert.Equal(t, NoticeFragmentChanged, reloadedCommand, "should trigger reload for fragment changes")
@@ -410,8 +424,10 @@ func TestHandleRedisEvent_NoticeFragmentChanged(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
+				ts.Gw.ReloadTestCase.Reset()
 				reloadCalled = false
 				reloadedCommand = ""
+				reloadDone.Add(1)
 
 				notification := Notification{
 					Command: tc.command,
@@ -425,6 +441,8 @@ func TestHandleRedisEvent_NoticeFragmentChanged(t *testing.T) {
 
 				msg := &mockMessage{payload: string(notifJSON)}
 				ts.Gw.handleRedisEvent(msg, handled, reloaded)
+				ts.Gw.ReloadTestCase.TickOk(t)
+				reloadDone.Wait()
 
 				assert.Equal(t, tc.command, reloadedCommand, "should trigger reload for %s", tc.command)
 				assert.True(t, reloadCalled, "reload callback should be called")
@@ -436,17 +454,18 @@ func TestHandleRedisEvent_NoticeFragmentChanged(t *testing.T) {
 // mockMessage implements the temporal Message interface for testing
 type mockMessage struct {
 	payload string
-	msgType int
 }
+
+var _ temporalmodel.Message = (*mockMessage)(nil)
 
 func (m *mockMessage) Payload() (string, error) {
 	return m.payload, nil
 }
 
-func (m *mockMessage) Type() int {
-	return 1 // MessageTypeMessage
+func (m *mockMessage) Type() string {
+	return temporalmodel.MessageTypeMessage
 }
 
-func (m *mockMessage) Channel() string {
-	return RedisPubSubChannel
+func (m *mockMessage) Channel() (string, error) {
+	return RedisPubSubChannel, nil
 }

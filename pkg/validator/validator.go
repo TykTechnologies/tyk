@@ -10,7 +10,10 @@ import (
 	"github.com/TykTechnologies/tyk/pkg/identifier"
 )
 
-const customIdValidatorTag = "custom_policy_id"
+const (
+	customPolicyIdValidatorTag = "custom_policy_id"
+	customApiIdValidatorTag    = "custom_api_id"
+)
 
 type Validator interface {
 	Validate(v any) error
@@ -22,6 +25,7 @@ type ValidateFn func(val reflect.Value) error
 
 type validatorCfg struct {
 	allowUnsafePolicyIds bool
+	allowUnsafeApiIds    bool
 }
 
 type customValidator interface {
@@ -42,9 +46,16 @@ func New(opts ...Option) Validator {
 
 	if !cfg.allowUnsafePolicyIds {
 		validator.autoregister(identifier.CustomPolicyId(""))
-		validator.mustRegisterValidator(customIdValidatorTag, customPolicyIdValidator)
+		validator.mustRegisterValidator(customPolicyIdValidatorTag, customPolicyIdValidator)
 	} else {
-		validator.mustRegisterValidator(customIdValidatorTag, skipValidator)
+		validator.mustRegisterValidator(customPolicyIdValidatorTag, skipValidator)
+	}
+
+	if !cfg.allowUnsafeApiIds {
+		validator.autoregister(identifier.CustomApiId(""))
+		validator.mustRegisterValidator(customApiIdValidatorTag, customApiIdValidator)
+	} else {
+		validator.mustRegisterValidator(customApiIdValidatorTag, skipValidator)
 	}
 
 	return validator
@@ -88,7 +99,7 @@ func (v *validatorImpl) Validate(obj any) error {
 func (v *validatorImpl) formatError(ve govalidator.ValidationErrors) error {
 	fe := ve[0]
 	switch fe.Tag() {
-	case customIdValidatorTag:
+	case customPolicyIdValidatorTag, customApiIdValidatorTag:
 		return errpack.Domainf("field %s: has invalid custom identifier format", fe.Field())
 	default:
 		return errpack.Domainf("field %s: failed validation on %s", fe.Field(), fe.Tag())
@@ -114,6 +125,12 @@ func (v *validatorImpl) autoregister(val customValidator) {
 func WithAllowUnsafePolicyIds(disabled bool) Option {
 	return func(cfg *validatorCfg) {
 		cfg.allowUnsafePolicyIds = disabled
+	}
+}
+
+func WithAllowUnsafeApiIds(disabled bool) Option {
+	return func(cfg *validatorCfg) {
+		cfg.allowUnsafeApiIds = disabled
 	}
 }
 

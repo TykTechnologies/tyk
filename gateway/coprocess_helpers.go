@@ -5,6 +5,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/coprocess"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -14,11 +15,17 @@ func TykSessionState(session *coprocess.SessionState) *user.SessionState {
 	accessDefinitions := make(map[string]user.AccessDefinition, len(session.AccessRights))
 
 	for key, protoAccDef := range session.AccessRights {
-		allowedUrls := make([]user.AccessSpec, len(protoAccDef.AllowedUrls))
+		// Note the capacity, not the length: allocating by length and then
+		// appending left every access definition padded with as many
+		// zero-valued specs as it had real ones. A spec with an empty URL is
+		// an empty regex, which matches every path, so those padding entries
+		// granted a custom-auth session access to the whole API.
+		allowedUrls := make([]user.AccessSpec, 0, len(protoAccDef.AllowedUrls))
 		for _, protoAllowedURL := range protoAccDef.AllowedUrls {
 			allowedUrls = append(allowedUrls, user.AccessSpec{
-				URL:     protoAllowedURL.Url,
-				Methods: protoAllowedURL.Methods,
+				URL:        protoAllowedURL.Url,
+				Methods:    protoAllowedURL.Methods,
+				Conditions: tykAccessConditions(protoAllowedURL.Conditions),
 			})
 		}
 		accessDefinitions[key] = user.AccessDefinition{
@@ -99,8 +106,9 @@ func ProtoSessionState(session *user.SessionState) *coprocess.SessionState {
 		var allowedUrls []*coprocess.AccessSpec
 		for _, allowedURL := range accessDefinition.AllowedURLs {
 			accessSpec := &coprocess.AccessSpec{
-				Url:     allowedURL.URL,
-				Methods: allowedURL.Methods,
+				Url:        allowedURL.URL,
+				Methods:    allowedURL.Methods,
+				Conditions: protoAccessConditions(allowedURL.Conditions),
 			}
 			allowedUrls = append(allowedUrls, accessSpec)
 		}
@@ -190,4 +198,161 @@ func ProtoMap(inputMap map[string][]string) map[string]string {
 	}
 
 	return newMap
+}
+
+// Granular access conditions have to survive the round trip through a
+// coprocess plugin in both directions. Dropping one does not merely lose
+// configuration: a condition is the only thing narrowing the URL it hangs off,
+// so a session that comes back without it grants strictly more than the one
+// that went out.
+
+// tykAccessConditions converts the Protocol Buffer representation of a spec's
+// conditions to the Gateway's own.
+func tykAccessConditions(protoConditions []*coprocess.AccessCondition) []user.AccessCondition {
+	if len(protoConditions) == 0 {
+		return nil
+	}
+
+	conditions := make([]user.AccessCondition, 0, len(protoConditions))
+	for _, protoCondition := range protoConditions {
+		if protoCondition == nil {
+			continue
+		}
+
+		conditions = append(conditions, user.AccessCondition{
+			On:      apidef.RoutingTriggerOnType(protoCondition.On),
+			Options: tykTriggerOptions(protoCondition.Options),
+		})
+	}
+
+	return conditions
+}
+
+func tykTriggerOptions(protoOptions *coprocess.RoutingTriggerOptions) user.AccessConditionOptions {
+	if protoOptions == nil {
+		return user.AccessConditionOptions{}
+	}
+
+	return user.AccessConditionOptions{
+		RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+			HeaderMatches:         tykStringRegexMaps(protoOptions.HeaderMatches),
+			QueryValMatches:       tykStringRegexMaps(protoOptions.QueryValMatches),
+			PathPartMatches:       tykStringRegexMaps(protoOptions.PathPartMatches),
+			SessionMetaMatches:    tykStringRegexMaps(protoOptions.SessionMetaMatches),
+			RequestContextMatches: tykStringRegexMaps(protoOptions.RequestContextMatches),
+			PayloadMatches:        tykStringRegexMap(protoOptions.PayloadMatches),
+		},
+		BodyFieldMatches: tykBodyFieldMatches(protoOptions.BodyFieldMatches),
+	}
+}
+
+func tykStringRegexMaps(in map[string]*coprocess.StringRegexMap) map[string]apidef.StringRegexMap {
+	if len(in) == 0 {
+		return nil
+	}
+
+	out := make(map[string]apidef.StringRegexMap, len(in))
+	for name, value := range in {
+		out[name] = tykStringRegexMap(value)
+	}
+
+	return out
+}
+
+func tykStringRegexMap(in *coprocess.StringRegexMap) apidef.StringRegexMap {
+	if in == nil {
+		return apidef.StringRegexMap{}
+	}
+
+	return apidef.StringRegexMap{
+		MatchPattern: in.MatchRx,
+		Reverse:      in.Reverse,
+	}
+}
+
+// protoAccessConditions converts a spec's conditions to their Protocol Buffer
+// representation.
+func protoAccessConditions(conditions []user.AccessCondition) []*coprocess.AccessCondition {
+	if len(conditions) == 0 {
+		return nil
+	}
+
+	protoConditions := make([]*coprocess.AccessCondition, 0, len(conditions))
+	for _, condition := range conditions {
+		protoConditions = append(protoConditions, &coprocess.AccessCondition{
+			On:      string(condition.On),
+			Options: protoTriggerOptions(condition.Options),
+		})
+	}
+
+	return protoConditions
+}
+
+func protoTriggerOptions(options user.AccessConditionOptions) *coprocess.RoutingTriggerOptions {
+	return &coprocess.RoutingTriggerOptions{
+		HeaderMatches:         protoStringRegexMaps(options.HeaderMatches),
+		QueryValMatches:       protoStringRegexMaps(options.QueryValMatches),
+		PathPartMatches:       protoStringRegexMaps(options.PathPartMatches),
+		SessionMetaMatches:    protoStringRegexMaps(options.SessionMetaMatches),
+		RequestContextMatches: protoStringRegexMaps(options.RequestContextMatches),
+		PayloadMatches:        protoStringRegexMap(options.PayloadMatches),
+		BodyFieldMatches:      protoBodyFieldMatches(options.BodyFieldMatches),
+	}
+}
+
+func protoStringRegexMaps(in map[string]apidef.StringRegexMap) map[string]*coprocess.StringRegexMap {
+	if len(in) == 0 {
+		return nil
+	}
+
+	out := make(map[string]*coprocess.StringRegexMap, len(in))
+	for name, value := range in {
+		out[name] = protoStringRegexMap(value)
+	}
+
+	return out
+}
+
+func protoStringRegexMap(in apidef.StringRegexMap) *coprocess.StringRegexMap {
+	return &coprocess.StringRegexMap{
+		MatchRx: in.MatchPattern,
+		Reverse: in.Reverse,
+	}
+}
+
+func tykBodyFieldMatches(in []*coprocess.BodyFieldMatch) []user.BodyFieldMatch {
+	if len(in) == 0 {
+		return nil
+	}
+
+	out := make([]user.BodyFieldMatch, 0, len(in))
+	for _, match := range in {
+		if match == nil {
+			continue
+		}
+
+		out = append(out, user.BodyFieldMatch{
+			Path:           match.Path,
+			StringRegexMap: apidef.StringRegexMap{MatchPattern: match.MatchRx, Reverse: match.Reverse},
+		})
+	}
+
+	return out
+}
+
+func protoBodyFieldMatches(in []user.BodyFieldMatch) []*coprocess.BodyFieldMatch {
+	if len(in) == 0 {
+		return nil
+	}
+
+	out := make([]*coprocess.BodyFieldMatch, 0, len(in))
+	for _, match := range in {
+		out = append(out, &coprocess.BodyFieldMatch{
+			Path:    match.Path,
+			MatchRx: match.MatchPattern,
+			Reverse: match.Reverse,
+		})
+	}
+
+	return out
 }

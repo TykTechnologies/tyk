@@ -338,7 +338,7 @@ func TestWithMCP(t *testing.T) {
 		rec := accesslog.NewRecord().WithMCP(req)
 		fields := rec.Fields(nil)
 
-		assert.Equal(t, -32601, fields["mcp_error_code"])
+		assert.Equal(t, int64(-32601), fields["mcp_error_code"])
 	})
 
 	t.Run("omits empty fields", func(t *testing.T) {

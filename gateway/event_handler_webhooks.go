@@ -21,6 +21,7 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/certcheck"
 	"github.com/TykTechnologies/tyk/internal/httpclient"
+	"github.com/TykTechnologies/tyk/pkg/osutil"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -74,19 +75,7 @@ func (w *WebHookHandler) Init(handlerConf interface{}) error {
 	w.store.Connect()
 
 	// Pre-load template on init
-	if w.conf.TemplatePath != "" {
-		w.template, err = htmltemplate.ParseFiles(w.conf.TemplatePath)
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "webhooks",
-				"target": w.conf.TargetPath,
-			}).Warning("Custom template load failure, using default: ", err)
-		}
-
-		if strings.HasSuffix(w.conf.TemplatePath, ".json") {
-			w.contentType = header.ApplicationJSON
-		}
-	}
+	w.preLoadCustomTemplate()
 
 	// We use the default if TemplatePath was empty or if we failed
 	// to load it.
@@ -139,6 +128,51 @@ func (w *WebHookHandler) WasHookFired(checksum string) bool {
 	}
 
 	return true
+}
+
+// resolveTemplatePath returns the template path the gateway will read.
+// By default the path is confined to the configured TemplatePath root via
+// osutil.Root, which also resolves symlinks and relative segments. When
+// AllowUnsafeWebhookTemplatePaths is set the path is returned verbatim,
+// without any validation.
+func (w *WebHookHandler) resolveTemplatePath(path string) (string, error) {
+	cfg := w.Gw.GetConfig()
+
+	if cfg.AllowUnsafeWebhookTemplatePaths {
+		return path, nil
+	}
+
+	templateRoot, err := osutil.NewRoot(cfg.TemplatePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to initialize template root: %w", err)
+	}
+	return templateRoot.Ensure(path)
+}
+
+func (w *WebHookHandler) preLoadCustomTemplate() {
+	if w.conf.TemplatePath == "" {
+		return
+	}
+
+	log := log.WithField("target", w.conf.TargetPath).WithField("prefix", "webhooks")
+
+	templatePath, err := w.resolveTemplatePath(w.conf.TemplatePath)
+	if err != nil {
+		log.WithError(err).Warning("Invalid template path, using default.")
+		return
+	}
+
+	w.template, err = htmltemplate.ParseFiles(templatePath)
+	if err != nil {
+		log.WithError(err).
+			WithField("path", templatePath).
+			Warning("Custom template load failure, using default.")
+		return
+	}
+
+	if strings.EqualFold(filepath.Ext(w.conf.TemplatePath), ".json") {
+		w.contentType = header.ApplicationJSON
+	}
 }
 
 // setHookFired will create an expiring key for the checksum of the event

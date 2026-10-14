@@ -54,6 +54,7 @@ import (
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/certs"
@@ -61,13 +62,13 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/model"
-	"github.com/TykTechnologies/tyk/internal/osutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/redis"
 	"github.com/TykTechnologies/tyk/internal/sanitize"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	lib "github.com/TykTechnologies/tyk/lib/apidef"
 	"github.com/TykTechnologies/tyk/pkg/identifier"
+	"github.com/TykTechnologies/tyk/pkg/osutil"
 	"github.com/TykTechnologies/tyk/pkg/schema"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
@@ -534,6 +535,11 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 	}
 
 	if err := gw.validateNonMCPFieldsOnMCPProxy(newSession.AccessRights); err != nil {
+		log.Error(err)
+		return apiError(err.Error()), http.StatusBadRequest
+	}
+
+	if err := validateAccessConditions(newSession.AccessRights); err != nil {
 		log.Error(err)
 		return apiError(err.Error()), http.StatusBadRequest
 	}
@@ -1170,6 +1176,11 @@ func (gw *Gateway) handleAddOrUpdatePolicy(polID string, r *http.Request) (inter
 		return apiError(err.Error()), http.StatusBadRequest
 	}
 
+	if err := validateAccessConditions(newPol.AccessRights); err != nil {
+		log.Error(err)
+		return apiError(err.Error()), http.StatusBadRequest
+	}
+
 	root, err := gw.newPolicyPathRoot()
 	if err != nil {
 		log.WithError(err).Error("Unable to access the policy storage root path.")
@@ -1356,6 +1367,11 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 		newDef.GenerateAPIID()
 	}
 
+	if err := gw.validator.Validate(identifier.CustomApiId(newDef.APIID)); err != nil {
+		log.WithField("api_id", newDef.APIID).WithError(err).Error("Failed to validate API ID")
+		return apiError(identifier.ErrInvalidCustomApiId.Error()), http.StatusBadRequest
+	}
+
 	if err := sanitize.ValidatePathComponent(newDef.APIID); err != nil {
 		log.Errorf(errInvalidAPIIDFmt, newDef.APIID, err)
 		return apiError(errInvalidAPIID), http.StatusBadRequest
@@ -1442,6 +1458,11 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 
 	if resp, code := validateAPIIDMatch(apiID, newDef.APIID); resp != nil {
 		return resp, code
+	}
+
+	if err := gw.validator.Validate(identifier.CustomApiId(newDef.APIID)); err != nil {
+		log.WithField("api_id", newDef.APIID).WithError(err).Error("Failed to validate API ID")
+		return apiError(identifier.ErrInvalidCustomApiId.Error()), http.StatusBadRequest
 	}
 
 	if validationErr := validateAPIDef(&newDef); validationErr != nil {
@@ -2221,6 +2242,12 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Validate mtls_static_certificate_bindings
 	if err := gw.validateMtlsStaticCertificateBindings(newSession.MtlsStaticCertificateBindings, newSession.OrgID); err != nil {
+		doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+		return
+	}
+
+	if err := validateAccessConditions(newSession.AccessRights); err != nil {
+		log.Error(err)
 		doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
 		return
 	}
@@ -3723,11 +3750,11 @@ func ctxGetMCPPrimitiveName(r *http.Request) string {
 	return ctx.GetMCPPrimitiveName(r)
 }
 
-func ctxSetJSONRPCErrorCode(r *http.Request, code int) {
+func ctxSetJSONRPCErrorCode(r *http.Request, code int64) {
 	setCtxValue(r, ctx.JSONRPCErrorCode, code)
 }
 
-func ctxGetJSONRPCErrorCode(r *http.Request) int {
+func ctxGetJSONRPCErrorCode(r *http.Request) int64 {
 	return ctx.GetJSONRPCErrorCode(r)
 }
 

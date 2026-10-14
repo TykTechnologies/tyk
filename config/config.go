@@ -15,6 +15,7 @@ import (
 	"github.com/TykTechnologies/storage/kv"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	internalhttputil "github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -694,12 +695,25 @@ type HttpServerOptionsConfig struct {
 	// A value of 1 means using the last IP, 2 means second to last, and so on.
 	XFFDepth int `json:"xff_depth"`
 
+	// TrustedProxyCIDRs lists the proxy networks whose Forwarded and
+	// X-Forwarded-* headers may be used to determine the request's public
+	// origin. Requests received directly, or from any other peer, ignore those
+	// headers.
+	TrustedProxyCIDRs []string `json:"trusted_proxy_cidrs"`
+
 	// MaxResponseBodySize sets an upper limit on the response body (payload) size in bytes. It defaults to 0, which means there is no restriction on the response body size.
 	//
 	// The Gateway will return `HTTP 500 Response Body Too Large` if the response payload exceeds MaxResponseBodySize+1 bytes.
 	//
 	// **Note:** The limit is applied only when the [Response Body Transform middleware](/api-management/traffic-transformation/response-body) is enabled.
 	MaxResponseBodySize int64 `json:"max_response_body_size"`
+}
+
+// ValidateTrustedProxyCIDRs validates the networks permitted to supply public
+// request-origin headers.
+func (h HttpServerOptionsConfig) ValidateTrustedProxyCIDRs() error {
+	_, err := internalhttputil.ParseTrustedProxyCIDRs(h.TrustedProxyCIDRs)
+	return err
 }
 
 type AuthOverrideConf struct {
@@ -1471,6 +1485,22 @@ type Config struct {
 	// The standard characters are alphanumeric characters plus underscore (_), hyphen (-), dot (.) and tilde (~).
 	// The use of other characters in IDs can cause unpredictable behavior and is not recommended.
 	AllowUnsafePolicyIds bool `json:"allow_unsafe_policy_ids"`
+
+	// AllowUnsafeWebhookTemplatePaths disables webhook template path validation. This is provided for compatibility with legacy webhook definitions containing potentially unsafe template paths (default: false).
+	AllowUnsafeWebhookTemplatePaths bool `json:"allow_unsafe_webhook_template_paths"`
+
+	// AllowUnsafeApiIds allows the use of non-standard characters in API identifiers (default: false).
+	// The standard characters are alphanumeric characters plus underscore (_), hyphen (-), dot (.) and tilde (~).
+	// A standard ID must also contain at least one letter or digit, so IDs made only of punctuation (e.g. "." or "..") are rejected.
+	// The use of other characters in IDs can cause unpredictable behavior and is not recommended.
+	AllowUnsafeApiIds bool `json:"allow_unsafe_api_ids"`
+
+	// AllowUnsafeBodyTransformTemplatePaths disables body transform template path validation.
+	// This is provided for compatibility with legacy API definitions whose `template_source`
+	// points outside the configured TemplatePath root (default: false).
+	// Enabling it allows an API definition to read arbitrary files from the gateway
+	// filesystem and is strongly discouraged outside of a migration window.
+	AllowUnsafeBodyTransformTemplatePaths bool `json:"allow_unsafe_body_transform_template_paths"`
 }
 
 // LabsConfig include config for streaming

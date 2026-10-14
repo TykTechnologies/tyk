@@ -20,6 +20,7 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -2177,15 +2178,14 @@ func TestDoReload_RuntimeReloadLoopUnaffected(t *testing.T) {
 		"DoReload should make exactly 1 request with RetryAttempts=0, got %d", callCount)
 }
 
-// TestRegister_DoReloadWithRetry_OnStartup verifies that when Register() is called
-// and the initial DoReloadWithRetry fails (dashboard returns 500 for APIs/policies),
-// the gateway keeps retrying until the upstream recovers, then marks the reload
-// as successful — without re-registering the node.
-func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
-	const succeedOnCall = 3
+// TestRegister_DoesNotReload verifies that registration only renews node state.
+// The caller that owns the registration flow remains responsible for reloading
+// APIs and policies.
+func TestRegister_DoesNotReload(t *testing.T) {
 	var (
 		registerCount int
 		policyCount   int
+		apiCount      int
 	)
 
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2202,17 +2202,12 @@ func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
 
 		case strings.Contains(r.URL.Path, "/system/policies"):
 			policyCount++
-			if policyCount < succeedOnCall {
-				w.WriteHeader(http.StatusInternalServerError)
-				_, err := w.Write([]byte(`{"Status":"Error","Message":"db unavailable","Meta":null}`))
-				require.NoError(t, err)
-				return
-			}
 			w.Header().Set("Content-Type", "application/json")
 			_, err := w.Write([]byte(`{"Message":[],"Nonce":"ok"}`))
 			require.NoError(t, err)
 
 		case strings.Contains(r.URL.Path, "/system/apis"):
+			apiCount++
 			w.Header().Set("Content-Type", "application/json")
 			_, err := w.Write([]byte(`{"Status":"OK","Nonce":"ok","Message":[]}`))
 			require.NoError(t, err)
@@ -2230,11 +2225,6 @@ func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
 		conf.NodeSecret = "test-secret"
 	})
 	defer ts.Close()
-
-	// Use a fast retry interval so retries happen in milliseconds during the test.
-	ts.Gw.reloadRetryBackoff = func() backoff.BackOff {
-		return backoff.NewConstantBackOff(50 * time.Millisecond)
-	}
 
 	// Enable dashboard mode and wire up the mock dashboard.
 	conf := ts.Gw.GetConfig()
@@ -2257,10 +2247,80 @@ func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
 	err := ts.Gw.DashService.Register(ctx)
 
 	assert.NoError(t, err, "Register should not return an error")
-	assert.True(t, ts.Gw.performedSuccessfulReload,
-		"performedSuccessfulReload should be true after recovery")
+	assert.False(t, ts.Gw.performedSuccessfulReload,
+		"Register should not mark a reload as successful")
 	assert.Equal(t, 1, registerCount,
-		"/register/node must be called exactly once — DoReloadWithRetry must not re-register")
-	assert.GreaterOrEqual(t, policyCount, succeedOnCall,
-		"policy endpoint should have been retried at least %d times", succeedOnCall)
+		"/register/node must be called exactly once")
+	assert.Zero(t, policyCount, "Register should not fetch policies")
+	assert.Zero(t, apiCount, "Register should not fetch APIs")
+	assert.Equal(t, "test-node-id", ts.Gw.GetNodeID())
+	ts.Gw.ServiceNonceMutex.RLock()
+	assert.Equal(t, "nonce-1", ts.Gw.ServiceNonce)
+	ts.Gw.ServiceNonceMutex.RUnlock()
+}
+
+func TestNewGateway_OSRootInitialization(t *testing.T) {
+	t.Run("successful initialization with valid TemplatePath", func(t *testing.T) {
+		tempDir := t.TempDir()
+
+		cfg := config.Config{
+			TemplatePath: tempDir,
+		}
+
+		gw := NewGateway(cfg, context.Background())
+
+		require.NotNil(t, gw.OSRoot, "OSRoot should be initialized when TemplatePath is valid")
+
+		safePath, err := gw.OSRoot.Ensure("test.tmpl")
+		require.NoError(t, err)
+		// OSRoot resolves symlinks, so compare against the resolved root rather
+		// than the raw TemplatePath (on macOS /var resolves to /private/var).
+		assert.Equal(t, filepath.Join(gw.OSRoot.RootPath(), "test.tmpl"), safePath)
+	})
+
+	t.Run("initialization fails with invalid TemplatePath", func(t *testing.T) {
+		cfg := config.Config{
+			TemplatePath: "/path/that/does/not/exist/12345",
+		}
+
+		gw := NewGateway(cfg, context.Background())
+
+		assert.Nil(t, gw.OSRoot, "OSRoot should be nil when TemplatePath is invalid")
+	})
+}
+
+func TestAfterConfSetup_AllowUnsafeBodyTransformTemplatePathsWarning(t *testing.T) {
+	const warning = "allow_unsafe_body_transform_template_paths is enabled"
+
+	hasWarning := func(t *testing.T, allowUnsafe bool) bool {
+		t.Helper()
+
+		// Other tests that go through StartTest drop the level to Error,
+		// which silences the Warn entries this test is checking for.
+		origLevel := log.GetLevel()
+		log.SetLevel(logrus.WarnLevel)
+		defer log.SetLevel(origLevel)
+
+		hook := &logrustest.Hook{}
+		log.AddHook(hook)
+		defer log.ReplaceHooks(make(logrus.LevelHooks))
+
+		gw := NewGateway(config.Config{AllowUnsafeBodyTransformTemplatePaths: allowUnsafe}, context.Background())
+		require.NoError(t, gw.afterConfSetup())
+
+		for _, e := range hook.AllEntries() {
+			if e.Level == logrus.WarnLevel && strings.Contains(e.Message, warning) {
+				return true
+			}
+		}
+		return false
+	}
+
+	t.Run("warns when enabled", func(t *testing.T) {
+		assert.True(t, hasWarning(t, true), "expected warning log about unsafe body transform template paths")
+	})
+
+	t.Run("does not warn when disabled", func(t *testing.T) {
+		assert.False(t, hasWarning(t, false), "unexpected warning log about unsafe body transform template paths")
+	})
 }

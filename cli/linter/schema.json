@@ -957,6 +957,12 @@
         },
         "xff_depth": {
           "type": "integer"
+        },
+        "trusted_proxy_cidrs": {
+          "type": ["array", "null"],
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -1716,6 +1722,18 @@
       "default": "quotas"
     },
     "allow_unsafe_policy_ids": {
+      "type": ["boolean", "null"],
+      "additionalProperties": false
+    },
+    "allow_unsafe_webhook_template_paths": {
+      "type": ["boolean", "null"],
+      "additionalProperties": false
+    },
+    "allow_unsafe_api_ids": {
+      "type": ["boolean", "null"],
+      "additionalProperties": false
+    },
+    "allow_unsafe_body_transform_template_paths": {
       "type": ["boolean", "null"],
       "additionalProperties": false
     },

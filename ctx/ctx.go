@@ -77,6 +77,8 @@ const (
 	MCPPrimitiveName
 	// JSONRPCErrorCode stores the JSON-RPC error code for metrics dimensions.
 	JSONRPCErrorCode
+	// MCPProtocolContext stores the typed, single-parse MCP ingress context.
+	MCPProtocolContext
 	// MatchedIdPBinding holds the per-request client-IdP registry binding matched
 	// in the JWT middleware. The value (a *gateway.Binding) is type-asserted on
 	// the gateway side; only the key lives here to avoid an import cycle.
@@ -239,9 +241,12 @@ func GetMCPPrimitiveName(r *http.Request) string {
 }
 
 // GetJSONRPCErrorCode returns the JSON-RPC error code from the request context.
-func GetJSONRPCErrorCode(r *http.Request) int {
-	if v, ok := r.Context().Value(JSONRPCErrorCode).(int); ok {
+func GetJSONRPCErrorCode(r *http.Request) int64 {
+	switch v := r.Context().Value(JSONRPCErrorCode).(type) {
+	case int64:
 		return v
+	case int:
+		return int64(v)
 	}
 	return 0
 }
