@@ -3,12 +3,15 @@ package gateway
 import (
 	"encoding/json"
 	"net/http"
+	"regexp"
 	"testing"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/test"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const tt18531Schema = `
@@ -121,6 +124,64 @@ func TestGraphQL_ValidationError_ErrorOverride_TT_18531(t *testing.T) {
 					})
 				})
 			}
+		})
+	}
+}
+
+// TestGraphQL_IntrospectionDisabled_ErrorOverride_TT_18531 covers the introspection-disabled
+// granular access failure: with a 403 override the override status and body win, without it
+// the standard 403 error template is returned unchanged.
+func TestGraphQL_IntrospectionDisabled_ErrorOverride_TT_18531(t *testing.T) {
+	const plainBody = "{\n    \"error\": \"introspection is disabled\"\n}"
+
+	introspectionQuery := graphql.Request{Query: "query Query { __schema { types { name } } }"}
+
+	for _, version := range []apidef.GraphQLConfigVersion{apidef.GraphQLConfigVersion2, apidef.GraphQLConfigVersion3Preview} {
+		t.Run(string(version), func(t *testing.T) {
+			g := StartTest(nil)
+			t.Cleanup(g.Close)
+
+			apis := g.Gw.BuildAndLoadAPI(
+				func(spec *APISpec) {
+					spec.Proxy.ListenPath = "/override"
+					spec.UseKeylessAccess = false
+					spec.GraphQL.Enabled = true
+					spec.GraphQL.Version = version
+					spec.GraphQL.Schema = tt18531Schema
+					spec.ErrorOverrides = apidef.ErrorOverridesMap{
+						"403": []apidef.ErrorOverride{{
+							Response: apidef.ErrorResponse{
+								StatusCode: http.StatusNotFound,
+								Body:       tt18531OverrideBody,
+							},
+						}},
+					}
+				},
+				func(spec *APISpec) {
+					spec.Proxy.ListenPath = "/plain"
+					spec.UseKeylessAccess = false
+					spec.GraphQL.Enabled = true
+					spec.GraphQL.Version = version
+					spec.GraphQL.Schema = tt18531Schema
+				},
+			)
+
+			_, key := g.CreateSession(func(s *user.SessionState) {
+				s.AccessRights = map[string]user.AccessDefinition{}
+				for _, api := range apis {
+					s.AccessRights[api.APIID] = user.AccessDefinition{
+						APIID:                api.APIID,
+						APIName:              api.Name,
+						DisableIntrospection: true,
+					}
+				}
+			})
+			authHeader := map[string]string{header.Authorization: key}
+
+			_, _ = g.Run(t, []test.TestCase{
+				{Method: http.MethodPost, Path: "/override", Data: introspectionQuery, Headers: authHeader, Code: http.StatusNotFound, BodyMatch: `^` + regexp.QuoteMeta(tt18531OverrideBody) + `$`},
+				{Method: http.MethodPost, Path: "/plain", Data: introspectionQuery, Headers: authHeader, Code: http.StatusForbidden, BodyMatch: `^` + regexp.QuoteMeta(plainBody) + `$`},
+			}...)
 		})
 	}
 }

@@ -22,7 +22,7 @@ func (e *EngineV3) ProcessGraphQLComplexity(r *http.Request, accessDefinition *C
 
 func (e *EngineV3) ProcessGraphQLGranularAccess(w http.ResponseWriter, r *http.Request, accessDefinition *GranularAccessDefinition) (err error, statusCode int) {
 	result := e.granularAccessChecker.CheckGraphQLRequestFieldAllowance(w, r, accessDefinition)
-	return granularAccessFailReasonAsHttpStatusCode(e.logger, &result, w)
+	return granularAccessFailReasonAsHttpStatusCode(e.logger, &result)
 }
 
 func (e *EngineV3) HandleReverseProxy(params ReverseProxyParams) (res *http.Response, hijacked bool, err error) {
