@@ -1137,7 +1137,7 @@ jobs:
       mcp_manifest: ${{ steps.mcp_images.outputs.manifest }}
     steps:
       - name: Set test parameters
-        uses: TykTechnologies/github-actions/.github/actions/tests/test-controller@6b715789b1acab061ff60e4493efc3d6f9f381d6
+        uses: TykTechnologies/github-actions/.github/actions/tests/test-controller@1ded3212d7aa6ed0d9dad52abdb9f14795d378ab
         id: params
         with:
           variation: ${{ env.VARIATION }}
@@ -1177,7 +1177,7 @@ jobs:
       - name: Resolve coordinated MCP API images
         if: github.event_name == 'pull_request'
         id: mcp_images
-        uses: TykTechnologies/github-actions/.github/actions/tests/resolve-mcp-images@6b715789b1acab061ff60e4493efc3d6f9f381d6
+        uses: TykTechnologies/github-actions/.github/actions/tests/resolve-mcp-images@1ded3212d7aa6ed0d9dad52abdb9f14795d378ab
         with:
           github_token: ${{ steps.mcp-token.outputs.token }}
           registry: ${{ steps.mcp-ecr.outputs.registry }}
@@ -1233,18 +1233,18 @@ jobs:
           # Only ${{ github.actor }} has access
           # See https://github.com/mxschmitt/action-tmate#use-registered-public-ssh-keys
       - name: Fetch environment from tyk-pro
-        uses: TykTechnologies/github-actions/.github/actions/tests/checkout-tyk-pro@6b715789b1acab061ff60e4493efc3d6f9f381d6
+        uses: TykTechnologies/github-actions/.github/actions/tests/checkout-tyk-pro@1ded3212d7aa6ed0d9dad52abdb9f14795d378ab
         with:
           org_gh_token: ${{ steps.app-token.outputs.token }}
           ref: ${{ matrix.envfiles.suite == 'mcp' && fromJSON(needs.test-controller-api.outputs.mcp_manifest || '{}').environment_sha || '' }}
       - name: Choose test code branch
-        uses: TykTechnologies/github-actions/.github/actions/tests/choose-test-branch@6b715789b1acab061ff60e4493efc3d6f9f381d6
+        uses: TykTechnologies/github-actions/.github/actions/tests/choose-test-branch@1ded3212d7aa6ed0d9dad52abdb9f14795d378ab
         with:
           test_folder: api
           org_gh_token: ${{ steps.app-token.outputs.token }}
           ref: ${{ matrix.envfiles.suite == 'mcp' && fromJSON(needs.test-controller-api.outputs.mcp_manifest || '{}').tested_shas.dashboard || '' }}
       - name: Set up test environment
-        uses: TykTechnologies/github-actions/.github/actions/tests/env-up@6b715789b1acab061ff60e4493efc3d6f9f381d6
+        uses: TykTechnologies/github-actions/.github/actions/tests/env-up@1ded3212d7aa6ed0d9dad52abdb9f14795d378ab
         timeout-minutes: 8
         id: env_up
         with:
@@ -1260,7 +1260,7 @@ jobs:
           mcp_serializer: ${{ matrix.envfiles.serializer || 'msgpack' }}
           mcp_cache: ${{ matrix.envfiles.cache }}
       - name: Run API tests
-        uses: TykTechnologies/github-actions/.github/actions/tests/api-tests@6b715789b1acab061ff60e4493efc3d6f9f381d6
+        uses: TykTechnologies/github-actions/.github/actions/tests/api-tests@1ded3212d7aa6ed0d9dad52abdb9f14795d378ab
         timeout-minutes: 25
         id: test_execution
         with:
@@ -1272,7 +1272,7 @@ jobs:
           shard_count: ${{ matrix.envfiles.shard_count || 1 }}
           shard_index: ${{ matrix.envfiles.shard_index || 0 }}
       - name: Generate test reports and collect logs
-        uses: TykTechnologies/github-actions/.github/actions/tests/reporting@6b715789b1acab061ff60e4493efc3d6f9f381d6
+        uses: TykTechnologies/github-actions/.github/actions/tests/reporting@1ded3212d7aa6ed0d9dad52abdb9f14795d378ab
         if: always() && (steps.test_execution.conclusion != 'skipped' || matrix.envfiles.suite == 'mcp')
         # Bound this best-effort step: `docker compose logs` inside it can hang on
         # an unresponsive container and otherwise burn the whole job timeout.
@@ -1305,7 +1305,7 @@ jobs:
           permission-contents: read
           repositories: tyk-analytics
       - name: Require complete MCP API evidence
-        uses: TykTechnologies/github-actions/.github/actions/tests/mcp-evidence@6b715789b1acab061ff60e4493efc3d6f9f381d6
+        uses: TykTechnologies/github-actions/.github/actions/tests/mcp-evidence@1ded3212d7aa6ed0d9dad52abdb9f14795d378ab
         with:
           github_token: ${{ steps.mcp-token.outputs.token }}
           manifest: ${{ needs.test-controller-api.outputs.mcp_manifest }}
