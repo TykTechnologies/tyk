@@ -1147,11 +1147,11 @@ type Config struct {
 	// This can cause a file-handler limit to be exceeded. Setting to false can have performance benefits as the connection can be reused.
 	ProxyCloseConnections bool `json:"proxy_close_connections"`
 
-	// ApplyStripListenPathToURLRewrite makes `strip_listen_path` also apply to a path that has already been
-	// rewritten by the URL Rewrite middleware (or another rewrite-like middleware). By default the rewritten
-	// path is proxied unchanged. Set to `true` to restore the legacy behaviour, where the listen path was
-	// stripped from the rewritten path when it happened to start with the API listen path.
-	// Reverts behavior described in the task https://tyktech.atlassian.net/browse/TT-1860
+	// ApplyStripListenPathToURLRewrite restores the legacy behavior, where
+	// listen path stripping also applied to paths rewritten by URL Rewrite. If a rewritten path starts
+	// with the API’s listen path, Gateway strips the listen path before proxying upstream.
+	// Defaults to false, which proxies rewritten paths unchanged.
+	// Enable it only if your APIs rely on the legacy behavior.
 	ApplyStripListenPathToURLRewrite bool `json:"apply_strip_listen_path_to_url_rewrite"`
 
 	// Tyk nodes can provide uptime awareness, uptime testing and analytics for your underlying APIs uptime and availability.
