@@ -44,7 +44,7 @@ jobs:
       (needs.dep-guard.result == 'success' || needs.dep-guard.result == 'skipped') &&
       github.event.pull_request.draft == false
     name: '${{ matrix.golang_cross }}'
-    runs-on: ${{ vars.WARP_RUNNER_8X_X64 || vars.BUILD_RUNNER || vars.DEFAULT_RUNNER }}
+    runs-on: ${{ vars.WARP_RUNNER_16X_X64 || vars.WARP_RUNNER_8X_X64 || vars.BUILD_RUNNER || vars.DEFAULT_RUNNER }}
     permissions:
       id-token: write # AWS OIDC JWT
       contents: read # actions/checkout
@@ -76,6 +76,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
+          ref: ${{ github.event.pull_request.head.sha }}
       - name: Set some outputs for later
         id: set_outputs
         shell: bash
@@ -221,9 +222,12 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
             type=sha,format=long
+            type=raw,value=sha-${{ github.event.pull_request.head.sha || github.sha }}
             type=semver,pattern={{major}},prefix=v
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
+          labels: |
+            org.opencontainers.image.revision=${{ github.event.pull_request.head.sha || github.sha }}
       - name: push ee image to CI
         if: ${{ matrix.golang_cross == '1.26-bullseye' }}
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
@@ -377,9 +381,12 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
             type=sha,format=long
+            type=raw,value=sha-${{ github.event.pull_request.head.sha || github.sha }}
             type=semver,pattern={{major}},prefix=v
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
+          labels: |
+            org.opencontainers.image.revision=${{ github.event.pull_request.head.sha || github.sha }}
       - name: push fips image to CI
         if: ${{ matrix.golang_cross == '1.26-bullseye' }}
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
@@ -532,9 +539,12 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
             type=sha,format=long
+            type=raw,value=sha-${{ github.event.pull_request.head.sha || github.sha }}
             type=semver,pattern={{major}},prefix=v
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
+          labels: |
+            org.opencontainers.image.revision=${{ github.event.pull_request.head.sha || github.sha }}
       - name: push std image to CI
         if: ${{ matrix.golang_cross == '1.26-bullseye' }}
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
@@ -1115,18 +1125,63 @@ jobs:
       needs.goreleaser.result == 'success' &&
       github.event.pull_request.draft == false
     runs-on: ${{ vars.DEFAULT_RUNNER }}
+    timeout-minutes: 30
+    permissions:
+      id-token: write
+      contents: read
     outputs:
       envfiles: ${{ steps.params.outputs.envfiles }}
       pump: ${{ steps.params.outputs.pump }}
       sink: ${{ steps.params.outputs.sink }}
+      matrix: ${{ steps.params.outputs.matrix }}
+      mcp_manifest: ${{ steps.mcp_images.outputs.manifest }}
     steps:
       - name: Set test parameters
-        uses: TykTechnologies/github-actions/.github/actions/tests/test-controller@production
+        uses: TykTechnologies/github-actions/.github/actions/tests/test-controller@6b715789b1acab061ff60e4493efc3d6f9f381d6
         id: params
         with:
           variation: ${{ env.VARIATION }}
           base_ref: ${{ env.BASE_REF }}
           test_type: api
+          expand_api_matrix: 'true'
+          include_mcp: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
+          mcp_topology: direct
+      - name: Generate coordinated source token
+        if: github.event_name == 'pull_request'
+        id: mcp-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
+          permission-contents: read
+          repositories: |
+            tyk
+            tyk-analytics
+            tyk-pump
+            tyk-sink
+            tyk-pro
+            tyk-mock-mcp-server
+      - uses: aws-actions/configure-aws-credentials@ff717079ee2060e4bcee96c4779b553acc87447c # v4
+        if: github.event_name == 'pull_request'
+        with:
+          role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
+          role-session-name: mcp-api-resolve
+          aws-region: eu-central-1
+      - name: Login to CI image registry
+        if: github.event_name == 'pull_request'
+        id: mcp-ecr
+        uses: aws-actions/amazon-ecr-login@f2e9fc6c2b355c1890b65e6f6f0e2ac3e6e22f78 # v2
+        with:
+          mask-password: 'true'
+      - name: Resolve coordinated MCP API images
+        if: github.event_name == 'pull_request'
+        id: mcp_images
+        uses: TykTechnologies/github-actions/.github/actions/tests/resolve-mcp-images@6b715789b1acab061ff60e4493efc3d6f9f381d6
+        with:
+          github_token: ${{ steps.mcp-token.outputs.token }}
+          registry: ${{ steps.mcp-ecr.outputs.registry }}
+          topology: direct
   api-tests:
     needs:
       - test-controller-api
@@ -1151,14 +1206,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        envfiles: ${{ fromJson(needs.test-controller-api.outputs.envfiles) }}
-        pump: ${{ fromJson(needs.test-controller-api.outputs.pump) }}
-        sink: ${{ fromJson(needs.test-controller-api.outputs.sink) }}
-        exclude:
-          - pump: tykio/tyk-pump-docker-pub:v1.8
-            sink: $ECR/tyk-sink:master
-          - pump: $ECR/tyk-pump:master
-            sink: tykio/tyk-mdcb-docker:v2.4
+        include: ${{ fromJson(needs.test-controller-api.outputs.matrix) }}
     steps:
       - name: Generate GitHub App token
         id: app-token
@@ -1185,12 +1233,19 @@ jobs:
           # Only ${{ github.actor }} has access
           # See https://github.com/mxschmitt/action-tmate#use-registered-public-ssh-keys
       - name: Fetch environment from tyk-pro
-        uses: TykTechnologies/github-actions/.github/actions/tests/checkout-tyk-pro@production
+        uses: TykTechnologies/github-actions/.github/actions/tests/checkout-tyk-pro@6b715789b1acab061ff60e4493efc3d6f9f381d6
         with:
           org_gh_token: ${{ steps.app-token.outputs.token }}
+          ref: ${{ matrix.envfiles.suite == 'mcp' && fromJSON(needs.test-controller-api.outputs.mcp_manifest || '{}').environment_sha || '' }}
+      - name: Choose test code branch
+        uses: TykTechnologies/github-actions/.github/actions/tests/choose-test-branch@6b715789b1acab061ff60e4493efc3d6f9f381d6
+        with:
+          test_folder: api
+          org_gh_token: ${{ steps.app-token.outputs.token }}
+          ref: ${{ matrix.envfiles.suite == 'mcp' && fromJSON(needs.test-controller-api.outputs.mcp_manifest || '{}').tested_shas.dashboard || '' }}
       - name: Set up test environment
-        uses: TykTechnologies/github-actions/.github/actions/tests/env-up@production
-        timeout-minutes: 5
+        uses: TykTechnologies/github-actions/.github/actions/tests/env-up@6b715789b1acab061ff60e4493efc3d6f9f381d6
+        timeout-minutes: 8
         id: env_up
         with:
           base_ref: ${{ env.BASE_REF }}
@@ -1199,49 +1254,61 @@ jobs:
           github_token: ${{ steps.app-token.outputs.token }}
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
-      - name: Choose test code branch
-        uses: TykTechnologies/github-actions/.github/actions/tests/choose-test-branch@production
-        with:
-          test_folder: api
-          org_gh_token: ${{ steps.app-token.outputs.token }}
+          suite: ${{ matrix.envfiles.suite }}
+          mcp_manifest: ${{ needs.test-controller-api.outputs.mcp_manifest }}
+          mcp_storage: ${{ matrix.envfiles.storage || 'mongo' }}
+          mcp_serializer: ${{ matrix.envfiles.serializer || 'msgpack' }}
+          mcp_cache: ${{ matrix.envfiles.cache }}
       - name: Run API tests
-        uses: TykTechnologies/github-actions/.github/actions/tests/api-tests@production
+        uses: TykTechnologies/github-actions/.github/actions/tests/api-tests@6b715789b1acab061ff60e4493efc3d6f9f381d6
         timeout-minutes: 25
         id: test_execution
         with:
           user_api_secret: ${{ steps.env_up.outputs.USER_API_SECRET }}
-          # MCP coverage runs serially against coordinated sources in the mandatory job below.
-          api_markers: (${{ matrix.envfiles.apimarkers }}) and not mcp
+          suite: ${{ matrix.envfiles.suite }}
+          api_markers: ${{ matrix.envfiles.apimarkers }}
+          mcp_storage: ${{ matrix.envfiles.storage || 'mongo' }}
+          mcp_serializer: ${{ matrix.envfiles.serializer || 'msgpack' }}
+          shard_count: ${{ matrix.envfiles.shard_count || 1 }}
+          shard_index: ${{ matrix.envfiles.shard_index || 0 }}
       - name: Generate test reports and collect logs
-        uses: TykTechnologies/github-actions/.github/actions/tests/reporting@production
-        if: always() && (steps.test_execution.conclusion != 'skipped')
+        uses: TykTechnologies/github-actions/.github/actions/tests/reporting@6b715789b1acab061ff60e4493efc3d6f9f381d6
+        if: always() && (steps.test_execution.conclusion != 'skipped' || matrix.envfiles.suite == 'mcp')
         # Bound this best-effort step: `docker compose logs` inside it can hang on
         # an unresponsive container and otherwise burn the whole job timeout.
         # continue-on-error keeps a log-collection hang from failing an otherwise
         # green test run (the real result comes from the Execute step above).
         timeout-minutes: 8
-        continue-on-error: true
+        continue-on-error: ${{ matrix.envfiles.suite != 'mcp' }}
         with:
           report_xml: 'true'
           execution_status: ${{ steps.test_execution.outcome }}
-  mcp-qualification:
-    name: Coordinated MCP qualification
-    needs: dep-guard
-    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
-    uses: TykTechnologies/github-actions/.github/workflows/mcp-qualification.yml@aee08ff727a05046f05ab8236c57b2947a037834
-    secrets:
-      PROBE_APP_ID: ${{ secrets.PROBE_APP_ID }}
-      PROBE_APP_PRIVATE_KEY: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
-      DASH_LICENSE: ${{ secrets.DASH_LICENSE }}
-    permissions:
-      contents: read
+          suite: ${{ matrix.envfiles.suite }}
+          mcp_storage: ${{ matrix.envfiles.storage || 'mongo' }}
+          mcp_serializer: ${{ matrix.envfiles.serializer || 'msgpack' }}
+          mcp_cache: ${{ matrix.envfiles.cache }}
+          shard_index: ${{ matrix.envfiles.shard_index || 0 }}
   aggregator-ci-test:
     name: Aggregated CI Status
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     # Dynamically determine which jobs to depend on based on repository configuration
-    needs: [dep-guard, goreleaser, api-tests, mcp-qualification]
+    needs: [dep-guard, goreleaser, api-tests, test-controller-api]
     if: ${{ always() && github.event_name == 'pull_request' }}
     steps:
+      - name: Generate API evidence token
+        id: mcp-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
+          permission-contents: read
+          repositories: tyk-analytics
+      - name: Require complete MCP API evidence
+        uses: TykTechnologies/github-actions/.github/actions/tests/mcp-evidence@6b715789b1acab061ff60e4493efc3d6f9f381d6
+        with:
+          github_token: ${{ steps.mcp-token.outputs.token }}
+          manifest: ${{ needs.test-controller-api.outputs.mcp_manifest }}
       - name: Aggregate results
         run: |
           failed=()
