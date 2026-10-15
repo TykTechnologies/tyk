@@ -19,6 +19,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/internal/rate/limiter"
 	"github.com/TykTechnologies/tyk/internal/redis"
+	"github.com/TykTechnologies/tyk/pkg/controlplane/keys"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
@@ -38,13 +39,13 @@ type PublicSession struct {
 
 const (
 	// QuotaKeyPrefix serves as a standard prefix for generating quota keys.
-	QuotaKeyPrefix = "quota-"
+	QuotaKeyPrefix = keys.QuotaKeyPrefix
 
 	// RateLimitKeyPrefix serves as a standard prefix for generating rate limiter keys.
-	RateLimitKeyPrefix = rate.LimiterKeyPrefix
+	RateLimitKeyPrefix = keys.RateLimitKeyPrefix
 
 	// SentinelRateLimitKeyPostfix is appended to the rate limiting key to combine into a sentinel key.
-	SentinelRateLimitKeyPostfix = ".BLOCKED"
+	SentinelRateLimitKeyPostfix = keys.SentinelRateLimitKeyPostfix
 )
 
 // SessionLimiter is the rate limiter for the API, use ForwardMessage() to

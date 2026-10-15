@@ -1,0 +1,2885 @@
+[
+  {
+    "name": "client-create",
+    "status": 200,
+    "body": {
+      "client_id": "client-1",
+      "description": "parity client",
+      "meta_data": {
+        "a": "b"
+      },
+      "policy_id": "pol-oauth",
+      "redirect_uri": "http://client.oauth.com",
+      "secret": "secret-1"
+    },
+    "redis": [
+      {
+        "key": "oauth-data.999999.oauth-client-index.default",
+        "type": "list",
+        "ttl": -1,
+        "value": [
+          "oauth-clientid.client-1"
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientid.client-1",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "description": "parity client",
+          "id": "client-1",
+          "meta_data": {
+            "a": "b"
+          },
+          "policyid": "pol-oauth",
+          "redirecturi": "http://client.oauth.com",
+          "secret": "secret-1"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientset.oauth-clientid.",
+        "type": "set",
+        "ttl": -1,
+        "value": [
+          {
+            "description": "parity client",
+            "id": "client-1",
+            "meta_data": {
+              "a": "b"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "client-update",
+    "status": 200,
+    "body": {
+      "client_id": "client-1",
+      "description": "parity client updated",
+      "meta_data": {
+        "a": "c"
+      },
+      "policy_id": "pol-oauth",
+      "redirect_uri": "http://client.oauth.com",
+      "secret": "secret-1"
+    },
+    "redis": [
+      {
+        "key": "oauth-data.999999.oauth-client-index.default",
+        "type": "list",
+        "ttl": -1,
+        "value": [
+          "oauth-clientid.client-1"
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientid.client-1",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "description": "parity client updated",
+          "id": "client-1",
+          "meta_data": {
+            "a": "c"
+          },
+          "policyid": "pol-oauth",
+          "redirecturi": "http://client.oauth.com",
+          "secret": "secret-1"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientset.oauth-clientid.",
+        "type": "set",
+        "ttl": -1,
+        "value": [
+          {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "client-list",
+    "status": 200,
+    "body": [
+      {
+        "client_id": "client-1",
+        "description": "parity client updated",
+        "meta_data": {
+          "a": "c"
+        },
+        "policy_id": "pol-oauth",
+        "redirect_uri": "http://client.oauth.com",
+        "secret": "secret-1"
+      }
+    ],
+    "redis": [
+      {
+        "key": "oauth-data.999999.oauth-client-index.default",
+        "type": "list",
+        "ttl": -1,
+        "value": [
+          "oauth-clientid.client-1"
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientid.client-1",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "description": "parity client updated",
+          "id": "client-1",
+          "meta_data": {
+            "a": "c"
+          },
+          "policyid": "pol-oauth",
+          "redirecturi": "http://client.oauth.com",
+          "secret": "secret-1"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientset.oauth-clientid.",
+        "type": "set",
+        "ttl": -1,
+        "value": [
+          {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "client-get",
+    "status": 200,
+    "body": {
+      "client_id": "client-1",
+      "description": "parity client updated",
+      "meta_data": {
+        "a": "c"
+      },
+      "policy_id": "pol-oauth",
+      "redirect_uri": "http://client.oauth.com",
+      "secret": "secret-1"
+    },
+    "redis": [
+      {
+        "key": "oauth-data.999999.oauth-client-index.default",
+        "type": "list",
+        "ttl": -1,
+        "value": [
+          "oauth-clientid.client-1"
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientid.client-1",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "description": "parity client updated",
+          "id": "client-1",
+          "meta_data": {
+            "a": "c"
+          },
+          "policyid": "pol-oauth",
+          "redirecturi": "http://client.oauth.com",
+          "secret": "secret-1"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientset.oauth-clientid.",
+        "type": "set",
+        "ttl": -1,
+        "value": [
+          {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "client-apis",
+    "status": 200,
+    "body": [
+      "999999"
+    ],
+    "redis": [
+      {
+        "key": "oauth-data.999999.oauth-client-index.default",
+        "type": "list",
+        "ttl": -1,
+        "value": [
+          "oauth-clientid.client-1"
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientid.client-1",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "description": "parity client updated",
+          "id": "client-1",
+          "meta_data": {
+            "a": "c"
+          },
+          "policyid": "pol-oauth",
+          "redirecturi": "http://client.oauth.com",
+          "secret": "secret-1"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientset.oauth-clientid.",
+        "type": "set",
+        "ttl": -1,
+        "value": [
+          {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "authorize-code",
+    "status": 200,
+    "body": {
+      "code": "\u003cCODE1\u003e",
+      "redirect_to": "http://client.oauth.com?code=\u003cCODE1\u003e"
+    },
+    "redis": [
+      {
+        "key": "oauth-data.999999.oauth-authorize.\u003cCODE1\u003e",
+        "type": "string",
+        "ttl": 250,
+        "value": {
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "Code": "\u003cCODE1\u003e",
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 250,
+          "RedirectUri": "http://client.oauth.com",
+          "Scope": "",
+          "State": "",
+          "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-client-index.default",
+        "type": "list",
+        "ttl": -1,
+        "value": [
+          "oauth-clientid.client-1"
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientid.client-1",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "description": "parity client updated",
+          "id": "client-1",
+          "meta_data": {
+            "a": "c"
+          },
+          "policyid": "pol-oauth",
+          "redirecturi": "http://client.oauth.com",
+          "secret": "secret-1"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientset.oauth-clientid.",
+        "type": "set",
+        "ttl": -1,
+        "value": [
+          {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "token-authorization-code",
+    "status": 200,
+    "body": {
+      "access_token": "\u003cA1\u003e",
+      "expires_in": 3600,
+      "refresh_token": "\u003cR1\u003e",
+      "token_type": "bearer"
+    },
+    "redis": [
+      {
+        "key": "apikey-\u003cA1.hash\u003e",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999",
+              "versions": [
+                "Default"
+              ]
+            }
+          },
+          "alias": "parity",
+          "expires": "\u003cts\u003e",
+          "meta_data": {
+            "a": "c",
+            "m": "v"
+          },
+          "oauth_client_id": "client-1",
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 100,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-access.\u003cA1.hash\u003e",
+        "type": "string",
+        "ttl": 3600,
+        "value": {
+          "AccessToken": "\u003cA1\u003e",
+          "AuthorizeData": {
+            "Client": {
+              "Id": "client-1",
+              "RedirectUri": "http://client.oauth.com",
+              "Secret": "secret-1"
+            },
+            "Code": "\u003cCODE1\u003e",
+            "CreatedAt": "\u003cts\u003e",
+            "ExpiresIn": 250,
+            "RedirectUri": "http://client.oauth.com",
+            "Scope": "",
+            "State": "",
+            "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+          },
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "\u003cR1\u003e",
+          "Scope": "",
+          "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-client-index.default",
+        "type": "list",
+        "ttl": -1,
+        "value": [
+          "oauth-clientid.client-1"
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-client-tokens.client-1",
+        "type": "zset",
+        "ttl": -1,
+        "value": [
+          {
+            "member": "\u003cA1.hash\u003e",
+            "score": "\u003cts\u003e"
+          }
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientid.client-1",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "description": "parity client updated",
+          "id": "client-1",
+          "meta_data": {
+            "a": "c"
+          },
+          "policyid": "pol-oauth",
+          "redirecturi": "http://client.oauth.com",
+          "secret": "secret-1"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientset.oauth-clientid.",
+        "type": "set",
+        "ttl": -1,
+        "value": [
+          {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          }
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-refresh.\u003cR1\u003e",
+        "type": "string",
+        "ttl": 7200,
+        "value": {
+          "AccessToken": "\u003cA1\u003e",
+          "AuthorizeData": {
+            "Client": {
+              "Id": "client-1",
+              "RedirectUri": "http://client.oauth.com",
+              "Secret": "secret-1"
+            },
+            "Code": "\u003cCODE1\u003e",
+            "CreatedAt": "\u003cts\u003e",
+            "ExpiresIn": 250,
+            "RedirectUri": "http://client.oauth.com",
+            "Scope": "",
+            "State": "",
+            "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+          },
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "\u003cR1\u003e",
+          "Scope": "",
+          "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+        }
+      }
+    ]
+  },
+  {
+    "name": "authorize-implicit-token",
+    "status": 200,
+    "body": {
+      "access_token": "\u003cA2\u003e",
+      "expires_in": 3600,
+      "redirect_to": "http://client.oauth.com#access_token=\u003cA2\u003e\u0026expires_in=3600\u0026token_type=bearer",
+      "token_type": "bearer"
+    },
+    "redis": [
+      {
+        "key": "apikey-\u003cA1.hash\u003e",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999",
+              "versions": [
+                "Default"
+              ]
+            }
+          },
+          "alias": "parity",
+          "expires": "\u003cts\u003e",
+          "meta_data": {
+            "a": "c",
+            "m": "v"
+          },
+          "oauth_client_id": "client-1",
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 100,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      },
+      {
+        "key": "apikey-\u003cA2.hash\u003e",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999",
+              "versions": [
+                "Default"
+              ]
+            }
+          },
+          "alias": "parity",
+          "expires": "\u003cts\u003e",
+          "meta_data": {
+            "a": "c",
+            "m": "v"
+          },
+          "oauth_client_id": "client-1",
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 100,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-access.\u003cA1.hash\u003e",
+        "type": "string",
+        "ttl": 3600,
+        "value": {
+          "AccessToken": "\u003cA1\u003e",
+          "AuthorizeData": {
+            "Client": {
+              "Id": "client-1",
+              "RedirectUri": "http://client.oauth.com",
+              "Secret": "secret-1"
+            },
+            "Code": "\u003cCODE1\u003e",
+            "CreatedAt": "\u003cts\u003e",
+            "ExpiresIn": 250,
+            "RedirectUri": "http://client.oauth.com",
+            "Scope": "",
+            "State": "",
+            "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+          },
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "\u003cR1\u003e",
+          "Scope": "",
+          "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-access.\u003cA2.hash\u003e",
+        "type": "string",
+        "ttl": 3600,
+        "value": {
+          "AccessToken": "\u003cA2\u003e",
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "",
+          "Scope": "",
+          "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-client-index.default",
+        "type": "list",
+        "ttl": -1,
+        "value": [
+          "oauth-clientid.client-1"
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-client-tokens.client-1",
+        "type": "zset",
+        "ttl": -1,
+        "value": [
+          {
+            "member": "\u003cA1.hash\u003e",
+            "score": "\u003cts\u003e"
+          },
+          {
+            "member": "\u003cA2.hash\u003e",
+            "score": "\u003cts\u003e"
+          }
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientid.client-1",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "description": "parity client updated",
+          "id": "client-1",
+          "meta_data": {
+            "a": "c"
+          },
+          "policyid": "pol-oauth",
+          "redirecturi": "http://client.oauth.com",
+          "secret": "secret-1"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientset.oauth-clientid.",
+        "type": "set",
+        "ttl": -1,
+        "value": [
+          {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          }
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-refresh.\u003cR1\u003e",
+        "type": "string",
+        "ttl": 7200,
+        "value": {
+          "AccessToken": "\u003cA1\u003e",
+          "AuthorizeData": {
+            "Client": {
+              "Id": "client-1",
+              "RedirectUri": "http://client.oauth.com",
+              "Secret": "secret-1"
+            },
+            "Code": "\u003cCODE1\u003e",
+            "CreatedAt": "\u003cts\u003e",
+            "ExpiresIn": 250,
+            "RedirectUri": "http://client.oauth.com",
+            "Scope": "",
+            "State": "",
+            "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+          },
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "\u003cR1\u003e",
+          "Scope": "",
+          "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+        }
+      }
+    ]
+  },
+  {
+    "name": "token-client-credentials",
+    "status": 200,
+    "body": {
+      "access_token": "\u003cA3\u003e",
+      "expires_in": 3600,
+      "token_type": "bearer"
+    },
+    "redis": [
+      {
+        "key": "apikey-\u003cA1.hash\u003e",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999",
+              "versions": [
+                "Default"
+              ]
+            }
+          },
+          "alias": "parity",
+          "expires": "\u003cts\u003e",
+          "meta_data": {
+            "a": "c",
+            "m": "v"
+          },
+          "oauth_client_id": "client-1",
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 100,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      },
+      {
+        "key": "apikey-\u003cA2.hash\u003e",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999",
+              "versions": [
+                "Default"
+              ]
+            }
+          },
+          "alias": "parity",
+          "expires": "\u003cts\u003e",
+          "meta_data": {
+            "a": "c",
+            "m": "v"
+          },
+          "oauth_client_id": "client-1",
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 100,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      },
+      {
+        "key": "apikey-\u003cA3.hash\u003e",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999"
+            }
+          },
+          "allowance": 1000,
+          "apply_policies": [
+            "pol-oauth"
+          ],
+          "expires": "\u003cts\u003e",
+          "meta_data": {
+            "a": "c"
+          },
+          "oauth_client_id": "client-1",
+          "org_id": "default",
+          "per": 1,
+          "quota_max": -1,
+          "quota_renewal_rate": -1,
+          "rate": 1000
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-access.\u003cA1.hash\u003e",
+        "type": "string",
+        "ttl": 3600,
+        "value": {
+          "AccessToken": "\u003cA1\u003e",
+          "AuthorizeData": {
+            "Client": {
+              "Id": "client-1",
+              "RedirectUri": "http://client.oauth.com",
+              "Secret": "secret-1"
+            },
+            "Code": "\u003cCODE1\u003e",
+            "CreatedAt": "\u003cts\u003e",
+            "ExpiresIn": 250,
+            "RedirectUri": "http://client.oauth.com",
+            "Scope": "",
+            "State": "",
+            "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+          },
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "\u003cR1\u003e",
+          "Scope": "",
+          "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-access.\u003cA2.hash\u003e",
+        "type": "string",
+        "ttl": 3600,
+        "value": {
+          "AccessToken": "\u003cA2\u003e",
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "",
+          "Scope": "",
+          "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-access.\u003cA3.hash\u003e",
+        "type": "string",
+        "ttl": 3600,
+        "value": {
+          "AccessToken": "\u003cA3\u003e",
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "",
+          "Scope": ""
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-client-index.default",
+        "type": "list",
+        "ttl": -1,
+        "value": [
+          "oauth-clientid.client-1"
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-client-tokens.client-1",
+        "type": "zset",
+        "ttl": -1,
+        "value": [
+          {
+            "member": "\u003cA1.hash\u003e",
+            "score": "\u003cts\u003e"
+          },
+          {
+            "member": "\u003cA2.hash\u003e",
+            "score": "\u003cts\u003e"
+          },
+          {
+            "member": "\u003cA3.hash\u003e",
+            "score": "\u003cts\u003e"
+          }
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientid.client-1",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "description": "parity client updated",
+          "id": "client-1",
+          "meta_data": {
+            "a": "c"
+          },
+          "policyid": "pol-oauth",
+          "redirecturi": "http://client.oauth.com",
+          "secret": "secret-1"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientset.oauth-clientid.",
+        "type": "set",
+        "ttl": -1,
+        "value": [
+          {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          }
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-refresh.\u003cR1\u003e",
+        "type": "string",
+        "ttl": 7200,
+        "value": {
+          "AccessToken": "\u003cA1\u003e",
+          "AuthorizeData": {
+            "Client": {
+              "Id": "client-1",
+              "RedirectUri": "http://client.oauth.com",
+              "Secret": "secret-1"
+            },
+            "Code": "\u003cCODE1\u003e",
+            "CreatedAt": "\u003cts\u003e",
+            "ExpiresIn": 250,
+            "RedirectUri": "http://client.oauth.com",
+            "Scope": "",
+            "State": "",
+            "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+          },
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "\u003cR1\u003e",
+          "Scope": "",
+          "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+        }
+      }
+    ]
+  },
+  {
+    "name": "token-refresh",
+    "status": 200,
+    "body": {
+      "access_token": "\u003cA4\u003e",
+      "expires_in": 3600,
+      "refresh_token": "\u003cR2\u003e",
+      "token_type": "bearer"
+    },
+    "redis": [
+      {
+        "key": "apikey-\u003cA2.hash\u003e",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999",
+              "versions": [
+                "Default"
+              ]
+            }
+          },
+          "alias": "parity",
+          "expires": "\u003cts\u003e",
+          "meta_data": {
+            "a": "c",
+            "m": "v"
+          },
+          "oauth_client_id": "client-1",
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 100,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      },
+      {
+        "key": "apikey-\u003cA3.hash\u003e",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999"
+            }
+          },
+          "allowance": 1000,
+          "apply_policies": [
+            "pol-oauth"
+          ],
+          "expires": "\u003cts\u003e",
+          "meta_data": {
+            "a": "c"
+          },
+          "oauth_client_id": "client-1",
+          "org_id": "default",
+          "per": 1,
+          "quota_max": -1,
+          "quota_renewal_rate": -1,
+          "rate": 1000
+        }
+      },
+      {
+        "key": "apikey-\u003cA4.hash\u003e",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999",
+              "versions": [
+                "Default"
+              ]
+            }
+          },
+          "alias": "parity",
+          "expires": "\u003cts\u003e",
+          "meta_data": {
+            "a": "c",
+            "m": "v"
+          },
+          "oauth_client_id": "client-1",
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 100,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-access.\u003cA2.hash\u003e",
+        "type": "string",
+        "ttl": 3600,
+        "value": {
+          "AccessToken": "\u003cA2\u003e",
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "",
+          "Scope": "",
+          "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-access.\u003cA3.hash\u003e",
+        "type": "string",
+        "ttl": 3600,
+        "value": {
+          "AccessToken": "\u003cA3\u003e",
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "",
+          "Scope": ""
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-access.\u003cA4.hash\u003e",
+        "type": "string",
+        "ttl": 3600,
+        "value": {
+          "AccessData": {
+            "AccessToken": "\u003cA1\u003e",
+            "AuthorizeData": {
+              "Client": {
+                "Id": "client-1",
+                "RedirectUri": "http://client.oauth.com",
+                "Secret": "secret-1"
+              },
+              "Code": "\u003cCODE1\u003e",
+              "CreatedAt": "\u003cts\u003e",
+              "ExpiresIn": 250,
+              "RedirectUri": "http://client.oauth.com",
+              "Scope": "",
+              "State": "",
+              "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+            },
+            "Client": {
+              "Id": "client-1",
+              "RedirectUri": "http://client.oauth.com",
+              "Secret": "secret-1"
+            },
+            "CreatedAt": "\u003cts\u003e",
+            "ExpiresIn": 3600,
+            "RedirectUri": "http://client.oauth.com",
+            "RefreshToken": "\u003cR1\u003e",
+            "Scope": "",
+            "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+          },
+          "AccessToken": "\u003cA4\u003e",
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "\u003cR2\u003e",
+          "Scope": "",
+          "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-client-index.default",
+        "type": "list",
+        "ttl": -1,
+        "value": [
+          "oauth-clientid.client-1"
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-client-tokens.client-1",
+        "type": "zset",
+        "ttl": -1,
+        "value": [
+          {
+            "member": "\u003cA2.hash\u003e",
+            "score": "\u003cts\u003e"
+          },
+          {
+            "member": "\u003cA3.hash\u003e",
+            "score": "\u003cts\u003e"
+          },
+          {
+            "member": "\u003cA4.hash\u003e",
+            "score": "\u003cts\u003e"
+          }
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientid.client-1",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "description": "parity client updated",
+          "id": "client-1",
+          "meta_data": {
+            "a": "c"
+          },
+          "policyid": "pol-oauth",
+          "redirecturi": "http://client.oauth.com",
+          "secret": "secret-1"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientset.oauth-clientid.",
+        "type": "set",
+        "ttl": -1,
+        "value": [
+          {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          }
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-refresh.\u003cR2\u003e",
+        "type": "string",
+        "ttl": 7200,
+        "value": {
+          "AccessData": {
+            "AccessToken": "\u003cA1\u003e",
+            "AuthorizeData": {
+              "Client": {
+                "Id": "client-1",
+                "RedirectUri": "http://client.oauth.com",
+                "Secret": "secret-1"
+              },
+              "Code": "\u003cCODE1\u003e",
+              "CreatedAt": "\u003cts\u003e",
+              "ExpiresIn": 250,
+              "RedirectUri": "http://client.oauth.com",
+              "Scope": "",
+              "State": "",
+              "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+            },
+            "Client": {
+              "Id": "client-1",
+              "RedirectUri": "http://client.oauth.com",
+              "Secret": "secret-1"
+            },
+            "CreatedAt": "\u003cts\u003e",
+            "ExpiresIn": 3600,
+            "RedirectUri": "http://client.oauth.com",
+            "RefreshToken": "\u003cR1\u003e",
+            "Scope": "",
+            "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+          },
+          "AccessToken": "\u003cA4\u003e",
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "\u003cR2\u003e",
+          "Scope": "",
+          "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+        }
+      }
+    ]
+  },
+  {
+    "name": "token-password",
+    "status": 403,
+    "body": {
+      "error": "access_denied",
+      "error_description": "The resource owner or authorization server denied the request."
+    },
+    "redis": [
+      {
+        "key": "apikey-57532680984cd6d5",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999",
+              "versions": [
+                "Default"
+              ]
+            }
+          },
+          "alias": "parity",
+          "basic_auth_data": {
+            "hash_type": "bcrypt",
+            "password": "\u003cpassword-hash\u003e"
+          },
+          "date_created": "\u003cts\u003e",
+          "last_updated": "\u003cts\u003e",
+          "meta_data": {
+            "m": "v"
+          },
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 100,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "quota_renews": "\u003cts\u003e",
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      },
+      {
+        "key": "apikey-\u003cA2.hash\u003e",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999",
+              "versions": [
+                "Default"
+              ]
+            }
+          },
+          "alias": "parity",
+          "expires": "\u003cts\u003e",
+          "meta_data": {
+            "a": "c",
+            "m": "v"
+          },
+          "oauth_client_id": "client-1",
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 100,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      },
+      {
+        "key": "apikey-\u003cA3.hash\u003e",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999"
+            }
+          },
+          "allowance": 1000,
+          "apply_policies": [
+            "pol-oauth"
+          ],
+          "expires": "\u003cts\u003e",
+          "meta_data": {
+            "a": "c"
+          },
+          "oauth_client_id": "client-1",
+          "org_id": "default",
+          "per": 1,
+          "quota_max": -1,
+          "quota_renewal_rate": -1,
+          "rate": 1000
+        }
+      },
+      {
+        "key": "apikey-\u003cA4.hash\u003e",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999",
+              "versions": [
+                "Default"
+              ]
+            }
+          },
+          "alias": "parity",
+          "expires": "\u003cts\u003e",
+          "meta_data": {
+            "a": "c",
+            "m": "v"
+          },
+          "oauth_client_id": "client-1",
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 100,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-access.\u003cA2.hash\u003e",
+        "type": "string",
+        "ttl": 3600,
+        "value": {
+          "AccessToken": "\u003cA2\u003e",
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "",
+          "Scope": "",
+          "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-access.\u003cA3.hash\u003e",
+        "type": "string",
+        "ttl": 3600,
+        "value": {
+          "AccessToken": "\u003cA3\u003e",
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "",
+          "Scope": ""
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-access.\u003cA4.hash\u003e",
+        "type": "string",
+        "ttl": 3600,
+        "value": {
+          "AccessData": {
+            "AccessToken": "\u003cA1\u003e",
+            "AuthorizeData": {
+              "Client": {
+                "Id": "client-1",
+                "RedirectUri": "http://client.oauth.com",
+                "Secret": "secret-1"
+              },
+              "Code": "\u003cCODE1\u003e",
+              "CreatedAt": "\u003cts\u003e",
+              "ExpiresIn": 250,
+              "RedirectUri": "http://client.oauth.com",
+              "Scope": "",
+              "State": "",
+              "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+            },
+            "Client": {
+              "Id": "client-1",
+              "RedirectUri": "http://client.oauth.com",
+              "Secret": "secret-1"
+            },
+            "CreatedAt": "\u003cts\u003e",
+            "ExpiresIn": 3600,
+            "RedirectUri": "http://client.oauth.com",
+            "RefreshToken": "\u003cR1\u003e",
+            "Scope": "",
+            "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+          },
+          "AccessToken": "\u003cA4\u003e",
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "\u003cR2\u003e",
+          "Scope": "",
+          "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-client-index.default",
+        "type": "list",
+        "ttl": -1,
+        "value": [
+          "oauth-clientid.client-1"
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-client-tokens.client-1",
+        "type": "zset",
+        "ttl": -1,
+        "value": [
+          {
+            "member": "\u003cA2.hash\u003e",
+            "score": "\u003cts\u003e"
+          },
+          {
+            "member": "\u003cA3.hash\u003e",
+            "score": "\u003cts\u003e"
+          },
+          {
+            "member": "\u003cA4.hash\u003e",
+            "score": "\u003cts\u003e"
+          }
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientid.client-1",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "description": "parity client updated",
+          "id": "client-1",
+          "meta_data": {
+            "a": "c"
+          },
+          "policyid": "pol-oauth",
+          "redirecturi": "http://client.oauth.com",
+          "secret": "secret-1"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientset.oauth-clientid.",
+        "type": "set",
+        "ttl": -1,
+        "value": [
+          {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          }
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-refresh.\u003cR2\u003e",
+        "type": "string",
+        "ttl": 7200,
+        "value": {
+          "AccessData": {
+            "AccessToken": "\u003cA1\u003e",
+            "AuthorizeData": {
+              "Client": {
+                "Id": "client-1",
+                "RedirectUri": "http://client.oauth.com",
+                "Secret": "secret-1"
+              },
+              "Code": "\u003cCODE1\u003e",
+              "CreatedAt": "\u003cts\u003e",
+              "ExpiresIn": 250,
+              "RedirectUri": "http://client.oauth.com",
+              "Scope": "",
+              "State": "",
+              "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+            },
+            "Client": {
+              "Id": "client-1",
+              "RedirectUri": "http://client.oauth.com",
+              "Secret": "secret-1"
+            },
+            "CreatedAt": "\u003cts\u003e",
+            "ExpiresIn": 3600,
+            "RedirectUri": "http://client.oauth.com",
+            "RefreshToken": "\u003cR1\u003e",
+            "Scope": "",
+            "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+          },
+          "AccessToken": "\u003cA4\u003e",
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "\u003cR2\u003e",
+          "Scope": "",
+          "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+        }
+      }
+    ]
+  },
+  {
+    "name": "client-tokens",
+    "status": 200,
+    "body": [
+      {
+        "code": "\u003cA2.hash\u003e",
+        "expires": "\u003cts\u003e"
+      },
+      {
+        "code": "\u003cA3.hash\u003e",
+        "expires": "\u003cts\u003e"
+      },
+      {
+        "code": "\u003cA4.hash\u003e",
+        "expires": "\u003cts\u003e"
+      }
+    ],
+    "redis": [
+      {
+        "key": "apikey-57532680984cd6d5",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999",
+              "versions": [
+                "Default"
+              ]
+            }
+          },
+          "alias": "parity",
+          "basic_auth_data": {
+            "hash_type": "bcrypt",
+            "password": "\u003cpassword-hash\u003e"
+          },
+          "date_created": "\u003cts\u003e",
+          "last_updated": "\u003cts\u003e",
+          "meta_data": {
+            "m": "v"
+          },
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 100,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "quota_renews": "\u003cts\u003e",
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      },
+      {
+        "key": "apikey-\u003cA2.hash\u003e",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999",
+              "versions": [
+                "Default"
+              ]
+            }
+          },
+          "alias": "parity",
+          "expires": "\u003cts\u003e",
+          "meta_data": {
+            "a": "c",
+            "m": "v"
+          },
+          "oauth_client_id": "client-1",
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 100,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      },
+      {
+        "key": "apikey-\u003cA3.hash\u003e",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999"
+            }
+          },
+          "allowance": 1000,
+          "apply_policies": [
+            "pol-oauth"
+          ],
+          "expires": "\u003cts\u003e",
+          "meta_data": {
+            "a": "c"
+          },
+          "oauth_client_id": "client-1",
+          "org_id": "default",
+          "per": 1,
+          "quota_max": -1,
+          "quota_renewal_rate": -1,
+          "rate": 1000
+        }
+      },
+      {
+        "key": "apikey-\u003cA4.hash\u003e",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999",
+              "versions": [
+                "Default"
+              ]
+            }
+          },
+          "alias": "parity",
+          "expires": "\u003cts\u003e",
+          "meta_data": {
+            "a": "c",
+            "m": "v"
+          },
+          "oauth_client_id": "client-1",
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 100,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-access.\u003cA2.hash\u003e",
+        "type": "string",
+        "ttl": 3600,
+        "value": {
+          "AccessToken": "\u003cA2\u003e",
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "",
+          "Scope": "",
+          "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-access.\u003cA3.hash\u003e",
+        "type": "string",
+        "ttl": 3600,
+        "value": {
+          "AccessToken": "\u003cA3\u003e",
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "",
+          "Scope": ""
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-access.\u003cA4.hash\u003e",
+        "type": "string",
+        "ttl": 3600,
+        "value": {
+          "AccessData": {
+            "AccessToken": "\u003cA1\u003e",
+            "AuthorizeData": {
+              "Client": {
+                "Id": "client-1",
+                "RedirectUri": "http://client.oauth.com",
+                "Secret": "secret-1"
+              },
+              "Code": "\u003cCODE1\u003e",
+              "CreatedAt": "\u003cts\u003e",
+              "ExpiresIn": 250,
+              "RedirectUri": "http://client.oauth.com",
+              "Scope": "",
+              "State": "",
+              "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+            },
+            "Client": {
+              "Id": "client-1",
+              "RedirectUri": "http://client.oauth.com",
+              "Secret": "secret-1"
+            },
+            "CreatedAt": "\u003cts\u003e",
+            "ExpiresIn": 3600,
+            "RedirectUri": "http://client.oauth.com",
+            "RefreshToken": "\u003cR1\u003e",
+            "Scope": "",
+            "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+          },
+          "AccessToken": "\u003cA4\u003e",
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "\u003cR2\u003e",
+          "Scope": "",
+          "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-client-index.default",
+        "type": "list",
+        "ttl": -1,
+        "value": [
+          "oauth-clientid.client-1"
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-client-tokens.client-1",
+        "type": "zset",
+        "ttl": -1,
+        "value": [
+          {
+            "member": "\u003cA2.hash\u003e",
+            "score": "\u003cts\u003e"
+          },
+          {
+            "member": "\u003cA3.hash\u003e",
+            "score": "\u003cts\u003e"
+          },
+          {
+            "member": "\u003cA4.hash\u003e",
+            "score": "\u003cts\u003e"
+          }
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientid.client-1",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "description": "parity client updated",
+          "id": "client-1",
+          "meta_data": {
+            "a": "c"
+          },
+          "policyid": "pol-oauth",
+          "redirecturi": "http://client.oauth.com",
+          "secret": "secret-1"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientset.oauth-clientid.",
+        "type": "set",
+        "ttl": -1,
+        "value": [
+          {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          }
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-refresh.\u003cR2\u003e",
+        "type": "string",
+        "ttl": 7200,
+        "value": {
+          "AccessData": {
+            "AccessToken": "\u003cA1\u003e",
+            "AuthorizeData": {
+              "Client": {
+                "Id": "client-1",
+                "RedirectUri": "http://client.oauth.com",
+                "Secret": "secret-1"
+              },
+              "Code": "\u003cCODE1\u003e",
+              "CreatedAt": "\u003cts\u003e",
+              "ExpiresIn": 250,
+              "RedirectUri": "http://client.oauth.com",
+              "Scope": "",
+              "State": "",
+              "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+            },
+            "Client": {
+              "Id": "client-1",
+              "RedirectUri": "http://client.oauth.com",
+              "Secret": "secret-1"
+            },
+            "CreatedAt": "\u003cts\u003e",
+            "ExpiresIn": 3600,
+            "RedirectUri": "http://client.oauth.com",
+            "RefreshToken": "\u003cR1\u003e",
+            "Scope": "",
+            "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+          },
+          "AccessToken": "\u003cA4\u003e",
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "\u003cR2\u003e",
+          "Scope": "",
+          "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+        }
+      }
+    ]
+  },
+  {
+    "name": "revoke-access-token",
+    "status": 200,
+    "body": {
+      "message": "token revoked successfully",
+      "status": "ok"
+    },
+    "redis": [
+      {
+        "key": "apikey-57532680984cd6d5",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999",
+              "versions": [
+                "Default"
+              ]
+            }
+          },
+          "alias": "parity",
+          "basic_auth_data": {
+            "hash_type": "bcrypt",
+            "password": "\u003cpassword-hash\u003e"
+          },
+          "date_created": "\u003cts\u003e",
+          "last_updated": "\u003cts\u003e",
+          "meta_data": {
+            "m": "v"
+          },
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 100,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "quota_renews": "\u003cts\u003e",
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      },
+      {
+        "key": "apikey-\u003cA2.hash\u003e",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999",
+              "versions": [
+                "Default"
+              ]
+            }
+          },
+          "alias": "parity",
+          "expires": "\u003cts\u003e",
+          "meta_data": {
+            "a": "c",
+            "m": "v"
+          },
+          "oauth_client_id": "client-1",
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 100,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      },
+      {
+        "key": "apikey-\u003cA4.hash\u003e",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999",
+              "versions": [
+                "Default"
+              ]
+            }
+          },
+          "alias": "parity",
+          "expires": "\u003cts\u003e",
+          "meta_data": {
+            "a": "c",
+            "m": "v"
+          },
+          "oauth_client_id": "client-1",
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 100,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-access.\u003cA2.hash\u003e",
+        "type": "string",
+        "ttl": 3600,
+        "value": {
+          "AccessToken": "\u003cA2\u003e",
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "",
+          "Scope": "",
+          "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-access.\u003cA4.hash\u003e",
+        "type": "string",
+        "ttl": 3600,
+        "value": {
+          "AccessData": {
+            "AccessToken": "\u003cA1\u003e",
+            "AuthorizeData": {
+              "Client": {
+                "Id": "client-1",
+                "RedirectUri": "http://client.oauth.com",
+                "Secret": "secret-1"
+              },
+              "Code": "\u003cCODE1\u003e",
+              "CreatedAt": "\u003cts\u003e",
+              "ExpiresIn": 250,
+              "RedirectUri": "http://client.oauth.com",
+              "Scope": "",
+              "State": "",
+              "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+            },
+            "Client": {
+              "Id": "client-1",
+              "RedirectUri": "http://client.oauth.com",
+              "Secret": "secret-1"
+            },
+            "CreatedAt": "\u003cts\u003e",
+            "ExpiresIn": 3600,
+            "RedirectUri": "http://client.oauth.com",
+            "RefreshToken": "\u003cR1\u003e",
+            "Scope": "",
+            "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+          },
+          "AccessToken": "\u003cA4\u003e",
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "\u003cR2\u003e",
+          "Scope": "",
+          "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-client-index.default",
+        "type": "list",
+        "ttl": -1,
+        "value": [
+          "oauth-clientid.client-1"
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-client-tokens.client-1",
+        "type": "zset",
+        "ttl": -1,
+        "value": [
+          {
+            "member": "\u003cA2.hash\u003e",
+            "score": "\u003cts\u003e"
+          },
+          {
+            "member": "\u003cA4.hash\u003e",
+            "score": "\u003cts\u003e"
+          }
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientid.client-1",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "description": "parity client updated",
+          "id": "client-1",
+          "meta_data": {
+            "a": "c"
+          },
+          "policyid": "pol-oauth",
+          "redirecturi": "http://client.oauth.com",
+          "secret": "secret-1"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientset.oauth-clientid.",
+        "type": "set",
+        "ttl": -1,
+        "value": [
+          {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          }
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-refresh.\u003cR2\u003e",
+        "type": "string",
+        "ttl": 7200,
+        "value": {
+          "AccessData": {
+            "AccessToken": "\u003cA1\u003e",
+            "AuthorizeData": {
+              "Client": {
+                "Id": "client-1",
+                "RedirectUri": "http://client.oauth.com",
+                "Secret": "secret-1"
+              },
+              "Code": "\u003cCODE1\u003e",
+              "CreatedAt": "\u003cts\u003e",
+              "ExpiresIn": 250,
+              "RedirectUri": "http://client.oauth.com",
+              "Scope": "",
+              "State": "",
+              "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+            },
+            "Client": {
+              "Id": "client-1",
+              "RedirectUri": "http://client.oauth.com",
+              "Secret": "secret-1"
+            },
+            "CreatedAt": "\u003cts\u003e",
+            "ExpiresIn": 3600,
+            "RedirectUri": "http://client.oauth.com",
+            "RefreshToken": "\u003cR1\u003e",
+            "Scope": "",
+            "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+          },
+          "AccessToken": "\u003cA4\u003e",
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "\u003cR2\u003e",
+          "Scope": "",
+          "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+        }
+      }
+    ]
+  },
+  {
+    "name": "invalidate-refresh",
+    "status": 200,
+    "body": {
+      "action": "deleted",
+      "key": "\u003cR2\u003e",
+      "status": "ok"
+    },
+    "redis": [
+      {
+        "key": "apikey-57532680984cd6d5",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999",
+              "versions": [
+                "Default"
+              ]
+            }
+          },
+          "alias": "parity",
+          "basic_auth_data": {
+            "hash_type": "bcrypt",
+            "password": "\u003cpassword-hash\u003e"
+          },
+          "date_created": "\u003cts\u003e",
+          "last_updated": "\u003cts\u003e",
+          "meta_data": {
+            "m": "v"
+          },
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 100,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "quota_renews": "\u003cts\u003e",
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      },
+      {
+        "key": "apikey-\u003cA2.hash\u003e",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999",
+              "versions": [
+                "Default"
+              ]
+            }
+          },
+          "alias": "parity",
+          "expires": "\u003cts\u003e",
+          "meta_data": {
+            "a": "c",
+            "m": "v"
+          },
+          "oauth_client_id": "client-1",
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 100,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      },
+      {
+        "key": "apikey-\u003cA4.hash\u003e",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999",
+              "versions": [
+                "Default"
+              ]
+            }
+          },
+          "alias": "parity",
+          "expires": "\u003cts\u003e",
+          "meta_data": {
+            "a": "c",
+            "m": "v"
+          },
+          "oauth_client_id": "client-1",
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 100,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-access.\u003cA2.hash\u003e",
+        "type": "string",
+        "ttl": 3600,
+        "value": {
+          "AccessToken": "\u003cA2\u003e",
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "",
+          "Scope": "",
+          "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-access.\u003cA4.hash\u003e",
+        "type": "string",
+        "ttl": 3600,
+        "value": {
+          "AccessData": {
+            "AccessToken": "\u003cA1\u003e",
+            "AuthorizeData": {
+              "Client": {
+                "Id": "client-1",
+                "RedirectUri": "http://client.oauth.com",
+                "Secret": "secret-1"
+              },
+              "Code": "\u003cCODE1\u003e",
+              "CreatedAt": "\u003cts\u003e",
+              "ExpiresIn": 250,
+              "RedirectUri": "http://client.oauth.com",
+              "Scope": "",
+              "State": "",
+              "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+            },
+            "Client": {
+              "Id": "client-1",
+              "RedirectUri": "http://client.oauth.com",
+              "Secret": "secret-1"
+            },
+            "CreatedAt": "\u003cts\u003e",
+            "ExpiresIn": 3600,
+            "RedirectUri": "http://client.oauth.com",
+            "RefreshToken": "\u003cR1\u003e",
+            "Scope": "",
+            "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+          },
+          "AccessToken": "\u003cA4\u003e",
+          "Client": {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          },
+          "CreatedAt": "\u003cts\u003e",
+          "ExpiresIn": 3600,
+          "RedirectUri": "http://client.oauth.com",
+          "RefreshToken": "\u003cR2\u003e",
+          "Scope": "",
+          "UserData": "{\"rate\":10,\"per\":60,\"quota_max\":100,\"quota_remaining\":100,\"quota_renewal_rate\":3600,\"access_rights\":{\"999999\":{\"api_id\":\"999999\",\"versions\":[\"Default\"]}},\"org_id\":\"default\",\"meta_data\":{\"m\":\"v\"},\"tags\":[\"parity\"],\"alias\":\"parity\"}"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-client-index.default",
+        "type": "list",
+        "ttl": -1,
+        "value": [
+          "oauth-clientid.client-1"
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-client-tokens.client-1",
+        "type": "zset",
+        "ttl": -1,
+        "value": [
+          {
+            "member": "\u003cA2.hash\u003e",
+            "score": "\u003cts\u003e"
+          },
+          {
+            "member": "\u003cA4.hash\u003e",
+            "score": "\u003cts\u003e"
+          }
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientid.client-1",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "description": "parity client updated",
+          "id": "client-1",
+          "meta_data": {
+            "a": "c"
+          },
+          "policyid": "pol-oauth",
+          "redirecturi": "http://client.oauth.com",
+          "secret": "secret-1"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientset.oauth-clientid.",
+        "type": "set",
+        "ttl": -1,
+        "value": [
+          {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "revoke-all",
+    "status": 200,
+    "body": {
+      "message": "tokens revoked successfully",
+      "status": "ok"
+    },
+    "redis": [
+      {
+        "key": "apikey-57532680984cd6d5",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999",
+              "versions": [
+                "Default"
+              ]
+            }
+          },
+          "alias": "parity",
+          "basic_auth_data": {
+            "hash_type": "bcrypt",
+            "password": "\u003cpassword-hash\u003e"
+          },
+          "date_created": "\u003cts\u003e",
+          "last_updated": "\u003cts\u003e",
+          "meta_data": {
+            "m": "v"
+          },
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 100,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "quota_renews": "\u003cts\u003e",
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-client-index.default",
+        "type": "list",
+        "ttl": -1,
+        "value": [
+          "oauth-clientid.client-1"
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientid.client-1",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "description": "parity client updated",
+          "id": "client-1",
+          "meta_data": {
+            "a": "c"
+          },
+          "policyid": "pol-oauth",
+          "redirecturi": "http://client.oauth.com",
+          "secret": "secret-1"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientset.oauth-clientid.",
+        "type": "set",
+        "ttl": -1,
+        "value": [
+          {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "secret-1"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "client-rotate",
+    "status": 200,
+    "body": {
+      "client_id": "client-1",
+      "description": "parity client updated",
+      "meta_data": {
+        "a": "c"
+      },
+      "policy_id": "pol-oauth",
+      "redirect_uri": "http://client.oauth.com",
+      "secret": "\u003cSECRET2\u003e"
+    },
+    "redis": [
+      {
+        "key": "apikey-57532680984cd6d5",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999",
+              "versions": [
+                "Default"
+              ]
+            }
+          },
+          "alias": "parity",
+          "basic_auth_data": {
+            "hash_type": "bcrypt",
+            "password": "\u003cpassword-hash\u003e"
+          },
+          "date_created": "\u003cts\u003e",
+          "last_updated": "\u003cts\u003e",
+          "meta_data": {
+            "m": "v"
+          },
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 100,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "quota_renews": "\u003cts\u003e",
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-client-index.default",
+        "type": "list",
+        "ttl": -1,
+        "value": [
+          "oauth-clientid.client-1"
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientid.client-1",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "description": "parity client updated",
+          "id": "client-1",
+          "meta_data": {
+            "a": "c"
+          },
+          "policyid": "pol-oauth",
+          "redirecturi": "http://client.oauth.com",
+          "secret": "\u003cSECRET2\u003e"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientset.oauth-clientid.",
+        "type": "set",
+        "ttl": -1,
+        "value": [
+          {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "\u003cSECRET2\u003e"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "name": "purge-lapsed",
+    "status": 200,
+    "body": {
+      "message": "lapsed tokens purged",
+      "status": "ok"
+    },
+    "redis": [
+      {
+        "key": "apikey-57532680984cd6d5",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999",
+              "versions": [
+                "Default"
+              ]
+            }
+          },
+          "alias": "parity",
+          "basic_auth_data": {
+            "hash_type": "bcrypt",
+            "password": "\u003cpassword-hash\u003e"
+          },
+          "date_created": "\u003cts\u003e",
+          "last_updated": "\u003cts\u003e",
+          "meta_data": {
+            "m": "v"
+          },
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 100,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "quota_renews": "\u003cts\u003e",
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-client-index.default",
+        "type": "list",
+        "ttl": -1,
+        "value": [
+          "oauth-clientid.client-1"
+        ]
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientid.client-1",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "description": "parity client updated",
+          "id": "client-1",
+          "meta_data": {
+            "a": "c"
+          },
+          "policyid": "pol-oauth",
+          "redirecturi": "http://client.oauth.com",
+          "secret": "\u003cSECRET2\u003e"
+        }
+      },
+      {
+        "key": "oauth-data.999999.oauth-clientset.oauth-clientid.",
+        "type": "set",
+        "ttl": -1,
+        "value": [
+          {
+            "description": "parity client updated",
+            "id": "client-1",
+            "meta_data": {
+              "a": "c"
+            },
+            "policyid": "pol-oauth",
+            "redirecturi": "http://client.oauth.com",
+            "secret": "\u003cSECRET2\u003e"
+          }
+        ]
+      },
+      {
+        "key": "oauth-purge-lock",
+        "type": "string",
+        "ttl": 60,
+        "value": "1"
+      }
+    ]
+  },
+  {
+    "name": "client-delete",
+    "status": 200,
+    "body": {
+      "action": "deleted",
+      "key": "client-1",
+      "status": "ok"
+    },
+    "redis": [
+      {
+        "key": "apikey-57532680984cd6d5",
+        "type": "string",
+        "ttl": -1,
+        "value": {
+          "access_rights": {
+            "999999": {
+              "api_id": "999999",
+              "versions": [
+                "Default"
+              ]
+            }
+          },
+          "alias": "parity",
+          "basic_auth_data": {
+            "hash_type": "bcrypt",
+            "password": "\u003cpassword-hash\u003e"
+          },
+          "date_created": "\u003cts\u003e",
+          "last_updated": "\u003cts\u003e",
+          "meta_data": {
+            "m": "v"
+          },
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 100,
+          "quota_remaining": 100,
+          "quota_renewal_rate": 3600,
+          "quota_renews": "\u003cts\u003e",
+          "rate": 10,
+          "tags": [
+            "parity"
+          ]
+        }
+      },
+      {
+        "key": "oauth-purge-lock",
+        "type": "string",
+        "ttl": 60,
+        "value": "1"
+      }
+    ]
+  }
+]

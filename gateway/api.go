@@ -34,12 +34,10 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
-	"math"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -47,30 +45,27 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gorilla/mux"
-	"github.com/lonelycode/osin"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
-	"golang.org/x/crypto/bcrypt"
 
 	gql "github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 	gqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
-	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/internal/redis"
 	"github.com/TykTechnologies/tyk/internal/sanitize"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	lib "github.com/TykTechnologies/tyk/lib/apidef"
+	"github.com/TykTechnologies/tyk/pkg/controlplane/keys"
+	"github.com/TykTechnologies/tyk/pkg/controlplane/oauth"
 	"github.com/TykTechnologies/tyk/pkg/identifier"
 	"github.com/TykTechnologies/tyk/pkg/osutil"
 	"github.com/TykTechnologies/tyk/pkg/schema"
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -119,68 +114,19 @@ func apiError(msg string) apiStatusMessage {
 // mtls_static_certificate_bindings array exist in the certificate manager.
 // Returns an error with the specific certificate ID if validation fails.
 func (gw *Gateway) validateMtlsStaticCertificateBindings(certIDs []string, orgID string) error {
-	if len(certIDs) == 0 {
-		return nil
-	}
-
-	// Validate certificate IDs start with orgID prefix to prevent path traversal attacks
-	// Certificate IDs follow the pattern: orgID + sha256hash
-	for _, certID := range certIDs {
-		if orgID != "" && !strings.HasPrefix(certID, orgID) {
-			return fmt.Errorf("invalid certificate ID: %s", certID)
-		}
-	}
-
-	// Use List() for efficient batch validation - single storage operation
-	// Pattern from cert.go:594-595
-	certificates := gw.CertificateManager.List(certIDs, certs.CertificateAny)
-
-	// Check if any certificates were not found (List returns nil for missing certs)
-	// Pattern from cert.go:607-612
-	for i, cert := range certificates {
-		if cert == nil {
-			return fmt.Errorf("certificate not found: %s", certIDs[i])
-		}
-	}
-
-	return nil
+	return gw.controlPlaneKeys().ValidateMtlsStaticCertificateBindings(certIDs, orgID)
 }
 
 // getNewCertIDs returns only the certificate IDs that are in newCerts but not in originalCerts.
 // Used for optimizing updates to only validate newly added certificates.
 func getNewCertIDs(originalCerts, newCerts []string) []string {
-	if len(originalCerts) == 0 {
-		return newCerts
-	}
-
-	// Build map of existing certificates for O(1) lookup
-	existingCerts := make(map[string]struct{}, len(originalCerts))
-	for _, certID := range originalCerts {
-		existingCerts[certID] = struct{}{}
-	}
-
-	// Filter to only NEW certificates
-	var newCertIDs []string
-	for _, certID := range newCerts {
-		if _, exists := existingCerts[certID]; !exists {
-			newCertIDs = append(newCertIDs, certID)
-		}
-	}
-
-	return newCertIDs
+	return keys.NewCertIDs(originalCerts, newCerts)
 }
 
 // paginationStatus provides more information about a paginated data set
-type paginationStatus struct {
-	PageNum   int `json:"page_num"`
-	PageTotal int `json:"page_total"`
-	PageSize  int `json:"page_size"`
-}
+type paginationStatus = oauth.PaginationStatus
 
-type paginatedOAuthClientTokens struct {
-	Pagination paginationStatus
-	Tokens     []OAuthClientToken
-}
+type paginatedOAuthClientTokens = oauth.PaginatedClientTokens
 
 type VersionMetas struct {
 	Status string        `json:"status"`
@@ -307,53 +253,6 @@ func (gw *Gateway) getApisIdsForOrg(orgID string) []string {
 	return result
 }
 
-func (gw *Gateway) checkAndApplyTrialPeriod(
-	keyName string,
-	newSession *user.SessionState,
-	isHashed bool,
-) {
-	// Check the policies to see if we are forcing an expiry on the key
-	for _, polID := range newSession.PolicyIDs() {
-		policy, ok := gw.policies.PolicyByID(model.NewScopedCustomPolicyId(newSession.OrgID, polID))
-		if !ok {
-			continue
-		}
-		// Are we foring an expiry?
-		if policy.KeyExpiresIn > 0 {
-			// We are, does the key exist?
-			_, found := gw.GlobalSessionManager.SessionDetail(newSession.OrgID, keyName, isHashed)
-			if !found {
-				// this is a new key, lets expire it
-				newSession.Expires = time.Now().Unix() + policy.KeyExpiresIn
-			}
-		}
-
-		if policy.PostExpiryAction != "" {
-			newSession.PostExpiryAction = policy.PostExpiryAction
-		}
-		if policy.PostExpiryGracePeriod != 0 {
-			newSession.PostExpiryGracePeriod = policy.PostExpiryGracePeriod
-		}
-	}
-}
-
-func (gw *Gateway) applyPoliciesAndSave(keyName string, session *user.SessionState, spec *APISpec, isHashed bool) error {
-	// use basic middleware to apply policies to key/session (it also saves it)
-	mw := &BaseMiddleware{
-		Spec: spec,
-		Gw:   gw,
-	}
-
-	if err := mw.ApplyPolicies(session); err != nil {
-		return err
-	}
-
-	// calculate lifetime considering access rights
-	lifetime := gw.ApplyLifetime(session, spec)
-
-	return gw.GlobalSessionManager.UpdateSession(keyName, session, lifetime, isHashed)
-}
-
 // GetApiSpecsFromAccessRights from the session.AccessRights returns the collection of api specs
 func (gw *Gateway) GetApiSpecsFromAccessRights(sess *user.SessionState) []*APISpec {
 	var apis []*APISpec
@@ -371,148 +270,26 @@ func (gw *Gateway) GetApiSpecsFromAccessRights(sess *user.SessionState) []*APISp
 
 // ApplyLifetime calculates the lifetime for the key. It considers the access rights and the bigger lifetime will be used
 func (gw *Gateway) ApplyLifetime(sess *user.SessionState, specs ...*APISpec) int64 {
-	var lifetime int64
-
-	if len(sess.AccessRights) > 0 {
-		specs = gw.GetApiSpecsFromAccessRights(sess)
-	}
-
+	infos := make([]*keys.APIInfo, 0, len(specs))
 	for _, spec := range specs {
 		if spec != nil {
-			sessionLifeTime := sess.Lifetime(spec.GetSessionLifetimeRespectsKeyExpiration(), spec.SessionLifetime, gw.GetConfig().ForceGlobalSessionLifetime, gw.GetConfig().GlobalSessionLifetime)
-			// -1 means "never delete" (persist forever), which is the maximum possible lifetime
-			if sessionLifeTime == -1 {
-				return -1
-			}
-			// uses the greater lifetime
-			if sessionLifeTime > lifetime {
-				lifetime = sessionLifeTime
-			}
+			info := apiInfoFromSpec(spec)
+			infos = append(infos, &info)
 		}
 	}
-
-	return lifetime
+	return gw.controlPlaneKeys().ApplyLifetime(sess, infos...)
 }
 
 func resetAPILimits(accessRights map[string]user.AccessDefinition) {
-	for apiID := range accessRights {
-		// reset API-level limit to nil if it has a zero-value
-		if access := accessRights[apiID]; !access.Limit.IsEmpty() && access.Limit == (user.APILimit{}) {
-			access.Limit = user.APILimit{}
-			accessRights[apiID] = access
-		}
-	}
-}
-
-func (gw *Gateway) doAddOrUpdate(keyName string, newSession *user.SessionState, dontReset bool, isHashed bool) error {
-	// field last_updated plays an important role in in-mem rate limiter
-	// so update last_updated to current timestamp only if suppress_reset wasn't set to 1
-	if !dontReset {
-		newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
-	}
-
-	logger := log.WithFields(logrus.Fields{
-		"prefix":      "api",
-		"key":         gw.obfuscateKey(keyName),
-		"org_id":      newSession.OrgID,
-		"expires":     newSession.Expires,
-		"api_id":      "--",
-		"user_id":     "system",
-		"user_ip":     "--",
-		"path":        "--",
-		"server_name": "system",
-	})
-
-	if len(newSession.AccessRights) > 0 {
-		// reset API-level limit to empty APILimit if any has a zero-value
-		resetAPILimits(newSession.AccessRights)
-
-		// We have a specific list of access rules, only add / update those
-		for apiId := range newSession.AccessRights {
-			apiSpec := gw.getApiSpec(apiId)
-			if apiSpec == nil {
-				logger.WithField("api_id", apiId).Warn("Can't find active API, storing anyway")
-			}
-
-			if apiSpec != nil {
-				gw.checkAndApplyTrialPeriod(keyName, newSession, isHashed)
-			}
-
-			// Lets reset keys if they are edited by admin
-			if apiSpec == nil || !apiSpec.DontSetQuotasOnCreate {
-				// Reset quote by default
-				if !dontReset {
-					gw.GlobalSessionManager.ResetQuota(keyName, newSession, isHashed)
-					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
-				}
-			}
-
-			// apply polices (if any) and save key
-			if err := gw.applyPoliciesAndSave(keyName, newSession, apiSpec, isHashed); err != nil {
-				return err
-			}
-		}
-	} else {
-		// nothing defined, add key to ALL
-		if !gw.GetConfig().AllowMasterKeys {
-			logger.Error("Master keys disallowed in configuration, key not added.")
-			return errors.New("Master keys not allowed")
-		}
-		logger.Warning("No API Access Rights set, adding key to ALL.")
-		gw.apisMu.RLock()
-		defer gw.apisMu.RUnlock()
-
-		for _, spec := range gw.apisByID {
-			if !dontReset {
-				gw.GlobalSessionManager.ResetQuota(keyName, newSession, isHashed)
-				newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
-			}
-			gw.checkAndApplyTrialPeriod(keyName, newSession, isHashed)
-			// apply polices (if any) and save key
-			if err := gw.applyPoliciesAndSave(keyName, newSession, spec, isHashed); err != nil {
-				return err
-			}
-		}
-	}
-
-	logger.Info("Key added or updated.")
-	return nil
+	keys.ResetAPILimits(accessRights)
 }
 
 func (gw *Gateway) setBasicAuthSessionPassword(session *user.SessionState) {
-	basicAuthHashAlgo := gw.basicAuthHashAlgo()
-
-	if basicAuthHashAlgo == string(user.HashBCrypt) {
-		session.BasicAuthData.Hash = user.HashBCrypt
-		hashedPassBytes, err := bcrypt.GenerateFromPassword([]byte(session.BasicAuthData.Password), 10)
-		if err != nil {
-			log.WithError(err).Error("Could not hash password, setting to plaintext")
-			session.BasicAuthData.Hash = user.HashPlainText
-			return
-		}
-
-		session.BasicAuthData.Password = string(hashedPassBytes)
-		return
-	}
-
-	session.BasicAuthData.Password = storage.HashStr(session.BasicAuthData.Password, basicAuthHashAlgo)
-	session.BasicAuthData.Hash = user.HashType(basicAuthHashAlgo)
+	gw.controlPlaneKeys().SetBasicAuthSessionPassword(session)
 }
 
 func (gw *Gateway) basicAuthHashAlgo() string {
-	config := gw.GetConfig()
-
-	// Use `basic_auth_hash_key_function` if set;
-	algo := config.BasicAuthHashKeyFunction
-
-	// If hash function name is empty/invalid
-	if ok := user.IsHashType(algo); !ok {
-		// set default basic auth hash to bcrypt
-		return string(user.HashBCrypt)
-	}
-
-	// Algo is validated at this point
-	return algo
+	return gw.controlPlaneKeys().BasicAuthHashAlgo()
 }
 
 func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed bool) (interface{}, int) {
@@ -529,284 +306,30 @@ func (gw *Gateway) handleAddOrUpdate(keyName string, r *http.Request, isHashed b
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
 
-	if err := gw.validateMCPFieldsInAccessRights(newSession.AccessRights); err != nil {
-		log.Error(err)
-		return apiError(err.Error()), http.StatusBadRequest
+	res, err := gw.controlPlaneKeys().CreateOrUpdate(keyName, newSession, keys.WriteOptions{
+		IsPut:         r.Method == http.MethodPut,
+		IsHashed:      isHashed,
+		SuppressReset: suppressReset,
+	})
+	if err != nil {
+		return cpResponse(nil, err)
 	}
 
-	if err := gw.validateNonMCPFieldsOnMCPProxy(newSession.AccessRights); err != nil {
-		log.Error(err)
-		return apiError(err.Error()), http.StatusBadRequest
-	}
-
-	if err := validateAccessConditions(newSession.AccessRights); err != nil {
-		log.Error(err)
-		return apiError(err.Error()), http.StatusBadRequest
-	}
-
-	mw := &BaseMiddleware{Gw: gw}
-	mw.ApplyPolicies(newSession)
-
-	// get original session in case of update and preserve fields that SHOULD NOT be updated
-	originalKey := user.SessionState{}
-	if r.Method == http.MethodPut {
-		key, found := gw.GlobalSessionManager.SessionDetail(newSession.OrgID, keyName, isHashed)
-		keyName = key.KeyID
-		if !found {
-			log.Error("Could not find key when updating")
-			return apiError("Key is not found"), http.StatusNotFound
-		}
-		originalKey = key.Clone()
-
-		isCertificateChanged := newSession.Certificate != originalKey.Certificate
-		if isCertificateChanged {
-			if newSession.Certificate == "" {
-				log.Error("Key must contain a certificate")
-				return apiError("Key cannot be used without a certificate"), http.StatusBadRequest
-			}
-
-			// check that the certificate exists in the system
-			_, err := gw.CertificateManager.GetRaw(newSession.Certificate)
-			if err != nil {
-				log.Error("Key must contain an existing certificate")
-				return apiError("Key must be used with an existent certificate"), http.StatusBadRequest
-			}
-		}
-
-		// preserve the creation date
-		newSession.DateCreated = originalKey.DateCreated
-
-		// don't change fields related to quota and rate limiting if was passed as "suppress_reset=1"
-		if suppressReset {
-			// save existing quota_renews and last_updated if suppress_reset was passed
-			// (which means don't reset quota or rate counters)
-			// - leaving quota_renews as 0 will force quota limiter to start new renewal period
-			// - setting new last_updated with force rate limiter to start new "per" rating period
-
-			// on session level
-			newSession.QuotaRenews = originalKey.QuotaRenews
-			newSession.LastUpdated = originalKey.LastUpdated
-
-			// on ACL API limit level
-			for apiID, access := range originalKey.AccessRights {
-				if access.Limit.IsEmpty() {
-					continue
-				}
-				if newAccess, ok := newSession.AccessRights[apiID]; ok && !newAccess.Limit.IsEmpty() {
-					newAccess.Limit.QuotaRenews = access.Limit.QuotaRenews
-					newSession.AccessRights[apiID] = newAccess
-				}
-			}
-		}
-	} else {
-		// POST path (create). Reject a user-supplied custom key ID that would
-		// be unreachable at auth time: CheckSessionAndIdentityForValidKey uses
-		// `len(key) < MinTokenLength` (see middleware.go), so storing a key
-		// shorter than that length would succeed here but every subsequent
-		// auth attempt with the raw ID would silently 403 (AKI). Empty keyName
-		// is fine — generateToken below will produce a safe-length UUID envelope.
-		minLen := effectiveMinTokenLength(gw.GetConfig().MinTokenLength)
-		if keyName != "" && len(keyName) < minLen {
-			return apiError(fmt.Sprintf(
-				"custom key ID length %d is less than min_token_length (%d); "+
-					"the key would be unreachable at auth time. Use an ID of at least min_token_length characters, "+
-					"or lower min_token_length in the gateway configuration.",
-				len(keyName), minLen,
-			)), http.StatusBadRequest
-		}
-		newSession.DateCreated = time.Now()
-		keyName = gw.generateToken(newSession.OrgID, keyName)
-	}
-
-	//set the original expiry if the content in payload is a past time
-	if time.Now().After(time.Unix(newSession.Expires, 0)) && newSession.Expires > 1 {
-		newSession.Expires = originalKey.Expires
-	}
-
-	// Validate mtls_static_certificate_bindings
-	// For POST: validates all certificates (originalKey is empty)
-	// For PUT: validates only NEW certificates (using originalKey data)
-	certsToValidate := getNewCertIDs(originalKey.MtlsStaticCertificateBindings, newSession.MtlsStaticCertificateBindings)
-	if err := gw.validateMtlsStaticCertificateBindings(certsToValidate, newSession.OrgID); err != nil {
-		log.Error("Invalid certificate in mtls_static_certificate_bindings: ", err)
-		return apiError(err.Error()), http.StatusBadRequest
-	}
-
-	// Update our session object (create it)
-	if newSession.IsBasicAuth() {
-		// If we are using a basic auth user, then we need to make the keyname explicit against the OrgId in order to differentiate it
-		// Only if it's NEW
-		switch r.Method {
-		case http.MethodPost:
-			// It's a create, so lets hash the password
-			gw.setBasicAuthSessionPassword(newSession)
-		case http.MethodPut:
-			if originalKey.BasicAuthData.Password != newSession.BasicAuthData.Password {
-				// passwords dont match assume it's new, lets hash it
-				log.Debug("Passwords dont match, original: ", originalKey.BasicAuthData.Password)
-				log.Debug("New: newSession.BasicAuthData.Password")
-				log.Debug("Changing password")
-				gw.setBasicAuthSessionPassword(newSession)
-			}
-		}
-	} else if originalKey.IsBasicAuth() {
-		// preserve basic auth data
-		newSession.BasicAuthData.Hash = originalKey.BasicAuthData.Hash
-		newSession.BasicAuthData.Password = originalKey.BasicAuthData.Password
-	}
-
-	if r.Method == http.MethodPost || storage.TokenOrg(keyName) != "" {
-		// use new key format if key gets created or updating key with new format
-		if err := gw.doAddOrUpdate(keyName, newSession, suppressReset, isHashed); err != nil {
-			return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
-		}
-	} else {
-
-		newFormatKey := gw.generateToken(newSession.OrgID, keyName)
-		// search as a custom key
-		_, err := gw.GlobalSessionManager.Store().GetKey(newFormatKey)
-
-		if err == nil {
-			// update new format key for custom keys, as it was found then its a customKey
-			keyName = newFormatKey
-		}
-
-		if err := gw.doAddOrUpdate(keyName, newSession, suppressReset, isHashed); err != nil {
-			return apiError("Failed to create key, ensure security settings are correct."), http.StatusInternalServerError
-		}
-	}
-
-	action := "modified"
 	event := EventTokenUpdated
 	if r.Method == http.MethodPost {
-		action = "added"
 		event = EventTokenCreated
 	}
 	gw.FireSystemEvent(event, EventTokenMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Key modified."},
 		Org:              newSession.OrgID,
-		Key:              keyName,
+		Key:              res.StoredKey,
 	})
 
-	response := apiModifyKeySuccess{
-		Key:    keyName,
-		Status: "ok",
-		Action: action,
-	}
-
-	// add key hash for newly created key
-	if gw.GetConfig().HashKeys && r.Method == http.MethodPost {
-		if newSession.IsBasicAuth() {
-			response.Key = ""
-		}
-
-		if isHashed {
-			response.KeyHash = keyName
-		} else {
-			response.KeyHash = storage.HashKey(keyName, gw.GetConfig().HashKeys)
-		}
-	}
-
-	return response, http.StatusOK
+	return res, http.StatusOK
 }
 
 func (gw *Gateway) handleGetDetail(sessionKey, apiID, orgID string, byHash bool) (interface{}, int) {
-	if byHash && !gw.GetConfig().HashKeys {
-		return apiError("Key requested by hash but key hashing is not enabled"), http.StatusBadRequest
-	}
-
-	spec := gw.getApiSpec(apiID)
-	if spec != nil {
-		orgID = spec.OrgID
-	}
-
-	session, ok := gw.GlobalSessionManager.SessionDetail(orgID, sessionKey, byHash)
-	sessionKey = session.KeyID
-	if !ok {
-		return apiError("Key not found"), http.StatusNotFound
-	}
-
-	mw := &BaseMiddleware{Spec: spec, Gw: gw}
-	mw.ApplyPolicies(&session)
-
-	if session.QuotaMax != -1 {
-		quotaKey := QuotaKeyPrefix + storage.HashKey(sessionKey, gw.GetConfig().HashKeys)
-		if byHash {
-			quotaKey = QuotaKeyPrefix + sessionKey
-		}
-
-		if usedQuota, err := gw.GlobalSessionManager.Store().GetRawKey(quotaKey); err == nil || errors.Is(err, redis.Nil) {
-			qInt, _ := strconv.Atoi(usedQuota)
-			remaining := session.QuotaMax - int64(qInt)
-
-			if remaining < 0 {
-				session.QuotaRemaining = 0
-			} else {
-				session.QuotaRemaining = remaining
-			}
-		} else {
-			log.WithError(err).WithFields(logrus.Fields{
-				"prefix": "api",
-				"key":    gw.obfuscateKey(quotaKey),
-				"status": "ok",
-			}).Info("Can't retrieve key quota")
-		}
-	}
-
-	// populate remaining quota for API limits (if any)
-	for id, access := range session.AccessRights {
-		if access.Limit.IsEmpty() || access.Limit.QuotaMax == -1 || access.Limit.QuotaMax == 0 {
-			continue
-		}
-
-		quotaScope := ""
-		if access.AllowanceScope != "" {
-			quotaScope = access.AllowanceScope + "-"
-		}
-
-		limQuotaKey := QuotaKeyPrefix + quotaScope + storage.HashKey(sessionKey, gw.GetConfig().HashKeys)
-		if byHash {
-			limQuotaKey = QuotaKeyPrefix + quotaScope + sessionKey
-		}
-
-		if usedQuota, err := gw.GlobalSessionManager.Store().GetRawKey(limQuotaKey); err == nil {
-			qInt, _ := strconv.Atoi(usedQuota)
-			remaining := access.Limit.QuotaMax - int64(qInt)
-
-			if remaining < 0 {
-				access.Limit.QuotaRemaining = 0
-			} else {
-				access.Limit.QuotaRemaining = remaining
-			}
-			session.AccessRights[id] = access
-		} else {
-			access.Limit.QuotaRemaining = access.Limit.QuotaMax
-			session.AccessRights[id] = access
-
-			log.WithFields(logrus.Fields{
-				"prefix": "api",
-				"apiID":  id,
-				"key":    gw.obfuscateKey(sessionKey),
-				"error":  err,
-			}).Info("Can't retrieve api limit quota")
-		}
-	}
-
-	// If it's a basic auth key and a valid Base64 string, use it as the key ID:
-	if session.IsBasicAuth() {
-		if storage.TokenOrg(sessionKey) != "" {
-			session.KeyID = sessionKey
-		}
-		session.BasicAuthData.Password = ""
-	}
-
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
-		"key":    gw.obfuscateKey(sessionKey),
-		"status": "ok",
-	}).Info("Retrieved key detail.")
-
-	return session.Clone(), http.StatusOK
+	return cpResponse(gw.controlPlaneKeys().Detail(sessionKey, apiID, orgID, byHash))
 }
 
 // apiAllKeys represents a list of keys in the memory store
@@ -817,132 +340,21 @@ type apiAllKeys struct {
 
 // handleGetAllKeys retrieves keys and filters them by API ID using a Worker Pool.
 func (gw *Gateway) handleGetAllKeys(c context.Context, filter string, apiID string, hashed bool) (interface{}, int) {
-	keys := gw.getAllSessionKeys(filter)
-
-	if apiID == "" {
-		validSessions := make([]string, 0, len(keys))
-		for _, k := range keys {
-			if !strings.HasPrefix(k, QuotaKeyPrefix) && !strings.HasPrefix(k, RateLimitKeyPrefix) {
-				validSessions = append(validSessions, k)
-			}
-		}
-		return apiAllKeys{validSessions}, http.StatusOK
-	}
-
-	validSessions, err := gw.filterKeysByAPIID(c, keys, filter, apiID, hashed)
+	list, err := gw.controlPlaneKeys().List(c, filter, apiID, hashed)
 	if err != nil {
-		log.WithError(err).Warn("Request timeout while processing keys")
-		return apiError("Request timeout while processing keys"), http.StatusGatewayTimeout
+		return cpResponse(nil, err)
 	}
-
-	sort.Strings(validSessions)
-
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
-		"status": "ok",
-		"count":  len(validSessions),
-	}).Info("Retrieved key list.")
-
-	return apiAllKeys{validSessions}, http.StatusOK
+	return apiAllKeys{list}, http.StatusOK
 }
 
 // filterKeysByAPIID handles the concurrent processing of key permissions
-func (gw *Gateway) filterKeysByAPIID(c context.Context, keys []string, filter, apiID string, hashed bool) ([]string, error) {
-	numKeys := len(keys)
-	// the values for keyListingWorkerCount and keyListingBufferSize were averaged through profiling and benchmarking
-	keyListingWorkerCount := min(int(4+math.Sqrt(float64(numKeys))), KeyListingWorkerCountCap)
-	keyListingBufferSize := keyListingWorkerCount * KeyListingWorkerEntriesPerKey
-
-	jobs := make(chan string, keyListingBufferSize)
-	validSessions := make([]string, 0)
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-
-	wg.Add(keyListingWorkerCount)
-	for w := 0; w < keyListingWorkerCount; w++ {
-		go func() {
-			defer wg.Done()
-			localMatches := make([]string, 0)
-
-			for {
-				select {
-				case <-c.Done():
-					return
-				case keyName, ok := <-jobs:
-					if !ok {
-						if len(localMatches) > 0 {
-							mu.Lock()
-							validSessions = append(validSessions, localMatches...)
-							mu.Unlock()
-						}
-						return
-					}
-
-					if gw.keyHasAccess(filter, keyName, apiID, hashed) {
-						localMatches = append(localMatches, keyName)
-					}
-				}
-			}
-		}()
-	}
-
-	go gw.feedKeyListingWorkers(c, keys, jobs)
-
-	wg.Wait()
-
-	if c.Err() != nil {
-		return nil, c.Err()
-	}
-
-	return validSessions, nil
-}
 
 // getAllSessionKeys handles the retrieval of raw keys from the session manager,
 // including the legacy base64 filter logic.
-func (gw *Gateway) getAllSessionKeys(filter string) []string {
-	keys := gw.GlobalSessionManager.Sessions(filter)
-	if filter != "" {
-		filterB64 := base64.StdEncoding.WithPadding(base64.NoPadding).EncodeToString([]byte(fmt.Sprintf(`{"org":"%s"`, filter)))
-		filterB64 = filterB64[0 : len(filterB64)-2]
-		orgIDB64Sessions := gw.GlobalSessionManager.Sessions(filterB64)
-		keys = append(keys, orgIDB64Sessions...)
-	}
-	return keys
-}
 
 // keyHasAccess checks if a specific key has access to the requested API ID.
-func (gw *Gateway) keyHasAccess(filter, keyName, apiID string, hashed bool) bool {
-	session, found := gw.GlobalSessionManager.SessionDetail(filter, keyName, hashed)
-	if !found {
-		return false
-	}
-
-	if _, ok := session.AccessRights[apiID]; ok {
-		return true
-	}
-
-	if len(session.AccessRights) == 0 && gw.GetConfig().AllowMasterKeys {
-		return true
-	}
-
-	return false
-}
 
 // feedKeyListingWorkers pushes keys into the job channel while filtering out internal system keys.
-func (gw *Gateway) feedKeyListingWorkers(c context.Context, keys []string, jobs chan<- string) {
-	defer close(jobs)
-	for _, k := range keys {
-		if strings.HasPrefix(k, QuotaKeyPrefix) || strings.HasPrefix(k, RateLimitKeyPrefix) {
-			continue
-		}
-
-		select {
-		case <-c.Done():
-			return
-		case jobs <- k:
-		}
-	}
-}
 
 func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
 	sess := &user.SessionState{}
@@ -976,68 +388,22 @@ func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
 }
 
 func (gw *Gateway) handleDeleteKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
-	session, ok := gw.GlobalSessionManager.SessionDetail(orgID, keyName, false)
-	if !ok {
-		return apiError("There is no such key found"), http.StatusNotFound
+	res, err := gw.controlPlaneKeys().Delete(keyName, orgID, apiID, resetQuota)
+	if err != nil {
+		return cpResponse(nil, err)
 	}
-	keyName = session.KeyID
-
-	if resetQuota {
-		gw.GlobalSessionManager.ResetQuota(keyName, &session, false)
-	}
-
-	if apiID == "-1" {
-		// Go through ALL managed API's and delete the key
-		gw.apisMu.RLock()
-		removed := gw.GlobalSessionManager.RemoveSession(orgID, keyName, false)
-		gw.apisMu.RUnlock()
-
-		if !removed {
-			log.WithFields(logrus.Fields{
-				"prefix": "api",
-				"key":    gw.obfuscateKey(keyName),
-				"status": "fail",
-			}).Error("Failed to remove the key")
-			return apiError("Failed to remove the key"), http.StatusBadRequest
-		}
-
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"key":    gw.obfuscateKey(keyName),
-			"status": "ok",
-		}).Info("Deleted key across all APIs.")
-
+	if res == nil {
+		// removed across all APIs
 		return nil, http.StatusOK
-	}
-
-	if !gw.GlobalSessionManager.RemoveSession(orgID, keyName, false) {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"key":    gw.obfuscateKey(keyName),
-			"status": "fail",
-		}).Error("Failed to remove the key")
-		return apiError("Failed to remove the key"), http.StatusBadRequest
-	}
-
-	statusObj := apiModifyKeySuccess{
-		Key:    keyName,
-		Status: "ok",
-		Action: "deleted",
 	}
 
 	gw.FireSystemEvent(EventTokenDeleted, EventTokenMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Key deleted."},
 		Org:              orgID,
-		Key:              keyName,
+		Key:              res.Key,
 	})
 
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
-		"key":    gw.obfuscateKey(keyName),
-		"status": "ok",
-	}).Info("Deleted key.")
-
-	return statusObj, http.StatusOK
+	return res, http.StatusOK
 }
 
 // handleDeleteHashedKeyWithLogs is a wrapper for handleDeleteHashedKey with logs
@@ -1062,42 +428,14 @@ func (gw *Gateway) handleDeleteHashedKeyWithLogs(keyName, orgID, apiID string, r
 }
 
 func (gw *Gateway) handleDeleteHashedKey(keyName, orgID, apiID string, resetQuota bool) (interface{}, int) {
-
-	session, ok := gw.GlobalSessionManager.SessionDetail(orgID, keyName, true)
-	keyName = session.KeyID
-	if !ok {
-		return apiError("There is no such key found"), http.StatusNotFound
-
+	res, err := gw.controlPlaneKeys().DeleteHashed(keyName, orgID, apiID, resetQuota)
+	if err != nil {
+		return cpResponse(nil, err)
 	}
-
-	if apiID == "-1" {
-		// Go through ALL managed API's and delete the key
-		gw.apisMu.RLock()
-		removed := gw.GlobalSessionManager.RemoveSession(orgID, keyName, true)
-		gw.apisMu.RUnlock()
-
-		if !removed {
-			return apiError("Failed to remove the key"), http.StatusBadRequest
-		}
-
+	if res == nil {
 		return nil, http.StatusOK
 	}
-
-	if !gw.GlobalSessionManager.RemoveSession(orgID, keyName, true) {
-		return apiError("Failed to remove the key"), http.StatusBadRequest
-	}
-
-	if resetQuota {
-		gw.GlobalSessionManager.ResetQuota(keyName, &session, true)
-	}
-
-	statusObj := apiModifyKeySuccess{
-		Key:    keyName,
-		Status: "ok",
-		Action: "deleted",
-	}
-
-	return statusObj, http.StatusOK
+	return res, http.StatusOK
 }
 
 func (gw *Gateway) handleGlobalAddToSortedSet(keyName, value string, score float64) {
@@ -1956,55 +1294,7 @@ func (gw *Gateway) policyUpdateHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (gw *Gateway) handleUpdateHashedKey(keyName string, applyPolicies []string) (interface{}, int) {
-	var orgID string
-
-	if len(applyPolicies) != 0 {
-		if pol, ok := gw.policies.PolicyByID(model.NonScopedLastInsertedPolicyId(applyPolicies[0])); ok {
-			orgID = pol.OrgID
-		}
-	}
-
-	sess, ok := gw.GlobalSessionManager.SessionDetail(orgID, keyName, true)
-	keyName = sess.KeyID
-	if !ok {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"key":    keyName,
-			"status": "fail",
-		}).Error("Failed to update hashed key.")
-
-		return apiError("Key not found"), http.StatusNotFound
-	}
-
-	// Set the policy
-	sess.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
-	sess.SetPolicies(applyPolicies...)
-
-	err := gw.GlobalSessionManager.UpdateSession(keyName, &sess, 0, true)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"key":    keyName,
-			"status": "fail",
-			"err":    err,
-		}).Error("Failed to update hashed key.")
-
-		return apiError("Could not write key data"), http.StatusInternalServerError
-	}
-
-	statusObj := apiModifyKeySuccess{
-		Key:    keyName,
-		Status: "ok",
-		Action: "updated",
-	}
-
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
-		"key":    keyName,
-		"status": "ok",
-	}).Info("Updated hashed key.")
-
-	return statusObj, http.StatusOK
+	return cpResponse(gw.controlPlaneKeys().ApplyPolicyIDs(keyName, applyPolicies))
 }
 
 func (gw *Gateway) orgHandler(w http.ResponseWriter, r *http.Request) {
@@ -2041,138 +1331,50 @@ func (gw *Gateway) handleOrgAddOrUpdate(orgID string, r *http.Request) (interfac
 		log.Error("Couldn't decode new session object: ", err)
 		return apiError("Request malformed"), http.StatusBadRequest
 	}
-	// Update our session object (create it)
 
-	spec := gw.getSpecForOrg(orgID)
-	var sessionManager SessionHandler
-
-	if spec == nil {
-		log.Warning("Couldn't find org session store in active API list")
-		if gw.GetConfig().SupressDefaultOrgStore {
-			return apiError("No such organisation found in Active API list"), http.StatusNotFound
-		}
-		sessionManager = &gw.DefaultOrgStore
-	} else {
-		sessionManager = spec.OrgSessionManager
-	}
-
-	if r.URL.Query().Get("reset_quota") == "1" {
-		sessionManager.ResetQuota(orgID, newSession, false)
-		newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
-		rawKey := QuotaKeyPrefix + storage.HashKey(orgID, gw.GetConfig().HashKeys)
-
-		// manage quotas separately
-		gw.DefaultQuotaStore.RemoveSession(orgID, rawKey, false)
-	}
-
-	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
-	err := sessionManager.UpdateSession(orgID, newSession, 0, false)
+	res, err := gw.controlPlaneOrgKeys().Set(orgID, newSession, r.Method == http.MethodPut, r.URL.Query().Get("reset_quota") == "1")
 	if err != nil {
-		return apiError("Error writing to key store " + err.Error()), http.StatusInternalServerError
+		return cpResponse(nil, err)
 	}
 
 	// identify that spec has org session
-	if spec != nil {
-		spec.Lock()
-		spec.OrgHasNoSession = false
-		spec.Unlock()
+	if res.Found {
+		if spec := gw.getSpecForOrg(orgID); spec != nil {
+			spec.Lock()
+			spec.OrgHasNoSession = false
+			spec.Unlock()
+		}
 	}
 
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
-		"org":    orgID,
-		"status": "ok",
-	}).Info("New organization key added or updated.")
-
-	action := "modified"
-	if r.Method == http.MethodPost {
-		action = "added"
-	}
-
-	response := apiModifyKeySuccess{
-		Key:    orgID,
-		Status: "ok",
-		Action: action,
-	}
-
-	return response, http.StatusOK
+	return res.Result, http.StatusOK
 }
 
 func (gw *Gateway) handleGetOrgDetail(orgID string) (interface{}, int) {
-	spec := gw.getSpecForOrg(orgID)
-	if spec == nil {
-		return apiError("Org not found"), http.StatusNotFound
-	}
-
-	session, ok := spec.OrgSessionManager.SessionDetail(orgID, orgID, false)
-	if !ok {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"org":    orgID,
-			"status": "fail",
-			"err":    "not found",
-		}).Error("Failed retrieval of record for ORG ID.")
-		return apiError("Org not found"), http.StatusNotFound
-	}
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
-		"org":    orgID,
-		"status": "ok",
-	}).Info("Retrieved record for ORG ID.")
-	return session.Clone(), http.StatusOK
+	return cpResponse(gw.controlPlaneOrgKeys().Get(orgID))
 }
 
 func (gw *Gateway) handleGetAllOrgKeys(filter string) (interface{}, int) {
-	spec := gw.getSpecForOrg("")
-	if spec == nil {
-		return apiError("ORG not found"), http.StatusNotFound
+	list, err := gw.controlPlaneOrgKeys().List(filter)
+	if err != nil {
+		return cpResponse(nil, err)
 	}
-
-	sessions := spec.OrgSessionManager.Sessions(filter)
-	fixed_sessions := make([]string, 0)
-	for _, s := range sessions {
-		if !strings.HasPrefix(s, QuotaKeyPrefix) && !strings.HasPrefix(s, RateLimitKeyPrefix) {
-			fixed_sessions = append(fixed_sessions, s)
-		}
-	}
-	sessionsObj := apiAllKeys{fixed_sessions}
-	return sessionsObj, http.StatusOK
+	return apiAllKeys{list}, http.StatusOK
 }
 
 func (gw *Gateway) handleDeleteOrgKey(orgID string) (interface{}, int) {
-	spec := gw.getSpecForOrg(orgID)
-	if spec == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"key":    orgID,
-			"status": "fail",
-			"err":    "not found",
-		}).Error("Failed to delete org key.")
-
-		return apiError("Org not found"), http.StatusNotFound
+	res, err := gw.controlPlaneOrgKeys().Delete(orgID)
+	if err != nil {
+		return cpResponse(nil, err)
 	}
-
-	if !spec.OrgSessionManager.RemoveSession(orgID, orgID, false) {
-		return apiError("Failed to remove the key"), http.StatusBadRequest
-	}
-
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
-		"key":    orgID,
-		"status": "ok",
-	}).Info("Org key deleted.")
 
 	// identify that spec has no org session
-	spec.Lock()
-	spec.OrgHasNoSession = true
-	spec.Unlock()
-
-	statusObj := apiModifyKeySuccess{
-		Key:    orgID,
-		Status: "ok",
-		Action: "deleted",
+	if spec := gw.getSpecForOrg(orgID); spec != nil {
+		spec.Lock()
+		spec.OrgHasNoSession = true
+		spec.Unlock()
 	}
-	return statusObj, http.StatusOK
+
+	return res.Result, http.StatusOK
 }
 
 func (gw *Gateway) groupResetHandler(w http.ResponseWriter, r *http.Request) {
@@ -2226,141 +1428,20 @@ func (gw *Gateway) createKeyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newKey := gw.keyGen.GenerateAuthKey(newSession.OrgID)
-	if newSession.HMACEnabled {
-		newSession.HmacSecret = gw.keyGen.GenerateHMACSecret()
-	}
-
-	if newSession.Certificate != "" {
-		newKey = gw.generateToken(newSession.OrgID, newSession.Certificate)
-		_, ok := gw.GlobalSessionManager.SessionDetail(newSession.OrgID, newKey, false)
-		if ok {
-			doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - Key with given certificate already found:"+newKey))
-			return
-		}
-	}
-
-	// Validate mtls_static_certificate_bindings
-	if err := gw.validateMtlsStaticCertificateBindings(newSession.MtlsStaticCertificateBindings, newSession.OrgID); err != nil {
-		doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
+	res, err := gw.controlPlaneKeys().Create(newSession)
+	if err != nil {
+		obj, code := cpResponse(nil, err)
+		doJSONWrite(w, code, obj)
 		return
-	}
-
-	if err := validateAccessConditions(newSession.AccessRights); err != nil {
-		log.Error(err)
-		doJSONWrite(w, http.StatusBadRequest, apiError(err.Error()))
-		return
-	}
-
-	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
-	newSession.DateCreated = time.Now()
-
-	sessionManager := gw.GlobalSessionManager
-
-	mw := &BaseMiddleware{Gw: gw}
-	if err := mw.ApplyPolicies(newSession); err != nil {
-		doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - "+err.Error()))
-		return
-	}
-
-	if len(newSession.AccessRights) > 0 {
-		// reset API-level limit to nil if any has a zero-value
-		resetAPILimits(newSession.AccessRights)
-		for apiID := range newSession.AccessRights {
-			apiSpec := gw.getApiSpec(apiID)
-			if apiSpec != nil {
-				gw.checkAndApplyTrialPeriod(newKey, newSession, false)
-			}
-
-			if apiSpec == nil || !apiSpec.DontSetQuotasOnCreate {
-				// Reset quota by default
-				newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
-				sessionManager.ResetQuota(newKey, newSession, false)
-			}
-
-			// apply polices (if any) and save key
-			if err := gw.applyPoliciesAndSave(newKey, newSession, apiSpec, false); err != nil {
-				doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - "+err.Error()))
-				return
-			}
-		}
-	} else {
-		if gw.GetConfig().AllowMasterKeys {
-			// nothing defined, add key to ALL
-			log.WithFields(logrus.Fields{
-				"prefix":      "api",
-				"status":      "warning",
-				"org_id":      newSession.OrgID,
-				"api_id":      "--",
-				"user_id":     "system",
-				"user_ip":     requestIPHops(r),
-				"path":        "--",
-				"server_name": "system",
-			}).Warning("No API Access Rights set on key session, adding key to all APIs.")
-
-			gw.apisMu.RLock()
-			defer gw.apisMu.RUnlock()
-			for _, spec := range gw.apisByID {
-				gw.checkAndApplyTrialPeriod(newKey, newSession, false)
-				if !spec.DontSetQuotasOnCreate {
-					// Reset quota by default
-					sessionManager.ResetQuota(newKey, newSession, false)
-					newSession.QuotaRenews = time.Now().Unix() + newSession.QuotaRenewalRate
-				}
-				if err := gw.applyPoliciesAndSave(newKey, newSession, spec, false); err != nil {
-					doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to create key - "+err.Error()))
-					return
-				}
-			}
-		} else {
-			log.WithFields(logrus.Fields{
-				"prefix":      "api",
-				"status":      "error",
-				"err":         "master keys disabled",
-				"org_id":      newSession.OrgID,
-				"api_id":      "--",
-				"user_id":     "system",
-				"user_ip":     requestIPHops(r),
-				"path":        "--",
-				"server_name": "system",
-			}).Error("Master keys disallowed in configuration, key not added.")
-
-			doJSONWrite(w, http.StatusBadRequest, apiError("Failed to create key, keys must have at least one Access Rights record set."))
-			return
-		}
-
-	}
-
-	obj := apiModifyKeySuccess{
-		Action: "added",
-		Key:    newKey,
-		Status: "ok",
-	}
-
-	// add key hash to reply
-	if gw.GetConfig().HashKeys {
-		obj.KeyHash = storage.HashKey(newKey, gw.GetConfig().HashKeys)
 	}
 
 	gw.FireSystemEvent(EventTokenCreated, EventTokenMeta{
 		EventMetaDefault: EventMetaDefault{Message: "Key generated."},
 		Org:              newSession.OrgID,
-		Key:              newKey,
+		Key:              res.Key,
 	})
 
-	log.WithFields(logrus.Fields{
-		"prefix":      "api",
-		"key":         gw.obfuscateKey(newKey),
-		"status":      "ok",
-		"api_id":      "--",
-		"org_id":      newSession.OrgID,
-		"user_id":     "system",
-		"user_ip":     requestIPHops(r),
-		"path":        "--",
-		"server_name": "system",
-	}).Info("Generated new key: (", gw.obfuscateKey(newKey), ")")
-
-	doJSONWrite(w, http.StatusOK, obj)
+	doJSONWrite(w, http.StatusOK, res)
 }
 
 func (gw *Gateway) previewKeyHandler(w http.ResponseWriter, r *http.Request) {
@@ -2376,31 +1457,13 @@ func (gw *Gateway) previewKeyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	newSession.LastUpdated = strconv.Itoa(int(time.Now().Unix()))
-	newSession.DateCreated = time.Now()
-
-	mw := &BaseMiddleware{Gw: gw}
-	mw.ApplyPolicies(newSession)
-
-	doJSONWrite(w, http.StatusOK, newSession)
+	doJSONWrite(w, http.StatusOK, gw.controlPlaneKeys().Preview(newSession))
 }
 
 // NewClientRequest is an outward facing JSON object translated from osin OAuthClients
 //
 // swagger:model NewClientRequest
-type NewClientRequest struct {
-	ClientID          string      `json:"client_id"`
-	ClientRedirectURI string      `json:"redirect_uri"`
-	APIID             string      `json:"api_id,omitempty"`
-	PolicyID          string      `json:"policy_id,omitempty"`
-	ClientSecret      string      `json:"secret"`
-	MetaData          interface{} `json:"meta_data"`
-	Description       string      `json:"description"`
-}
-
-func oauthClientStorageID(clientID string) string {
-	return prefixClient + clientID
-}
+type NewClientRequest = oauth.ClientRequest
 
 func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 	var newOauthClient NewClientRequest
@@ -2414,213 +1477,16 @@ func (gw *Gateway) createOauthClient(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Allow the client ID to be set
-	clientID := newOauthClient.ClientID
-
-	if newOauthClient.ClientID == "" {
-		clientID = uuid.NewHex()
-	}
-
-	// Allow the secret to be set
-	secret := newOauthClient.ClientSecret
-	if newOauthClient.ClientSecret == "" {
-		secret = createOauthClientSecret()
-	}
-
-	newClient := OAuthClient{
-		ClientID:          clientID,
-		ClientRedirectURI: newOauthClient.ClientRedirectURI,
-		ClientSecret:      secret,
-		PolicyID:          newOauthClient.PolicyID,
-		MetaData:          newOauthClient.MetaData,
-		Description:       newOauthClient.Description,
-	}
-
-	storageID := oauthClientStorageID(newClient.GetId())
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
-	}).Debug("Created storage ID: ", storageID)
-
-	if newOauthClient.APIID != "" {
-		// set client only for passed API ID
-		apiSpec := gw.getApiSpec(newOauthClient.APIID)
-		if apiSpec == nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "api",
-				"apiID":  newOauthClient.APIID,
-				"status": "fail",
-				"err":    "API doesn't exist",
-			}).Error("Failed to create OAuth client")
-			doJSONWrite(w, http.StatusBadRequest, apiError("API doesn't exist"))
-			return
-		}
-
-		if !apiSpec.UseOauth2 {
-			doJSONWrite(w, http.StatusBadRequest,
-				apiError("API is not OAuth2"))
-			return
-		}
-
-		err := apiSpec.OAuthManager.Storage().SetClient(storageID, apiSpec.OrgID, &newClient, true)
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "api",
-				"apiID":  newOauthClient.APIID,
-				"status": "fail",
-				"err":    err,
-			}).Error("Failed to create OAuth client")
-			doJSONWrite(w, http.StatusInternalServerError, apiError("Failure in storing client data."))
-			return
-		}
-	} else {
-		// set client for all APIs from the given policy
-		policy, ok := gw.policies.PolicyByID(model.NonScopedLastInsertedPolicyId(newClient.PolicyID))
-		if !ok {
-			log.WithFields(logrus.Fields{
-				"prefix":   "api",
-				"policyID": newClient.PolicyID,
-				"status":   "fail",
-				"err":      "Policy doesn't exist",
-			}).Error("Failed to create OAuth client")
-			doJSONWrite(w, http.StatusBadRequest, apiError("Policy doesn't exist"))
-			return
-		}
-
-		oauth2 := false
-		// iterate over APIs and set client for each of them
-		for apiID := range policy.AccessRights {
-			apiSpec := gw.getApiSpec(apiID)
-			if apiSpec == nil {
-				log.WithFields(logrus.Fields{
-					"prefix": "api",
-					"apiID":  apiID,
-					"status": "fail",
-					"err":    "API doesn't exist",
-				}).Error("Failed to create OAuth client")
-				doJSONWrite(w, http.StatusBadRequest, apiError("API doesn't exist"))
-				return
-			}
-			// set oauth client if it is oauth API
-			if apiSpec.UseOauth2 || apiSpec.EnableJWT {
-				oauth2 = true
-				if apiSpec.OAuthManager == nil {
-
-					prefix := generateOAuthPrefix(apiSpec.APIID)
-					storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
-					storageManager.Connect()
-
-					storageDriver := &storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
-					storageDriver.Connect()
-
-					apiSpec.OAuthManager = &OAuthManager{
-						OsinServer: gw.TykOsinNewServer(
-							&osin.ServerConfig{},
-							&RedisOsinStorageInterface{
-								storageManager,
-								gw.GlobalSessionManager,
-								storageDriver,
-								apiSpec.OrgID,
-								gw,
-							}),
-					}
-				}
-				err := apiSpec.OAuthManager.Storage().SetClient(storageID, apiSpec.APIDefinition.OrgID, &newClient, true)
-				if err != nil {
-					log.WithFields(logrus.Fields{
-						"prefix": "api",
-						"apiID":  apiID,
-						"status": "fail",
-						"err":    err,
-					}).Error("Failed to create OAuth client")
-					doJSONWrite(w, http.StatusInternalServerError, apiError("Failure in storing client data."))
-					return
-				}
-			}
-		}
-
-		if !oauth2 {
-			doJSONWrite(w, http.StatusBadRequest,
-				apiError("API is not OAuth2"))
-			return
-		}
-	}
-
-	clientData := NewClientRequest{
-		ClientID:          newClient.GetId(),
-		ClientSecret:      newClient.GetSecret(),
-		ClientRedirectURI: newClient.GetRedirectUri(),
-		PolicyID:          newClient.GetPolicyID(),
-		MetaData:          newClient.GetUserData(),
-		Description:       newClient.GetDescription(),
-	}
-
-	log.WithFields(logrus.Fields{
-		"prefix":            "api",
-		"apiID":             newOauthClient.APIID,
-		"clientID":          clientData.ClientID,
-		"clientRedirectURI": clientData.ClientRedirectURI,
-		"policyID":          clientData.PolicyID,
-		"description":       clientData.Description,
-		"status":            "ok",
-	}).Info("Created OAuth client")
-
-	doJSONWrite(w, http.StatusOK, clientData)
+	obj, code := cpResponse(gw.controlPlaneOAuth().CreateClient(newOauthClient))
+	doJSONWrite(w, code, obj)
 }
 
 func (gw *Gateway) rotateOauthClient(keyName, apiID string) (interface{}, int) {
-	// check API
-	apiSpec := gw.getApiSpec(apiID)
-	if apiSpec == nil {
-		return apiError("API doesn't exist"), http.StatusNotFound
-	}
-
-	// get existing version of oauth-client
-	storageID := oauthClientStorageID(keyName)
-	client, err := apiSpec.OAuthManager.Storage().GetExtendedClientNoPrefix(storageID)
-	if err != nil {
-		return apiError("OAuth Client ID not found"), http.StatusNotFound
-	}
-
-	// update client
-	updatedClient := OAuthClient{
-		ClientID:          client.GetId(),
-		ClientSecret:      createOauthClientSecret(),
-		ClientRedirectURI: client.GetRedirectUri(),
-		PolicyID:          client.GetPolicyID(),
-		MetaData:          client.GetUserData(),
-		Description:       client.GetDescription(),
-	}
-
-	err = apiSpec.OAuthManager.Storage().SetClient(storageID, apiSpec.OrgID, &updatedClient, true)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "fail",
-			"err":    err,
-		}).Error("Failed to update OAuth client")
-		return apiError("Failure in storing client data"), http.StatusInternalServerError
-	}
-
-	// invalidate tokens if we had a new policy
-	invalidateTokens(client, updatedClient, apiSpec.OAuthManager)
-
-	// convert to outbound format
-	replyData := NewClientRequest{
-		ClientID:          updatedClient.GetId(),
-		ClientSecret:      updatedClient.ClientSecret,
-		ClientRedirectURI: updatedClient.GetRedirectUri(),
-		PolicyID:          updatedClient.GetPolicyID(),
-		MetaData:          updatedClient.GetUserData(),
-		Description:       updatedClient.GetDescription(),
-	}
-
-	return replyData, http.StatusOK
+	return cpResponse(gw.controlPlaneOAuth().RotateClientSecret(apiID, keyName))
 }
 
 // Update Client
 func (gw *Gateway) updateOauthClient(keyName, apiID string, r *http.Request) (interface{}, int) {
-	// read payload
 	var updateClientData NewClientRequest
 	if err := json.NewDecoder(r.Body).Decode(&updateClientData); err != nil {
 		log.WithFields(logrus.Fields{
@@ -2631,133 +1497,14 @@ func (gw *Gateway) updateOauthClient(keyName, apiID string, r *http.Request) (in
 		return apiError("Unmarshalling failed"), http.StatusInternalServerError
 	}
 
-	// check API
-	apiSpec := gw.getApiSpec(apiID)
-	if apiSpec == nil {
-		return apiError("API doesn't exist"), http.StatusNotFound
-	}
-
-	// check policy
-	if updateClientData.PolicyID != "" {
-		policy, ok := gw.policies.PolicyByID(model.NewScopedCustomPolicyId(apiSpec.OrgID, updateClientData.PolicyID))
-		if !ok {
-			return apiError("Policy doesn't exist"), http.StatusNotFound
-		}
-		if _, ok := policy.AccessRights[apiID]; !ok {
-			return apiError("Policy access rights doesn't contain API this OAuth client belongs to"),
-				http.StatusBadRequest
-		}
-	}
-
-	// get existing version of oauth-client
-	storageID := oauthClientStorageID(keyName)
-	client, err := apiSpec.OAuthManager.Storage().GetExtendedClientNoPrefix(storageID)
-	if err != nil {
-		return apiError("OAuth Client ID not found"), http.StatusNotFound
-	}
-
-	// update client
-	updatedClient := OAuthClient{
-		ClientID:          client.GetId(),
-		ClientSecret:      client.GetSecret(),
-		ClientRedirectURI: updateClientData.ClientRedirectURI, // update
-		PolicyID:          updateClientData.PolicyID,          // update
-		MetaData:          updateClientData.MetaData,          // update
-		Description:       updateClientData.Description,       // update
-	}
-
-	err = apiSpec.OAuthManager.Storage().SetClient(storageID, apiSpec.OrgID, &updatedClient, true)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "fail",
-			"err":    err,
-		}).Error("Failed to update OAuth client")
-		return apiError("Failure in storing client data"), http.StatusInternalServerError
-	}
-
-	// invalidate tokens if we had a new policy
-	invalidateTokens(client, updatedClient, apiSpec.OAuthManager)
-
-	// convert to outbound format
-	replyData := NewClientRequest{
-		ClientID:          updatedClient.GetId(),
-		ClientSecret:      updatedClient.GetSecret(),
-		ClientRedirectURI: updatedClient.GetRedirectUri(),
-		PolicyID:          updatedClient.GetPolicyID(),
-		MetaData:          updatedClient.GetUserData(),
-		Description:       updatedClient.GetDescription(),
-	}
-
-	return replyData, http.StatusOK
+	return cpResponse(gw.controlPlaneOAuth().UpdateClient(apiID, keyName, updateClientData))
 }
 
 func (gw *Gateway) invalidateOauthRefresh(w http.ResponseWriter, r *http.Request) {
 	apiID := r.URL.Query().Get("api_id")
-	if apiID == "" {
-		doJSONWrite(w, http.StatusBadRequest, apiError("Missing parameter api_id"))
-		return
-	}
-	apiSpec := gw.getApiSpec(apiID)
-
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
-		"apiID":  apiID,
-	}).Debug("Looking for refresh token in API Register")
-
-	if apiSpec == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "fail",
-			"err":    "API not found",
-		}).Error("Failed to invalidate refresh token")
-
-		doJSONWrite(w, http.StatusNotFound, apiError("API for this refresh token not found"))
-		return
-	}
-
-	if apiSpec.OAuthManager == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "fail",
-			"err":    "API is not OAuth",
-		}).Error("Failed to invalidate refresh token")
-
-		doJSONWrite(w, http.StatusBadRequest, apiError("OAuth is not enabled on this API"))
-		return
-	}
-
 	keyName := mux.Vars(r)["keyName"]
-	err := apiSpec.OAuthManager.Storage().RemoveRefresh(keyName)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "fail",
-			"err":    err,
-		}).Error("Failed to invalidate refresh token")
-
-		doJSONWrite(w, http.StatusInternalServerError, apiError("Failed to invalidate refresh token"))
-		return
-	}
-
-	success := apiModifyKeySuccess{
-		Key:    keyName,
-		Status: "ok",
-		Action: "deleted",
-	}
-
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
-		"apiID":  apiID,
-		"token":  keyName,
-		"status": "ok",
-	}).Info("Invalidated refresh token")
-
-	doJSONWrite(w, http.StatusOK, success)
+	obj, code := cpResponse(gw.controlPlaneOAuth().InvalidateRefresh(apiID, keyName))
+	doJSONWrite(w, code, obj)
 }
 
 func (gw *Gateway) rotateOauthClientHandler(w http.ResponseWriter, r *http.Request) {
@@ -2771,29 +1518,9 @@ func (gw *Gateway) rotateOauthClientHandler(w http.ResponseWriter, r *http.Reque
 }
 
 func (gw *Gateway) getApisForOauthApp(w http.ResponseWriter, r *http.Request) {
-	apis := []string{}
 	appID := mux.Vars(r)["appID"]
 	orgID := r.FormValue("orgID")
-
-	//get all organization apis
-	apisIds := gw.getApisIdsForOrg(orgID)
-
-	for index := range apisIds {
-		if api := gw.getApiSpec(apisIds[index]); api != nil {
-			if api.UseOauth2 {
-				clients, _, code := gw.getApiClients(apisIds[index])
-				if code == http.StatusOK {
-					for _, client := range clients {
-						if client.GetId() == appID {
-							apis = append(apis, apisIds[index])
-						}
-					}
-				}
-			}
-		}
-	}
-
-	doJSONWrite(w, http.StatusOK, apis)
+	doJSONWrite(w, http.StatusOK, gw.controlPlaneOAuth().APIsForClient(appID, orgID))
 }
 
 func (gw *Gateway) oAuthClientHandler(w http.ResponseWriter, r *http.Request) {
@@ -2826,19 +1553,6 @@ func (gw *Gateway) oAuthClientTokensHandler(w http.ResponseWriter, r *http.Reque
 	apiID := mux.Vars(r)["apiID"]
 	keyName := mux.Vars(r)["keyName"]
 
-	apiSpec := gw.getApiSpec(apiID)
-	if apiSpec == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "fail",
-			"client": keyName,
-			"err":    "not found",
-		}).Error("Failed to retrieve OAuth tokens")
-		doJSONWrite(w, http.StatusNotFound, apiError("OAuth Client ID not found"))
-		return
-	}
-
 	if p := r.URL.Query().Get("page"); p != "" {
 		page := 1
 
@@ -2851,89 +1565,18 @@ func (gw *Gateway) oAuthClientTokensHandler(w http.ResponseWriter, r *http.Reque
 			page = 1
 		}
 
-		tokens, totalPages, err := apiSpec.OAuthManager.Storage().GetPaginatedClientTokens(keyName, page)
-		if err != nil {
-			doJSONWrite(w, http.StatusInternalServerError, apiError("Get client tokens failed"))
-			return
-		}
-
-		doJSONWrite(w, http.StatusOK, paginatedOAuthClientTokens{
-			Pagination: paginationStatus{
-				PageSize:  100,
-				PageNum:   page,
-				PageTotal: totalPages,
-			},
-			Tokens: tokens,
-		})
-
+		obj, code := cpResponse(gw.controlPlaneOAuth().ClientTokensPage(apiID, keyName, page))
+		doJSONWrite(w, code, obj)
 		return
 	}
 
-	tokens, err := apiSpec.OAuthManager.Storage().GetClientTokens(keyName)
-	if err != nil {
-		doJSONWrite(w, http.StatusInternalServerError, apiError("Get client tokens failed"))
-		return
-	}
-
-	doJSONWrite(w, http.StatusOK, tokens)
+	obj, code := cpResponse(gw.controlPlaneOAuth().ClientTokens(apiID, keyName))
+	doJSONWrite(w, code, obj)
 }
 
 // Get client details
 func (gw *Gateway) getOauthClientDetails(keyName, apiID string) (interface{}, int) {
-	storageID := oauthClientStorageID(keyName)
-	apiSpec := gw.getApiSpec(apiID)
-	if apiSpec == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "fail",
-			"client": keyName,
-			"err":    "not found",
-		}).Error("Failed to retrieve OAuth client details")
-		return apiError("OAuth Client ID not found"), http.StatusNotFound
-	}
-
-	if apiSpec.OAuthManager == nil {
-		prefix := generateOAuthPrefix(apiSpec.APIID)
-		storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
-		storageManager.Connect()
-
-		storageDriver := &storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
-		storageDriver.Connect()
-
-		apiSpec.OAuthManager = &OAuthManager{
-			OsinServer: gw.TykOsinNewServer(&osin.ServerConfig{},
-				&RedisOsinStorageInterface{
-					storageManager,
-					gw.GlobalSessionManager,
-					storageDriver,
-					apiSpec.OrgID,
-					gw,
-				}),
-		}
-	}
-
-	clientData, err := apiSpec.OAuthManager.Storage().GetExtendedClientNoPrefix(storageID)
-	if err != nil {
-		return apiError("OAuth Client ID not found"), http.StatusNotFound
-	}
-	reportableClientData := NewClientRequest{
-		ClientID:          clientData.GetId(),
-		ClientSecret:      clientData.GetSecret(),
-		ClientRedirectURI: clientData.GetRedirectUri(),
-		PolicyID:          clientData.GetPolicyID(),
-		MetaData:          clientData.GetUserData(),
-		Description:       clientData.GetDescription(),
-	}
-
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
-		"apiID":  apiID,
-		"status": "ok",
-		"client": keyName,
-	}).Info("Retrieved OAuth client ID")
-
-	return reportableClientData, http.StatusOK
+	return cpResponse(gw.controlPlaneOAuth().GetClient(apiID, keyName))
 }
 
 func (gw *Gateway) oAuthTokensHandler(w http.ResponseWriter, r *http.Request) {
@@ -2958,44 +1601,7 @@ func (gw *Gateway) oAuthTokensHandler(w http.ResponseWriter, r *http.Request) {
 
 // Delete Client
 func (gw *Gateway) handleDeleteOAuthClient(keyName, apiID string) (interface{}, int) {
-	storageID := oauthClientStorageID(keyName)
-
-	apiSpec := gw.getApiSpec(apiID)
-	if apiSpec == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "fail",
-			"client": keyName,
-			"err":    "not found",
-		}).Error("Failed to delete OAuth client")
-
-		return apiError("OAuth Client ID not found"), http.StatusNotFound
-	}
-
-	if apiSpec.OAuthManager != nil {
-		err := apiSpec.OAuthManager.Storage().DeleteClient(storageID, apiSpec.OrgID, true)
-		if err != nil {
-			return apiError("Delete failed"), http.StatusInternalServerError
-		}
-
-		statusObj := apiModifyKeySuccess{
-			Key:    keyName,
-			Status: "ok",
-			Action: "deleted",
-		}
-
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "ok",
-			"client": keyName,
-		}).Info("Deleted OAuth client")
-
-		return statusObj, http.StatusOK
-	}
-
-	return apiError("OAuth Client ID not found"), http.StatusNotFound
+	return cpResponse(gw.controlPlaneOAuth().DeleteClient(apiID, keyName))
 }
 
 const oAuthNotPropagatedErr = "OAuth client list isn't available or hasn't been propagated yet."
@@ -3005,86 +1611,9 @@ const oauthClientSecretEmpty = "client_secret is required"
 const oauthClientSecretWrong = "client secret is wrong"
 const oauthTokenEmpty = "token is required"
 
-func (gw *Gateway) getApiClients(apiID string) ([]ExtendedOsinClientInterface, apiStatusMessage, int) {
-	var err error
-	filterID := prefixClient
-	apiSpec := gw.getApiSpec(apiID)
-
-	if apiSpec == nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "api",
-			"apiID":  apiID,
-			"status": "fail",
-			"err":    "API not found",
-		}).Error("Failed to retrieve OAuth client list.")
-		return nil, apiError(oAuthClientNotFound), http.StatusNotFound
-	}
-
-	clientData := []ExtendedOsinClientInterface{}
-	if apiSpec.UseOauth2 {
-		clientData, err = apiSpec.OAuthManager.Storage().GetClients(filterID, apiSpec.OrgID, true)
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"prefix": "api",
-				"apiID":  apiID,
-				"status": "fail",
-				"err":    err,
-			}).Error("Failed to report OAuth client list")
-
-			return nil, apiError(oAuthClientNotFound), http.StatusNotFound
-		}
-	}
-
-	return clientData, apiStatusMessage{}, http.StatusOK
-}
-
 // List Clients
 func (gw *Gateway) getOauthClients(apiID string) (interface{}, int) {
-
-	clientData, _, apiStatusCode := gw.getApiClients(apiID)
-
-	if apiStatusCode != 200 {
-		return clientData, apiStatusCode
-	}
-
-	clients := []NewClientRequest{}
-	for _, osinClient := range clientData {
-		reportableClientData := NewClientRequest{
-			ClientID:          osinClient.GetId(),
-			ClientSecret:      osinClient.GetSecret(),
-			ClientRedirectURI: osinClient.GetRedirectUri(),
-			PolicyID:          osinClient.GetPolicyID(),
-			MetaData:          osinClient.GetUserData(),
-			Description:       osinClient.GetDescription(),
-		}
-
-		clients = append(clients, reportableClientData)
-	}
-	log.WithFields(logrus.Fields{
-		"prefix": "api",
-		"apiID":  apiID,
-		"status": "ok",
-	}).Info("Retrieved OAuth client list")
-
-	return clients, http.StatusOK
-}
-
-func (gw *Gateway) getApisForOauthClientId(oauthClientId string, orgId string) []string {
-	apis := []string{}
-	orgApis := gw.getApisIdsForOrg(orgId)
-
-	for index := range orgApis {
-		clientsData, _, status := gw.getApiClients(orgApis[index])
-		if status == http.StatusOK {
-			for _, client := range clientsData {
-				if client.GetId() == oauthClientId {
-					apis = append(apis, orgApis[index])
-				}
-			}
-		}
-	}
-
-	return apis
+	return cpResponse(gw.controlPlaneOAuth().ListClients(apiID))
 }
 
 func (gw *Gateway) healthCheckhandler(w http.ResponseWriter, r *http.Request) {
@@ -3152,9 +1681,7 @@ func (gw *Gateway) invalidateCacheHandler(w http.ResponseWriter, r *http.Request
 }
 
 func (gw *Gateway) RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseForm()
-
-	if err != nil {
+	if err := r.ParseForm(); err != nil {
 		doJSONWrite(w, http.StatusBadRequest, apiError("cannot parse form. Form malformed"))
 		return
 	}
@@ -3164,62 +1691,39 @@ func (gw *Gateway) RevokeTokenHandler(w http.ResponseWriter, r *http.Request) {
 	clientID := r.PostFormValue("client_id")
 	orgID := r.PostFormValue("org_id")
 
-	if token == "" {
-		doJSONWrite(w, http.StatusBadRequest, apiError(oauthTokenEmpty))
+	if err := gw.controlPlaneOAuth().RevokeClientToken(orgID, clientID, token, tokenTypeHint); err != nil {
+		obj, code := cpResponse(nil, err)
+		doJSONWrite(w, code, obj)
 		return
-	}
-
-	if clientID == "" {
-		doJSONWrite(w, http.StatusBadRequest, apiError(oauthClientIdEmpty))
-		return
-	}
-
-	apis := gw.getApisForOauthClientId(clientID, orgID)
-	if len(apis) == 0 {
-		doJSONWrite(w, http.StatusBadRequest, apiError("oauth client doesn't exist"))
-		return
-	}
-
-	for _, apiID := range apis {
-		storage, _, err := gw.GetStorageForApi(apiID)
-		if err == nil {
-			RevokeToken(storage, token, tokenTypeHint)
-		}
 	}
 	doJSONWrite(w, http.StatusOK, apiOk("token revoked successfully"))
 }
 
 func (gw *Gateway) GetStorageForApi(apiID string) (ExtendedOsinStorageInterface, int, error) {
-	apiSpec := gw.getApiSpec(apiID)
-	if apiSpec == nil {
+	st, res := gwOAuthResolver{gw}.StorageFor(apiID, false)
+	switch res {
+	case oauth.APINotFound:
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 			"apiID":  apiID,
 			"status": "fail",
 			"err":    "API not found",
 		}).Error("Failed to retrieve OAuth client list.")
-
 		return nil, http.StatusNotFound, errors.New(oAuthClientNotFound)
-	}
-
-	if apiSpec.OAuthManager == nil {
+	case oauth.NoManager:
 		log.WithFields(logrus.Fields{
 			"prefix": "api",
 			"apiID":  apiID,
 			"status": "fail",
 			"err":    "API not found",
 		}).Error("Failed to revoke client tokens.")
-
 		return nil, http.StatusNotFound, errors.New(oAuthNotPropagatedErr)
 	}
-
-	return apiSpec.OAuthManager.Storage(), http.StatusOK, nil
+	return st, http.StatusOK, nil
 }
 
 func (gw *Gateway) RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request) {
-	err := r.ParseForm()
-
-	if err != nil {
+	if err := r.ParseForm(); err != nil {
 		doJSONWrite(w, http.StatusBadRequest, apiError("cannot parse form. Form malformed"))
 		return
 	}
@@ -3228,30 +1732,11 @@ func (gw *Gateway) RevokeAllTokensHandler(w http.ResponseWriter, r *http.Request
 	clientSecret := r.PostFormValue("client_secret")
 	orgId := r.PostFormValue("org_id")
 
-	if clientId == "" {
-		doJSONWrite(w, http.StatusUnauthorized, apiError(oauthClientIdEmpty))
+	tokens, err := gw.controlPlaneOAuth().RevokeAllClientTokens(orgId, clientId, clientSecret)
+	if err != nil {
+		obj, code := cpResponse(nil, err)
+		doJSONWrite(w, code, obj)
 		return
-	}
-
-	if clientSecret == "" {
-		doJSONWrite(w, http.StatusUnauthorized, apiError(oauthClientSecretEmpty))
-		return
-	}
-
-	apis := gw.getApisForOauthClientId(clientId, orgId)
-	if len(apis) == 0 {
-		//if api is 0 is because the client wasn't found
-		doJSONWrite(w, http.StatusNotFound, apiError("oauth client doesn't exist"))
-		return
-	}
-
-	tokens := []string{}
-	for _, apiId := range apis {
-		storage, _, err := gw.GetStorageForApi(apiId)
-		if err == nil {
-			_, tokensRevoked, _ := RevokeAllTokens(storage, clientId, clientSecret)
-			tokens = append(tokens, tokensRevoked...)
-		}
 	}
 
 	n := Notification{
@@ -3764,20 +2249,6 @@ var createOauthClientSecret = func() string {
 }
 
 // invalidate tokens if we had a new policy
-func invalidateTokens(prevClient ExtendedOsinClientInterface, updatedClient OAuthClient, oauthManager OAuthManagerInterface) {
-	if prevPolicy := prevClient.GetPolicyID(); prevPolicy != "" && prevPolicy != updatedClient.PolicyID {
-		tokenList, err := oauthManager.Storage().GetClientTokens(updatedClient.ClientID)
-		if err != nil {
-			log.WithError(err).Warning("Could not get list of tokens for updated OAuth client")
-		}
-
-		for _, token := range tokenList {
-			if err := oauthManager.Storage().RemoveAccess(token.Token); err != nil {
-				log.WithError(err).Warning("Could not remove token for updated OAuth client policy")
-			}
-		}
-	}
-}
 
 func extractOASObjFromReq(reqBody io.Reader) ([]byte, *oas.OAS, error) {
 	var oasObj oas.OAS

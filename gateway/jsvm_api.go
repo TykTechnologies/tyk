@@ -200,7 +200,7 @@ func (h *JSVMAPIHelper) SetKeyData(apiKey, encodedSession, suppressReset string)
 		h.Log.WithError(err).Error("Failed to decode the sesison data")
 		return err
 	}
-	if err := h.Gw.doAddOrUpdate(apiKey, &newSession, suppressReset == "1", false); err != nil {
+	if err := h.Gw.controlPlaneKeys().AddOrUpdate(apiKey, &newSession, suppressReset == "1", false); err != nil {
 		h.Log.WithError(err).Error("Failed to update key data")
 		return err
 	}

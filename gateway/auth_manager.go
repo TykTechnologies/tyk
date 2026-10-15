@@ -2,13 +2,9 @@ package gateway
 
 import (
 	"encoding/base64"
-	"encoding/json"
-	"strings"
-	"time"
-
-	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/internal/uuid"
+	"github.com/TykTechnologies/tyk/pkg/controlplane/keys"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -27,10 +23,39 @@ type SessionHandler interface {
 	Stop()
 }
 
+// DefaultSessionManager is the gateway's SessionHandler. The persistence
+// logic lives in pkg/controlplane/keys.SessionManager; this type binds it to
+// the gateway's live configuration, session cache and cluster notifier.
 type DefaultSessionManager struct {
 	store storage.Handler
 	orgID string
 	Gw    *Gateway `json:"-"`
+}
+
+// manager binds the shared session logic to this gateway instance. The
+// returned value is cheap and carries no state beyond the store, so one is
+// built per call rather than cached on the struct, which keeps struct
+// literal construction (used throughout the gateway and its tests) valid.
+func (b *DefaultSessionManager) manager() *keys.SessionManager {
+	return keys.NewSessionManager(b.store, b.hashConfig, b.clearCacheForKey, log)
+}
+
+func (b *DefaultSessionManager) hashConfig() keys.HashConfig {
+	if b.Gw == nil {
+		return keys.HashConfig{}
+	}
+	return hashConfigFromGateway(b.Gw)
+}
+
+func hashConfigFromGateway(gw *Gateway) keys.HashConfig {
+	c := gw.GetConfig()
+	return keys.HashConfig{
+		HashKeys:                    c.HashKeys,
+		HashKeyFunction:             c.HashKeyFunction,
+		HashKeyFunctionFallback:     c.HashKeyFunctionFallback,
+		DisableKeyActionsByUsername: c.DisableKeyActionsByUsername,
+		EnableKeyLogging:            c.EnableKeyLogging,
+	}
 }
 
 func (b *DefaultSessionManager) ResetQuotaObfuscateKey(keyName string) string {
@@ -47,10 +72,7 @@ func (b *DefaultSessionManager) Init(store storage.Handler) {
 
 // KeyExpired checks if a key has expired, if the value of user.SessionState.Expires is 0, it will be ignored
 func (b *DefaultSessionManager) KeyExpired(newSession *user.SessionState) bool {
-	if newSession.Expires >= 1 {
-		return time.Now().After(time.Unix(newSession.Expires, 0))
-	}
-	return false
+	return b.manager().KeyExpired(newSession)
 }
 
 func (b *DefaultSessionManager) Store() storage.Handler {
@@ -58,56 +80,22 @@ func (b *DefaultSessionManager) Store() storage.Handler {
 }
 
 func (b *DefaultSessionManager) ResetQuota(keyName string, session *user.SessionState, isHashed bool) {
-	origKeyName := keyName
-
-	if !isHashed {
-		keyName = storage.HashKey(keyName, b.Gw.GetConfig().HashKeys)
-	}
-
-	rawKey := QuotaKeyPrefix + keyName
-	log.WithFields(logrus.Fields{
-		"prefix":      "auth-mgr",
-		"inbound-key": b.Gw.obfuscateKey(origKeyName),
-		"key":         b.ResetQuotaObfuscateKey(keyName),
-	}).Info("Reset quota for key.")
-
-	rateLimiterSentinelKey := RateLimitKeyPrefix + keyName + ".BLOCKED"
-
-	// Clear the rate limiter and
-	// Fix the raw key
-	defaultKeys := []string{rateLimiterSentinelKey, rawKey}
-	keys := rawKeysWithAllowanceScope(defaultKeys, keyName, session)
-	b.store.DeleteRawKeys(keys)
+	b.manager().ResetQuota(keyName, session, isHashed)
 }
 
-func rawKeysWithAllowanceScope(keys []string, keyName string, session *user.SessionState) []string {
-	for _, acl := range session.AccessRights {
-		if acl.AllowanceScope == "" {
-			continue
-		}
-		keys = append(keys, QuotaKeyPrefix+acl.AllowanceScope+"-"+keyName)
-	}
-	return keys
+func rawKeysWithAllowanceScope(rawKeys []string, keyName string, session *user.SessionState) []string {
+	return keys.RawKeysWithAllowanceScope(rawKeys, keyName, session)
 }
 
 func (b *DefaultSessionManager) deleteRawKeysWithAllowanceScope(store storage.Handler, session *user.SessionState, keyName string) {
-	if store == nil || session == nil {
-		return
-	}
-
-	for _, acl := range session.AccessRights {
-		if acl.AllowanceScope == "" {
-			continue
-		}
-		rawKey := QuotaKeyPrefix + acl.AllowanceScope + "-" + keyName
-		store.DeleteRawKey(rawKey)
-	}
+	keys.DeleteRawKeysWithAllowanceScope(store, session, keyName)
 }
 
-func (b *DefaultSessionManager) clearCacheForKey(keyName string, hashed bool) {
-	cacheKey := keyName
-	if !hashed {
-		cacheKey = storage.HashKey(keyName, b.Gw.GetConfig().HashKeys)
+// clearCacheForKey is the change hook: it drops the key from this gateway's
+// session cache and tells the rest of the cluster to do the same.
+func (b *DefaultSessionManager) clearCacheForKey(cacheKey string) {
+	if b.Gw == nil {
+		return
 	}
 	// Delete gateway's cache immediately
 	b.Gw.SessionCache.Delete(cacheKey)
@@ -128,112 +116,24 @@ func (b *DefaultSessionManager) UpdateSession(
 	resetTTLTo int64,
 	hashed bool,
 ) error {
-
-	defer b.clearCacheForKey(keyName, hashed)
-
-	v, err := json.Marshal(session)
-	if err != nil {
-		log.Error("Error marshalling session for sync update")
-		return err
-	}
-
-	if !session.IsRestored() {
-		if hashed {
-			keyName = b.store.GetKeyPrefix() + keyName
-			err = b.store.SetRawKey(keyName, string(v), resetTTLTo)
-		} else {
-			err = b.store.SetKey(keyName, string(v), resetTTLTo)
-		}
-	} else {
-		if hashed {
-			keyName = b.store.GetKeyPrefix() + keyName
-			err = b.store.SetRawKeyEx(keyName, string(v), resetTTLTo)
-		} else {
-			err = b.store.SetKeyEx(keyName, string(v), resetTTLTo)
-		}
-	}
-
-	return err
+	return b.manager().UpdateSession(keyName, session, resetTTLTo, hashed)
 }
 
 // RemoveSession removes session from storage
 func (b *DefaultSessionManager) RemoveSession(orgID string, keyName string, hashed bool) bool {
-	defer b.clearCacheForKey(keyName, hashed)
-
-	if hashed {
-		return b.store.DeleteRawKey(b.store.GetKeyPrefix() + keyName)
-	} else {
-		// support both old and new key hashing
-		res1 := b.store.DeleteKey(keyName)
-		res2 := b.store.DeleteKey(b.Gw.generateToken(orgID, keyName))
-		return res1 || res2
-	}
+	return b.manager().RemoveSession(orgID, keyName, hashed)
 }
 
 // SessionDetail returns the session detail using the storage engine (either in memory or Redis)
 func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
-	var jsonKeyVal string
-	var err error
-	keyId := keyName
-
-	// get session by key
-	if hashed {
-		jsonKeyVal, err = b.store.GetRawKey(b.store.GetKeyPrefix() + keyName)
-	} else {
-		if storage.TokenOrg(keyName) != orgID {
-			// try to get legacy and new format key at once
-			toSearchList := []string{}
-			if !b.Gw.GetConfig().DisableKeyActionsByUsername {
-				toSearchList = append(toSearchList, b.Gw.generateToken(orgID, keyName))
-			}
-
-			toSearchList = append(toSearchList, keyName)
-			for _, fallback := range b.Gw.GetConfig().HashKeyFunctionFallback {
-				if !b.Gw.GetConfig().DisableKeyActionsByUsername {
-					toSearchList = append(toSearchList, b.Gw.generateToken(orgID, keyName, fallback))
-				}
-			}
-
-			var jsonKeyValList []string
-
-			jsonKeyValList, err = b.store.GetMultiKey(toSearchList)
-			// pick the 1st non empty from the returned list
-			for idx, val := range jsonKeyValList {
-				if val != "" {
-					jsonKeyVal = val
-					keyId = toSearchList[idx]
-					break
-				}
-			}
-		} else {
-			// key is not an imported one
-			jsonKeyVal, err = b.store.GetKey(keyName)
-		}
-	}
-
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix":      "auth-mgr",
-			"inbound-key": b.Gw.obfuscateKey(keyName),
-			"err":         err,
-		}).Debug("Could not get session detail, key not found")
-		return user.SessionState{}, false
-	}
-	session := &user.SessionState{}
-	if err := json.Unmarshal([]byte(jsonKeyVal), &session); err != nil {
-		log.Error("Couldn't unmarshal session object (may be cache miss): ", err)
-		return user.SessionState{}, false
-	}
-	session.KeyID = keyId
-	session.MarkAsRestored()
-	return session.Clone(), true
+	return b.manager().SessionDetail(orgID, keyName, hashed)
 }
 
 func (b *DefaultSessionManager) Stop() {}
 
 // Sessions returns all sessions in the key store that match a filter key (a prefix)
 func (b *DefaultSessionManager) Sessions(filter string) []string {
-	return b.store.GetKeys(filter)
+	return b.manager().Sessions(filter)
 }
 
 type DefaultKeyGenerator struct {
@@ -241,22 +141,11 @@ type DefaultKeyGenerator struct {
 }
 
 func (gw *Gateway) generateToken(orgID, keyID string, customHashKeyFunction ...string) string {
-	keyID = strings.TrimPrefix(keyID, orgID)
 	hashKeyFunction := gw.GetConfig().HashKeyFunction
-
 	if len(customHashKeyFunction) > 0 {
 		hashKeyFunction = customHashKeyFunction[0]
 	}
-
-	token, err := storage.GenerateToken(orgID, keyID, hashKeyFunction)
-	if err != nil {
-		log.WithFields(logrus.Fields{
-			"prefix": "auth-mgr",
-			"orgID":  orgID,
-		}).WithError(err).Warning("Issue during token generation")
-	}
-
-	return token
+	return keys.GenerateToken(hashKeyFunction, orgID, keyID, log)
 }
 
 // GenerateAuthKey is a utility function for generating new auth keys. Returns the storage key name and the actual key

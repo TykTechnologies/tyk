@@ -1,0 +1,67 @@
+[
+  {
+    "name": "create-custom",
+    "status": 200,
+    "body": {
+      "action": "added",
+      "key": "eyJvcmciOiJkZWZhdWx0IiwiaWQiOiJjdXN0b20ta2V5LTAwMDEiLCJoIjoibXVybXVyNjQifQ==",
+      "key_hash": "9b26884423d402b4",
+      "status": "ok"
+    },
+    "redis": [
+      {
+        "key": "apikey-9b26884423d402b4",
+        "type": "string",
+        "ttl": 600,
+        "value": {
+          "access_rights": {
+            "api-a": {
+              "limit": {
+                "per": 60,
+                "quota_max": 10,
+                "quota_renewal_rate": 3600,
+                "rate": 100
+              }
+            },
+            "api-b": {
+              "limit": {
+                "per": 60,
+                "quota_max": 10,
+                "quota_renewal_rate": 3600,
+                "rate": 100
+              }
+            }
+          },
+          "alias": "parity",
+          "apply_policies": [
+            "pol-a"
+          ],
+          "date_created": "\u003cts\u003e",
+          "last_updated": "\u003cts\u003e",
+          "meta_data": {
+            "m": "v"
+          },
+          "org_id": "default",
+          "per": 60,
+          "quota_max": 10,
+          "quota_renewal_rate": 3600,
+          "quota_renews": "\u003cts\u003e",
+          "rate": 100,
+          "tags": [
+            "parity"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "delete-custom-by-hash",
+    "status": 200,
+    "body": {
+      "action": "deleted",
+      "key": "9b26884423d402b4",
+      "status": "ok"
+    },
+    "redis": []
+  }
+]

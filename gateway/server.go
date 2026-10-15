@@ -31,7 +31,6 @@ import (
 	logrussentry "github.com/evalphobia/logrus_sentry"
 	grayloghook "github.com/gemnasium/logrus-graylog-hook"
 	"github.com/gorilla/mux"
-	"github.com/lonelycode/osin"
 	"github.com/rs/cors"
 	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
@@ -69,6 +68,8 @@ import (
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	tyklog "github.com/TykTechnologies/tyk/log"
+	cpcerts "github.com/TykTechnologies/tyk/pkg/controlplane/certs"
+	"github.com/TykTechnologies/tyk/pkg/controlplane/oauth"
 	"github.com/TykTechnologies/tyk/pkg/osutil"
 	"github.com/TykTechnologies/tyk/pkg/validator"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -656,12 +657,9 @@ func (gw *Gateway) setupGlobals() {
 		gw.SetConfig(conf)
 	}
 
-	certificateSecret := gw.GetConfig().Secret
-	if gw.GetConfig().Security.PrivateCertificateEncodingSecret != "" {
-		certificateSecret = gw.GetConfig().Security.PrivateCertificateEncodingSecret
-	}
+	certificateSecret := cpcerts.EncodingSecret(gw.GetConfig().Security.PrivateCertificateEncodingSecret, gw.GetConfig().Secret)
 
-	storeCert := &storage.RedisCluster{KeyPrefix: "cert-", HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
+	storeCert := cpcerts.NewStore(gw.StorageConnectionHandler)
 	storeCert.Connect()
 
 	conf := gw.GetConfig()
@@ -1036,35 +1034,8 @@ func (gw *Gateway) addOAuthHandlers(spec *APISpec, muxer *mux.Router) *OAuthMana
 	revokeToken := "/oauth/revoke"
 	revokeAllTokens := "/oauth/revoke_all"
 
-	serverConfig := osin.NewServerConfig()
-
-	gwConfig := gw.GetConfig()
-	if gwConfig.OauthErrorStatusCode != 0 {
-		serverConfig.ErrorStatusCode = gwConfig.OauthErrorStatusCode
-	} else {
-		serverConfig.ErrorStatusCode = http.StatusForbidden
-	}
-
-	serverConfig.AllowedAccessTypes = spec.Oauth2Meta.AllowedAccessTypes
-	serverConfig.AllowedAuthorizeTypes = spec.Oauth2Meta.AllowedAuthorizeTypes
-	serverConfig.RedirectUriSeparator = gwConfig.OauthRedirectUriSeparator
-
-	prefix := generateOAuthPrefix(spec.APIID)
-	storageManager := gw.getGlobalMDCBStorageHandler(prefix, false)
-	storageManager.Connect()
-
-	storageDriver := &storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: gw.StorageConnectionHandler}
-	storageDriver.Connect()
-
-	osinStorage := &RedisOsinStorageInterface{
-		storageManager,
-		gw.GlobalSessionManager,
-		storageDriver,
-		spec.OrgID,
-		gw,
-	}
-
-	osinServer := gw.TykOsinNewServer(serverConfig, osinStorage)
+	osinStorage := gw.newOAuthStorage(spec.APIID, spec.OrgID)
+	osinServer := gw.TykOsinNewServer(oauth.ServerConfigFor(apiInfoFromSpec(spec), oauthConfigFromGateway(gw.GetConfig())), osinStorage)
 
 	oauthManager := OAuthManager{spec, osinServer, gw}
 	oauthHandlers := OAuthHandlers{oauthManager}

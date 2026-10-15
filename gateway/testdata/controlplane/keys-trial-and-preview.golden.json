@@ -1,0 +1,166 @@
+[
+  {
+    "name": "create-trial",
+    "status": 200,
+    "body": {
+      "action": "added",
+      "key": "\u003cK1\u003e",
+      "key_hash": "\u003cK1.hash\u003e",
+      "status": "ok"
+    },
+    "redis": [
+      {
+        "key": "apikey-\u003cK1.hash\u003e",
+        "type": "string",
+        "ttl": 600,
+        "value": {
+          "access_rights": {
+            "api-a": {
+              "limit": {
+                "per": 1,
+                "quota_max": -1,
+                "rate": 1000
+              }
+            }
+          },
+          "alias": "parity",
+          "apply_policies": [
+            "pol-trial"
+          ],
+          "date_created": "\u003cts\u003e",
+          "expires": "\u003cts\u003e",
+          "last_updated": "\u003cts\u003e",
+          "meta_data": {
+            "m": "v"
+          },
+          "org_id": "default",
+          "per": 1,
+          "quota_max": -1,
+          "rate": 1000,
+          "tags": [
+            "parity"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "preview",
+    "status": 200,
+    "body": {
+      "access_rights": {
+        "api-a": {
+          "limit": {
+            "per": 60,
+            "quota_max": 10,
+            "quota_renewal_rate": 3600,
+            "rate": 100
+          }
+        },
+        "api-b": {
+          "limit": {
+            "per": 60,
+            "quota_max": 10,
+            "quota_renewal_rate": 3600,
+            "rate": 100
+          }
+        }
+      },
+      "alias": "parity",
+      "apply_policies": [
+        "pol-a"
+      ],
+      "date_created": "\u003cts\u003e",
+      "last_updated": "\u003cts\u003e",
+      "meta_data": {
+        "m": "v"
+      },
+      "org_id": "default",
+      "per": 60,
+      "quota_max": 10,
+      "quota_renewal_rate": 3600,
+      "rate": 100,
+      "tags": [
+        "parity"
+      ]
+    },
+    "redis": [
+      {
+        "key": "apikey-\u003cK1.hash\u003e",
+        "type": "string",
+        "ttl": 600,
+        "value": {
+          "access_rights": {
+            "api-a": {
+              "limit": {
+                "per": 1,
+                "quota_max": -1,
+                "rate": 1000
+              }
+            }
+          },
+          "alias": "parity",
+          "apply_policies": [
+            "pol-trial"
+          ],
+          "date_created": "\u003cts\u003e",
+          "expires": "\u003cts\u003e",
+          "last_updated": "\u003cts\u003e",
+          "meta_data": {
+            "m": "v"
+          },
+          "org_id": "default",
+          "per": 1,
+          "quota_max": -1,
+          "rate": 1000,
+          "tags": [
+            "parity"
+          ]
+        }
+      }
+    ]
+  },
+  {
+    "name": "create-no-rights-master-keys-disabled",
+    "status": 400,
+    "body": {
+      "message": "Failed to create key, keys must have at least one Access Rights record set.",
+      "status": "error"
+    },
+    "redis": [
+      {
+        "key": "apikey-\u003cK1.hash\u003e",
+        "type": "string",
+        "ttl": 600,
+        "value": {
+          "access_rights": {
+            "api-a": {
+              "limit": {
+                "per": 1,
+                "quota_max": -1,
+                "rate": 1000
+              }
+            }
+          },
+          "alias": "parity",
+          "apply_policies": [
+            "pol-trial"
+          ],
+          "date_created": "\u003cts\u003e",
+          "expires": "\u003cts\u003e",
+          "last_updated": "\u003cts\u003e",
+          "meta_data": {
+            "m": "v"
+          },
+          "org_id": "default",
+          "per": 1,
+          "quota_max": -1,
+          "rate": 1000,
+          "tags": [
+            "parity"
+          ]
+        }
+      }
+    ]
+  }
+]

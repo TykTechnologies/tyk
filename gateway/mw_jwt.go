@@ -18,7 +18,6 @@ import (
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/google/go-cmp/cmp"
 	"github.com/gorilla/mux"
-	"github.com/lonelycode/osin"
 	"github.com/ohler55/ojg/jp"
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
@@ -32,7 +31,6 @@ import (
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/otel"
-	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -1134,25 +1132,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 	if !k.Spec.IDPClientIDMappingDisabled && oauthClientID != "" {
 		// Initialize the OAuthManager if empty:
-		if k.Spec.OAuthManager == nil {
-			prefix := generateOAuthPrefix(k.Spec.APIID)
-			storageManager := k.Gw.getGlobalMDCBStorageHandler(prefix, false)
-			storageManager.Connect()
-
-			storageDriver := &storage.RedisCluster{KeyPrefix: prefix, HashKeys: false, ConnectionHandler: k.Gw.StorageConnectionHandler}
-			storageDriver.Connect()
-
-			k.Spec.OAuthManager = &OAuthManager{
-				OsinServer: k.Gw.TykOsinNewServer(&osin.ServerConfig{},
-					&RedisOsinStorageInterface{
-						storageManager,
-						k.Gw.GlobalSessionManager,
-						storageDriver,
-						k.Spec.OrgID,
-						k.Gw,
-					}),
-			}
-		}
+		k.Gw.ensureOAuthManager(k.Spec)
 
 		// Retrieve OAuth client data from storage and inject developer ID into the session object:
 		client, err := k.Spec.OAuthManager.Storage().GetClient(oauthClientID)
