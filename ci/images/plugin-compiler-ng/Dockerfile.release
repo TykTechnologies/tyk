@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-ARG GOLANG_IMAGE=tykio/golang-cross:1.26-bullseye
+ARG GOLANG_IMAGE=tykio/golang-cross:1.27-bullseye
 ARG BASE_IMAGE
 # The exact Go version the gateway is built with, e.g. go1.26.4, as reported by
 # GOLANG_IMAGE. A compiler whose Go differs from the gateway's by so much as a
