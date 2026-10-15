@@ -1147,6 +1147,12 @@ type Config struct {
 	// This can cause a file-handler limit to be exceeded. Setting to false can have performance benefits as the connection can be reused.
 	ProxyCloseConnections bool `json:"proxy_close_connections"`
 
+	// DontStripListenPathOnRewrite stops `strip_listen_path` from modifying a path that has already been
+	// rewritten by the URL Rewrite middleware (or another rewrite-like middleware). By default the listen path
+	// is stripped from the rewritten path when it happens to start with the API listen path. Set to `true` to
+	// proxy the rewritten path unchanged.
+	DontStripListenPathOnRewrite bool `json:"dont_strip_listen_path_on_rewrite"`
+
 	// Tyk nodes can provide uptime awareness, uptime testing and analytics for your underlying APIs uptime and availability.
 	// Tyk can also notify you when a service goes down.
 	UptimeTests UptimeTestsConfig `json:"uptime_tests"`
