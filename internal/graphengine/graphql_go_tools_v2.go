@@ -8,11 +8,12 @@ import (
 	"io"
 	"net/http"
 
+	"github.com/buger/jsonparser"
 	"github.com/jensneuse/abstractlogger"
 
-	"github.com/buger/jsonparser"
-
+	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/ast"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/astparser"
+	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/astvisitor"
 	postprocessv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/engine/postprocess"
 	graphqlv2 "github.com/TykTechnologies/graphql-go-tools/v2/pkg/graphql"
 	"github.com/TykTechnologies/graphql-go-tools/v2/pkg/introspection"
@@ -340,7 +341,9 @@ func (g *granularAccessCheckerV2) convertGranularAccessTypeToGraphQLType(accessT
 }
 
 func (g *granularAccessCheckerV2) validateFieldRestrictions(gqlRequest *graphqlv2.Request, fieldRestrictionList graphqlv2.FieldRestrictionList, schema *graphqlv2.Schema) GraphQLGranularAccessResult {
-	result, err := gqlRequest.ValidateFieldRestrictions(schema, fieldRestrictionList, graphqlv2.DefaultFieldsValidator{})
+	result, err := gqlRequest.ValidateFieldRestrictions(schema, fieldRestrictionList, &TykFieldsValidatorV2{
+		Variables: gqlRequest.Variables,
+	})
 	if err != nil {
 		return GraphQLGranularAccessResult{FailReason: GranularAccessFailReasonInternalError, InternalErr: err}
 	}
@@ -349,6 +352,312 @@ func (g *granularAccessCheckerV2) validateFieldRestrictions(gqlRequest *graphqlv
 		return GraphQLGranularAccessResult{FailReason: GranularAccessFailReasonValidationError, ValidationError: result.Errors, writeErrorResponse: g.writeErrorResponse}
 	}
 	return GraphQLGranularAccessResult{FailReason: GranularAccessFailReasonNone}
+}
+
+type TykFieldsValidatorV2 struct {
+	Variables []byte
+}
+
+type inputFieldsVisitorV2 struct {
+	walker            *astvisitor.Walker
+	operation         *ast.Document
+	definition        *ast.Document
+	variables         []byte
+	data              graphqlv2.RequestTypes
+	currentParentType ast.Node
+}
+
+func (v *inputFieldsVisitorV2) EnterField(ref int) {
+	v.currentParentType = v.walker.EnclosingTypeDefinition
+}
+
+func (v *inputFieldsVisitorV2) EnterArgument(ref int) {
+	argName := v.operation.ArgumentNameString(ref)
+	val := v.operation.ArgumentValue(ref)
+
+	if len(v.walker.Ancestors) == 0 {
+		return
+	}
+	parentFieldNode := v.walker.Ancestors[len(v.walker.Ancestors)-1]
+	if parentFieldNode.Kind != ast.NodeKindField {
+		return
+	}
+	fieldName := v.operation.FieldNameString(parentFieldNode.Ref)
+
+	parentType := v.currentParentType
+	fieldDefRef, exists := v.getFieldDefinition(parentType, fieldName)
+	if !exists {
+		return
+	}
+
+	var argTypeName string
+	for _, argDefRef := range v.definition.FieldDefinitionArgumentsDefinitions(fieldDefRef) {
+		if v.definition.InputValueDefinitionNameString(argDefRef) == argName {
+			typeRef := v.definition.InputValueDefinitionType(argDefRef)
+			argTypeName = v.definition.ResolveTypeNameString(typeRef)
+			break
+		}
+	}
+
+	if argTypeName == "" {
+		return
+	}
+
+	if val.Kind == ast.ValueKindObject {
+		v.walkInlineObjectValue(val.Ref, argTypeName)
+	} else if val.Kind == ast.ValueKindVariable {
+		varName := v.operation.VariableValueNameString(val.Ref)
+		varType, ok := v.getVariableTypeName(varName)
+		if ok {
+			varValue, _, _, err := jsonparser.Get(v.variables, varName)
+			if err == nil {
+				v.walkJSONValue(varValue, varType)
+			}
+		}
+	}
+}
+
+func (v *inputFieldsVisitorV2) getFieldDefinition(parentType ast.Node, fieldName string) (int, bool) {
+	switch parentType.Kind {
+	case ast.NodeKindObjectTypeDefinition:
+		for _, fieldDefRef := range v.definition.ObjectTypeDefinitions[parentType.Ref].FieldsDefinition.Refs {
+			if v.definition.FieldDefinitionNameString(fieldDefRef) == fieldName {
+				return fieldDefRef, true
+			}
+		}
+	case ast.NodeKindInterfaceTypeDefinition:
+		for _, fieldDefRef := range v.definition.InterfaceTypeDefinitions[parentType.Ref].FieldsDefinition.Refs {
+			if v.definition.FieldDefinitionNameString(fieldDefRef) == fieldName {
+				return fieldDefRef, true
+			}
+		}
+	}
+	return 0, false
+}
+
+func (v *inputFieldsVisitorV2) getVariableTypeName(varName string) (string, bool) {
+	for _, varDef := range v.operation.VariableDefinitions {
+		name := v.operation.VariableValueNameString(varDef.VariableValue.Ref)
+		if name == varName {
+			typeRef := varDef.Type
+			return v.operation.ResolveTypeNameString(typeRef), true
+		}
+	}
+	return "", false
+}
+
+func (v *inputFieldsVisitorV2) walkJSONValue(value []byte, typeName string) {
+	node, exists := v.definition.Index.FirstNodeByNameStr(typeName)
+	if !exists || node.Kind != ast.NodeKindInputObjectTypeDefinition {
+		return
+	}
+
+	_ = jsonparser.ObjectEach(value, func(key []byte, val []byte, dataType jsonparser.ValueType, offset int) error {
+		fieldName := string(key)
+		t, ok := v.data[typeName]
+		if !ok {
+			t = make(graphqlv2.RequestFields)
+		}
+		t[fieldName] = struct{}{}
+		v.data[typeName] = t
+
+		fieldRef := v.definition.InputObjectTypeDefinitionInputValueDefinitionByName(node.Ref, key)
+		if fieldRef != -1 {
+			fieldTypeRef := v.definition.InputValueDefinitionType(fieldRef)
+			fieldTypeName := v.definition.ResolveTypeNameString(fieldTypeRef)
+
+			if dataType == jsonparser.Object {
+				v.walkJSONValue(val, fieldTypeName)
+			} else if dataType == jsonparser.Array {
+				_, _ = jsonparser.ArrayEach(val, func(arrVal []byte, arrDataType jsonparser.ValueType, arrOffset int, arrErr error) {
+					if arrDataType == jsonparser.Object {
+						v.walkJSONValue(arrVal, fieldTypeName)
+					}
+				})
+			}
+		}
+		return nil
+	})
+}
+
+func (v *inputFieldsVisitorV2) walkInlineObjectValue(ref int, typeName string) {
+	node, exists := v.definition.Index.FirstNodeByNameStr(typeName)
+	if !exists || node.Kind != ast.NodeKindInputObjectTypeDefinition {
+		return
+	}
+
+	objVal := v.operation.ObjectValues[ref]
+	for _, fieldRef := range objVal.Refs {
+		field := v.operation.ObjectFields[fieldRef]
+		fieldName := v.operation.ObjectFieldNameString(fieldRef)
+
+		t, ok := v.data[typeName]
+		if !ok {
+			t = make(graphqlv2.RequestFields)
+		}
+		t[fieldName] = struct{}{}
+		v.data[typeName] = t
+
+		schemaFieldRef := v.definition.InputObjectTypeDefinitionInputValueDefinitionByName(node.Ref, []byte(fieldName))
+		if schemaFieldRef != -1 {
+			fieldTypeRef := v.definition.InputValueDefinitionType(schemaFieldRef)
+			fieldTypeName := v.definition.ResolveTypeNameString(fieldTypeRef)
+
+			if field.Value.Kind == ast.ValueKindObject {
+				v.walkInlineObjectValue(field.Value.Ref, fieldTypeName)
+			} else if field.Value.Kind == ast.ValueKindList {
+				v.walkInlineListValue(field.Value.Ref, fieldTypeName)
+			} else if field.Value.Kind == ast.ValueKindVariable {
+				varName := v.operation.VariableValueNameString(field.Value.Ref)
+				varValue, _, _, err := jsonparser.Get(v.variables, varName)
+				if err == nil {
+					v.walkJSONValue(varValue, fieldTypeName)
+				}
+			}
+		}
+	}
+}
+
+func (v *inputFieldsVisitorV2) walkInlineListValue(ref int, typeName string) {
+	listVal := v.operation.ListValues[ref]
+	for _, valRef := range listVal.Refs {
+		val := v.operation.Values[valRef]
+		if val.Kind == ast.ValueKindObject {
+			v.walkInlineObjectValue(val.Ref, typeName)
+		} else if val.Kind == ast.ValueKindList {
+			v.walkInlineListValue(val.Ref, typeName)
+		} else if val.Kind == ast.ValueKindVariable {
+			varName := v.operation.VariableValueNameString(val.Ref)
+			varValue, _, _, err := jsonparser.Get(v.variables, varName)
+			if err == nil {
+				v.walkJSONValue(varValue, typeName)
+			}
+		}
+	}
+}
+
+func (t *TykFieldsValidatorV2) ValidateByFieldList(request *graphqlv2.Request, schema *graphqlv2.Schema, restrictionList graphqlv2.FieldRestrictionList) (graphqlv2.RequestFieldsValidationResult, error) {
+	report := operationreport.Report{}
+	if len(restrictionList.Types) == 0 {
+		return graphqlv2.RequestFieldsValidationResult{Valid: true}, nil
+	}
+
+	requestedTypes := make(graphqlv2.RequestTypes)
+	graphqlv2.NewExtractor().ExtractFieldsFromRequest(request, schema, &report, requestedTypes)
+	if report.HasErrors() {
+		return graphqlv2.RequestFieldsValidationResult{Valid: false, Errors: graphqlv2.RequestErrorsFromOperationReport(report)}, nil
+	}
+
+	reqDoc, reqReport := astparser.ParseGraphqlDocumentString(request.Query)
+	if reqReport.HasErrors() {
+		return graphqlv2.RequestFieldsValidationResult{Valid: false, Errors: graphqlv2.RequestErrorsFromOperationReport(reqReport)}, nil
+	}
+
+	schemaDoc, schemaReport := astparser.ParseGraphqlDocumentBytes(schema.Document())
+	if schemaReport.HasErrors() {
+		return graphqlv2.RequestFieldsValidationResult{Valid: false, Errors: graphqlv2.RequestErrorsFromOperationReport(schemaReport)}, nil
+	}
+
+	walker := astvisitor.NewWalker(48)
+	visitor := inputFieldsVisitorV2{
+		walker:     &walker,
+		operation:  &reqDoc,
+		definition: &schemaDoc,
+		variables:  t.Variables,
+		data:       requestedTypes,
+	}
+
+	walker.RegisterEnterFieldVisitor(&visitor)
+	walker.RegisterEnterArgumentVisitor(&visitor)
+
+	walker.Walk(&reqDoc, &schemaDoc, &report)
+	if report.HasErrors() {
+		return graphqlv2.RequestFieldsValidationResult{Valid: false, Errors: graphqlv2.RequestErrorsFromOperationReport(report)}, nil
+	}
+
+	if fieldRestrictionListKindV2(restrictionList.Kind) == blockListV2 {
+		return checkForBlockedFieldsV2(restrictionList, requestedTypes)
+	}
+
+	return checkForAllowedFieldsV2(restrictionList, requestedTypes)
+}
+
+type fieldRestrictionListKindV2 int
+
+const (
+	allowListV2 fieldRestrictionListKindV2 = iota
+	blockListV2
+)
+
+func checkForBlockedFieldsV2(restrictionList graphqlv2.FieldRestrictionList, requestTypes graphqlv2.RequestTypes) (graphqlv2.RequestFieldsValidationResult, error) {
+	restrictedFieldsLookupMap := make(map[string]map[string]bool)
+	for _, restrictedType := range restrictionList.Types {
+		restrictedFieldsLookupMap[restrictedType.Name] = make(map[string]bool)
+		for _, restrictedField := range restrictedType.Fields {
+			restrictedFieldsLookupMap[restrictedType.Name][restrictedField] = true
+		}
+	}
+
+	for requestType, requestFields := range requestTypes {
+		for requestField := range requestFields {
+			if _, ok := restrictedFieldsLookupMap[requestType]["*"]; ok {
+				return graphqlv2.RequestFieldsValidationResult{
+					Valid: false,
+					Errors: graphqlv2.RequestErrors{
+						graphqlv2.RequestError{
+							Message: fmt.Sprintf("all fields of %s type are restricted", requestType),
+						},
+					},
+				}, nil
+			}
+
+			isRestrictedType := restrictedFieldsLookupMap[requestType][requestField]
+			if isRestrictedType {
+				return graphqlv2.RequestFieldsValidationResult{
+					Valid: false,
+					Errors: graphqlv2.RequestErrors{
+						graphqlv2.RequestError{
+							Message: fmt.Sprintf("field: %s is restricted on type: %s", requestField, requestType),
+						},
+					},
+				}, nil
+			}
+		}
+	}
+
+	return graphqlv2.RequestFieldsValidationResult{Valid: true}, nil
+}
+
+func checkForAllowedFieldsV2(restrictionList graphqlv2.FieldRestrictionList, requestTypes graphqlv2.RequestTypes) (graphqlv2.RequestFieldsValidationResult, error) {
+	allowedFieldsLookupMap := make(map[string]map[string]bool)
+	for _, allowedType := range restrictionList.Types {
+		allowedFieldsLookupMap[allowedType.Name] = make(map[string]bool)
+		for _, allowedField := range allowedType.Fields {
+			allowedFieldsLookupMap[allowedType.Name][allowedField] = true
+		}
+	}
+
+	for requestType, requestFields := range requestTypes {
+		if _, ok := allowedFieldsLookupMap[requestType]["*"]; ok {
+			continue
+		}
+
+		for requestField := range requestFields {
+			isAllowedField := allowedFieldsLookupMap[requestType][requestField]
+			if !isAllowedField {
+				return graphqlv2.RequestFieldsValidationResult{
+					Valid: false,
+					Errors: graphqlv2.RequestErrors{
+						graphqlv2.RequestError{
+							Message: fmt.Sprintf("field: %s is restricted on type: %s", requestField, requestType),
+						},
+					},
+				}, nil
+			}
+		}
+	}
+
+	return graphqlv2.RequestFieldsValidationResult{Valid: true}, nil
 }
 
 func (g *granularAccessCheckerV2) writeErrorResponse(w io.Writer, providedErr error) (n int, err error) {
