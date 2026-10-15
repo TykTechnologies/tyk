@@ -278,7 +278,7 @@ type AnalyticsConfigConfig struct {
 	// This setting can be overridden with an organization flag, enabed at an API level, or on individual Key level.
 	EnableDetailedRecording bool `json:"enable_detailed_recording"`
 
-	// AllowUnsafeDetailedLogs controls whether sensitive headers (Authorization) are obfuscated when detailed recording is enabled.
+	// AllowUnsafeDetailedLogs controls whether sensitive headers (the standard `Authorization` header and any custom auth headers defined for the API) are obfuscated when detailed recording is enabled.
 	// Setting this to true restores the legacy behavior where raw requests are captured as-is, which may expose sensitive tokens in plain text.
 	AllowUnsafeDetailedLogs bool `json:"allow_unsafe_detailed_logs"`
 
@@ -615,10 +615,12 @@ type HttpServerOptionsConfig struct {
 	// Start your Gateway HTTP server on specific server name
 	ServerName string `json:"server_name"`
 
-	// Minimum TLS version. Possible values: https://tyk.io/docs/api-management/certificates#supported-tls-versions
+	// Minimum TLS version is inherited from Go library, but can be overridden here.
+	// For details see: https://tyk.io/docs/api-management/implement-tls#controlling-tls-version-&-cipher-suites
 	MinVersion uint16 `json:"min_version"`
 
-	// Maximum TLS version.
+	// Maximum TLS version is inherited from Go library, but can be overridden here.
+	// For details see: https://tyk.io/docs/api-management/implement-tls#controlling-tls-version-&-cipher-suites
 	MaxVersion uint16 `json:"max_version"`
 
 	// When mTLS enabled, this option allows to skip client CA announcement in the TLS handshake.
@@ -1442,11 +1444,7 @@ type Config struct {
 	// The use of other characters in IDs can cause unpredictable behavior and is not recommended.
 	AllowUnsafeApiIds bool `json:"allow_unsafe_api_ids"`
 
-	// AllowUnsafeBodyTransformTemplatePaths disables body transform template path validation.
-	// This is provided for compatibility with legacy API definitions whose `template_source`
-	// points outside the configured TemplatePath root (default: false).
-	// Enabling it allows an API definition to read arbitrary files from the gateway
-	// filesystem and is strongly discouraged outside of a migration window.
+	// AllowUnsafeBodyTransformTemplatePaths disables body transform template path validation. This is provided for compatibility with legacy API definitions containing potentially unsafe template paths (default: false).
 	AllowUnsafeBodyTransformTemplatePaths bool `json:"allow_unsafe_body_transform_template_paths"`
 }
 
