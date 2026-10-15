@@ -615,12 +615,10 @@ type HttpServerOptionsConfig struct {
 	// Start your Gateway HTTP server on specific server name
 	ServerName string `json:"server_name"`
 
-	// Minimum TLS version is inherited from Go library, but can be overridden here.
-	// For details see: https://tyk.io/docs/api-management/implement-tls#controlling-tls-version-&-cipher-suites
+	// Minimum TLS version. For details see: https://tyk.io/docs/api-management/implement-tls#controlling-tls-version-and-cipher-suites
 	MinVersion uint16 `json:"min_version"`
 
-	// Maximum TLS version is inherited from Go library, but can be overridden here.
-	// For details see: https://tyk.io/docs/api-management/implement-tls#controlling-tls-version-&-cipher-suites
+	// Maximum TLS version. For details see: https://tyk.io/docs/api-management/implement-tls#controlling-tls-version-and-cipher-suites
 	MaxVersion uint16 `json:"max_version"`
 
 	// When mTLS enabled, this option allows to skip client CA announcement in the TLS handshake.
