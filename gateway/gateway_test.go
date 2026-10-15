@@ -125,32 +125,62 @@ func TestStripPathWithURLRewrite(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		rewritePath  string
-		matchPattern string
-		rewriteTo    string
-		want         string
+		name                string
+		applyStripToRewrite bool
+		rewritePath         string
+		matchPattern        string
+		rewriteTo           string
+		want                string
 	}{
 		{
-			name:         "rewritten path beginning with listen path is preserved",
+			name:                "legacy flag: rewritten path beginning with listen path is stripped",
+			applyStripToRewrite: true,
+			rewritePath:         "/xml",
+			matchPattern:        "/(.*)$",
+			rewriteTo:           "/anything/bla/$1",
+			want:                `"Url":"/bla/anything/xml"`,
+		},
+		{
+			name:                "legacy flag: identity rewrite is stripped",
+			applyStripToRewrite: true,
+			rewritePath:         "/xml",
+			matchPattern:        "/(.*)$",
+			rewriteTo:           "/$1",
+			want:                `"Url":"/xml"`,
+		},
+		{
+			name:                "legacy flag: ordinary request strips listen path",
+			applyStripToRewrite: true,
+			want:                `"Url":"/xml"`,
+		},
+		{
+			name:                "legacy flag: non-matching rewrite strips listen path",
+			applyStripToRewrite: true,
+			rewritePath:         "/other",
+			matchPattern:        "/other/(.*)$",
+			rewriteTo:           "/anything/bla/$1",
+			want:                `"Url":"/xml"`,
+		},
+		{
+			name:         "default: rewritten path beginning with listen path is preserved",
 			rewritePath:  "/xml",
 			matchPattern: "/(.*)$",
 			rewriteTo:    "/anything/bla/$1",
 			want:         `"Url":"/anything/bla/anything/xml"`,
 		},
 		{
-			name:         "identity rewrite is authoritative",
+			name:         "default: identity rewrite is authoritative",
 			rewritePath:  "/xml",
 			matchPattern: "/(.*)$",
 			rewriteTo:    "/$1",
 			want:         `"Url":"/anything/xml"`,
 		},
 		{
-			name: "ordinary request still strips listen path",
+			name: "default: ordinary request still strips listen path",
 			want: `"Url":"/xml"`,
 		},
 		{
-			name:         "non-matching rewrite still strips listen path",
+			name:         "default: non-matching rewrite still strips listen path",
 			rewritePath:  "/other",
 			matchPattern: "/other/(.*)$",
 			rewriteTo:    "/anything/bla/$1",
@@ -160,7 +190,9 @@ func TestStripPathWithURLRewrite(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ts := StartTest(nil)
+			ts := StartTest(func(globalConf *config.Config) {
+				globalConf.ApplyStripListenPathToURLRewrite = tc.applyStripToRewrite
+			})
 			t.Cleanup(ts.Close)
 			buildAPI(ts, tc.rewritePath, tc.matchPattern, tc.rewriteTo)
 
@@ -172,22 +204,42 @@ func TestStripPathWithURLRewrite(t *testing.T) {
 		})
 	}
 
-	t.Run("absolute host rewrite preserves path beginning with listen path", func(t *testing.T) {
-		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			_, _ = fmt.Fprint(w, r.URL.Path)
-		}))
-		t.Cleanup(upstream.Close)
+	hostRewriteTests := []struct {
+		name                string
+		applyStripToRewrite bool
+		want                string
+	}{
+		{
+			name:                "legacy flag: absolute host rewrite strips path beginning with listen path",
+			applyStripToRewrite: true,
+			want:                `^/bla/anything/xml$`,
+		},
+		{
+			name: "default: absolute host rewrite preserves path beginning with listen path",
+			want: `^/anything/bla/anything/xml$`,
+		},
+	}
 
-		ts := StartTest(nil)
-		t.Cleanup(ts.Close)
-		buildAPI(ts, "/xml", "/(.*)$", upstream.URL+"/anything/bla/$1")
+	for _, tc := range hostRewriteTests {
+		t.Run(tc.name, func(t *testing.T) {
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				_, _ = fmt.Fprint(w, r.URL.Path)
+			}))
+			t.Cleanup(upstream.Close)
 
-		_, _ = ts.Run(t, test.TestCase{
-			Path:      "/anything/xml",
-			Code:      http.StatusOK,
-			BodyMatch: `^/anything/bla/anything/xml$`,
+			ts := StartTest(func(globalConf *config.Config) {
+				globalConf.ApplyStripListenPathToURLRewrite = tc.applyStripToRewrite
+			})
+			t.Cleanup(ts.Close)
+			buildAPI(ts, "/xml", "/(.*)$", upstream.URL+"/anything/bla/$1")
+
+			_, _ = ts.Run(t, test.TestCase{
+				Path:      "/anything/xml",
+				Code:      http.StatusOK,
+				BodyMatch: tc.want,
+			})
 		})
-	})
+	}
 }
 
 func TestSkipTargetPassEscapingOff(t *testing.T) {
