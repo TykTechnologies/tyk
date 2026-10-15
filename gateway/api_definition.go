@@ -2474,7 +2474,7 @@ func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 	}
 
 	// Do not strip an already-final path selected by a rewrite-like middleware.
-	if ctxGetUrlRewritePath(r) != "" {
+	if !a.GlobalConfig.ApplyStripListenPathToURLRewrite && ctxGetUrlRewritePath(r) != "" {
 		return
 	}
 

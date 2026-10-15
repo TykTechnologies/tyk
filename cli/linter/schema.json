@@ -621,6 +621,10 @@
     "proxy_close_connections": {
       "type": "boolean"
     },
+    "apply_strip_listen_path_to_url_rewrite": {
+      "type": "boolean",
+      "default": false
+    },
     "close_idle_connections": {
       "type": "boolean"
     },
