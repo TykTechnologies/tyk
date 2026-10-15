@@ -1398,27 +1398,27 @@ func TestAPISpec_SanitizeProxyPaths(t *testing.T) {
 		assert.Equal(t, "", r.URL.RawPath)
 	})
 
-	t.Run("strip=true and URL rewrite path is set, dont_strip_listen_path_on_rewrite=false", func(t *testing.T) {
+	t.Run("strip=true and URL rewrite path is set, apply_strip_listen_path_to_url_rewrite=false", func(t *testing.T) {
 		a.Proxy.StripListenPath = true
-		a.GlobalConfig.DontStripListenPathOnRewrite = false
+		a.GlobalConfig.ApplyStripListenPathToURLRewrite = false
+		r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "https://proxy.com/listen/get", nil)
+		ctxSetUrlRewritePath(r, r.URL.Path)
+
+		a.SanitizeProxyPaths(r)
+
+		assert.Equal(t, "/listen/get", r.URL.Path)
+		assert.Equal(t, "", r.URL.RawPath)
+	})
+
+	t.Run("strip=true and URL rewrite path is set, apply_strip_listen_path_to_url_rewrite=true", func(t *testing.T) {
+		a.Proxy.StripListenPath = true
+		a.GlobalConfig.ApplyStripListenPathToURLRewrite = true
 		r := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "https://proxy.com/listen/get", nil)
 		ctxSetUrlRewritePath(r, r.URL.Path)
 
 		a.SanitizeProxyPaths(r)
 
 		assert.Equal(t, "/get", r.URL.Path)
-		assert.Equal(t, "", r.URL.RawPath)
-	})
-
-	t.Run("strip=true and URL rewrite path is set, dont_strip_listen_path_on_rewrite=true", func(t *testing.T) {
-		a.Proxy.StripListenPath = true
-		a.GlobalConfig.DontStripListenPathOnRewrite = true
-		r := httptest.NewRequest(http.MethodGet, "https://proxy.com/listen/get", nil)
-		ctxSetUrlRewritePath(r, r.URL.Path)
-
-		a.SanitizeProxyPaths(r)
-
-		assert.Equal(t, "/listen/get", r.URL.Path)
 		assert.Equal(t, "", r.URL.RawPath)
 	})
 }

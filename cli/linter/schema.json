@@ -624,9 +624,10 @@
     "proxy_close_connections": {
       "type": "boolean"
     },
-    "dont_strip_listen_path_on_rewrite": {
+    "apply_strip_listen_path_to_url_rewrite": {
       "type": "boolean",
-      "default": false
+      "default": false,
+      "description": "Reverts behavior before before https://tyktech.atlassian.net/browse/TT-1860"
     },
     "close_idle_connections": {
       "type": "boolean"
