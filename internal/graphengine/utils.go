@@ -58,7 +58,27 @@ func wrapGraphQLErrorAndLog(logger abstractlogger.Logger, gqlErrors graphql.Erro
 	return GraphQlError{err: gqlErrors}, http.StatusBadRequest
 }
 
-func complexityFailReasonAsHttpStatusCode(failReason ComplexityFailReason) (error, int) {
+// baseEngine holds what every engine version shares: the logger, the access checkers
+// and the Engine methods built on them.
+type baseEngine struct {
+	logger                abstractlogger.Logger
+	complexityChecker     ComplexityChecker
+	granularAccessChecker GranularAccessChecker
+}
+
+//nolint:staticcheck // ST1008: Engine interface convention returns (error, int)
+func (e *baseEngine) ProcessGraphQLComplexity(r *http.Request, accessDefinition *ComplexityAccessDefinition) (err error, statusCode int) {
+	return e.complexityFailReasonAsHttpStatusCode(e.complexityChecker.DepthLimitExceeded(r, accessDefinition))
+}
+
+//nolint:staticcheck // ST1008: Engine interface convention returns (error, int)
+func (e *baseEngine) ProcessGraphQLGranularAccess(w http.ResponseWriter, r *http.Request, accessDefinition *GranularAccessDefinition) (err error, statusCode int) {
+	result := e.granularAccessChecker.CheckGraphQLRequestFieldAllowance(w, r, accessDefinition)
+	return e.granularAccessFailReasonAsHttpStatusCode(&result)
+}
+
+//nolint:staticcheck // ST1008: Engine interface convention returns (error, int)
+func (e *baseEngine) complexityFailReasonAsHttpStatusCode(failReason ComplexityFailReason) (err error, statusCode int) {
 	switch failReason {
 	case ComplexityFailReasonInternalError:
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
@@ -69,21 +89,21 @@ func complexityFailReasonAsHttpStatusCode(failReason ComplexityFailReason) (erro
 	return nil, http.StatusOK
 }
 
-//nolint:staticcheck // ST1008: engine ProcessGraphQLGranularAccess convention returns (error, int)
-func granularAccessFailReasonAsHttpStatusCode(logger abstractlogger.Logger, result *GraphQLGranularAccessResult) (error, int) {
+//nolint:staticcheck // ST1008: Engine interface convention returns (error, int)
+func (e *baseEngine) granularAccessFailReasonAsHttpStatusCode(result *GraphQLGranularAccessResult) (err error, statusCode int) {
 	const restrictedFieldValidationFailedLogMsg = "error during GraphQL request restricted fields validation"
 
 	switch result.FailReason {
 	case GranularAccessFailReasonNone:
 		return nil, http.StatusOK
 	case GranularAccessFailReasonInternalError:
-		logger.Error(restrictedFieldValidationFailedLogMsg, abstractlogger.Error(result.InternalErr))
+		e.logger.Error(restrictedFieldValidationFailedLogMsg, abstractlogger.Error(result.InternalErr))
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	case GranularAccessFailReasonValidationError:
-		logger.Debug(restrictedFieldValidationFailedLogMsg, abstractlogger.Error(result.ValidationError))
+		e.logger.Debug(restrictedFieldValidationFailedLogMsg, abstractlogger.Error(result.ValidationError))
 		return GraphQlError{err: result.ValidationError}, http.StatusBadRequest
 	case GranularAccessFailReasonIntrospectionDisabled:
-		logger.Debug("introspection disabled")
+		e.logger.Debug("introspection disabled")
 		return ErrIntrospectionDisabled, http.StatusForbidden
 	}
 

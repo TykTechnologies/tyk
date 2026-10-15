@@ -14,9 +14,10 @@ import (
 )
 
 type EngineV3 struct {
+	baseEngine
+
 	engine        *graphqlv2.ExecutionEngineV2
 	schema        *graphqlv2.Schema
-	logger        abstractlogger.Logger
 	openTelemetry *EngineV2OTelConfig
 	apiDefinition *apidef.APIDefinition
 
@@ -25,8 +26,6 @@ type EngineV3 struct {
 
 	gqlTools                  graphqlGoToolsV2
 	graphqlRequestProcessor   GraphQLRequestProcessor
-	complexityChecker         ComplexityChecker
-	granularAccessChecker     GranularAccessChecker
 	reverseProxyPreHandler    ReverseProxyPreHandler
 	specCtx                   context.Context
 	contextCancel             context.CancelFunc
@@ -119,7 +118,11 @@ func NewEngineV3(options EngineV3Options) (*EngineV3, error) {
 	}
 
 	engine := EngineV3{
-		logger:                 logger,
+		baseEngine: baseEngine{
+			logger:                logger,
+			complexityChecker:     complexityChecker,
+			granularAccessChecker: granularAccessChecker,
+		},
 		schema:                 options.Schema,
 		engine:                 executionEngine,
 		ctxRetrieveRequestFunc: options.Injections.ContextRetrieveRequest,
@@ -132,8 +135,6 @@ func NewEngineV3(options EngineV3Options) (*EngineV3, error) {
 		seekReadCloser:         options.Injections.SeekReadCloser,
 		specCtx:                specCtx,
 		contextCancel:          cancel,
-		complexityChecker:      complexityChecker,
-		granularAccessChecker:  granularAccessChecker,
 	}
 
 	if engine.openTelemetry == nil {

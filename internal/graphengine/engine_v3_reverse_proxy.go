@@ -16,15 +16,6 @@ import (
 	"github.com/TykTechnologies/tyk/internal/otel"
 )
 
-func (e *EngineV3) ProcessGraphQLComplexity(r *http.Request, accessDefinition *ComplexityAccessDefinition) (err error, statusCode int) {
-	return complexityFailReasonAsHttpStatusCode(e.complexityChecker.DepthLimitExceeded(r, accessDefinition))
-}
-
-func (e *EngineV3) ProcessGraphQLGranularAccess(w http.ResponseWriter, r *http.Request, accessDefinition *GranularAccessDefinition) (err error, statusCode int) {
-	result := e.granularAccessChecker.CheckGraphQLRequestFieldAllowance(w, r, accessDefinition)
-	return granularAccessFailReasonAsHttpStatusCode(e.logger, &result)
-}
-
 func (e *EngineV3) HandleReverseProxy(params ReverseProxyParams) (res *http.Response, hijacked bool, err error) {
 	reverseProxyType, err := e.reverseProxyPreHandler.PreHandle(params)
 	if err != nil {

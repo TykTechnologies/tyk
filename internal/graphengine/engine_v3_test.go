@@ -27,7 +27,7 @@ func NewTestEngine(t *testing.T) *EngineV3 {
 
 	return &EngineV3{
 		schema:                 parsedSchema,
-		logger:                 abstractlogger.Noop{},
+		baseEngine:             baseEngine{logger: abstractlogger.Noop{}},
 		ctxRetrieveRequestFunc: nil,
 	}
 }

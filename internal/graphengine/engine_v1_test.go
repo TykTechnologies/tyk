@@ -517,13 +517,15 @@ func newTestEngineV1(t *testing.T, options ...testEngineV1Option) (*EngineV1, en
 	})
 
 	engine := &EngineV1{
-		ExecutionEngine:         executionEngine,
-		Schema:                  schema,
-		ApiDefinition:           apiDefinition,
-		logger:                  abstractlogger.NoopLogger,
+		ExecutionEngine: executionEngine,
+		Schema:          schema,
+		ApiDefinition:   apiDefinition,
+		baseEngine: baseEngine{
+			logger:                abstractlogger.NoopLogger,
+			complexityChecker:     mocks.complexityChecker,
+			granularAccessChecker: mocks.granularAccessChecker,
+		},
 		graphqlRequestProcessor: mocks.requestProcessor,
-		complexityChecker:       mocks.complexityChecker,
-		granularAccessChecker:   mocks.granularAccessChecker,
 		reverseProxyPreHandler:  mocks.reverseProxyPreHandler,
 	}
 
