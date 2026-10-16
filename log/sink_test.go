@@ -168,7 +168,7 @@ func TestNewSinkFromConfig(t *testing.T) {
 		{"unknown output", SinkConfig{Format: "json", Output: "file"}, `unknown output "file"`},
 		{"unknown level", SinkConfig{Format: "json", Output: "stdout", Level: "verbose"}, `unknown level "verbose"`},
 		{"unknown high_level", SinkConfig{Format: "json", Output: "stdout", HighLevel: "trace"}, `unknown high_level "trace"`},
-		{"unknown format option", SinkConfig{Format: "json", Output: "stdout", FormatOptions: json.RawMessage(`{"pretty": true}`)}, `unknown field "pretty"`},
+		{"unknown format option", SinkConfig{Format: "json", Output: "stdout", FormatOptions: json.RawMessage(`{"pretty": true}`)}, `unknown option(s): "pretty"`},
 		{"output options for stdout", SinkConfig{Format: "json", Output: "stdout", OutputOptions: json.RawMessage(`{"path": "x"}`)}, "takes no output_options"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
