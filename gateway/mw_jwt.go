@@ -1070,7 +1070,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 
 			// add all policies matched from scope-policy mapping
-			mappedPolIDs := mapScopeToPolicies(scopeMap, scope, log)
+			mappedPolIDs := mapScopeToPolicies(scopeMap, scope, log.AsLogrus())
 			if len(mappedPolIDs) > 0 {
 				k.Logger().Debugf("Identified policy(s) to apply to this token from scope claim: %s", scopeClaimName)
 			} else {

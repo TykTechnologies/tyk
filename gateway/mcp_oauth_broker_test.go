@@ -18,7 +18,6 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gorilla/mux"
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -558,7 +557,7 @@ func TestMCPOAuthBrokerDCRRollbackFailuresAreBoundedAndSanitized(t *testing.T) {
 			capture.mu.Lock()
 			testCase.configure(capture, upstream.URL)
 			capture.mu.Unlock()
-			hook := captureGatewayLog(t, logrus.InfoLevel)
+			hook := log.GetTestHook(t)
 
 			response := runMCPBrokerRegistrationWithFailedPersistence(t, ts)
 			require.Equal(t, http.StatusServiceUnavailable, response.Code)
@@ -1627,7 +1626,7 @@ func TestMCPOAuthAuthenticatedInvalidGrantRevokesOnlyMappedFamily(t *testing.T) 
 
 func TestMCPOAuthBrokerCallbackTokenRuntimeAndRefresh(t *testing.T) {
 	ts, _, capture := newMCPBrokerTest(t, "/mcp/")
-	hook := captureGatewayLog(t, logrus.InfoLevel)
+	hook := log.GetTestHook(t)
 	redirectURI := "https://client.example/callback"
 	clientID, verifier, code := runMCPBrokerAuthorization(t, ts, redirectURI, "client-state")
 	tokens := exchangeMCPBrokerToken(t, ts, url.Values{
@@ -1903,7 +1902,7 @@ func TestMCPOAuthBrokerCallbackRejectsIssuerAndReplay(t *testing.T) {
 
 func TestMCPOAuthBrokerCallbackForwardsProviderErrorWithPublicIdentity(t *testing.T) {
 	ts, upstream, capture := newMCPBrokerTest(t, "/mcp/")
-	hook := captureGatewayLog(t, logrus.InfoLevel)
+	hook := log.GetTestHook(t)
 	analyticsRecord := captureAnalytics(ts)
 	redirectURI := "https://client.example/callback"
 	clientID := registerMCPBrokerClient(t, ts, redirectURI)
@@ -1978,7 +1977,7 @@ func TestMCPOAuthBrokerCallbackRequiresAdvertisedIssuerAndRejectsHybrid(t *testi
 
 func TestMCPOAuthBrokerTokenRejectsWrongVerifierAndIsolation(t *testing.T) {
 	ts, _, capture := newMCPBrokerTest(t, "/mcp/")
-	hook := captureGatewayLog(t, logrus.InfoLevel)
+	hook := log.GetTestHook(t)
 	analyticsRecord := captureAnalytics(ts)
 	redirectURI := "https://client.example/callback"
 	clientID, correctVerifier, code := runMCPBrokerAuthorization(t, ts, redirectURI, "client-state")
