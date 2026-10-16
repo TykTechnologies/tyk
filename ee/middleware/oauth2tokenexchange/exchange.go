@@ -329,6 +329,7 @@ func buildExchangeForm(provider *oas.OAuth2TokenExchangeProvider, subjectToken s
 	form.Set(oas.OAuth2FormGrantType, oas.OAuth2GrantTypeTokenExchange)
 	form.Set(oas.OAuth2FormSubjectToken, subjectToken)
 	form.Set(oas.OAuth2FormSubjectTokenType, oas.OAuth2TokenTypeAccessToken)
+	form.Set(oas.OAuth2FormRequestedTokenType, oas.OAuth2TokenTypeAccessToken)
 	if target.Audience != "" {
 		form.Set(oas.OAuth2FormAudience, target.Audience)
 		form.Set(oas.OAuth2FormResource, target.Audience)
