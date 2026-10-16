@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	stdlog "log"
 	"slices"
 	"testing"
 	"time"
@@ -12,7 +11,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func Test_Logger(t *testing.T) {
@@ -198,24 +196,4 @@ func Benchmark_Logger_Slow_Sink(b *testing.B) {
 
 	b.Run("slow sink", makeBenchmark(loggerWithOneSlowSink))
 	b.Run("fast sink", makeBenchmark(loggerWithFastSink))
-}
-
-func TestLogger_RedirectStdlib(t *testing.T) {
-	origFlags, origWriter := stdlog.Flags(), stdlog.Writer()
-	t.Cleanup(func() {
-		stdlog.SetFlags(origFlags)
-		stdlog.SetOutput(origWriter)
-	})
-
-	l := Build(func(b *Builder) { b.WithLevel(logrus.InfoLevel) })
-	hook := l.GetTestHook(t)
-
-	l.RedirectStdlib(logrus.WarnLevel)
-	stdlog.Print("http: TLS handshake error from 10.0.0.1: EOF")
-
-	require.Len(t, hook.AllEntries(), 1)
-	entry := hook.LastEntry()
-	assert.Equal(t, logrus.WarnLevel, entry.Level)
-	assert.Equal(t, "http: TLS handshake error from 10.0.0.1: EOF", entry.Message, "no stdlib timestamp, no trailing newline")
-	assert.Equal(t, "system", entry.Data["prefix"])
 }

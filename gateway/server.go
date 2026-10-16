@@ -1688,7 +1688,7 @@ func (gw *Gateway) warnUncoveredLevels(level logrus.Level, sinks []*tyklog.Sink)
 func (gw *Gateway) setupLogger(builder *tyklog.Builder) {
 	gwConfig := gw.GetConfig()
 	builder.WithApplyHooksToRawLog()
-	log.RedirectStdlib(logrus.WarnLevel)
+	builder.RedirectStdlib(logrus.WarnLevel)
 
 	level := gw.extractLogLevel(&gwConfig)
 	discardOutput := gw.isRunningTests() && os.Getenv(tyklog.EnvTykLoglevel) == ""

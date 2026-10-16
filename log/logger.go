@@ -2,9 +2,7 @@ package log
 
 import (
 	"io"
-	stdlog "log"
 	"os"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -154,23 +152,6 @@ func (l *Logger) SetTestLogLevel(t *testing.T, level logrus.Level) {
 	t.Cleanup(func() {
 		l.innerLogger.SetLevel(oLevel)
 	})
-}
-
-// RedirectStdlib turns Go's standard logger output into entries of this logger
-// at the given level, tagged prefix=system. Timestamps come from the formatter.
-func (l *Logger) RedirectStdlib(level logrus.Level) {
-	stdlog.SetFlags(0)
-	stdlog.SetOutput(&stdlibWriter{entry: l.WithField("prefix", "system"), level: level})
-}
-
-type stdlibWriter struct {
-	entry *logrus.Entry
-	level logrus.Level
-}
-
-func (w *stdlibWriter) Write(p []byte) (int, error) {
-	w.entry.Log(w.level, strings.TrimRight(string(p), "\n"))
-	return len(p), nil
 }
 
 // SetFormatter

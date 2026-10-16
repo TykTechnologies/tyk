@@ -174,15 +174,20 @@ func Test_GW_setupLogger_sinks(t *testing.T) {
 	t.Run("standard library messages become warn entries", func(t *testing.T) {
 		cli.InitTest(t, nil)
 		captureStream(t, &os.Stderr)
-		hook := log.GetTestHook(t)
+		origFlags, origWriter := stdlog.Flags(), stdlog.Writer()
+		t.Cleanup(func() {
+			stdlog.SetFlags(origFlags)
+			stdlog.SetOutput(origWriter)
+		})
 
-		buildTestLogger(t, config.Config{LogFormat: logFormatFromJSON(t, splitSinks)})
+		l := buildTestLogger(t, config.Config{LogFormat: logFormatFromJSON(t, splitSinks)})
+		hook := l.GetTestHook(t)
 		stdlog.Print("http: TLS handshake error from 10.0.0.1: EOF")
 
-		entries := hook.FilterBy(func(e *logrus.Entry) bool { return e.Data["prefix"] == "system" })
-		require.Len(t, entries, 1)
-		assert.Equal(t, logrus.WarnLevel, entries[0].Level)
-		assert.Equal(t, "http: TLS handshake error from 10.0.0.1: EOF", entries[0].Message)
+		require.Len(t, hook.AllEntries(), 1)
+		assert.Equal(t, logrus.WarnLevel, hook.LastEntry().Level)
+		assert.Equal(t, "system", hook.LastEntry().Data["prefix"])
+		assert.Equal(t, "http: TLS handshake error from 10.0.0.1: EOF", hook.LastEntry().Message)
 	})
 
 	t.Run("legacy format flag follows the string format", func(t *testing.T) {

@@ -2,6 +2,8 @@ package log
 
 import (
 	"io"
+	stdlog "log"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 )
@@ -16,6 +18,8 @@ type Builder struct {
 	propagate              bool
 	discardOutput          bool
 	legacyLogFormatEnabled bool
+	stdlibLevel            *logrus.Level
+	stdlibLogger           *stdlog.Logger
 }
 
 // WithLevel sets the level at which entries are generated; sinks keep their own ranges.
@@ -58,6 +62,17 @@ func (b *Builder) WithRawLog(log *logrus.Logger) {
 	b.rawLog = log
 }
 
+// RedirectStdlib turns Go's standard logger output into entries of the built logger
+// at the given level, tagged prefix=system. Timestamps come from the formatter.
+func (b *Builder) RedirectStdlib(level logrus.Level) {
+	b.stdlibLevel = &level
+}
+
+// WithStdlibLogger sets the standard logger to redirect instead of the global one. Added for testing.
+func (b *Builder) WithStdlibLogger(l *stdlog.Logger) {
+	b.stdlibLogger = l
+}
+
 func (b *Builder) SetLogformat(val Format) {
 	b.legacyLogFormatEnabled = val == FormatLegacy
 }
@@ -78,6 +93,32 @@ func (b *Builder) buildAndPropagate(dest *Logger) {
 		b.discardLogger(logrusStdLog)
 		b.applyHooksAndSinks(logrusStdLog)
 	}
+
+	b.redirectStdlib(dest)
+}
+
+func (b *Builder) redirectStdlib(dest *Logger) {
+	if b.stdlibLevel == nil {
+		return
+	}
+
+	target := stdlog.Default()
+	if b.stdlibLogger != nil {
+		target = b.stdlibLogger
+	}
+
+	target.SetFlags(0)
+	target.SetOutput(&stdlibWriter{entry: dest.WithField("prefix", "system"), level: *b.stdlibLevel})
+}
+
+type stdlibWriter struct {
+	entry *logrus.Entry
+	level logrus.Level
+}
+
+func (w *stdlibWriter) Write(p []byte) (int, error) {
+	w.entry.Log(w.level, strings.TrimRight(string(p), "\n"))
+	return len(p), nil
 }
 
 func (b *Builder) discardLogger(target *logrus.Logger) {
