@@ -20,6 +20,13 @@ func NewHook(base *logrustest.Hook) *Hook {
 	return &Hook{base}
 }
 
+// Fire stores a copy of the entry without its logger, so captured entries can be marshalled to JSON.
+func (h *Hook) Fire(entry *logrus.Entry) error {
+	detached := *entry
+	detached.Logger = nil
+	return h.innerHook.Fire(&detached)
+}
+
 func (h *Hook) SomeBy(predicate func(*logrus.Entry) bool) bool {
 	return lo.SomeBy(h.AllEntries(), predicate)
 }
