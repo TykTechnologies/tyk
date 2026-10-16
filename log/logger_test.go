@@ -14,7 +14,7 @@ import (
 )
 
 func Test_Logger(t *testing.T) {
-	makeDummySink := func(writer io.Writer) SinkerExtended {
+	makeDummySink := func(writer io.Writer) Sinker {
 		return NewSink(writer, &logrus.TextFormatter{}, AcceptorAllowAll)
 	}
 

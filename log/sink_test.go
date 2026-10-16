@@ -2,7 +2,9 @@ package log
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
+	"os"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -127,4 +129,85 @@ func TestAcceptorFn_Accept(t *testing.T) {
 
 	assert.True(t, fn.Accept(&logrus.Entry{Message: "allow"}))
 	assert.False(t, fn.Accept(&logrus.Entry{Message: "deny"}))
+}
+
+func TestNewSinkFromConfig(t *testing.T) {
+	t.Run("values are case-insensitive", func(t *testing.T) {
+		sink, err := NewSinkFromConfig(SinkConfig{Level: "Debug", HighLevel: "WARN", Format: "JSON", Output: "STDOUT"})
+		assert.NoError(t, err)
+		assert.Equal(t, os.Stdout, sink.logger.Out)
+		assert.IsType(t, &JSONFormatter{}, sink.logger.Formatter)
+		assert.True(t, sink.Accept(&logrus.Entry{Level: logrus.DebugLevel}))
+		assert.True(t, sink.Accept(&logrus.Entry{Level: logrus.WarnLevel}))
+		assert.False(t, sink.Accept(&logrus.Entry{Level: logrus.ErrorLevel}))
+	})
+
+	t.Run("level defaults to info and high_level to panic", func(t *testing.T) {
+		sink, err := NewSinkFromConfig(SinkConfig{Format: "text", Output: "stderr"})
+		assert.NoError(t, err)
+		assert.False(t, sink.Accept(&logrus.Entry{Level: logrus.DebugLevel}))
+		assert.True(t, sink.Accept(&logrus.Entry{Level: logrus.InfoLevel}))
+		assert.True(t, sink.Accept(&logrus.Entry{Level: logrus.PanicLevel}))
+	})
+
+	t.Run("fatal and panic are valid sink levels", func(t *testing.T) {
+		sink, err := NewSinkFromConfig(SinkConfig{Level: "fatal", HighLevel: "panic", Format: "text", Output: "stderr"})
+		assert.NoError(t, err)
+		assert.False(t, sink.Accept(&logrus.Entry{Level: logrus.ErrorLevel}))
+		assert.True(t, sink.Accept(&logrus.Entry{Level: logrus.FatalLevel}))
+	})
+
+	for _, tc := range []struct {
+		name string
+		cfg  SinkConfig
+		err  string
+	}{
+		{"missing format", SinkConfig{Output: "stdout"}, "missing format"},
+		{"missing output", SinkConfig{Format: "json"}, "missing output"},
+		{"unknown format", SinkConfig{Format: "yaml", Output: "stdout"}, `unknown formatter "yaml"`},
+		{"unknown output", SinkConfig{Format: "json", Output: "file"}, `unknown output "file"`},
+		{"unknown level", SinkConfig{Format: "json", Output: "stdout", Level: "verbose"}, `unknown level "verbose"`},
+		{"unknown high_level", SinkConfig{Format: "json", Output: "stdout", HighLevel: "trace"}, `unknown high_level "trace"`},
+		{"unknown format option", SinkConfig{Format: "json", Output: "stdout", FormatOptions: json.RawMessage(`{"pretty": true}`)}, `unknown field "pretty"`},
+		{"output options for stdout", SinkConfig{Format: "json", Output: "stdout", OutputOptions: json.RawMessage(`{"path": "x"}`)}, "takes no output_options"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			sink, err := NewSinkFromConfig(tc.cfg)
+			assert.Nil(t, sink)
+			assert.ErrorContains(t, err, tc.err)
+		})
+	}
+}
+
+func TestNewSinksFromConfig(t *testing.T) {
+	sinks, err := NewSinksFromConfig([]SinkConfig{
+		{Format: "json", Output: "stdout"},
+		{Format: "json", Output: "nowhere"},
+		{Format: "", Output: "stderr"},
+	})
+	assert.Len(t, sinks, 1)
+	assert.ErrorContains(t, err, `log_format[1]: unknown output "nowhere"`)
+	assert.ErrorContains(t, err, "log_format[2]: missing format")
+}
+
+func TestParseSinkConfigs(t *testing.T) {
+	sinks, err := ParseSinkConfigs([]byte(`[{"format": "json", "output": "stdout", "format_options": {"data_key": "d"}}]`))
+	assert.NoError(t, err)
+	assert.Equal(t, []SinkConfig{{Format: "json", Output: "stdout", FormatOptions: json.RawMessage(`{"data_key": "d"}`)}}, sinks)
+
+	_, err = ParseSinkConfigs([]byte(`[{"format": "json", "output": "stdout"}, {"format": "json", "destination": "stderr"}]`))
+	assert.ErrorContains(t, err, `log_format[1]: json: unknown field "destination"`)
+
+	_, err = ParseSinkConfigs([]byte(`[{"format": 1}]`))
+	assert.ErrorContains(t, err, "log_format[0]")
+}
+
+func TestUncoveredLevels(t *testing.T) {
+	errorsOnly := NewAcceptorRange(logrus.ErrorLevel, logrus.PanicLevel)
+	debugToWarn := NewAcceptorRange(logrus.DebugLevel, logrus.WarnLevel)
+
+	assert.Equal(t, []logrus.Level{logrus.WarnLevel, logrus.InfoLevel}, UncoveredLevels(logrus.InfoLevel, errorsOnly))
+	assert.Empty(t, UncoveredLevels(logrus.DebugLevel, errorsOnly, debugToWarn))
+	assert.Equal(t, []logrus.Level{logrus.PanicLevel, logrus.FatalLevel, logrus.ErrorLevel}, UncoveredLevels(logrus.InfoLevel, debugToWarn))
+	assert.Len(t, UncoveredLevels(logrus.DebugLevel), 6, "no sinks at all")
 }

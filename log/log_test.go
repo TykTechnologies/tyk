@@ -166,6 +166,11 @@ func Test_MakeFormatter(t *testing.T) {
 		assert.False(t, textFormatter.DisableSorting, "disable colors has default value")
 	})
 
+	t.Run("rejects unknown options", func(t *testing.T) {
+		_, err := MakeFormatter(FormatJson, json.RawMessage(`{"indent": true}`))
+		assert.ErrorContains(t, err, `unknown field "indent"`)
+	})
+
 	t.Run("json formatter keeps default field map when options add fields", func(t *testing.T) {
 		formatter, err := MakeFormatter(FormatJson, json.RawMessage(`{"field_map":{"time":"@timestamp"}}`))
 		assert.NoError(t, err)

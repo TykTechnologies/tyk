@@ -14,25 +14,19 @@ import (
 
 	"github.com/clbanning/mxj"
 	"github.com/lonelycode/osin"
+	"golang.org/x/oauth2"
 
+	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
 	"github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/TykTechnologies/tyk/internal/event"
 	internalhttputil "github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/mcpadapter"
-
 	"github.com/TykTechnologies/tyk/internal/reflect"
-	tyktime "github.com/TykTechnologies/tyk/internal/time"
-
-	"golang.org/x/oauth2"
-
-	"github.com/TykTechnologies/graphql-go-tools/pkg/execution/datasource"
-
 	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
-
-	"github.com/TykTechnologies/tyk/regexp"
-
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 	"github.com/TykTechnologies/tyk/internal/uuid"
+	"github.com/TykTechnologies/tyk/regexp"
 )
 
 type AuthProviderCode string
