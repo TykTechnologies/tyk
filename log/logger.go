@@ -65,6 +65,7 @@ func Build(factory func(b *Builder)) *Logger {
 
 func NewNullLogger() (*Logger, *Hook) {
 	rawLogger, hook := logrustest.NewNullLogger()
+	rawLogger.SetLevel(logrus.TraceLevel)
 
 	lgr := New()
 	lgr.Setup(func(_ *Builder) {})

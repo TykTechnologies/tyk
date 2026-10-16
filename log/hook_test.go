@@ -1,6 +1,7 @@
 package log
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -53,4 +54,16 @@ func Test_Hook(t *testing.T) {
 		assert.Equal(t, 0, hook.CountBy(predicateErrorLevel))
 		assert.Len(t, hook.FilterBy(predicateErrorLevel), 0)
 	})
+}
+
+func TestHook_EntriesMarshalToJSON(t *testing.T) {
+	logger := Build(func(b *Builder) { b.WithLevel(logrus.InfoLevel) })
+	hook := logger.GetTestHook(t)
+
+	logger.WithField("api_id", "abc").Info("hello")
+
+	out, err := json.Marshal(hook.AllEntries()) //nolint:staticcheck // entries are stored without Logger, see Hook.Fire
+	assert.NoError(t, err)
+	assert.Contains(t, string(out), `"api_id":"abc"`)
+	assert.Contains(t, string(out), "hello")
 }
