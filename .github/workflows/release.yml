@@ -44,7 +44,7 @@ jobs:
       (needs.dep-guard.result == 'success' || needs.dep-guard.result == 'skipped') &&
       github.event.pull_request.draft == false
     name: '${{ matrix.golang_cross }}'
-    runs-on: ${{ vars.WARP_RUNNER_8X_X64 || vars.BUILD_RUNNER || vars.DEFAULT_RUNNER }}
+    runs-on: ${{ vars.WARP_RUNNER_16X_X64 || vars.WARP_RUNNER_8X_X64 || vars.BUILD_RUNNER || vars.DEFAULT_RUNNER }}
     permissions:
       id-token: write # AWS OIDC JWT
       contents: read # actions/checkout
@@ -76,6 +76,7 @@ jobs:
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 1
+          ref: ${{ github.event.pull_request.head.sha }}
       - name: Set some outputs for later
         id: set_outputs
         shell: bash
@@ -221,9 +222,12 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
             type=sha,format=long
+            type=raw,value=sha-${{ github.event.pull_request.head.sha || github.sha }}
             type=semver,pattern={{major}},prefix=v
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
+          labels: |
+            org.opencontainers.image.revision=${{ github.event.pull_request.head.sha || github.sha }}
       - name: push ee image to CI
         if: ${{ matrix.golang_cross == '1.26-bullseye' }}
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
@@ -377,9 +381,12 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
             type=sha,format=long
+            type=raw,value=sha-${{ github.event.pull_request.head.sha || github.sha }}
             type=semver,pattern={{major}},prefix=v
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
+          labels: |
+            org.opencontainers.image.revision=${{ github.event.pull_request.head.sha || github.sha }}
       - name: push fips image to CI
         if: ${{ matrix.golang_cross == '1.26-bullseye' }}
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
@@ -532,9 +539,12 @@ jobs:
             type=ref,event=branch
             type=ref,event=pr
             type=sha,format=long
+            type=raw,value=sha-${{ github.event.pull_request.head.sha || github.sha }}
             type=semver,pattern={{major}},prefix=v
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
+          labels: |
+            org.opencontainers.image.revision=${{ github.event.pull_request.head.sha || github.sha }}
       - name: push std image to CI
         if: ${{ matrix.golang_cross == '1.26-bullseye' }}
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
@@ -691,422 +701,6 @@ jobs:
             dist/*.rpm
             !dist/*PAYG*.rpm
             !dist/*fips*.rpm
-  resolve-dashboard-image:
-    needs: goreleaser
-    if: |
-      !cancelled() &&
-      needs.goreleaser.result == 'success' &&
-      github.event.pull_request.draft == false
-    runs-on: ${{ vars.DEFAULT_RUNNER }}
-    permissions:
-      id-token: write
-      contents: read
-    outputs:
-      dashboard_image: ${{ steps.resolve.outputs.dashboard_image }}
-      needs_build: ${{ steps.resolve.outputs.needs_build }}
-      dashboard_branch: ${{ steps.resolve.outputs.dashboard_branch }}
-      strategy: ${{ steps.resolve.outputs.strategy }}
-    steps:
-      - name: Generate GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
-        with:
-          app-id: ${{ secrets.PROBE_APP_ID }}
-          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
-          owner: TykTechnologies
-      - name: Checkout tyk repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-          ref: ${{ github.event.pull_request.head.sha }}
-      - name: Check for relevant package changes in PR
-        id: check_changes
-        shell: bash
-        env:
-          RELEVANT_PACKAGES: ${{ vars.DASHBOARD_DEPENDENCY_PACKAGES || 'pkg apidef lib common certs log config test user header' }}
-        run: |
-          echo "Checking PR for changes in packages: $RELEVANT_PACKAGES"
-          echo "Comparing PR against base branch: ${{ env.BASE_REF }}"
-
-          # Compare entire PR against base branch
-          git fetch origin ${{ env.BASE_REF }} 2>/dev/null || true
-          CHANGED_FILES=$(git diff --name-only origin/${{ env.BASE_REF }}...HEAD 2>/dev/null || echo "")
-
-          echo "Changed files in PR:"
-          echo "$CHANGED_FILES"
-
-          # Check if any changed files are in relevant packages
-          HAS_RELEVANT_CHANGES=false
-          for pkg in $RELEVANT_PACKAGES; do
-            if echo "$CHANGED_FILES" | grep -q "^${pkg}/"; then
-              echo "✓ Found changes in package: $pkg"
-              HAS_RELEVANT_CHANGES=true
-            fi
-          done
-
-          if [ "$HAS_RELEVANT_CHANGES" = "true" ]; then
-            echo "has_relevant_changes=true" >> $GITHUB_OUTPUT
-            echo "📦 Relevant package changes in PR - will build dashboard"
-          else
-            echo "has_relevant_changes=false" >> $GITHUB_OUTPUT
-            echo "ℹ️ No relevant package changes in PR"
-          fi
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@ff717079ee2060e4bcee96c4779b553acc87447c # v4
-        with:
-          role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
-          role-session-name: cipush
-          aws-region: eu-central-1
-          mask-aws-account-id: false
-      - name: Login to Amazon ECR
-        id: ecr
-        uses: aws-actions/amazon-ecr-login@f2e9fc6c2b355c1890b65e6f6f0e2ac3e6e22f78 # v2
-        with:
-          mask-password: 'true'
-      - name: Check if tyk-analytics branch exists
-        id: check_branch
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          HEAD_REF: ${{ github.head_ref }}
-        run: |
-          if [ -z "$HEAD_REF" ]; then
-            echo "Not a pull request, skipping branch check"
-            echo "branch_exists=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          BRANCH="$HEAD_REF"
-          echo "Checking for branch: $BRANCH in tyk-analytics"
-
-          if ! REMOTE_REF=$(git ls-remote \
-            --heads \
-            "https://x-access-token:${GITHUB_TOKEN}@github.com/TykTechnologies/tyk-analytics.git" \
-            "refs/heads/$BRANCH"); then
-            echo "::error::Unable to query tyk-analytics; check GitHub App authentication and repository permissions"
-            exit 1
-          fi
-
-          if [ -n "$REMOTE_REF" ]; then
-            echo "✓ Branch '$BRANCH' exists in tyk-analytics"
-            echo "branch_exists=true" >> $GITHUB_OUTPUT
-            echo "branch=$BRANCH" >> $GITHUB_OUTPUT
-          else
-            echo "✗ Branch '$BRANCH' not found in tyk-analytics"
-            echo "branch_exists=false" >> $GITHUB_OUTPUT
-          fi
-      - name: Check if ECR image exists for this PR
-        id: check_ecr
-        shell: bash
-        env:
-          REGISTRY: ${{ steps.ecr.outputs.registry }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: |
-          if [ -z "$PR_NUMBER" ]; then
-            echo "Not a pull request, skipping ECR check"
-            echo "image_exists=false" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-
-          IMAGE_TAG="tyk-${PR_NUMBER}"
-          echo "Checking for ECR image: tyk-analytics:${IMAGE_TAG}"
-
-          if aws ecr describe-images \
-            --repository-name tyk-analytics \
-            --image-ids imageTag=${IMAGE_TAG} \
-            --region eu-central-1 2>/dev/null | grep -q imageId; then
-            echo "✓ ECR image exists: ${IMAGE_TAG}"
-            echo "image_exists=true" >> $GITHUB_OUTPUT
-            echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
-          else
-            echo "✗ ECR image not found: ${IMAGE_TAG}"
-            echo "image_exists=false" >> $GITHUB_OUTPUT
-          fi
-      - name: Resolve dashboard image strategy
-        id: resolve
-        shell: bash
-        env:
-          REGISTRY: ${{ steps.ecr.outputs.registry }}
-          BRANCH_EXISTS: ${{ steps.check_branch.outputs.branch_exists }}
-          IMAGE_EXISTS: ${{ steps.check_ecr.outputs.image_exists }}
-          BRANCH: ${{ steps.check_branch.outputs.branch }}
-          IMAGE_TAG: ${{ steps.check_ecr.outputs.image_tag }}
-          BASE_REF: ${{ env.BASE_REF }}
-          COMMIT_SHA: ${{ github.sha }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-          HAS_RELEVANT_CHANGES: ${{ steps.check_changes.outputs.has_relevant_changes }}
-          ORG_GH_TOKEN: ${{ secrets.ORG_GH_TOKEN }}
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          echo "=================================="
-          echo "📊 Dashboard Image Resolution"
-          echo "=================================="
-          echo "PR number: $PR_NUMBER"
-          echo "Base ref: $BASE_REF"
-          echo "Branch exists: $BRANCH_EXISTS"
-          echo "PR image exists: $IMAGE_EXISTS"
-          echo "Branch name: $BRANCH"
-          echo "PR image tag: $IMAGE_TAG"
-          echo "Commit SHA: $COMMIT_SHA"
-          echo "Has relevant changes in PR: $HAS_RELEVANT_CHANGES"
-          echo "=================================="
-
-          # emit <strategy> <dashboard_image> <needs_build> <dashboard_branch>
-          emit() {
-            echo "strategy=$1" >> $GITHUB_OUTPUT
-            echo "dashboard_image=$2" >> $GITHUB_OUTPUT
-            echo "needs_build=$3" >> $GITHUB_OUTPUT
-            echo "dashboard_branch=$4" >> $GITHUB_OUTPUT
-          }
-
-          dash_image_exists() {
-            aws ecr describe-images \
-              --repository-name tyk-analytics \
-              --image-ids imageTag=$1 \
-              --region eu-central-1 > /dev/null 2>&1
-          }
-
-          # For non-master base branches, check if the same branch exists in tyk-analytics
-          if [ "$BASE_REF" != "master" ]; then
-            if ! git ls-remote --exit-code --heads "https://x-access-token:${ORG_GH_TOKEN}@github.com/TykTechnologies/tyk-analytics.git" "refs/heads/$BASE_REF" > /dev/null 2>&1; then
-              echo "ℹ️ Strategy: Use gromit default (base branch '$BASE_REF' not found in tyk-analytics)"
-              emit gromit-default "" false ""
-            elif dash_image_exists "$BASE_REF"; then
-              echo "📋 Strategy: Use release branch '$BASE_REF' from tyk-analytics"
-              emit release-branch-match "${REGISTRY}/tyk-analytics:${BASE_REF}" false "$BASE_REF"
-            elif [ -n "$PR_NUMBER" ]; then
-              echo "🔨 Strategy: Build dashboard from base branch '$BASE_REF' (branch exists but has no ECR image)"
-              emit build-from-base-branch "${REGISTRY}/tyk-analytics:tyk-${PR_NUMBER}" true "$BASE_REF"
-            else
-              echo "ℹ️ Strategy: Use gromit default (no ECR image for '$BASE_REF' and not a PR)"
-              emit gromit-default "" false ""
-            fi
-
-          # Strategy 1: Matching branch exists in tyk-analytics → use its PR image, or build from it
-          elif [ "$BRANCH_EXISTS" = "true" ]; then
-            # Find the tyk-analytics PR for the branch by matching its head SHA
-            # against refs/pull/*/head; needs only repository read access
-            TA_REMOTE="https://x-access-token:${GH_TOKEN}@github.com/TykTechnologies/tyk-analytics.git"
-            BRANCH_SHA=$(git ls-remote --heads "$TA_REMOTE" "refs/heads/$BRANCH" | cut -f1 || true)
-            DASH_PR=$(git ls-remote "$TA_REMOTE" 'refs/pull/*/head' 2>/dev/null \
-              | awk -v sha="$BRANCH_SHA" '$1 == sha { split($2, r, "/"); print r[3] }' \
-              | sort -n | tail -1 || true)
-
-            if [ -n "$DASH_PR" ] && dash_image_exists "pr-${DASH_PR}"; then
-              echo "📋 Strategy: Use tyk-analytics PR #${DASH_PR} image (tyk-analytics:pr-${DASH_PR}) for matching branch '$BRANCH'"
-              emit analytics-pr-image "${REGISTRY}/tyk-analytics:pr-${DASH_PR}" false "$BRANCH"
-            else
-              echo "🔨 Strategy: Build dashboard from matching branch '$BRANCH' (no open tyk-analytics PR image)"
-              emit build-from-branch "${REGISTRY}/tyk-analytics:tyk-${PR_NUMBER}" true "$BRANCH"
-            fi
-
-          # Strategy 2a: PR has relevant changes → build new image
-          elif [ "$HAS_RELEVANT_CHANGES" = "true" ]; then
-            echo "🔨 Strategy: Build dashboard from '$BASE_REF' with gateway ref $COMMIT_SHA (PR has relevant package changes)"
-            emit build-required "${REGISTRY}/tyk-analytics:tyk-${PR_NUMBER}" true "$BASE_REF"
-
-          # Strategy 2b: PR image exists and no relevant changes → reuse existing image
-          elif [ "$IMAGE_EXISTS" = "true" ]; then
-            echo "🐳 Strategy: Reuse existing PR image tyk-analytics:${IMAGE_TAG} (no relevant package changes in PR)"
-            emit reuse-pr-image "${REGISTRY}/tyk-analytics:${IMAGE_TAG}" false ""
-
-          # Strategy 3: Fallback to gromit default
-          else
-            echo "ℹ️ Strategy: Use gromit default (no matching branch, PR image, or relevant changes)"
-            emit gromit-default "" false ""
-          fi
-
-          echo "=================================="
-          echo "✅ Resolution complete"
-          echo "=================================="
-  build-dashboard-image:
-    if: needs.resolve-dashboard-image.outputs.needs_build == 'true'
-    needs: resolve-dashboard-image
-    runs-on: ${{ vars.WARP_RUNNER_8X_X64 || vars.DEFAULT_RUNNER }}
-    permissions:
-      id-token: write
-      contents: read
-    outputs:
-      dashboard_image: ${{ steps.output.outputs.image }}
-    steps:
-      - name: Generate GitHub App token
-        id: app-token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
-        with:
-          app-id: ${{ secrets.PROBE_APP_ID }}
-          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
-          owner: TykTechnologies
-      - name: Checkout tyk-analytics
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
-        with:
-          repository: TykTechnologies/tyk-analytics
-          ref: ${{ needs.resolve-dashboard-image.outputs.dashboard_branch }}
-          token: ${{ steps.app-token.outputs.token }}
-          fetch-depth: 1
-          submodules: true
-      - name: Update gateway reference to PR branch
-        shell: bash
-        env:
-          GATEWAY_BRANCH: ${{ github.head_ref }}
-          ORG_GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          echo "📦 Updating tyk-gateway dependency to branch: $GATEWAY_BRANCH"
-
-          # Configure git for go get
-          git config --global url."https://x-access-token:${ORG_GH_TOKEN}@github.com/".insteadOf "https://github.com/"
-
-          # Update dependency using branch name
-          go get github.com/TykTechnologies/tyk@$GATEWAY_BRANCH
-
-          # Update replace directive if present
-          go mod edit -replace github.com/TykTechnologies/tyk=github.com/TykTechnologies/tyk@$GATEWAY_BRANCH
-
-          go mod tidy
-
-          echo "✅ Updated go.mod:"
-          grep "github.com/TykTechnologies/tyk" go.mod
-      - name: Fetch pre-built UI assets from S3
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_BINDATA_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_BINDATA_SECRET_ACCESS_KEY }}
-          AWS_REGION: eu-central-1
-          AWS_SESSION_TOKEN: ""
-        run: |
-          # Read the vendored commit SHA
-          ASSETS_COMMIT=$(cat .assets_vendor | head -n 1 | tr -d '\n')
-
-          echo "Fetching UI assets for commit: ${ASSETS_COMMIT}"
-          aws s3 sync s3://tyk-dashboard-assets-ci/commits/${ASSETS_COMMIT}/ internal/uiassets/dist/
-
-          if [ ! -f internal/uiassets/dist/_index.html ]; then
-            echo "❌ Failed to fetch assets: _index.html not found"
-            exit 1
-          fi
-
-          echo "✓ Assets fetched successfully to internal/uiassets/dist/"
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@ff717079ee2060e4bcee96c4779b553acc87447c # v4
-        with:
-          role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
-          role-session-name: cipush
-          aws-region: eu-central-1
-      - name: Login to Amazon ECR
-        id: ecr
-        uses: aws-actions/amazon-ecr-login@f2e9fc6c2b355c1890b65e6f6f0e2ac3e6e22f78 # v2
-        with:
-          mask-password: 'true'
-      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-      - uses: WarpBuilds/cache@f643a1ba29942d56621d07fc2d4284c7219868ad # v1
-        with:
-          path: |
-            ~/.cache/go-build
-            ~/go/pkg/mod
-          key: ${{ runner.os }}-go-dashboard-${{ hashFiles('**/go.sum') }}
-          restore-keys: |
-            ${{ runner.os }}-go-dashboard-
-      - name: Build dashboard packages for current architecture
-        shell: bash
-        env:
-          ECR_REGISTRY: ${{ steps.ecr.outputs.registry }}
-          IMAGE_TAG: tyk-${{ github.event.pull_request.number }}
-          GOPRIVATE: github.com/TykTechnologies
-          ORG_GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          # Detect current architecture
-          ARCH=$(uname -m)
-          case $ARCH in
-            x86_64)
-              GOARCH=amd64
-              ;;
-            aarch64)
-              GOARCH=arm64
-              ;;
-            *)
-              echo "Unsupported architecture: $ARCH"
-              exit 1
-              ;;
-          esac
-
-          echo "🔨 Building tyk-analytics packages for linux/$GOARCH"
-          echo "   Target image: ${ECR_REGISTRY}/tyk-analytics:${IMAGE_TAG}"
-
-          # Build using goreleaser for current platform only
-          cat > /tmp/build-dashboard.sh <<'EOF'
-          #!/bin/sh
-          set -eax
-          git config --global url."https://x-access-token:${ORG_GH_TOKEN}@github.com/".insteadOf "https://github.com/"
-          git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk-analytics
-
-          # Build packages for current platform (GOOS and GOARCH are set via docker -e)
-          goreleaser release --timeout 120m --clean -f ci/goreleaser/goreleaser.yml --snapshot --skip=sign,docker
-          EOF
-
-          chmod +x /tmp/build-dashboard.sh
-
-          # Build in golang-cross container
-          docker run --rm --privileged -e GITHUB_TOKEN=${ORG_GH_TOKEN} \
-            -e GOPRIVATE=github.com/TykTechnologies \
-            -e CGO_ENABLED=1 \
-            -e GOOS=linux \
-            -e GOARCH=$GOARCH \
-            -v ${{ github.workspace }}:/go/src/github.com/TykTechnologies/tyk-analytics \
-            -v ~/.cache/go-build:/cache/go-build \
-            -v ~/go/pkg/mod:/go/pkg/mod \
-            -e GOCACHE=/cache/go-build \
-            -e GOMODCACHE=/go/pkg/mod \
-            -v /tmp/build-dashboard.sh:/tmp/build-dashboard.sh \
-            -w /go/src/github.com/TykTechnologies/tyk-analytics \
-            tykio/golang-cross:1.26-bullseye /tmp/build-dashboard.sh
-
-          echo "✅ Packages built successfully for $GOARCH"
-      - name: Detect platform for Docker build
-        id: platform
-        shell: bash
-        run: |
-          ARCH=$(uname -m)
-          case $ARCH in
-            x86_64)
-              PLATFORM=linux/amd64
-              ;;
-            aarch64)
-              PLATFORM=linux/arm64
-              ;;
-            *)
-              echo "Unsupported architecture: $ARCH"
-              exit 1
-              ;;
-          esac
-          echo "platform=$PLATFORM" >> $GITHUB_OUTPUT
-          echo "Building for platform: $PLATFORM"
-      - name: Build and push dashboard Docker image
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
-        with:
-          context: dist
-          file: ci/Dockerfile.distroless
-          platforms: ${{ steps.platform.outputs.platform }}
-          push: true
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-          tags: ${{ steps.ecr.outputs.registry }}/tyk-analytics:tyk-${{ github.event.pull_request.number }}
-          labels: |
-            org.opencontainers.image.title=Tyk Dashboard (Custom Build for PR)
-            org.opencontainers.image.description=Built from ${{ needs.resolve-dashboard-image.outputs.dashboard_branch }} with gateway branch ${{ github.head_ref }}
-            org.opencontainers.image.revision=${{ github.sha }}
-            org.opencontainers.image.source=https://github.com/TykTechnologies/tyk-analytics
-            tyk.gateway.branch=${{ github.head_ref }}
-            tyk.gateway.pr=${{ github.event.pull_request.number }}
-            tyk.dashboard.branch=${{ needs.resolve-dashboard-image.outputs.dashboard_branch }}
-          build-args: |
-            BUILD_PACKAGE_NAME=tyk-dashboard
-      - name: Output image reference
-        id: output
-        shell: bash
-        run: |
-          IMAGE="${{ steps.ecr.outputs.registry }}/tyk-analytics:tyk-${{ github.event.pull_request.number }}"
-          echo "image=$IMAGE" >> $GITHUB_OUTPUT
-          echo "✅ Dashboard image built and pushed: $IMAGE"
   test-controller-api:
     needs:
       - goreleaser
@@ -1115,31 +709,71 @@ jobs:
       needs.goreleaser.result == 'success' &&
       github.event.pull_request.draft == false
     runs-on: ${{ vars.DEFAULT_RUNNER }}
+    timeout-minutes: 30
+    permissions:
+      id-token: write
+      contents: read
     outputs:
       envfiles: ${{ steps.params.outputs.envfiles }}
       pump: ${{ steps.params.outputs.pump }}
       sink: ${{ steps.params.outputs.sink }}
+      matrix: ${{ steps.params.outputs.matrix }}
+      mcp_manifest: ${{ steps.mcp_images.outputs.manifest }}
     steps:
       - name: Set test parameters
-        uses: TykTechnologies/github-actions/.github/actions/tests/test-controller@production
+        uses: TykTechnologies/github-actions/.github/actions/tests/test-controller@ae9b1fdfeb3c8e739ac99e7a99eb6b7d284a7fae
         id: params
         with:
           variation: ${{ env.VARIATION }}
           base_ref: ${{ env.BASE_REF }}
           test_type: api
+          expand_api_matrix: 'true'
+          include_mcp: ${{ github.event_name == 'pull_request' && 'true' || 'false' }}
+          mcp_topology: direct
+      - name: Generate coordinated source token
+        if: github.event_name == 'pull_request'
+        id: mcp-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
+          permission-contents: read
+          repositories: |
+            tyk
+            tyk-analytics
+            tyk-pump
+            tyk-sink
+            tyk-pro
+            tyk-mock-mcp-server
+      - uses: aws-actions/configure-aws-credentials@ff717079ee2060e4bcee96c4779b553acc87447c # v4
+        if: github.event_name == 'pull_request'
+        with:
+          role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
+          role-session-name: mcp-api-resolve
+          aws-region: eu-central-1
+      - name: Login to CI image registry
+        if: github.event_name == 'pull_request'
+        id: mcp-ecr
+        uses: aws-actions/amazon-ecr-login@f2e9fc6c2b355c1890b65e6f6f0e2ac3e6e22f78 # v2
+        with:
+          mask-password: 'true'
+      - name: Resolve coordinated MCP API images
+        if: github.event_name == 'pull_request'
+        id: mcp_images
+        uses: TykTechnologies/github-actions/.github/actions/tests/resolve-mcp-images@ae9b1fdfeb3c8e739ac99e7a99eb6b7d284a7fae
+        with:
+          github_token: ${{ steps.mcp-token.outputs.token }}
+          registry: ${{ steps.mcp-ecr.outputs.registry }}
+          topology: direct
   api-tests:
     needs:
       - test-controller-api
       - goreleaser
-      - resolve-dashboard-image
-      - build-dashboard-image
-    # build-dashboard-image may be skipped, so use !cancelled() to run regardless
     if: |
       !cancelled() &&
       needs.test-controller-api.result == 'success' &&
-      needs.goreleaser.result == 'success' &&
-      needs.resolve-dashboard-image.result == 'success' &&
-      (needs.build-dashboard-image.result == 'success' || needs.build-dashboard-image.result == 'skipped')
+      needs.goreleaser.result == 'success'
     runs-on: ${{ vars.WARP_RUNNER_8X_X64 || vars.DEFAULT_RUNNER }}
     # Cost guard: hard cap vs the 360-min default (matters on bigger runners).
     timeout-minutes: 25
@@ -1151,14 +785,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        envfiles: ${{ fromJson(needs.test-controller-api.outputs.envfiles) }}
-        pump: ${{ fromJson(needs.test-controller-api.outputs.pump) }}
-        sink: ${{ fromJson(needs.test-controller-api.outputs.sink) }}
-        exclude:
-          - pump: tykio/tyk-pump-docker-pub:v1.8
-            sink: $ECR/tyk-sink:master
-          - pump: $ECR/tyk-pump:master
-            sink: tykio/tyk-mdcb-docker:v2.4
+        include: ${{ fromJson(needs.test-controller-api.outputs.matrix) }}
     steps:
       - name: Generate GitHub App token
         id: app-token
@@ -1185,63 +812,82 @@ jobs:
           # Only ${{ github.actor }} has access
           # See https://github.com/mxschmitt/action-tmate#use-registered-public-ssh-keys
       - name: Fetch environment from tyk-pro
-        uses: TykTechnologies/github-actions/.github/actions/tests/checkout-tyk-pro@production
+        uses: TykTechnologies/github-actions/.github/actions/tests/checkout-tyk-pro@ae9b1fdfeb3c8e739ac99e7a99eb6b7d284a7fae
         with:
           org_gh_token: ${{ steps.app-token.outputs.token }}
+          ref: ${{ matrix.envfiles.suite == 'mcp' && fromJSON(needs.test-controller-api.outputs.mcp_manifest || '{}').environment_sha || '' }}
+      - name: Choose test code branch
+        uses: TykTechnologies/github-actions/.github/actions/tests/choose-test-branch@ae9b1fdfeb3c8e739ac99e7a99eb6b7d284a7fae
+        with:
+          test_folder: api
+          org_gh_token: ${{ steps.app-token.outputs.token }}
+          ref: ${{ fromJSON(needs.test-controller-api.outputs.mcp_manifest || '{}').tested_shas.dashboard || '' }}
       - name: Set up test environment
-        uses: TykTechnologies/github-actions/.github/actions/tests/env-up@production
-        timeout-minutes: 5
+        uses: TykTechnologies/github-actions/.github/actions/tests/env-up@ae9b1fdfeb3c8e739ac99e7a99eb6b7d284a7fae
+        timeout-minutes: 8
         id: env_up
         with:
           base_ref: ${{ env.BASE_REF }}
           tags: ${{ needs.goreleaser.outputs.ee_tags || needs.goreleaser.outputs.std_tags || format('{0}/tyk-ee:master', steps.ecr.outputs.registry) }}
-          dashboard_image: ${{ needs.resolve-dashboard-image.outputs.dashboard_image }}
+          dashboard_image: ${{ fromJSON(needs.test-controller-api.outputs.mcp_manifest || '{}').images.dashboard || '' }}
           github_token: ${{ steps.app-token.outputs.token }}
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
-      - name: Choose test code branch
-        uses: TykTechnologies/github-actions/.github/actions/tests/choose-test-branch@production
-        with:
-          test_folder: api
-          org_gh_token: ${{ steps.app-token.outputs.token }}
+          suite: ${{ matrix.envfiles.suite }}
+          mcp_manifest: ${{ needs.test-controller-api.outputs.mcp_manifest }}
+          mcp_storage: ${{ matrix.envfiles.storage || 'mongo' }}
+          mcp_serializer: ${{ matrix.envfiles.serializer || 'msgpack' }}
+          mcp_cache: ${{ matrix.envfiles.cache }}
       - name: Run API tests
-        uses: TykTechnologies/github-actions/.github/actions/tests/api-tests@production
+        uses: TykTechnologies/github-actions/.github/actions/tests/api-tests@ae9b1fdfeb3c8e739ac99e7a99eb6b7d284a7fae
         timeout-minutes: 25
         id: test_execution
         with:
           user_api_secret: ${{ steps.env_up.outputs.USER_API_SECRET }}
-          # MCP coverage runs serially against coordinated sources in the mandatory job below.
-          api_markers: (${{ matrix.envfiles.apimarkers }}) and not mcp
+          suite: ${{ matrix.envfiles.suite }}
+          api_markers: ${{ matrix.envfiles.apimarkers }}
+          mcp_storage: ${{ matrix.envfiles.storage || 'mongo' }}
+          mcp_serializer: ${{ matrix.envfiles.serializer || 'msgpack' }}
+          shard_count: ${{ matrix.envfiles.shard_count || 1 }}
+          shard_index: ${{ matrix.envfiles.shard_index || 0 }}
       - name: Generate test reports and collect logs
-        uses: TykTechnologies/github-actions/.github/actions/tests/reporting@production
-        if: always() && (steps.test_execution.conclusion != 'skipped')
+        uses: TykTechnologies/github-actions/.github/actions/tests/reporting@ae9b1fdfeb3c8e739ac99e7a99eb6b7d284a7fae
+        if: always() && (steps.test_execution.conclusion != 'skipped' || matrix.envfiles.suite == 'mcp')
         # Bound this best-effort step: `docker compose logs` inside it can hang on
         # an unresponsive container and otherwise burn the whole job timeout.
         # continue-on-error keeps a log-collection hang from failing an otherwise
         # green test run (the real result comes from the Execute step above).
         timeout-minutes: 8
-        continue-on-error: true
+        continue-on-error: ${{ matrix.envfiles.suite != 'mcp' }}
         with:
           report_xml: 'true'
           execution_status: ${{ steps.test_execution.outcome }}
-  mcp-qualification:
-    name: Coordinated MCP qualification
-    needs: dep-guard
-    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
-    uses: TykTechnologies/github-actions/.github/workflows/mcp-qualification.yml@aee08ff727a05046f05ab8236c57b2947a037834
-    secrets:
-      PROBE_APP_ID: ${{ secrets.PROBE_APP_ID }}
-      PROBE_APP_PRIVATE_KEY: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
-      DASH_LICENSE: ${{ secrets.DASH_LICENSE }}
-    permissions:
-      contents: read
+          suite: ${{ matrix.envfiles.suite }}
+          mcp_storage: ${{ matrix.envfiles.storage || 'mongo' }}
+          mcp_serializer: ${{ matrix.envfiles.serializer || 'msgpack' }}
+          mcp_cache: ${{ matrix.envfiles.cache }}
+          shard_index: ${{ matrix.envfiles.shard_index || 0 }}
   aggregator-ci-test:
     name: Aggregated CI Status
     runs-on: ${{ vars.DEFAULT_RUNNER }}
     # Dynamically determine which jobs to depend on based on repository configuration
-    needs: [dep-guard, goreleaser, api-tests, mcp-qualification]
+    needs: [dep-guard, goreleaser, api-tests, test-controller-api]
     if: ${{ always() && github.event_name == 'pull_request' }}
     steps:
+      - name: Generate API evidence token
+        id: mcp-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ secrets.PROBE_APP_ID }}
+          private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
+          owner: TykTechnologies
+          permission-contents: read
+          repositories: tyk-analytics
+      - name: Require complete MCP API evidence
+        uses: TykTechnologies/github-actions/.github/actions/tests/mcp-evidence@ae9b1fdfeb3c8e739ac99e7a99eb6b7d284a7fae
+        with:
+          github_token: ${{ steps.mcp-token.outputs.token }}
+          manifest: ${{ needs.test-controller-api.outputs.mcp_manifest }}
       - name: Aggregate results
         run: |
           failed=()
