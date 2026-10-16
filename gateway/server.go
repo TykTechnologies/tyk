@@ -7,9 +7,7 @@ import (
 	"errors"
 	"fmt"
 	htmltemplate "html/template"
-	"io"
 	"io/ioutil"
-	stdlog "log"
 	"log/syslog"
 	"net"
 	"net/http"
@@ -1690,6 +1688,7 @@ func (gw *Gateway) warnUncoveredLevels(level logrus.Level, sinks []*tyklog.Sink)
 func (gw *Gateway) setupLogger(builder *tyklog.Builder) {
 	gwConfig := gw.GetConfig()
 	builder.WithApplyHooksToRawLog()
+	log.RedirectStdlib(logrus.WarnLevel)
 
 	level := gw.extractLogLevel(&gwConfig)
 	discardOutput := gw.isRunningTests() && os.Getenv(tyklog.EnvTykLoglevel) == ""
@@ -1700,7 +1699,6 @@ func (gw *Gateway) setupLogger(builder *tyklog.Builder) {
 		level = logrus.ErrorLevel
 		builder.WithDiscardOutput()
 		gorpc.SetErrorLogger(func(string, ...any) {})
-		stdlog.SetOutput(io.Discard)
 	} else if *cli.DebugMode {
 		level = logrus.DebugLevel
 		mainLog.Debug("Enabling debug-level output")
@@ -1713,8 +1711,6 @@ func (gw *Gateway) setupLogger(builder *tyklog.Builder) {
 		log.Fatalf("Failed to build log sinks: %v", err)
 		return
 	}
-	sinksConfigured := format == ""
-
 	builder.SetLogformat(format)
 	for _, sink := range sinks {
 		builder.AddSinker(sink)
@@ -1722,11 +1718,6 @@ func (gw *Gateway) setupLogger(builder *tyklog.Builder) {
 
 	if !discardOutput {
 		gw.warnUncoveredLevels(level, sinks)
-	}
-
-	if sinksConfigured && !discardOutput {
-		// with sinks, the standard library logger follows them instead of writing raw to stderr
-		stdlog.SetOutput(log.AsLogrus().WriterLevel(logrus.InfoLevel))
 	}
 
 	if gwConfig.UseSentry {
