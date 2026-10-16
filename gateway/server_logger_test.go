@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	stdlog "log"
 	"os"
 	"testing"
 
@@ -168,6 +169,20 @@ func Test_GW_setupLogger_sinks(t *testing.T) {
 				assert.Contains(t, stderr(), "level=info message=info-entry")
 			})
 		}
+	})
+
+	t.Run("standard library messages become warn entries", func(t *testing.T) {
+		cli.InitTest(t, nil)
+		captureStream(t, &os.Stderr)
+		hook := log.GetTestHook(t)
+
+		buildTestLogger(t, config.Config{LogFormat: logFormatFromJSON(t, splitSinks)})
+		stdlog.Print("http: TLS handshake error from 10.0.0.1: EOF")
+
+		entries := hook.FilterBy(func(e *logrus.Entry) bool { return e.Data["prefix"] == "system" })
+		require.Len(t, entries, 1)
+		assert.Equal(t, logrus.WarnLevel, entries[0].Level)
+		assert.Equal(t, "http: TLS handshake error from 10.0.0.1: EOF", entries[0].Message)
 	})
 
 	t.Run("legacy format flag follows the string format", func(t *testing.T) {
