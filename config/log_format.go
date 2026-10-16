@@ -1,9 +1,10 @@
 package config
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
-	"fmt"
+	"strings"
 
 	tyklog "github.com/TykTechnologies/tyk/log"
 )
@@ -38,36 +39,42 @@ func (lf *LogFormat) Defined() bool {
 	return lf.formatType != LogFormatUndefined
 }
 
+// UnmarshalJSON accepts null, any string, or an array of sinks.
+// A string is stored as given; unknown names fall back to text when the logger is built (TT-18718
+// covers validating them). An empty string or an empty array is the same as not set.
 func (lf *LogFormat) UnmarshalJSON(data []byte) error {
-	if string(data) == "null" || string(data) == `""` {
+	data = bytes.TrimSpace(data)
+
+	switch {
+	case string(data) == "null":
 		return nil
-	}
 
-	var errs []error
-
-	var legacyStr tyklog.Format
-	if err := json.Unmarshal(data, &legacyStr); err == nil {
-		if !legacyStr.Valid() {
-			return fmt.Errorf("invalid format %q", string(legacyStr))
+	case bytes.HasPrefix(data, []byte(`"`)):
+		var format tyklog.Format
+		if err := json.Unmarshal(data, &format); err != nil {
+			return err
 		}
-
+		if format == "" {
+			return nil
+		}
 		lf.formatType = LogFormatString
-		lf.format = legacyStr
+		lf.format = format
 		return nil
-	} else {
-		errs = append(errs, err)
-	}
 
-	var sinks []tyklog.SinkConfig
-	if err := json.Unmarshal(data, &sinks); err == nil {
+	case bytes.HasPrefix(data, []byte(`[`)):
+		sinks, err := tyklog.ParseSinkConfigs(data)
+		if err != nil {
+			return err
+		}
+		if len(sinks) == 0 {
+			return nil
+		}
 		lf.formatType = LogFormatSinks
 		lf.sinks = sinks
 		return nil
-	} else {
-		errs = append(errs, err)
 	}
 
-	return fmt.Errorf("invalid log_format: must be a string, null, or an array of tyklog.SinkConfig: %w", errors.Join(errs...))
+	return errors.New("invalid log_format: must be a string, null, or an array of sink objects")
 }
 
 func (lf LogFormat) MarshalJSON() ([]byte, error) {
@@ -81,4 +88,23 @@ func (lf LogFormat) MarshalJSON() ([]byte, error) {
 	default:
 		return nil, errors.New("invalid invariant")
 	}
+}
+
+// ParseLogFormatEnv parses an environment variable value: a JSON array of sinks, or a format name.
+// Names are lowercased, as they always were for environment variables.
+func ParseLogFormatEnv(raw string) (LogFormat, error) {
+	raw = strings.TrimSpace(raw)
+
+	var lf LogFormat
+	if strings.HasPrefix(raw, "[") {
+		err := lf.UnmarshalJSON([]byte(raw))
+		return lf, err
+	}
+
+	if raw != "" {
+		lf.formatType = LogFormatString
+		lf.format = tyklog.Format(strings.ToLower(raw))
+	}
+
+	return lf, nil
 }

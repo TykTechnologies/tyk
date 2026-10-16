@@ -7,7 +7,7 @@ import (
 )
 
 type Builder struct {
-	sinkers                []SinkerExtended
+	sinkers                []Sinker
 	hooks                  []logrus.Hook
 	level                  *logrus.Level
 	stdLog                 *logrus.Logger
@@ -18,7 +18,7 @@ type Builder struct {
 	legacyLogFormatEnabled bool
 }
 
-// WithLevel sets level.
+// WithLevel sets the level at which entries are generated; sinks keep their own ranges.
 func (b *Builder) WithLevel(level logrus.Level) {
 	b.level = &level
 }
@@ -34,7 +34,7 @@ func (b *Builder) AddHook(hook logrus.Hook) {
 }
 
 // AddSinker adds sinker.
-func (b *Builder) AddSinker(sink ...SinkerExtended) {
+func (b *Builder) AddSinker(sink ...Sinker) {
 	b.sinkers = append(b.sinkers, sink...)
 }
 
@@ -70,12 +70,6 @@ func (b *Builder) buildAndPropagate(dest *Logger) {
 	}
 	b.applyHooksToRawLog()
 
-	if b.level != nil {
-		for _, sinker := range b.sinkers {
-			sinker.SetAcceptor(NewAcceptorRange(*b.level, logrus.PanicLevel))
-		}
-	}
-
 	dest.legacyLogFormatEnabled = b.legacyLogFormatEnabled
 	b.discardLogger(dest.innerLogger)
 	b.applyHooksAndSinks(dest.innerLogger)
@@ -88,20 +82,12 @@ func (b *Builder) buildAndPropagate(dest *Logger) {
 
 func (b *Builder) discardLogger(target *logrus.Logger) {
 	var level = target.Level
+	if b.level != nil {
+		level = *b.level
+	}
 	target.SetFormatter(&dummyFormatter{})
 	target.SetOutput(io.Discard)
 	target.SetLevel(level)
-}
-
-func (b *Builder) convertSinkers() []Sinker {
-	if b.sinkers == nil {
-		return nil
-	}
-	sinks := make([]Sinker, 0, len(b.sinkers))
-	for _, sink := range b.sinkers {
-		sinks = append(sinks, sink)
-	}
-	return sinks
 }
 
 func (b *Builder) applyHooksAndSinks(target *logrus.Logger) {
@@ -111,7 +97,7 @@ func (b *Builder) applyHooksAndSinks(target *logrus.Logger) {
 
 	if !b.discardOutput && len(b.sinkers) > 0 {
 		target.AddHook(&multiSinkHook{
-			sinks: b.convertSinkers(),
+			sinks: b.sinkers,
 		})
 	}
 }

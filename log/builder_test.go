@@ -1,6 +1,7 @@
 package log
 
 import (
+	"bytes"
 	"io"
 	"testing"
 
@@ -15,8 +16,7 @@ func (m *mockHook) Fire(_ *logrus.Entry) error { return nil }
 
 type mockSink struct{}
 
-func (m *mockSink) SetAcceptor(_ Acceptor) {}
-func (m *mockSink) Sink(_ *logrus.Entry)   {}
+func (m *mockSink) Sink(_ *logrus.Entry) {}
 
 func TestBuilder(t *testing.T) {
 	t.Run("Default", func(t *testing.T) {
@@ -66,6 +66,23 @@ func TestBuilder(t *testing.T) {
 			}
 		}
 		assert.True(t, found)
+	})
+
+	t.Run("WithLevel sets the generated level and leaves sink ranges alone", func(t *testing.T) {
+		buf := &bytes.Buffer{}
+		sink := NewSink(buf, &mockFormatter{}, NewAcceptorRange(logrus.DebugLevel, logrus.InfoLevel))
+
+		logger := Build(func(b *Builder) {
+			b.WithLevel(logrus.InfoLevel)
+			b.AddSinker(sink)
+		})
+
+		assert.Equal(t, logrus.InfoLevel, logger.GetLevel())
+
+		logger.Debug("dropped by level")
+		logger.Info("written")
+		logger.Warn("dropped by sink range")
+		assert.Equal(t, "written", buf.String())
 	})
 
 	t.Run("WithPropagate", func(t *testing.T) {

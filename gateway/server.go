@@ -1602,83 +1602,131 @@ func (gw *Gateway) extractLogLevel(cfg *config.Config) logrus.Level {
 	return level
 }
 
-func (gw *Gateway) buildSinkWithDest(
-	method string,
-	format tyklog.Format,
-	cfg *config.Config,
-) ([]tyklog.SinkerExtended, error) {
+// resolveLogFormat picks the log format to use.
+// Precedence: TYK_LOGFORMAT > TYK_GW_LOGFORMAT > config.LogFormat.
+// An environment variable may hold a format name or a JSON array of sinks; an unknown name is skipped.
+func (gw *Gateway) resolveLogFormat(cfg *config.Config) (config.LogFormat, error) {
+	for _, envName := range []string{tyklog.EnvTykLogformat, tyklog.EnvTykGwLogformat} {
+		raw := os.Getenv(envName)
+		if raw == "" {
+			continue
+		}
 
-	level := gw.extractLogLevel(cfg)
-	sink := tyklog.NewSink(
-		os.Stderr,
-		tyklog.NewFormatter(format),
-		tyklog.NewAcceptorRange(level, logrus.PanicLevel),
-	)
-	log.Debugf("Building logger format=%q level=%q case=%s", format, level, method)
-	return []tyklog.SinkerExtended{sink}, nil
+		envFormat, err := config.ParseLogFormatEnv(raw)
+		if err != nil {
+			return config.LogFormat{}, fmt.Errorf("%s: %w", envName, err)
+		}
+
+		if format, ok := envFormat.Format(); !envFormat.Defined() || (ok && !format.Valid()) {
+			continue
+		}
+
+		if cfg.LogFormat.Defined() {
+			log.Warnf("%s environment variable is set. Ignoring 'log_format' configuration in tyk.conf.", envName)
+		}
+
+		return envFormat, nil
+	}
+
+	return cfg.LogFormat, nil
 }
 
-func (gw *Gateway) buildSinks(cfg *config.Config) ([]tyklog.SinkerExtended, error) {
-	// precedence: TYK_LOGFORMAT > TYK_GW_LOGFORMAT > config.LogFormat > fallback(tyklog.FormatText)
-
-	if envFormat, ok := tyklog.CoalesceValidEnv[tyklog.Format](tyklog.EnvTykLogformat, tyklog.EnvTykGwLogformat); ok {
-		if cfg.LogFormat.Defined() {
-			log.Warn("TYK_LOGFORMAT environment variable is set. Ignoring 'log_format' configuration in tyk.conf.")
-		}
-
-		return gw.buildSinkWithDest("ENV_VARIABLES", envFormat, cfg)
+// buildSinks returns the configured sinks, or a single stderr sink in the configured format.
+// The returned format is empty when sinks are configured.
+func (gw *Gateway) buildSinks(cfg *config.Config) ([]*tyklog.Sink, tyklog.Format, error) {
+	logFormat, err := gw.resolveLogFormat(cfg)
+	if err != nil {
+		return nil, "", err
 	}
 
-	if sinkConfigs, ok := cfg.LogFormat.Sinks(); ok {
+	if sinkConfigs, ok := logFormat.Sinks(); ok {
 		log.Debugf("Building logger from provided sinks=%#v", sinkConfigs)
-		sinkers := make([]tyklog.SinkerExtended, 0, len(sinkConfigs))
-		var errs []error
-
-		for _, sinkConfig := range sinkConfigs {
-			if sink, err := tyklog.NewSinkFromConfig(sinkConfig); err != nil {
-				errs = append(errs, err)
-			} else {
-				sinkers = append(sinkers, sink)
-			}
-		}
-
-		if len(errs) > 0 {
-			return nil, errors.Join(errs...)
-		}
-
-		return sinkers, nil
+		sinks, err := tyklog.NewSinksFromConfig(sinkConfigs)
+		return sinks, "", err
 	}
 
-	if cfgFormatAsString, ok := cfg.LogFormat.Format(); ok {
-		return gw.buildSinkWithDest("CONFIG_AS_STRING", cfgFormatAsString, cfg)
+	format, _ := logFormat.Format()
+	if !format.Valid() {
+		format = tyklog.FormatText
 	}
 
-	return gw.buildSinkWithDest("FALLBACK", tyklog.FormatText, cfg)
+	log.Debugf("Building logger format=%q", format)
+	sink := tyklog.NewSink(os.Stderr, tyklog.NewFormatter(format), tyklog.AcceptorAllowAll)
+
+	return []*tyklog.Sink{sink}, format, nil
+}
+
+// warnUncoveredLevels reports generated levels that no sink accepts. The warning goes through
+// the logger, and straight to stderr when no sink would show it.
+func (gw *Gateway) warnUncoveredLevels(level logrus.Level, sinks []*tyklog.Sink) {
+	acceptors := make([]tyklog.Acceptor, 0, len(sinks))
+	for _, sink := range sinks {
+		acceptors = append(acceptors, sink)
+	}
+
+	uncovered := tyklog.UncoveredLevels(level, acceptors...)
+	if len(uncovered) == 0 {
+		return
+	}
+
+	names := lo.Map(uncovered, func(l logrus.Level, _ int) string { return l.String() })
+	msg := fmt.Sprintf("No log sink accepts %s entries; they will be discarded", strings.Join(names, ", "))
+	mainLog.Warn(msg)
+
+	warnEntry := &logrus.Entry{Level: logrus.WarnLevel}
+	if lo.SomeBy(acceptors, func(a tyklog.Acceptor) bool { return a.Accept(warnEntry) }) {
+		return
+	}
+
+	stderrSink := tyklog.NewSink(os.Stderr, tyklog.NewFormatter(tyklog.FormatText), tyklog.AcceptorAllowAll)
+	stderrSink.Sink(&logrus.Entry{
+		Level:   logrus.WarnLevel,
+		Message: msg,
+		Time:    time.Now(),
+		Data:    logrus.Fields{"prefix": "main"},
+	})
 }
 
 func (gw *Gateway) setupLogger(builder *tyklog.Builder) {
 	gwConfig := gw.GetConfig()
 	builder.WithApplyHooksToRawLog()
 
-	stdlog.SetOutput(io.Discard)
+	level := gw.extractLogLevel(&gwConfig)
+	discardOutput := gw.isRunningTests() && os.Getenv(tyklog.EnvTykLoglevel) == ""
 
-	sinks, err := gw.buildSinks(&gwConfig)
-	if err != nil {
-		log.Fatalf("Failed to build sinks: %v", err)
-		return
-	}
-
-	builder.AddSinker(sinks...)
-
-	if gw.isRunningTests() && os.Getenv(tyklog.EnvTykLoglevel) == "" {
+	if discardOutput {
 		// `go test` without TYK_LOGLEVEL set defaults to no log
 		// output
-		builder.WithLevel(logrus.ErrorLevel)
+		level = logrus.ErrorLevel
 		builder.WithDiscardOutput()
-		gorpc.SetErrorLogger(func(string, ...interface{}) {})
+		gorpc.SetErrorLogger(func(string, ...any) {})
+		stdlog.SetOutput(io.Discard)
 	} else if *cli.DebugMode {
-		builder.WithLevel(logrus.DebugLevel)
+		level = logrus.DebugLevel
 		mainLog.Debug("Enabling debug-level output")
+	}
+
+	builder.WithLevel(level)
+
+	sinks, format, err := gw.buildSinks(&gwConfig)
+	if err != nil {
+		log.Fatalf("Failed to build log sinks: %v", err)
+		return
+	}
+	sinksConfigured := format == ""
+
+	builder.SetLogformat(format)
+	for _, sink := range sinks {
+		builder.AddSinker(sink)
+	}
+
+	if !discardOutput {
+		gw.warnUncoveredLevels(level, sinks)
+	}
+
+	if sinksConfigured && !discardOutput {
+		// with sinks, the standard library logger follows them instead of writing raw to stderr
+		stdlog.SetOutput(log.AsLogrus().WriterLevel(logrus.InfoLevel))
 	}
 
 	if gwConfig.UseSentry {

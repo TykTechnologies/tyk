@@ -1,6 +1,7 @@
 package log
 
 import (
+	"encoding/json"
 	"os"
 	"testing"
 
@@ -32,4 +33,16 @@ func TestMakeOutput(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMakeOutput_Options(t *testing.T) {
+	for _, opts := range []string{"", "null", "{}"} {
+		writer, err := MakeOutput(OutputStdout, json.RawMessage(opts))
+		assert.NoError(t, err, "options %q", opts)
+		assert.Equal(t, os.Stdout, writer)
+	}
+
+	writer, err := MakeOutput(OutputStderr, json.RawMessage(`{"path": "/dev/null"}`))
+	assert.ErrorContains(t, err, `output "stderr" takes no output_options`)
+	assert.Nil(t, writer)
 }
