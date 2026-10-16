@@ -1,9 +1,11 @@
 package log
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -150,9 +152,8 @@ func defaultFieldMap() logrus.FieldMap {
 	}
 }
 
-// applySnakeCaseOptions strips underscores from JSON keys so that snake_case
-// transparently maps to CamelCase struct fields via Go's case-insensitive unmarshaler.
-// Keys that match no field are an error.
+// applySnakeCaseOptions maps snake_case JSON keys onto the target's CamelCase fields.
+// Keys that match no field are reported as given.
 func applySnakeCaseOptions(data json.RawMessage, target any) error {
 	if len(data) == 0 || string(data) == "null" {
 		return nil
@@ -163,10 +164,22 @@ func applySnakeCaseOptions(data json.RawMessage, target any) error {
 		return err
 	}
 
+	known := optionFieldNames(target)
 	normalizedMap := make(map[string]json.RawMessage, len(rawMap))
+	var unknown []string
+
 	for key, val := range rawMap {
-		normalizedKey := strings.ReplaceAll(key, "_", "")
+		normalizedKey := normalizeOptionKey(key)
+		if _, ok := known[normalizedKey]; !ok {
+			unknown = append(unknown, strconv.Quote(key))
+			continue
+		}
 		normalizedMap[normalizedKey] = val
+	}
+
+	if len(unknown) > 0 {
+		sort.Strings(unknown)
+		return fmt.Errorf("unknown option(s): %s", strings.Join(unknown, ", "))
 	}
 
 	transformedData, err := json.Marshal(normalizedMap)
@@ -174,7 +187,39 @@ func applySnakeCaseOptions(data json.RawMessage, target any) error {
 		return err
 	}
 
-	dec := json.NewDecoder(bytes.NewReader(transformedData))
-	dec.DisallowUnknownFields()
-	return dec.Decode(target)
+	return json.Unmarshal(transformedData, target)
+}
+
+func normalizeOptionKey(key string) string {
+	return strings.ToLower(strings.ReplaceAll(key, "_", ""))
+}
+
+// optionFieldNames lists the target struct's settable fields, normalized like the option keys.
+func optionFieldNames(target any) map[string]struct{} {
+	names := make(map[string]struct{})
+
+	t := reflect.TypeOf(target)
+	for t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	if t.Kind() != reflect.Struct {
+		return names
+	}
+
+	for field := range t.Fields() {
+		if !field.IsExported() {
+			continue
+		}
+
+		name := field.Name
+		if tag, _, _ := strings.Cut(field.Tag.Get("json"), ","); tag == "-" {
+			continue
+		} else if tag != "" {
+			name = tag
+		}
+
+		names[normalizeOptionKey(name)] = struct{}{}
+	}
+
+	return names
 }
