@@ -153,7 +153,7 @@ func defaultFieldMap() logrus.FieldMap {
 // applySnakeCaseOptions strips underscores from JSON keys so that snake_case
 // transparently maps to CamelCase struct fields via Go's case-insensitive unmarshaler.
 // Keys that match no field are an error.
-func applySnakeCaseOptions(data json.RawMessage, target interface{}) error {
+func applySnakeCaseOptions(data json.RawMessage, target any) error {
 	if len(data) == 0 || string(data) == "null" {
 		return nil
 	}

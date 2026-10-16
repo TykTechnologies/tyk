@@ -12,7 +12,7 @@ func TestMakeOutput(t *testing.T) {
 	tests := []struct {
 		name        string
 		output      Output
-		expected    interface{}
+		expected    any
 		expectError bool
 	}{
 		{"stdout_success", OutputStdout, os.Stdout, false},

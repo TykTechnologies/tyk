@@ -3,6 +3,7 @@ package log
 import (
 	"bytes"
 	"io"
+	stdlog "log"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -83,6 +84,37 @@ func TestBuilder(t *testing.T) {
 		logger.Info("written")
 		logger.Warn("dropped by sink range")
 		assert.Equal(t, "written", buf.String())
+	})
+
+	t.Run("RedirectStdlib", func(t *testing.T) {
+		goLog := stdlog.New(io.Discard, "", stdlog.LstdFlags)
+
+		logger := Build(func(b *Builder) {
+			b.WithLevel(logrus.InfoLevel)
+			b.WithStdlibLogger(goLog)
+			b.RedirectStdlib(logrus.WarnLevel)
+		})
+		hook := logger.GetTestHook(t)
+
+		goLog.Print("http: TLS handshake error from 10.0.0.1: EOF")
+
+		assert.Equal(t, 0, goLog.Flags(), "stdlib timestamp disabled")
+		if assert.Len(t, hook.AllEntries(), 1) {
+			entry := hook.LastEntry()
+			assert.Equal(t, logrus.WarnLevel, entry.Level)
+			assert.Equal(t, "http: TLS handshake error from 10.0.0.1: EOF", entry.Message)
+			assert.Equal(t, "system", entry.Data["prefix"])
+		}
+	})
+
+	t.Run("RedirectStdlib not requested leaves the standard logger alone", func(t *testing.T) {
+		goLog := stdlog.New(io.Discard, "", stdlog.LstdFlags)
+
+		_ = Build(func(b *Builder) {
+			b.WithStdlibLogger(goLog)
+		})
+
+		assert.Equal(t, stdlog.LstdFlags, goLog.Flags())
 	})
 
 	t.Run("WithPropagate", func(t *testing.T) {
