@@ -1,7 +1,9 @@
 package streams
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -15,6 +17,88 @@ type HandleFuncAdapter struct {
 	Logger           *logrus.Entry
 }
 
+// PrepareKafkaAcknowledgmentComponents assigns a globally unique runtime ID
+// to each external-ack Kafka input and returns those IDs for HTTP routing.
+// The ID is operational metadata, not a secret.
+func PrepareKafkaAcknowledgmentComponents(streamConfig map[string]interface{}, apiID, streamID string) []string {
+	input, ok := streamConfig["input"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	var inputs []map[string]interface{}
+	inputs = append(inputs, input)
+	if broker, ok := input["broker"].(map[string]interface{}); ok {
+		if values, ok := broker["inputs"].([]interface{}); ok {
+			for _, value := range values {
+				if item, ok := value.(map[string]interface{}); ok {
+					inputs = append(inputs, item)
+				}
+			}
+		}
+	}
+	var componentIDs []string
+	for _, candidate := range inputs {
+		config, ok := candidate["tyk_kafka"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		ack, ok := config["acknowledgment"].(map[string]interface{})
+		if !ok || ack["mode"] != "external_ack" {
+			continue
+		}
+		configured, _ := ack["component_id"].(string)
+		configured = strings.TrimSpace(configured)
+		if configured == "" {
+			configured = fmt.Sprintf("input-%d", len(componentIDs))
+		}
+		prefix := fmt.Sprintf("%s_%s_", apiID, streamID)
+		componentID := configured
+		if !strings.HasPrefix(componentID, prefix) {
+			componentID = prefix + componentID
+		}
+		ack["component_id"] = componentID
+		componentIDs = append(componentIDs, componentID)
+	}
+	return componentIDs
+}
+
+func DistributedKafkaAcknowledgmentComponents(streamConfig map[string]interface{}) []string {
+	return kafkaAcknowledgmentComponentsByRouting(streamConfig, "distributed")
+}
+
+func LocalKafkaAcknowledgmentComponents(streamConfig map[string]interface{}) []string {
+	return kafkaAcknowledgmentComponentsByRouting(streamConfig, "local")
+}
+
+func kafkaAcknowledgmentComponentsByRouting(streamConfig map[string]interface{}, wanted string) []string {
+	input, _ := streamConfig["input"].(map[string]interface{})
+	inputs := []map[string]interface{}{input}
+	if broker, ok := input["broker"].(map[string]interface{}); ok {
+		if values, ok := broker["inputs"].([]interface{}); ok {
+			for _, value := range values {
+				if candidate, ok := value.(map[string]interface{}); ok {
+					inputs = append(inputs, candidate)
+				}
+			}
+		}
+	}
+	var result []string
+	for _, candidate := range inputs {
+		config, _ := candidate["tyk_kafka"].(map[string]interface{})
+		ack, _ := config["acknowledgment"].(map[string]interface{})
+		componentID, _ := ack["component_id"].(string)
+		routing, _ := ack["routing"].(string)
+		routing = strings.TrimSpace(routing)
+		if routing == "" {
+			routing = "distributed"
+		}
+		if ack["mode"] == "external_ack" && routing == wanted && componentID != "" {
+			result = append(result, componentID)
+		}
+	}
+	return result
+}
+
 func (h *HandleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, *http.Request)) {
 	h.Logger.Debugf("Registering streaming handleFunc for path: %s", path)
 
@@ -25,8 +109,9 @@ func (h *HandleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, 
 
 	h.StreamManager.routeLock.Lock()
 	h.Muxer.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
-		recorder := h.StreamManager.analyticsFactory.CreateRecorder(r)
-		analyticsResponseWriter := h.StreamManager.analyticsFactory.CreateResponseWriter(w, r, h.StreamID, recorder)
+		factory := h.StreamManager.getAnalyticsFactory()
+		recorder := factory.CreateRecorder(r)
+		analyticsResponseWriter := factory.CreateResponseWriter(w, r, h.StreamID, recorder)
 
 		h.StreamManager.activityCounter.Add(1)
 		defer h.StreamManager.activityCounter.Add(-1)
@@ -98,4 +183,74 @@ func GetHTTPPaths(streamConfig map[string]interface{}) []string {
 		}
 	}
 	return deduplicated
+}
+
+type KafkaConfig struct {
+	Brokers       []string
+	Topic         string
+	ConsumerGroup string
+	TLS           map[string]interface{}
+	SASL          []interface{}
+}
+
+func extractKafkaConfig(config map[string]interface{}) *KafkaConfig {
+	for _, key := range []string{"tyk_kafka", "kafka_franz"} {
+		if kafkaConfig, ok := config[key].(map[string]interface{}); ok {
+			var brokers []string
+			if seedBrokers, ok := kafkaConfig["seed_brokers"].([]interface{}); ok {
+				for _, b := range seedBrokers {
+					if str, ok := b.(string); ok {
+						brokers = append(brokers, str)
+					}
+				}
+			}
+			var topic string
+			if topics, ok := kafkaConfig["topics"].([]interface{}); ok && len(topics) > 0 {
+				if str, ok := topics[0].(string); ok {
+					topic = str
+				}
+			}
+			var consumerGroup string
+			if cg, ok := kafkaConfig["consumer_group"].(string); ok {
+				consumerGroup = cg
+			}
+			var tlsConfig map[string]interface{}
+			if tlsMap, ok := kafkaConfig["tls"].(map[string]interface{}); ok {
+				tlsConfig = tlsMap
+			}
+			var saslConfig []interface{}
+			if saslList, ok := kafkaConfig["sasl"].([]interface{}); ok {
+				saslConfig = saslList
+			}
+			if len(brokers) > 0 && topic != "" && consumerGroup != "" {
+				return &KafkaConfig{
+					Brokers:       brokers,
+					Topic:         topic,
+					ConsumerGroup: consumerGroup,
+					TLS:           tlsConfig,
+					SASL:          saslConfig,
+				}
+			}
+		}
+	}
+	return nil
+}
+func GetKafkaConfig(streamConfig map[string]interface{}) *KafkaConfig {
+	if inputConfig, ok := streamConfig["input"].(map[string]interface{}); ok {
+		if kConfig := extractKafkaConfig(inputConfig); kConfig != nil {
+			return kConfig
+		}
+		if brokerConfig, ok := inputConfig["broker"].(map[string]interface{}); ok {
+			if inputs, ok := brokerConfig["inputs"].([]interface{}); ok {
+				for _, input := range inputs {
+					if inputMap, ok := input.(map[string]interface{}); ok {
+						if kConfig := extractKafkaConfig(inputMap); kConfig != nil {
+							return kConfig
+						}
+					}
+				}
+			}
+		}
+	}
+	return nil
 }
