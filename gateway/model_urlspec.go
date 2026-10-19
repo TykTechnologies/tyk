@@ -187,9 +187,9 @@ func (u *URLSpec) matchesMethod(method string) bool {
 // matchesPath takes the input string and matches it against an internal regex.
 // it will match the regex against the clean URL with stripped listen path first,
 // then it will match against the full URL including the listen path as provided.
-// For Tyk OAS APIs the full URL fallback is skipped unless
-// apply_legacy_oas_path_matching is enabled, so that the matched path is the
-// path proxied upstream.
+// For Tyk OAS APIs the last step, matching with the listen path still in
+// place, is skipped unless apply_legacy_oas_path_matching is enabled, so the
+// matched path is the path proxied upstream. Version stripping is unaffected.
 // APISpec to provide URL sanitization of the input is passed along.
 func (a *URLSpec) matchesPath(reqPath string, api *APISpec) bool {
 	clean := api.StripListenPath(reqPath)
