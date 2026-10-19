@@ -108,7 +108,7 @@ func (b *Builder) redirectStdlib(dest *Logger) {
 	}
 
 	target.SetFlags(0)
-	target.SetOutput(&stdlibWriter{entry: dest.WithField("prefix", "system"), level: *b.stdlibLevel})
+	target.SetOutput(&stdlibWriter{entry: dest.WithField("prefix", "stdlib"), level: *b.stdlibLevel})
 }
 
 type stdlibWriter struct {
