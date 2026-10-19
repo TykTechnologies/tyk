@@ -1154,6 +1154,14 @@ type Config struct {
 	// Enable it only if your APIs rely on the legacy behavior.
 	ApplyStripListenPathToURLRewrite bool `json:"apply_strip_listen_path_to_url_rewrite"`
 
+	// ApplyLegacyOASPathMatching restores the legacy behavior, where endpoint
+	// matching for Tyk OAS APIs also accepted the full request URL including the
+	// listen path. With strip_listen_path enabled this could approve a request for
+	// one endpoint and proxy a different, undeclared path upstream.
+	// Defaults to false, which matches OAS endpoints only against the path that
+	// is proxied upstream. Tyk Classic APIs are not affected by this setting.
+	ApplyLegacyOASPathMatching bool `json:"apply_legacy_oas_path_matching"`
+
 	// Tyk nodes can provide uptime awareness, uptime testing and analytics for your underlying APIs uptime and availability.
 	// Tyk can also notify you when a service goes down.
 	UptimeTests UptimeTestsConfig `json:"uptime_tests"`
