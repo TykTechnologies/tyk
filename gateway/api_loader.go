@@ -59,6 +59,9 @@ type ChainObject struct {
 // ProcessSpecOptions represents options for processSpec method
 type ProcessSpecOptions struct {
 	quotaKey string
+
+	// skipUpstreamDNSDiscovery leaves the scheduler untouched; subscriptions are keyed on APIID.
+	skipUpstreamDNSDiscovery bool
 }
 
 func (gw *Gateway) prepareStorage() generalStores {
@@ -238,6 +241,10 @@ func (gw *Gateway) processSpec(
 		spec.Proxy.StructuredTargetList = sl
 	}
 
+	if !options.skipUpstreamDNSDiscovery {
+		gw.setupUpstreamDNSDiscovery(spec, logger)
+	}
+
 	// Initialise the auth and session managers (use Redis for now)
 	authStore, orgStore, _ := gw.configureAuthAndOrgStores(gs, spec)
 
@@ -400,6 +407,10 @@ func (gw *Gateway) processSpec(
 		chainDef.Open = true
 		logger.Info("Checking security policy: Open")
 	}
+
+	// Origin validation must run before body parsing, authentication, policy,
+	// and quota side effects for MCP traffic.
+	gw.mwAppendEnabled(&chainArray, &MCPOriginValidationMiddleware{BaseMiddleware: baseMid.Copy()})
 
 	// For MCP/JSON-RPC APIs, add RequestSizeLimitMiddleware early to prevent DoS attacks.
 	// JSONRPCMiddleware reads the entire request body, so size must be validated first.
@@ -636,18 +647,21 @@ func (gw *Gateway) processSpec(
 	if streamMw := getStreamingMiddleware(baseMid); streamMw != nil {
 		gw.mwAppendEnabled(&chainArray, streamMw)
 	}
+	gw.mwAppendEnabled(&chainArray, &MCPOAuthBrokerTokenMiddleware{BaseMiddleware: baseMid.Copy()})
 
 	if !spec.UseKeylessAccess {
 		gw.mwAppendEnabled(&chainArray, &GraphQLComplexityMiddleware{BaseMiddleware: baseMid.Copy()})
 		gw.mwAppendEnabled(&chainArray, &GraphQLGranularAccessMiddleware{BaseMiddleware: baseMid.Copy()})
 	}
 
-	if upstreamBasicAuthMw := getUpstreamBasicAuthMw(baseMid); upstreamBasicAuthMw != nil {
-		gw.mwAppendEnabled(&chainArray, upstreamBasicAuthMw)
-	}
+	if shouldLoadGenericUpstreamAuth(spec) {
+		if upstreamBasicAuthMw := getUpstreamBasicAuthMw(baseMid); upstreamBasicAuthMw != nil {
+			gw.mwAppendEnabled(&chainArray, upstreamBasicAuthMw)
+		}
 
-	if upstreamOAuthMw := getUpstreamOAuthMw(baseMid); upstreamOAuthMw != nil {
-		gw.mwAppendEnabled(&chainArray, upstreamOAuthMw)
+		if upstreamOAuthMw := getUpstreamOAuthMw(baseMid); upstreamOAuthMw != nil {
+			gw.mwAppendEnabled(&chainArray, upstreamOAuthMw)
+		}
 	}
 
 	gw.mwAppendEnabled(&chainArray, &ValidateJSON{BaseMiddleware: baseMid.Copy()})
@@ -741,6 +755,10 @@ func (gw *Gateway) processSpec(
 	}).Info("API Loaded")
 
 	return &chainDef
+}
+
+func shouldLoadGenericUpstreamAuth(spec *APISpec) bool {
+	return spec == nil || spec.MCP == nil || spec.MCP.OAuthBroker == nil || !spec.MCP.OAuthBroker.Enabled
 }
 
 func (gw *Gateway) configureAuthAndOrgStores(gs *generalStores, spec *APISpec) (storage.Handler, storage.Handler, storage.Handler) {
@@ -865,7 +883,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if d.SH.Spec.target.Scheme == "tyk" {
-		handler, _, found := d.Gw.findInternalHTTPHandlerForLoop(d.SH.Spec.target.Host, d.SH.Spec, r)
+		handler, targetSpec, found := d.Gw.findInternalHTTPHandlerForLoop(d.SH.Spec.target.Host, d.SH.Spec, r)
 
 		if !found {
 			handler := ErrorHandler{d.SH.Base()}
@@ -880,6 +898,12 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			handler := ErrorHandler{d.SH.Base()}
 			handler.HandleError(w, r, "Failed to perform internal redirect", http.StatusInternalServerError, true)
 			return
+		}
+
+		if d.SH.Spec.IsPairedMCPAdapterProxy() && targetSpec != nil && targetSpec.IsSyntheticMCPAdapter() {
+			owner, observedWriter := newMCPCompletionAnalyticsOwner(&d.SH, r, w)
+			defer owner.Complete(r)
+			w = observedWriter
 		}
 
 		d.SH.Spec.SanitizeProxyPaths(r)
@@ -1041,14 +1065,16 @@ func (gw *Gateway) loadHTTPService(spec *APISpec, apisByListen map[string]int, g
 		spec.Proxy.ListenPath,
 	}
 
-	// Register routes for each prefix
-	gw.generateRoutesForPrefixes(spec, prefixes, gwConfig.HttpServerOptions.EnableStrictRoutes, router, chainObj)
-
 	// Mirror-mode PRM clients (mcp-remote, Claude Desktop) probe the
 	// path-suffix variant of /.well-known/oauth-protected-resource at the
 	// gateway root, not under the API's listen path. Auto-register a
-	// sibling handler so users don't have to wire up a second API.
+	// sibling handler so users don't have to wire up a second API. Register
+	// these exact routes before the API catch-all so a root listen path cannot
+	// shadow the per-API authorization-server routes.
 	gw.registerMCPPRMSuffixRoutes(spec, router)
+
+	// Register routes for each prefix
+	gw.generateRoutesForPrefixes(spec, prefixes, gwConfig.HttpServerOptions.EnableStrictRoutes, router, chainObj)
 
 	return chainObj, nil
 }
@@ -1067,6 +1093,10 @@ func (gw *Gateway) registerMCPPRMSuffixRoutes(spec *APISpec, router *mux.Router)
 	prm := spec.GetPRMConfig()
 	if prm == nil {
 		return
+	}
+	brokerEnabled := spec.MCP != nil && spec.MCP.OAuthBroker != nil && spec.MCP.OAuthBroker.Enabled
+	if brokerEnabled && prm.IsMirrorMode(spec.IsMCPManaged()) {
+		gw.registerMCPASBrokerRoutes(spec, router)
 	}
 
 	listen := strings.TrimRight(spec.Proxy.ListenPath, "/")
@@ -1089,9 +1119,29 @@ func (gw *Gateway) registerMCPPRMSuffixRoutes(spec *APISpec, router *mux.Router)
 	// request with `invalid_target` because mcp-remote sends the
 	// gateway URL as the resource (per the mirrored PRM doc) but the
 	// upstream AS only knows the upstream URL.
-	if prm.IsMirrorMode(spec.IsMCPManaged()) {
+	if prm.IsMirrorMode(spec.IsMCPManaged()) && !brokerEnabled {
 		gw.registerMCPASProxyRoutes(spec, router)
 	}
+}
+
+// registerMCPASBrokerRoutes wires the fixed public issuer endpoints for an
+// explicitly enabled MCP OAuth broker. It is called before the root-listen-path
+// shortcut so root MCP APIs still publish their per-API authorization server.
+func (gw *Gateway) registerMCPASBrokerRoutes(spec *APISpec, router *mux.Router) {
+	broker := newMCPOAuthBroker(gw, spec)
+	issuerPath := mcpASProxyPathPrefix + spec.APIID
+	suffixMetadataPath := "/.well-known/oauth-authorization-server" + issuerPath
+	prefixMetadataPath := issuerPath + "/.well-known/oauth-authorization-server"
+
+	router.HandleFunc(suffixMetadataPath, broker.metadataHandler).Methods(http.MethodGet)
+	router.HandleFunc(prefixMetadataPath, broker.metadataHandler).Methods(http.MethodGet)
+	router.HandleFunc(issuerPath+"/register", broker.registrationHandler).Methods(http.MethodPost)
+	router.HandleFunc(issuerPath+"/register/{client_id}", broker.registrationDeleteHandler).Methods(http.MethodDelete)
+	router.HandleFunc(issuerPath+"/register/{client_id}", broker.registrationUpdateHandler).Methods(http.MethodPut)
+	router.HandleFunc(issuerPath+"/authorize", broker.authorizeHandler).Methods(http.MethodGet)
+	router.HandleFunc(issuerPath+"/callback", broker.callbackHandler).Methods(http.MethodGet)
+	router.HandleFunc(issuerPath+"/token", broker.tokenHandler).Methods(http.MethodPost)
+	mainLog.WithField("api_id", spec.APIID).Debugf("registered MCP OAuth broker routes under %s", issuerPath)
 }
 
 // registerMCPASProxyRoutes wires the per-API OAuth Authorization Server
@@ -1416,8 +1466,8 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 				tmpSpecRegister[spec.APIID] = spec
 			}
 
-			switch spec.Protocol {
-			case "", "http", "https", "h2c":
+			switch {
+			case httpProtocol(spec.Protocol):
 				if shouldTrace {
 					// opentracing works only with http services.
 					err := trace.AddTracer("", spec.Name)
@@ -1433,7 +1483,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 					return
 				}
 				tmpSpecHandles.Store(spec.APIID, tmpSpecHandle)
-			case "tcp", "tls":
+			case spec.Protocol == "tcp" || spec.Protocol == "tls":
 				gw.loadTCPService(spec, &gs, muxer)
 			}
 
@@ -1441,6 +1491,8 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 			spec.VersionDefinition.BaseID = ""
 		}()
 	}
+
+	gw.warmUpstreamDNS()
 
 	gw.DefaultProxyMux.swap(muxer, gw)
 
@@ -1452,6 +1504,9 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 		curSpec, ok := gw.apisByID[spec.APIID]
 		if ok && curSpec != nil && shouldReloadSpec(curSpec, spec) {
 			mainLog.Debugf("Spec %s has changed and needs to be reloaded", curSpec.APIID)
+			if !httpProtocol(spec.Protocol) {
+				gw.releaseUpstreamDNSDiscovery(curSpec)
+			}
 			specsToUnload = append(specsToUnload, curSpec)
 		}
 
@@ -1466,6 +1521,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 	// Find the removed specs to unload them
 	for apiID, curSpec := range gw.apisByID {
 		if _, ok := tmpSpecRegister[apiID]; !ok {
+			gw.releaseUpstreamDNSDiscovery(curSpec)
 			specsToUnload = append(specsToUnload, curSpec)
 		}
 	}
@@ -1584,5 +1640,21 @@ func collectAllMiddleware(authCheck apidef.MiddlewareDefinition, slices ...[]api
 func WithQuotaKey(key string) option.Option[ProcessSpecOptions] {
 	return func(p *ProcessSpecOptions) {
 		p.quotaKey = key
+	}
+}
+
+// WithoutUpstreamDNSDiscovery is for callers assembling a throwaway spec with a live APIID.
+func WithoutUpstreamDNSDiscovery() option.Option[ProcessSpecOptions] {
+	return func(p *ProcessSpecOptions) {
+		p.skipUpstreamDNSDiscovery = true
+	}
+}
+
+func httpProtocol(protocol string) bool {
+	switch protocol {
+	case "", "http", "https", "h2c":
+		return true
+	default:
+		return false
 	}
 }

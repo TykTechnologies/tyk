@@ -223,6 +223,12 @@ func TestMCPListFilterSSEHook_FilterEvent(t *testing.T) {
 
 		names := extractToolNames(t, strings.Join(modified.Data, "\n"))
 		assert.ElementsMatch(t, []string{"get_weather", "get_forecast"}, names)
+		var envelope mcp.JSONRPCResponse
+		require.NoError(t, json.Unmarshal([]byte(strings.Join(modified.Data, "\n")), &envelope))
+		var result map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(envelope.Result, &result))
+		assert.JSONEq(t, `"private"`, string(result["cacheScope"]))
+		assert.JSONEq(t, `0`, string(result["ttlMs"]))
 	})
 
 	t.Run("filters tools by denylist", func(t *testing.T) {
