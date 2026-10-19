@@ -3,7 +3,6 @@ package graphengine
 
 import (
 	"context"
-	"io"
 	"net/http"
 
 	"github.com/gorilla/websocket"
@@ -63,10 +62,9 @@ type GraphQLRequestProcessor interface {
 }
 
 type GraphQLGranularAccessResult struct {
-	FailReason         GranularAccessFailReason
-	ValidationError    error
-	InternalErr        error
-	writeErrorResponse func(w io.Writer, providedErr error) (n int, err error)
+	FailReason      GranularAccessFailReason
+	ValidationError GraphQLErrors
+	InternalErr     error
 }
 
 type GranularAccessDefinition struct {
