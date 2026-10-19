@@ -3,6 +3,7 @@ package gateway
 import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/agentprotocol"
 	"github.com/TykTechnologies/tyk/regexp"
 )
 
@@ -186,6 +187,9 @@ func (u *URLSpec) matchesMethod(method string) bool {
 // matchesPath takes the input string and matches it against an internal regex.
 // it will match the regex against the clean URL with stripped listen path first,
 // then it will match against the full URL including the listen path as provided.
+// For Tyk OAS APIs the full URL fallback is skipped unless
+// apply_legacy_oas_path_matching is enabled, so that the matched path is the
+// path proxied upstream.
 // APISpec to provide URL sanitization of the input is passed along.
 func (a *URLSpec) matchesPath(reqPath string, api *APISpec) bool {
 	clean := api.StripListenPath(reqPath)
@@ -197,6 +201,11 @@ func (a *URLSpec) matchesPath(reqPath string, api *APISpec) bool {
 	// match /v3/users
 	if a.spec.MatchString(clean) {
 		return true
+	}
+	// VEM paths are internal looping targets without a listen path, so the
+	// full URL is the only form they can be matched against.
+	if api.IsOAS && !api.GlobalConfig.ApplyLegacyOASPathMatching && !agentprotocol.IsProtocolVEMPath(reqPath) {
+		return false
 	}
 	// match /listenpath/v3/users
 	if a.spec.MatchString(reqPath) {
