@@ -186,7 +186,7 @@ func Test_GW_setupLogger_sinks(t *testing.T) {
 
 		require.Len(t, hook.AllEntries(), 1)
 		assert.Equal(t, logrus.WarnLevel, hook.LastEntry().Level)
-		assert.Equal(t, "system", hook.LastEntry().Data["prefix"])
+		assert.Equal(t, "stdlib", hook.LastEntry().Data["prefix"])
 		assert.Equal(t, "http: TLS handshake error from 10.0.0.1: EOF", hook.LastEntry().Message)
 	})
 

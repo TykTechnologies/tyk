@@ -103,7 +103,7 @@ func TestBuilder(t *testing.T) {
 			entry := hook.LastEntry()
 			assert.Equal(t, logrus.WarnLevel, entry.Level)
 			assert.Equal(t, "http: TLS handshake error from 10.0.0.1: EOF", entry.Message)
-			assert.Equal(t, "system", entry.Data["prefix"])
+			assert.Equal(t, "stdlib", entry.Data["prefix"])
 		}
 	})
 
