@@ -4,14 +4,18 @@ import (
 	"encoding/base64"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/assetloader"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -304,12 +308,12 @@ function simpleVirt(request, session, config) {
 `
 
 func TestPreLoadVirtualMetaCodeGoja_UseFile(t *testing.T) {
-	dir := t.TempDir()
-	jsFile := dir + "/virt.js"
-	require.NoError(t, os.WriteFile(jsFile, []byte(simpleVirtJS), 0644))
-
 	ts := StartTest(nil)
 	defer ts.Close()
+
+	// Scripts are confined to middleware_path, so the file lives inside it.
+	jsFile := filepath.Join(ts.Gw.GetConfig().MiddlewarePath, "virt-"+uuid.New()+".js")
+	require.NoError(t, os.WriteFile(jsFile, []byte(simpleVirtJS), 0644))
 
 	vm := &GojaJSVM{}
 	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
@@ -335,7 +339,7 @@ func TestPreLoadVirtualMetaCodeGoja_UseFile_Missing(t *testing.T) {
 
 	meta := &apidef.VirtualMeta{
 		FunctionSourceType: apidef.UseFile,
-		FunctionSourceURI:  "/nonexistent/path/to/file.js",
+		FunctionSourceURI:  filepath.Join(ts.Gw.GetConfig().MiddlewarePath, "nonexistent.js"),
 	}
 
 	ts.Gw.preLoadVirtualMetaCodeGoja(meta, vm)
@@ -397,4 +401,78 @@ func TestPreLoadVirtualMetaCodeGoja_UnknownType(t *testing.T) {
 	ts.Gw.preLoadVirtualMetaCodeGoja(meta, vm)
 	// Unknown type → no new program added.
 	assert.Equal(t, before, len(vm.programs))
+}
+
+func TestPreLoadVirtualMetaCode_RejectsUnsafePath(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	outside := t.TempDir()
+	secret := filepath.Join(outside, "secret.js")
+	require.NoError(t, os.WriteFile(secret, []byte(simpleVirtJS), 0o644))
+
+	// The rejection log must name the API but never the host path.
+	assertSanitizedRejection := func(t *testing.T, hook *logrustest.Hook) {
+		t.Helper()
+
+		var rejected bool
+		for _, e := range hook.AllEntries() {
+			msg, err := e.String()
+			require.NoError(t, err)
+			assert.NotContains(t, msg, outside, "log entry leaks the host path")
+			assert.NotContains(t, msg, "secret.js", "log entry leaks the host path")
+			if e.Level == logrus.WarnLevel && strings.Contains(e.Message, "Virtual endpoint script path rejected") {
+				rejected = true
+				assert.Equal(t, "test-api", e.Data["api_id"])
+			}
+		}
+		assert.True(t, rejected, "expected a rejection warning")
+	}
+
+	meta := &apidef.VirtualMeta{
+		ResponseFunctionName: "simpleVirt",
+		FunctionSourceType:   apidef.UseFile,
+		FunctionSourceURI:    secret,
+	}
+
+	t.Run("goja", func(t *testing.T) {
+		logger, hook := logrustest.NewNullLogger()
+		vm := &GojaJSVM{}
+		vm.Init(nil, logger.WithField("api_id", "test-api"), ts.Gw)
+		before := len(vm.programs)
+
+		ts.Gw.preLoadVirtualMetaCodeGoja(meta, vm)
+
+		assert.Equal(t, before, len(vm.programs))
+		assertSanitizedRejection(t, hook)
+	})
+
+	t.Run("otto", func(t *testing.T) {
+		logger, hook := logrustest.NewNullLogger()
+		vm := &JSVM{}
+		vm.Init(nil, logger.WithField("api_id", "test-api"), ts.Gw)
+
+		ts.Gw.preLoadVirtualMetaCode(meta, vm)
+
+		fn, err := vm.VM.Get("simpleVirt")
+		require.NoError(t, err)
+		assert.True(t, fn.IsUndefined(), "script outside middleware_path must not be loaded")
+		assertSanitizedRejection(t, hook)
+	})
+
+	t.Run("flag on loads the script", func(t *testing.T) {
+		origLoader := ts.Gw.JSAssetLoader
+		defer func() { ts.Gw.JSAssetLoader = origLoader }()
+		var err error
+		ts.Gw.JSAssetLoader, err = assetloader.New(ts.Gw.GetConfig().MiddlewarePath, assetloader.WithAllowUnsafe(true))
+		require.NoError(t, err)
+
+		vm := &GojaJSVM{}
+		vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+		before := len(vm.programs)
+
+		ts.Gw.preLoadVirtualMetaCodeGoja(meta, vm)
+
+		assert.Greater(t, len(vm.programs), before)
+	})
 }

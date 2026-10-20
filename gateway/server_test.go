@@ -2259,33 +2259,37 @@ func TestRegister_DoesNotReload(t *testing.T) {
 	ts.Gw.ServiceNonceMutex.RUnlock()
 }
 
-func TestNewGateway_OSRootInitialization(t *testing.T) {
-	t.Run("successful initialization with valid TemplatePath", func(t *testing.T) {
-		tempDir := t.TempDir()
+func TestNewGateway_AssetLoaders(t *testing.T) {
+	t.Run("loaders are rooted at the configured paths", func(t *testing.T) {
+		templates, middleware := t.TempDir(), t.TempDir()
 
-		cfg := config.Config{
-			TemplatePath: tempDir,
-		}
+		gw := NewGateway(config.Config{TemplatePath: templates, MiddlewarePath: middleware}, context.Background())
 
-		gw := NewGateway(cfg, context.Background())
-
-		require.NotNil(t, gw.OSRoot, "OSRoot should be initialized when TemplatePath is valid")
-
-		safePath, err := gw.OSRoot.Ensure("test.tmpl")
+		// The loaders resolve symlinks, so compare against the resolved roots
+		// (on macOS /var resolves to /private/var).
+		realTemplates, err := filepath.EvalSymlinks(templates)
 		require.NoError(t, err)
-		// OSRoot resolves symlinks, so compare against the resolved root rather
-		// than the raw TemplatePath (on macOS /var resolves to /private/var).
-		assert.Equal(t, filepath.Join(gw.OSRoot.RootPath(), "test.tmpl"), safePath)
+		got, err := gw.TemplateLoader.ResolvePath("test.tmpl")
+		require.NoError(t, err)
+		assert.Equal(t, filepath.Join(realTemplates, "test.tmpl"), got)
+
+		realMiddleware, err := filepath.EvalSymlinks(middleware)
+		require.NoError(t, err)
+		got, err = gw.JSAssetLoader.ResolvePath("virt.js")
+		require.NoError(t, err)
+		assert.Equal(t, filepath.Join(realMiddleware, "virt.js"), got)
 	})
 
-	t.Run("initialization fails with invalid TemplatePath", func(t *testing.T) {
-		cfg := config.Config{
-			TemplatePath: "/path/that/does/not/exist/12345",
-		}
+	t.Run("missing directories fail closed", func(t *testing.T) {
+		gw := NewGateway(config.Config{
+			TemplatePath:   "/path/that/does/not/exist/12345",
+			MiddlewarePath: "/path/that/does/not/exist/67890",
+		}, context.Background())
 
-		gw := NewGateway(cfg, context.Background())
-
-		assert.Nil(t, gw.OSRoot, "OSRoot should be nil when TemplatePath is invalid")
+		_, err := gw.TemplateLoader.ResolvePath("test.tmpl")
+		assert.ErrorContains(t, err, "is not available")
+		_, err = gw.JSAssetLoader.ResolvePath("virt.js")
+		assert.ErrorContains(t, err, "is not available")
 	})
 }
 
@@ -2322,5 +2326,39 @@ func TestAfterConfSetup_AllowUnsafeBodyTransformTemplatePathsWarning(t *testing.
 
 	t.Run("does not warn when disabled", func(t *testing.T) {
 		assert.False(t, hasWarning(t, false), "unexpected warning log about unsafe body transform template paths")
+	})
+}
+
+func TestAfterConfSetup_AllowUnsafeVirtualEndpointPathsWarning(t *testing.T) {
+	const warning = "allow_unsafe_virtual_endpoint_paths is enabled"
+
+	hasWarning := func(t *testing.T, allowUnsafe bool) bool {
+		t.Helper()
+
+		origLevel := log.GetLevel()
+		log.SetLevel(logrus.WarnLevel)
+		defer log.SetLevel(origLevel)
+
+		hook := &logrustest.Hook{}
+		log.AddHook(hook)
+		defer log.ReplaceHooks(make(logrus.LevelHooks))
+
+		gw := NewGateway(config.Config{AllowUnsafeVirtualEndpointPaths: allowUnsafe}, context.Background())
+		require.NoError(t, gw.afterConfSetup())
+
+		for _, e := range hook.AllEntries() {
+			if e.Level == logrus.WarnLevel && strings.Contains(e.Message, warning) {
+				return true
+			}
+		}
+		return false
+	}
+
+	t.Run("warns when enabled", func(t *testing.T) {
+		assert.True(t, hasWarning(t, true), "expected warning log about unsafe virtual endpoint paths")
+	})
+
+	t.Run("does not warn when disabled", func(t *testing.T) {
+		assert.False(t, hasWarning(t, false), "unexpected warning log about unsafe virtual endpoint paths")
 	})
 }

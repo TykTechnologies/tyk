@@ -16,6 +16,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/assetloader"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -402,8 +403,12 @@ func TestTransformRequestBody_LegacyWorkingDirectoryPath(t *testing.T) {
 	defer ts.Close()
 
 	// Documented form: relative to the gateway's working directory, which holds
-	// the template root.
+	// the template root. The loader reads the working directory once when it is
+	// built, so it is rebuilt after the change.
 	t.Chdir(filepath.Dir(ts.Gw.GetConfig().TemplatePath))
+	var err error
+	ts.Gw.TemplateLoader, err = assetloader.New(ts.Gw.GetConfig().TemplatePath)
+	require.NoError(t, err)
 
 	body := `{"value1":"a","value2":"b","value_list":["x"]}`
 
