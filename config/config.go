@@ -15,7 +15,9 @@ import (
 	"github.com/TykTechnologies/storage/kv"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	internalhttputil "github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 )
@@ -694,12 +696,25 @@ type HttpServerOptionsConfig struct {
 	// A value of 1 means using the last IP, 2 means second to last, and so on.
 	XFFDepth int `json:"xff_depth"`
 
+	// TrustedProxyCIDRs lists the proxy networks whose Forwarded and
+	// X-Forwarded-* headers may be used to determine the request's public
+	// origin. Requests received directly, or from any other peer, ignore those
+	// headers.
+	TrustedProxyCIDRs []string `json:"trusted_proxy_cidrs"`
+
 	// MaxResponseBodySize sets an upper limit on the response body (payload) size in bytes. It defaults to 0, which means there is no restriction on the response body size.
 	//
 	// The Gateway will return `HTTP 500 Response Body Too Large` if the response payload exceeds MaxResponseBodySize+1 bytes.
 	//
 	// **Note:** The limit is applied only when the [Response Body Transform middleware](/api-management/traffic-transformation/response-body) is enabled.
 	MaxResponseBodySize int64 `json:"max_response_body_size"`
+}
+
+// ValidateTrustedProxyCIDRs validates the networks permitted to supply public
+// request-origin headers.
+func (h HttpServerOptionsConfig) ValidateTrustedProxyCIDRs() error {
+	_, err := internalhttputil.ParseTrustedProxyCIDRs(h.TrustedProxyCIDRs)
+	return err
 }
 
 type AuthOverrideConf struct {
@@ -751,19 +766,9 @@ type CoProcessConfig struct {
 	// GRPCRoundRobinLoadBalancing enables round robin load balancing for gRPC services; you must provide the address of the load balanced service using `dns:///` protocol in `coprocess_grpc_server`.
 	GRPCRoundRobinLoadBalancing bool `json:"grpc_round_robin_load_balancing"`
 
-	// GRPCDNSRefreshInterval is how often, in seconds, the gRPC plugin target is
-	// re-resolved so that pods created by an autoscaling event are discovered.
-	// Only meaningful together with `grpc_round_robin_load_balancing`, and only
-	// against a headless Service — a ClusterIP resolves to one virtual IP and
-	// hides individual pods.
-	//
-	// 0 selects the default of 30 seconds; a negative value turns polling off,
-	// restoring the stock grpc-go behaviour of re-resolving only when a
-	// connection fails. Values below 10 are raised to 10, because the added DNS
-	// load is `gateways x APIs / interval` against a shared CoreDNS.
-	//
-	// The environment variable is TYK_GW_COPROCESSOPTIONS_GRPCDNSREFRESHINTERVAL.
-	GRPCDNSRefreshInterval int64 `json:"grpc_dns_refresh_interval"`
+	// GRPCDNSDiscovery resolves the hostname in `coprocess_grpc_server` in the background, so that gRPC plugin pods created by an autoscaling event receive traffic.
+	// Requires `grpc_round_robin_load_balancing` and a headless Kubernetes Service.
+	GRPCDNSDiscovery GRPCDNSDiscoveryConfig `json:"grpc_dns_discovery"`
 
 	// Sets the path to built-in Tyk modules. This will be part of the Python module lookup path. The value used here is the default one for most installations.
 	PythonPathPrefix string `json:"python_path_prefix"`
@@ -772,37 +777,13 @@ type CoProcessConfig struct {
 	PythonVersion string `json:"python_version"`
 }
 
-// DNS refresh interval bounds, shared by both gRPC paths. They match
-// rpc/dns_monitor.go, so the gateway's two DNS pollers agree on what is
-// reasonable to ask of a shared CoreDNS.
-const (
-	// DNSRefreshIntervalDefault is used when the configured interval is 0.
-	DNSRefreshIntervalDefault = 30 * time.Second
+// GRPCDNSDiscoveryConfig configures DNS discovery of gRPC plugin pods.
+type GRPCDNSDiscoveryConfig struct {
+	// Enabled determines if DNS discovery is active. Default: false.
+	Enabled bool `json:"enabled"`
 
-	// DNSRefreshIntervalMinimum is the floor applied to any positive interval.
-	DNSRefreshIntervalMinimum = 10 * time.Second
-)
-
-// ResolveDNSRefreshInterval turns a configured interval in seconds into a
-// duration, and reports whether polling is enabled at all.
-//
-// A negative value disables polling. 0 cannot mean "disabled" here: defaults
-// throughout this package are applied as `if conf.X == 0 { conf.X = default }`,
-// so a zero is indistinguishable from an unset field. `dns_cache.ttl` uses the
-// same negative sentinel for the same reason.
-func ResolveDNSRefreshInterval(seconds int64) (time.Duration, bool) {
-	switch {
-	case seconds < 0:
-		return 0, false
-	case seconds == 0:
-		return DNSRefreshIntervalDefault, true
-	}
-
-	interval := time.Duration(seconds) * time.Second
-	if interval < DNSRefreshIntervalMinimum {
-		interval = DNSRefreshIntervalMinimum
-	}
-	return interval, true
+	// RefreshInterval is how often the hostname is resolved. Set as human-readable format; defaults to 30s, minimum 5s.
+	RefreshInterval tyktime.ReadableDuration `json:"refresh_interval"`
 }
 
 type CertificatesConfig struct {
@@ -1518,6 +1499,22 @@ type Config struct {
 	// The standard characters are alphanumeric characters plus underscore (_), hyphen (-), dot (.) and tilde (~).
 	// The use of other characters in IDs can cause unpredictable behavior and is not recommended.
 	AllowUnsafePolicyIds bool `json:"allow_unsafe_policy_ids"`
+
+	// AllowUnsafeWebhookTemplatePaths disables webhook template path validation. This is provided for compatibility with legacy webhook definitions containing potentially unsafe template paths (default: false).
+	AllowUnsafeWebhookTemplatePaths bool `json:"allow_unsafe_webhook_template_paths"`
+
+	// AllowUnsafeApiIds allows the use of non-standard characters in API identifiers (default: false).
+	// The standard characters are alphanumeric characters plus underscore (_), hyphen (-), dot (.) and tilde (~).
+	// A standard ID must also contain at least one letter or digit, so IDs made only of punctuation (e.g. "." or "..") are rejected.
+	// The use of other characters in IDs can cause unpredictable behavior and is not recommended.
+	AllowUnsafeApiIds bool `json:"allow_unsafe_api_ids"`
+
+	// AllowUnsafeBodyTransformTemplatePaths disables body transform template path validation.
+	// This is provided for compatibility with legacy API definitions whose `template_source`
+	// points outside the configured TemplatePath root (default: false).
+	// Enabling it allows an API definition to read arbitrary files from the gateway
+	// filesystem and is strongly discouraged outside of a migration window.
+	AllowUnsafeBodyTransformTemplatePaths bool `json:"allow_unsafe_body_transform_template_paths"`
 }
 
 // LabsConfig include config for streaming

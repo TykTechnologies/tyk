@@ -13,10 +13,16 @@ import (
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
-	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
+	"github.com/TykTechnologies/tyk/internal/dnsdiscovery"
 	"github.com/TykTechnologies/tyk/internal/grpcresolver"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 )
+
+// grpcPluginDNSKey is the gRPC plugin dispatcher's subscription on the upstream
+// DNS scheduler. Upstream subscriptions are keyed by API ID, and the standard
+// API ID characters exclude ':'.
+const grpcPluginDNSKey = "coprocess:grpc"
 
 var (
 	grpcConnection *grpc.ClientConn
@@ -157,35 +163,10 @@ func (gw *Gateway) NewGRPCDispatcher() (coprocess.Dispatcher, error) {
 	isRoundRobinEnabled := gw.GetConfig().CoProcessOptions.GRPCRoundRobinLoadBalancing
 	if isRoundRobinEnabled {
 		dialOptions = append(dialOptions, grpc.WithDefaultServiceConfig(`{"loadBalancingConfig": [{"round_robin":{}}]}`))
+	}
 
-		// Round-robin balances across whatever the resolver reports, and the
-		// stock DNS resolver only re-resolves when a connection breaks — so a
-		// pod added by a scale-up, which breaks nothing, is never discovered.
-		// Swap in a resolver that polls, and address the client at it.
-		if interval, pollEnabled := config.ResolveDNSRefreshInterval(gw.GetConfig().CoProcessOptions.GRPCDNSRefreshInterval); pollEnabled {
-			endpoint, ok := bareGRPCEndpoint(target)
-			if !ok {
-				// Leave the client on the stock resolver rather than guessing.
-				// Losing pod discovery is recoverable; failing to build the
-				// dispatcher takes every plugin down with it.
-				log.WithFields(logrus.Fields{
-					"prefix": "coprocess",
-					"target": target,
-				}).Warning("Could not read a host:port from coprocess_grpc_server; gRPC plugin pod discovery disabled")
-			} else {
-				dialOptions = append(dialOptions, grpc.WithResolvers(&grpcresolver.Builder{
-					Interval: interval,
-					Ctx:      gw.ctx,
-				}))
-				target = grpcresolver.Target(endpoint)
-
-				log.WithFields(logrus.Fields{
-					"prefix":   "coprocess",
-					"target":   target,
-					"interval": interval.String(),
-				}).Info("gRPC plugin pod discovery enabled")
-			}
-		}
+	if gw.GetConfig().CoProcessOptions.GRPCDNSDiscovery.Enabled {
+		target, dialOptions = gw.grpcPluginDNSDiscovery(target, dialOptions)
 	}
 
 	grpcConnection, err = grpc.NewClient(
@@ -201,4 +182,56 @@ func (gw *Gateway) NewGRPCDispatcher() (coprocess.Dispatcher, error) {
 
 	grpcClient = coprocess.NewDispatcherClient(grpcConnection)
 	return &GRPCDispatcher{}, nil
+}
+
+// grpcPluginDNSDiscovery points the gRPC plugin client at a resolver backed by
+// the gateway's DNS discovery scheduler. Round-robin balances across whatever
+// the resolver reports, and the stock DNS resolver only re-resolves when a
+// connection breaks, so a pod added by a scale-up is never discovered.
+//
+// Any configuration it cannot honour leaves the client on the stock resolver:
+// losing pod discovery is recoverable, failing to build the dispatcher takes
+// every plugin down with it.
+func (gw *Gateway) grpcPluginDNSDiscovery(target string, dialOptions []grpc.DialOption) (string, []grpc.DialOption) {
+	conf := gw.GetConfig().CoProcessOptions
+	logger := log.WithFields(logrus.Fields{
+		"prefix": "coprocess",
+		"target": target,
+	})
+
+	if !conf.GRPCRoundRobinLoadBalancing {
+		logger.Error("grpc_dns_discovery requires grpc_round_robin_load_balancing; " +
+			"it supplies the address list but does not distribute across it. gRPC plugin pod discovery disabled")
+		return target, dialOptions
+	}
+
+	endpoint, ok := bareGRPCEndpoint(target)
+	if !ok {
+		logger.Warning("Could not read a host:port from coprocess_grpc_server; gRPC plugin pod discovery disabled")
+		return target, dialOptions
+	}
+
+	if strings.HasPrefix(target, "dns://") && !strings.HasPrefix(target, "dns:///") {
+		logger.Warning("grpc_dns_discovery resolves with the system resolver and cannot use the DNS server " +
+			"named in coprocess_grpc_server; gRPC plugin pod discovery disabled")
+		return target, dialOptions
+	}
+
+	interval := dnsdiscovery.NormaliseInterval(tyktime.Duration(conf.GRPCDNSDiscovery.RefreshInterval))
+
+	dialOptions = append(dialOptions, grpc.WithResolvers(&grpcresolver.Builder{
+		Scheduler:   &gw.upstreamDNS,
+		Key:         grpcPluginDNSKey,
+		Interval:    interval,
+		WarmTimeout: dnsDiscoveryWarmTimeout,
+		Ctx:         gw.ctx,
+	}))
+	target = grpcresolver.Target(endpoint)
+
+	logger.WithFields(logrus.Fields{
+		"target":           target,
+		"refresh_interval": interval.String(),
+	}).Info("gRPC plugin pod discovery enabled")
+
+	return target, dialOptions
 }

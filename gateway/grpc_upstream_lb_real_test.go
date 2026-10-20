@@ -13,30 +13,18 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	pbexample "google.golang.org/grpc/examples/helloworld/helloworld"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	pbexample "google.golang.org/grpc/examples/helloworld/helloworld"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 )
 
-// The tests in this file answer two questions with a real gRPC server and a
-// real gRPC client on either side of the gateway, rather than by asserting on
-// r.Proto against a plain h2c handler as grpc_h2c_defects_test.go does:
-//
-//   1. Is load balancing broken for h2c? A protocol downgrade is only a defect
-//      if it actually fails. A real gRPC server speaks HTTP/2 and nothing else,
-//      so a downgraded target produces a failed RPC rather than a slower one.
-//
-//   2. Does DNS discovery work for real gRPC? Distribution of HTTP/2 requests
-//      is necessary but not sufficient: the resolved addresses have to keep the
-//      h2c scheme and the configured authority, or the calls fail on arrival.
-//
-// Both are measured in the same run, against the same pod set.
+// A real gRPC server and client either side of the gateway, rather than
+// r.Proto against a plain h2c handler. A real server speaks HTTP/2 and nothing
+// else, so a downgraded target fails the RPC rather than slowing it.
 
-// grpcPod is one backend replica in a simulated headless Service: a real gRPC
-// server bound to its own loopback address, reporting its identity in every
-// reply so the caller can attribute traffic, and recording the :authority it
-// was addressed with.
+// Reports its identity in every reply, and records the :authority.
 type grpcPod struct {
 	id   string
 	ip   string
@@ -63,13 +51,12 @@ func (p *grpcPod) authorityList() map[string]int {
 	return out
 }
 
-// podGreeter answers SayHello with the pod's identity.
 type podGreeter struct {
 	pbexample.UnimplementedGreeterServer
 	pod *grpcPod
 }
 
-func (g *podGreeter) SayHello(ctx context.Context, in *pbexample.HelloRequest) (*pbexample.HelloReply, error) {
+func (g *podGreeter) SayHello(ctx context.Context, _ *pbexample.HelloRequest) (*pbexample.HelloReply, error) {
 	atomic.AddInt64(&g.pod.hits, 1)
 
 	if md, ok := metadata.FromIncomingContext(ctx); ok {
@@ -83,13 +70,7 @@ func (g *podGreeter) SayHello(ctx context.Context, in *pbexample.HelloRequest) (
 	return &pbexample.HelloReply{Message: g.pod.id}, nil
 }
 
-// startGRPCPodSet starts n real gRPC servers, each on its own local address but
-// all on the SAME port, which is what a headless Service looks like to a
-// client: one name, one port, N pod addresses.
-//
-// Port selection mirrors startH2CPodSet: claim a port on the first candidate
-// address, then hold every listener open so nothing can take the port on the
-// others underneath the set.
+// startGRPCPodSet is startH2CPodSet with real gRPC servers.
 func startGRPCPodSet(t *testing.T, n int) ([]*grpcPod, string) {
 	t.Helper()
 
@@ -153,7 +134,6 @@ func startGRPCPodSet(t *testing.T, n int) ([]*grpcPod, string) {
 	return pods, port
 }
 
-// resetPods clears the counters so one pod set can serve several arms.
 func resetPods(pods []*grpcPod) {
 	for _, p := range pods {
 		atomic.StoreInt64(&p.hits, 0)
@@ -163,9 +143,8 @@ func resetPods(pods []*grpcPod) {
 	}
 }
 
-// gatewayHostPort returns the host:port a real gRPC client should dial for the
-// gateway's default listener. That listener wraps its handler in h2c, so a
-// cleartext gRPC client reaches it without a dedicated port being whitelisted.
+// The default listener wraps its handler in h2c, so a gRPC client can dial
+// it.
 func gatewayHostPort(t *testing.T, ts *Test) string {
 	t.Helper()
 
@@ -176,15 +155,9 @@ func gatewayHostPort(t *testing.T, ts *Test) string {
 	return u.Host
 }
 
-// waitForGRPCGateway blocks until the gateway answers on its h2c listener,
-// then leaves the pod counters clean.
-//
-// The listener for a custom ListenPort is created while the API loads, so the
-// first calls after BuildAndLoadAPI can be sent before anything is listening
-// and sit until their own deadline. Waiting for a definitive answer keeps that
-// start-up window out of the measurement. Any answer counts, including a
-// proxying error: an arm expecting every call to fail still needs the gateway
-// to be up before the failures mean anything.
+// A custom ListenPort's listener is created while the API loads, so calls
+// sent straight after BuildAndLoadAPI can sit until their own deadline. Any
+// answer counts, including a proxying error.
 func waitForGRPCGateway(t *testing.T, gatewayAddr string, pods []*grpcPod) {
 	t.Helper()
 
@@ -214,10 +187,8 @@ func waitForGRPCGateway(t *testing.T, gatewayAddr string, pods []*grpcPod) {
 	t.Fatalf("gateway at %s did not answer within 60s", gatewayAddr)
 }
 
-// callGreeter makes n unary calls through the gateway on one client connection
-// and returns the replies grouped by the pod that answered, plus the first
-// error seen. It does not fail the test on an RPC error, because one of the
-// tests below expects every call to fail.
+// Groups replies by pod. An RPC error does not fail the test, since one arm
+// expects every call to fail.
 func callGreeter(t *testing.T, gatewayAddr string, n int) (map[string]int, error) {
 	t.Helper()
 
@@ -239,8 +210,7 @@ func callGreeter(t *testing.T, gatewayAddr string, n int) (map[string]int, error
 		cancel()
 
 		if err != nil {
-			// Only the first few, so an arm where every call is expected to
-			// fail does not bury the verdict in identical lines.
+			// Only the first few, or an all-failing arm buries the verdict.
 			if failed < 3 {
 				t.Logf("    call %2d failed after %s: %v", i, time.Since(started).Round(time.Millisecond), err)
 			}
@@ -260,46 +230,93 @@ func callGreeter(t *testing.T, gatewayAddr string, n int) (map[string]int, error
 	return served, firstErr
 }
 
-// evenness reports max/mean over the served counts, the same bar the TT-17922
-// reproduction harness scores distribution against.
 func evenness(served map[string]int, pods int) float64 {
 	if pods == 0 || len(served) == 0 {
 		return 0
 	}
 
-	total, max := 0, 0
+	total, highest := 0, 0
 	for _, n := range served {
 		total += n
-		if n > max {
-			max = n
+		if n > highest {
+			highest = n
 		}
 	}
 	mean := float64(total) / float64(pods)
 	if mean == 0 {
 		return 0
 	}
-	return float64(max) / mean
+	return float64(highest) / mean
 }
 
-// TestGRPCUpstream_StaticLB_RealGRPC measures whether load balancing works for
-// a cleartext gRPC upstream, using a real gRPC client and two real gRPC servers.
+func totalServed(served map[string]int) int {
+	total := 0
+	for _, n := range served {
+		total += n
+	}
+	return total
+}
+
+func logGRPCPods(t *testing.T, pods []*grpcPod) {
+	t.Helper()
+
+	for _, p := range pods {
+		t.Logf("  %s (%s): %d calls served, authorities %v",
+			p.id, p.bareTarget(), atomic.LoadInt64(&p.hits), p.authorityList())
+	}
+}
+
+func idleGRPCPods(pods []*grpcPod) []string {
+	var idle []string
+	for _, p := range pods {
+		if atomic.LoadInt64(&p.hits) == 0 {
+			idle = append(idle, fmt.Sprintf("%s (%s)", p.id, p.bareTarget()))
+		}
+	}
+	return idle
+}
+
+// assertDowngradedArmFails checks the control arm still fails outright, which is
+// what makes the passing arm evidence of anything.
+func assertDowngradedArmFails(t *testing.T, reason string, total, requests int, callErr error) {
+	t.Helper()
+
+	if callErr == nil && total == requests {
+		t.Fatalf("every call succeeded, but this arm is expected to fail: %s.\n"+
+			"If the gateway now reaches a gRPC upstream over a load-balanced entry "+
+			"written without a scheme, the coalescing described above has changed and "+
+			"the service discovery limitation recorded in TT-18059 no longer holds.",
+			reason)
+	}
+	if total > 0 {
+		t.Errorf("%d of %d calls were answered on an arm expected to fail outright; "+
+			"the downgrade is expected to break every call, not some of them", total, requests)
+	}
+}
+
+func assertAllCallsAnswered(t *testing.T, total, requests int, callErr error) {
+	t.Helper()
+
+	if callErr != nil {
+		t.Fatalf("%d/%d calls answered, first error %v.\n"+
+			"Load balancing over explicit h2c:// targets must reach a real gRPC server. "+
+			"An error here means the target list is being rewritten to http:// again and "+
+			"the gateway is offering HTTP/1.1 to an HTTP/2-only server.", total, requests, callErr)
+	}
+	if total != requests {
+		t.Fatalf("%d of %d calls answered and no error was returned, which should not happen",
+			total, requests)
+	}
+}
+
+// The arms differ only in how the target list spells its entries, which is the
+// whole of the h2c load balancing defect. Target selection prepends the listen
+// protocol to an entry with no scheme, coalescing an inherited h2c to http.
 //
-// The two arms differ only in how the target list spells its entries, and that
-// difference is the whole of the h2c load-balancing defect. Target selection
-// runs before the transport is chosen, and it prepends the API's listen
-// protocol to any entry that has no scheme of its own, coalescing an inherited
-// h2c to http. The transport is then chosen from the scheme on the outgoing
-// request, which by then says http, so the gateway offers HTTP/1.1 to a server
-// that speaks HTTP/2 and nothing else.
-//
-//   - explicit_h2c_targets: every entry carries h2c:// of its own. Calls
-//     succeed and are distributed. Before TT-17922 narrowed the rewrite, the
-//     scheme was replaced unconditionally and this arm failed the same way the
-//     second one does.
-//   - inherited_scheme_targets: entries are bare host:port. Still downgraded
-//     today, which is why service discovery cannot currently deliver a
-//     cleartext HTTP/2 target: a registry returning host and port values
-//     produces exactly this shape.
+//   - explicit_h2c_targets: entries carry h2c:// of their own, and succeed.
+//   - inherited_scheme_targets: bare host:port, still downgraded. A registry
+//     returns exactly this shape, which is why service discovery cannot
+//     deliver a cleartext HTTP/2 target.
 func TestGRPCUpstream_StaticLB_RealGRPC(t *testing.T) {
 	const requests = 20
 
@@ -343,50 +360,19 @@ func TestGRPCUpstream_StaticLB_RealGRPC(t *testing.T) {
 			waitForGRPCGateway(t, gatewayAddr, pods)
 
 			served, callErr := callGreeter(t, gatewayAddr, requests)
+			total := totalServed(served)
 
-			total := 0
-			for _, n := range served {
-				total += n
-			}
-			for _, p := range pods {
-				t.Logf("  %s (%s): %d calls served, authorities %v",
-					p.id, p.bareTarget(), atomic.LoadInt64(&p.hits), p.authorityList())
-			}
+			logGRPCPods(t, pods)
 			t.Logf("  %d/%d calls answered, first error: %v", total, requests, callErr)
 
 			if !arm.wantCalls {
-				if callErr == nil && total == requests {
-					t.Fatalf("every call succeeded, but this arm is expected to fail: %s.\n"+
-						"If the gateway now reaches a gRPC upstream over a load-balanced entry "+
-						"written without a scheme, the coalescing described above has changed and "+
-						"the service discovery limitation recorded in TT-18059 no longer holds.",
-						arm.wantReason)
-				}
-				if total > 0 {
-					t.Errorf("%d of %d calls were answered on an arm expected to fail outright; "+
-						"the downgrade is expected to break every call, not some of them", total, requests)
-				}
+				assertDowngradedArmFails(t, arm.wantReason, total, requests, callErr)
 				return
 			}
 
-			if callErr != nil {
-				t.Fatalf("%d/%d calls answered, first error %v.\n"+
-					"Load balancing over explicit h2c:// targets must reach a real gRPC server. "+
-					"An error here means the target list is being rewritten to http:// again and "+
-					"the gateway is offering HTTP/1.1 to an HTTP/2-only server.", total, requests, callErr)
-			}
-			if total != requests {
-				t.Fatalf("%d of %d calls answered and no error was returned, which should not happen",
-					total, requests)
-			}
+			assertAllCallsAnswered(t, total, requests, callErr)
 
-			var idle []string
-			for _, p := range pods {
-				if atomic.LoadInt64(&p.hits) == 0 {
-					idle = append(idle, fmt.Sprintf("%s (%s)", p.id, p.bareTarget()))
-				}
-			}
-			if len(idle) > 0 {
+			if idle := idleGRPCPods(pods); len(idle) > 0 {
 				t.Fatalf("load balancing is enabled over %d targets but %v received no calls; "+
 					"requests are not being distributed", len(arm.targets), idle)
 			}
@@ -398,19 +384,39 @@ func TestGRPCUpstream_StaticLB_RealGRPC(t *testing.T) {
 	}
 }
 
-// TestGRPCUpstream_DNSDiscovery_RealGRPC measures whether DNS discovery
-// delivers working gRPC, not merely distributed HTTP/2.
-//
-// The API is configured the way the reported case is: one upstream name, no
-// target list. The name resolves to every pod address, as a headless Service
-// does. Three things have to hold together for the calls to succeed at all,
-// which is why they are asserted in one test: the resolved addresses have to
-// enter the target list, they have to keep the h2c scheme so the cleartext
-// HTTP/2 transport is selected, and each request has to keep the configured
-// service name as its authority so the pod sees the Host it expects.
-//
-// The disabled arm is the control. Without the setting the traffic pins to one
-// pod, which is the behaviour on the released gateway.
+// assertPodAuthority checks every pod was told the configured authority. A gRPC
+// server doing virtual hosting rejects anything else.
+func assertPodAuthority(t *testing.T, pods []*grpcPod, want string) {
+	t.Helper()
+
+	for _, p := range pods {
+		auths := p.authorityList()
+		if auths[want] == 0 {
+			t.Errorf("%s saw authorities %v, none of them %q. Dialling the pod address "+
+				"must not change the authority the upstream is told.",
+				p.id, auths, want)
+		}
+	}
+}
+
+// assertPinnedToOneGRPCPod is the control arm: without discovery the cleartext
+// HTTP/2 client has no resolver and pools by the host in the request URL.
+func assertPinnedToOneGRPCPod(t *testing.T, pods []*grpcPod, idle []string) {
+	t.Helper()
+
+	if len(idle) != len(pods)-1 {
+		t.Errorf("control: with DNS discovery off, %d of %d pods were idle, want %d. "+
+			"Traffic is expected to pin to one pod, because the cleartext HTTP/2 client "+
+			"has no resolver and pools by the host in the request URL. If it spreads "+
+			"here, the enabled arm is not measuring the setting.",
+			len(idle), len(pods), len(pods)-1)
+	}
+}
+
+// Configured as the reported case is: one upstream name, no target list. The
+// calls only succeed if the resolved addresses enter the target list, keep the
+// h2c scheme, and keep the service name as their authority, so all three are
+// asserted together. The disabled arm is the control, and pins to one pod.
 func TestGRPCUpstream_DNSDiscovery_RealGRPC(t *testing.T) {
 	const (
 		upstreamHost    = "grpc-real-lb.test"
@@ -430,48 +436,38 @@ func TestGRPCUpstream_DNSDiscovery_RealGRPC(t *testing.T) {
 
 	wantAuthority := net.JoinHostPort(upstreamHost, port)
 
-	for _, enabled := range []bool{true, false} {
-		name := "dns_discovery_disabled"
-		if enabled {
-			name = "dns_discovery_enabled"
-		}
+	cases := []struct {
+		name    string
+		enabled bool
+	}{
+		{"dns_discovery_enabled", true},
+		{"dns_discovery_disabled", false},
+	}
 
-		t.Run(name, func(t *testing.T) {
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
 			resetPods(pods)
 
 			ts := StartTest(nil)
 			defer ts.Close()
 
 			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-				spec.Name = "grpc-dns-lb-" + name
+				spec.Name = "grpc-dns-lb-" + tc.name
 				spec.Proxy.ListenPath = "/"
 				spec.UseKeylessAccess = true
 				spec.Proxy.TargetURL = fmt.Sprintf("h2c://%s:%s", upstreamHost, port)
-				// DNS discovery supplies the target list;
-				// enable_load_balancing distributes it. Both go on together,
-				// and the control arm has neither.
-				spec.Proxy.EnableLoadBalancing = enabled
-				spec.Proxy.DNSDiscovery.Enabled = enabled
-				spec.Proxy.DNSDiscovery.RefreshInterval = dnsCacheTimeout
+				spec.Proxy.EnableLoadBalancing = tc.enabled
+				spec.Proxy.DNSDiscovery.Enabled = tc.enabled
+				spec.Proxy.DNSDiscovery.RefreshInterval = tyktime.ReadableDuration(dnsCacheTimeout * time.Second)
 			})
 
 			gatewayAddr := gatewayHostPort(t, ts)
 			waitForGRPCGateway(t, gatewayAddr, pods)
 
 			served, callErr := callGreeter(t, gatewayAddr, requests)
-
-			total := 0
-			for _, n := range served {
-				total += n
-			}
-			var idle []string
-			for _, p := range pods {
-				if atomic.LoadInt64(&p.hits) == 0 {
-					idle = append(idle, fmt.Sprintf("%s (%s)", p.id, p.bareTarget()))
-				}
-				t.Logf("  %s (%s:%s): %d calls served, authorities %v",
-					p.id, p.ip, port, atomic.LoadInt64(&p.hits), p.authorityList())
-			}
+			total := totalServed(served)
+			idle := idleGRPCPods(pods)
+			logGRPCPods(t, pods)
 
 			if callErr != nil {
 				t.Fatalf("%d/%d calls answered, first error %v.\n"+
@@ -484,14 +480,8 @@ func TestGRPCUpstream_DNSDiscovery_RealGRPC(t *testing.T) {
 				t.Fatalf("pods answered %d of %d calls with no error returned", total, requests)
 			}
 
-			if !enabled {
-				if len(idle) != len(pods)-1 {
-					t.Errorf("control: with DNS discovery off, %d of %d pods were idle, want %d. "+
-						"Traffic is expected to pin to one pod, because the cleartext HTTP/2 client "+
-						"has no resolver and pools by the host in the request URL. If it spreads "+
-						"here, the enabled arm is not measuring the setting.",
-						len(idle), len(pods), len(pods)-1)
-				}
+			if !tc.enabled {
+				assertPinnedToOneGRPCPod(t, pods, idle)
 				return
 			}
 
@@ -504,28 +494,14 @@ func TestGRPCUpstream_DNSDiscovery_RealGRPC(t *testing.T) {
 				t.Errorf("distribution evenness %.2f exceeds the 1.5 bar, counts %v", got, served)
 			}
 
-			// The pods are addressed individually but must still be told the
-			// service name, or a gRPC server doing virtual hosting rejects them.
-			for _, p := range pods {
-				auths := p.authorityList()
-				if n := auths[wantAuthority]; n == 0 {
-					t.Errorf("%s saw authorities %v, none of them %q. Dialling the pod address "+
-						"must not change the authority the upstream is told.",
-						p.id, auths, wantAuthority)
-				}
-			}
+			assertPodAuthority(t, pods, wantAuthority)
 		})
 	}
 }
 
-// TestGRPCUpstream_DNSDiscovery_ScaleUp measures the defect the parent ticket
-// exists for: a pod created by an autoscaling event has to start receiving
-// calls without a connection failing first.
-//
-// The Service starts with one address, so the first arm of calls has only one
-// place to go. A second address is then added to the name, as a scale-up does,
-// and nothing is disturbed: no connection is broken, no API is reloaded. The
-// new pod has to appear within the refresh interval on its own.
+// The defect the parent ticket exists for. A second address is added to the
+// name with no connection broken and no API reloaded, and the new pod has to
+// appear within the refresh interval.
 func TestGRPCUpstream_DNSDiscovery_ScaleUp(t *testing.T) {
 	const (
 		upstreamHost    = "grpc-real-scaleup.test"
@@ -536,7 +512,7 @@ func TestGRPCUpstream_DNSDiscovery_ScaleUp(t *testing.T) {
 	pods, port := startGRPCPodSet(t, 2)
 	before, added := pods[0], pods[1]
 
-	// Membership at boot: one pod.
+	// Membership at boot.
 	handle := mockDomain(t, upstreamHost, []string{before.ip})
 
 	ts := StartTest(nil)
@@ -549,7 +525,7 @@ func TestGRPCUpstream_DNSDiscovery_ScaleUp(t *testing.T) {
 		spec.Proxy.TargetURL = fmt.Sprintf("h2c://%s:%s", upstreamHost, port)
 		spec.Proxy.EnableLoadBalancing = true
 		spec.Proxy.DNSDiscovery.Enabled = true
-		spec.Proxy.DNSDiscovery.RefreshInterval = refreshInterval
+		spec.Proxy.DNSDiscovery.RefreshInterval = tyktime.ReadableDuration(refreshInterval * time.Second)
 	})
 
 	gatewayAddr := gatewayHostPort(t, ts)
@@ -574,14 +550,7 @@ func TestGRPCUpstream_DNSDiscovery_ScaleUp(t *testing.T) {
 
 	resetPods(pods)
 
-	// Poll until the new pod is reached, bounded by the refresh interval with
-	// margin. The calls made while polling are incidental: the scheduler
-	// refreshes in the background, so the pod would be discovered with no
-	// traffic at all. TestScheduler_DiscoversWithoutTraffic asserts that
-	// directly. The traffic itself does nothing to
-	// trigger rediscovery: no connection is closed and every call succeeds
-	// whichever pod answers, which is exactly why the released gateway never
-	// notices a scale-up.
+	// The polling calls are incidental; the refresh is in the background.
 	deadline := time.Now().Add((refreshInterval + 15) * time.Second)
 	var discovered bool
 	for time.Now().Before(deadline) {

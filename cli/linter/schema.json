@@ -646,9 +646,21 @@
         "grpc_round_robin_load_balancing": {
           "type": "boolean"
         },
-        "grpc_dns_refresh_interval": {
-          "type": "integer",
-          "minimum": -1
+        "grpc_dns_discovery": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "refresh_interval": {
+              "type": "string",
+              "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?(\\d+ms)?(\\d+µs)?(\\d+ns)?$"
+            }
+          }
         },
         "enable_coprocess": {
           "type": "boolean"
@@ -961,6 +973,12 @@
         },
         "xff_depth": {
           "type": "integer"
+        },
+        "trusted_proxy_cidrs": {
+          "type": ["array", "null"],
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -1720,6 +1738,18 @@
       "default": "quotas"
     },
     "allow_unsafe_policy_ids": {
+      "type": ["boolean", "null"],
+      "additionalProperties": false
+    },
+    "allow_unsafe_webhook_template_paths": {
+      "type": ["boolean", "null"],
+      "additionalProperties": false
+    },
+    "allow_unsafe_api_ids": {
+      "type": ["boolean", "null"],
+      "additionalProperties": false
+    },
+    "allow_unsafe_body_transform_template_paths": {
       "type": ["boolean", "null"],
       "additionalProperties": false
     },

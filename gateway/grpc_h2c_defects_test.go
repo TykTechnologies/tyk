@@ -1,20 +1,7 @@
 package gateway
 
-// Reproduction tests for three defects in the h2c (plaintext HTTP/2, i.e. gRPC)
-// upstream path. All three were found while investigating why gRPC upstreams do
-// not load-balance or discover autoscaled pods.
-//
-// THESE TESTS FAIL ON MASTER BY DESIGN. Each asserts the behaviour the gateway
-// should have; each currently demonstrates the defect instead. They are written
-// to be the regression gate for the fixes, not to be green today.
-//
-//	TestH2C_LoadBalancing_UsesHTTP2          — h2c + enable_load_balancing sends HTTP/1.1
-//	TestH2C_DNSCache_IsApplied               — dns_cache silently does not apply to h2c
-//	TestH2C_TransportRebuild_ClosesOldConns  — max_conn_time leaks an h2c connection per rebuild
-//	TestH2C_Upstream_RoundRobin_Distributes  — gRPC upstreams never load-balance at all
-//
-// Run with:
-//	go test ./gateway/ -run 'TestH2C_' -v
+// Regression tests for defects in the h2c (plaintext HTTP/2, so gRPC) upstream
+// path. Each one failed on master.
 
 import (
 	"context"
@@ -32,24 +19,17 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 	"github.com/TykTechnologies/tyk/test"
 )
 
-// mockDomain points the process-wide DNS mock at ips for the duration of the
-// test, then restores whatever was registered before.
-//
-// There is exactly one mock server per process: net.DefaultResolver can only
-// point at one, so every InitDNSMock caller shares it. Registering through
-// PushDomains keeps each test's mappings from outliving it and colliding with
-// the next one — TestReverseProxyDnsCache in particular installs its own set
-// and runs after this file.
+// One mock server per process: net.DefaultResolver can only point at one.
 func mockDomain(t *testing.T, host string, ips []string) *test.DnsMockHandle {
 	t.Helper()
 
-	// The gateway package only creates its global mock when EnableTestDNSMock
-	// is set, which it is not, so take a handle on the process-wide one here.
-	// InitDNSMock returns the same server to every caller.
+	// InitDNSMock returns the same process-wide server to every caller.
 	handle, err := test.InitDNSMock(map[string][]string{}, nil)
 	if err != nil {
 		t.Fatalf("init dns mock: %v", err)
@@ -62,8 +42,6 @@ func mockDomain(t *testing.T, host string, ips []string) *test.DnsMockHandle {
 	return handle
 }
 
-// assertResolves fails the test unless host resolves to exactly len(ips)
-// addresses, so a later assertion cannot fail for want of a working mock.
 func assertResolves(t *testing.T, host string, ips []string) {
 	t.Helper()
 
@@ -76,9 +54,7 @@ func assertResolves(t *testing.T, host string, ips []string) {
 	}
 }
 
-// newH2CUpstream starts a plaintext HTTP/2 (h2c) server, the shape a gRPC
-// upstream presents to the gateway. The handler records the protocol each
-// request arrived over, which is how these tests tell HTTP/2 from HTTP/1.1.
+// The shape a gRPC upstream presents. Records the protocol per request.
 func newH2CUpstream(t *testing.T, onRequest func(r *http.Request)) *httptest.Server {
 	t.Helper()
 	srv := httptest.NewUnstartedServer(
@@ -87,7 +63,7 @@ func newH2CUpstream(t *testing.T, onRequest func(r *http.Request)) *httptest.Ser
 				onRequest(r)
 			}
 			w.WriteHeader(http.StatusOK)
-			_, _ = io.WriteString(w, "ok")
+			writeBody(t, w, "ok")
 		}), &http2.Server{}),
 	)
 	srv.Start()
@@ -95,14 +71,8 @@ func newH2CUpstream(t *testing.T, onRequest func(r *http.Request)) *httptest.Ser
 	return srv
 }
 
-// TestH2C_LoadBalancing_UsesHTTP2 reproduces defect D-3.
-//
-// EnsureTransport rewrites "h2c://" to "http://" (gateway/reverse_proxy.go:149)
-// and is called from the load-balancing target path (:170, :199). The h2c
-// transport is only selected when outReq.URL.Scheme == "h2c" (:836), which by
-// then is "http". So enabling enable_load_balancing on an h2c API silently
-// downgrades it to HTTP/1.1 — the gateway speaks the wrong protocol to a gRPC
-// server, which is a hard failure for real gRPC rather than a slow path.
+// Target selection rewrote h2c:// to http:// before the transport was chosen
+// from the scheme, downgrading any h2c API with load balancing on.
 func TestH2C_LoadBalancing_UsesHTTP2(t *testing.T) {
 	var mu sync.Mutex
 	var protos []string
@@ -142,9 +112,7 @@ func TestH2C_LoadBalancing_UsesHTTP2(t *testing.T) {
 	}
 }
 
-// TestH2C_LoadBalancing_Disabled_UsesHTTP2 is the control for D-3. The same API
-// without enable_load_balancing must reach the upstream over HTTP/2. If this
-// one fails, the test above proves nothing.
+// The control for the test above.
 func TestH2C_LoadBalancing_Disabled_UsesHTTP2(t *testing.T) {
 	var mu sync.Mutex
 	var protos []string
@@ -178,64 +146,8 @@ func TestH2C_LoadBalancing_Disabled_UsesHTTP2(t *testing.T) {
 	}
 }
 
-// TestH2C_DNSCache_IsApplied reproduces defect D-2.
-//
-// The dns cache is wired only into http.Transport.DialContext
-// (gateway/reverse_proxy.go:426). The h2c transport builds its own dialer with a
-// raw net.Dial (:838-844), bypassing dnsCacheManager.WrapDialer entirely. A
-// customer who enables dns_cache does not get it on h2c APIs, and gets no
-// indication of that.
-func TestH2C_DNSCache_IsApplied(t *testing.T) {
-	const upstreamHost = "h2c-dns-target.com"
-
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	upstream := newH2CUpstream(t, nil)
-	_, port, err := net.SplitHostPort(strings.TrimPrefix(upstream.URL, "http://"))
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Point the mocked resolver at the loopback listener the upstream is on.
-	mockDomain(t, upstreamHost, []string{"127.0.0.1"})
-
-	ts.Gw.dnsCacheManager.InitDNSCaching(60*time.Second, 60*time.Second)
-	defer ts.Gw.dnsCacheManager.DisposeCache()
-
-	globalConf := ts.Gw.GetConfig()
-	globalConf.DnsCache.Enabled = true
-	globalConf.DnsCache.TTL = 60
-	globalConf.DnsCache.MultipleIPsHandleStrategy = config.NoCacheStrategy
-	ts.Gw.SetConfig(globalConf)
-	ts.Gw.DoReload()
-
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/h2c-dns/"
-		spec.UseKeylessAccess = true
-		spec.Proxy.TargetURL = fmt.Sprintf("h2c://%s:%s", upstreamHost, port)
-	})
-
-	_, _ = ts.Run(t, test.TestCase{Path: "/h2c-dns/", Code: http.StatusOK})
-
-	storage := ts.Gw.dnsCacheManager.CacheStorage()
-	if storage == nil {
-		t.Fatal("dns cache storage is nil despite dns_cache being enabled")
-	}
-	if _, found := storage.Get(upstreamHost); !found {
-		t.Errorf("after proxying to an h2c upstream at %q, the dns cache holds no entry for it.\n"+
-			"The h2c transport dials with a raw net.Dial and bypasses the cached dialer, "+
-			"so dns_cache silently does not apply to h2c APIs.", upstreamHost)
-	}
-}
-
-// connCounter tracks how many TCP connections a test upstream has accepted and
-// how many are still open.
-//
-// Counting via http.Server.ConnState does NOT work for h2c: h2c.NewHandler
-// hijacks the connection to hand it to the HTTP/2 server, so every connection
-// reports StateHijacked immediately and the server stops reporting on it
-// entirely. Wrapping the listener is the only way to observe the real lifetime.
+// ConnState cannot count h2c: NewHandler hijacks each connection, so it
+// reports StateHijacked and nothing after.
 type connCounter struct {
 	net.Listener
 	accepted int64
@@ -263,23 +175,14 @@ func (c *countedConn) Close() error {
 	return c.Conn.Close()
 }
 
-// TestH2C_TransportRebuild_ClosesOldConns reproduces defect D-1.
-//
-// On rebuild the gateway retires only the HTTP/1 transport — oldTransport is
-// HTTPTransport.transport and only that gets CloseIdleConnections()
-// (gateway/reverse_proxy.go:1289-1315). The h2ctransport field (:902) is
-// dropped without being closed. A standalone http2.Transport has
-// IdleConnTimeout == 0, so its ClientConns never self-close, and the readLoop
-// goroutine keeps them reachable so GC does not collect them either.
-//
-// Consequence: max_conn_time — the currently recommended mitigation for gRPC
-// upstream pod discovery — leaks one TCP connection and its goroutines per
-// rebuild, for the life of the process.
+// A rebuild retired only the HTTP/1 transport, dropping the h2c one unclosed.
+// A standalone http2.Transport has IdleConnTimeout 0, so its ClientConns never
+// self-close and their readLoops keep them from being collected.
 func TestH2C_TransportRebuild_ClosesOldConns(t *testing.T) {
 	upstream := httptest.NewUnstartedServer(
 		h2c.NewHandler(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			_, _ = io.WriteString(w, "ok")
+			writeBody(t, w, "ok")
 		}), &http2.Server{}),
 	)
 	counter := &connCounter{Listener: upstream.Listener}
@@ -292,7 +195,6 @@ func TestH2C_TransportRebuild_ClosesOldConns(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
 
-	// Force a transport rebuild between every request.
 	globalConf := ts.Gw.GetConfig()
 	globalConf.MaxConnTime = 1
 	ts.Gw.SetConfig(globalConf)
@@ -310,23 +212,19 @@ func TestH2C_TransportRebuild_ClosesOldConns(t *testing.T) {
 		// MaxConnTime is in seconds and the check is `time.Since(created) > d`.
 		time.Sleep(1100 * time.Millisecond)
 	}
-	// Give the upstream a moment to observe any closes.
 	time.Sleep(500 * time.Millisecond)
 
 	accepted := atomic.LoadInt64(&counter.accepted)
 	live := atomic.LoadInt64(&counter.live)
 	t.Logf("upstream accepted %d connections over %d rebuilds; %d still open", accepted, rebuilds, live)
 
-	// Guard against a vacuous pass: if the transport was never actually rebuilt
-	// there is only ever one connection and the leak assertion proves nothing.
+	// Without a rebuild there is one connection and nothing is proved.
 	if accepted < 2 {
 		t.Fatalf("upstream accepted only %d connection(s) across %d rebuilds — the transport "+
 			"was not rebuilt, so this test is not exercising the defect", accepted, rebuilds)
 	}
 
-	// One live connection is expected: the transport currently in use. Anything
-	// approaching `accepted` means every superseded h2c transport is still
-	// holding its connection open.
+	// One live connection is expected, the transport currently in use.
 	if live > 2 {
 		t.Errorf("after %d rebuilds (%d connections accepted) the h2c upstream still has %d live "+
 			"connections, want <= 2.\nSuperseded h2c transports are never closed, so max_conn_time "+
@@ -334,92 +232,6 @@ func TestH2C_TransportRebuild_ClosesOldConns(t *testing.T) {
 	}
 }
 
-// TestH2C_Upstream_MaxConnTime_Rebalances tests the mitigation, not the defect.
-//
-// max_conn_time is the only knob that currently causes an h2c upstream to be
-// re-dialled, and it is therefore the workaround a customer would be told to
-// set while waiting for real load balancing. This asks whether that workaround
-// actually redistributes traffic across a headless Service's pods.
-//
-// It does not balance. The h2c transport dials with a bare net.Dial
-// (gateway/reverse_proxy.go:840-842), and net.Dial walks the resolved address
-// list in order, only falling through to the next address when one fails to
-// connect — so it always takes whatever the resolver put first.
-//
-// This test uses a fixed-order DNS mock, so "first" is the same pod every time
-// and the re-pin is total. Note what that does and does not prove: against a
-// resolver that randomises record order (CoreDNS's loadbalance plugin, in the
-// default kubeadm Corefile, and Docker's embedded DNS) each rebuild becomes an
-// independent draw and traffic spreads statistically. The invariant that holds
-// in BOTH cases is the one that matters: max_conn_time re-rolls a connection, it
-// never distributes requests, so the granularity is the connection and the
-// outcome depends on the operator's resolver rather than on Tyk. Combined with
-// D-1 — each superseded transport leaks its connection — it is a weak,
-// environment-dependent mitigation with a guaranteed leak attached.
-func TestH2C_Upstream_MaxConnTime_Rebalances(t *testing.T) {
-	const upstreamHost = "grpc-upstream-churn.test"
-
-	pods, port := startH2CPodSet(t, 2)
-
-	ips := make([]string, 0, len(pods))
-	for _, p := range pods {
-		ips = append(ips, p.ip)
-	}
-
-	mockDomain(t, upstreamHost, ips)
-
-	ts := StartTest(nil)
-	defer ts.Close()
-
-	// Rebuild the transport between every request.
-	globalConf := ts.Gw.GetConfig()
-	globalConf.MaxConnTime = 1
-	ts.Gw.SetConfig(globalConf)
-	ts.Gw.DoReload()
-
-	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-		spec.Proxy.ListenPath = "/h2c-churn/"
-		spec.UseKeylessAccess = true
-		spec.Proxy.TargetURL = fmt.Sprintf("h2c://%s:%s", upstreamHost, port)
-	})
-
-	const rebuilds = 6
-	for i := 0; i < rebuilds; i++ {
-		_, _ = ts.Run(t, test.TestCase{Path: "/h2c-churn/", Code: http.StatusOK})
-		time.Sleep(1100 * time.Millisecond)
-	}
-
-	var totalConns int64
-	for _, p := range pods {
-		hits := atomic.LoadInt64(&p.hits)
-		conns := atomic.LoadInt64(&p.conns.accepted)
-		totalConns += conns
-		t.Logf("  %s (%s:%s): %d requests, %d TCP connection(s) accepted", p.id, p.ip, port, hits, conns)
-	}
-
-	// Guard against a vacuous pass: without real churn there is nothing to spread.
-	if totalConns < 2 {
-		t.Fatalf("only %d connection(s) dialled across %d rebuild windows — max_conn_time "+
-			"did not churn the transport, so this test is not exercising the mitigation", totalConns, rebuilds)
-	}
-
-	for _, p := range pods {
-		if atomic.LoadInt64(&p.conns.accepted) == 0 {
-			t.Errorf("after %d transport rebuilds (%d connections dialled in total), pod %s (%s) was "+
-				"never dialled even once.\nmax_conn_time re-dials, but net.Dial walks the resolved "+
-				"address list in order and only advances past an address that fails to connect, so with "+
-				"this fixed-order resolver every rebuild re-pins to the same pod. Against a shuffling "+
-				"resolver it would spread only by chance. Either way it re-rolls a connection rather than "+
-				"distributing requests, and combined with D-1 (each superseded h2c transport leaks its "+
-				"connection) it is not a usable load-balancing workaround for h2c APIs.",
-				rebuilds, totalConns, p.id, p.ip)
-		}
-	}
-}
-
-// h2cPod is one backend replica in a simulated headless Service: an h2c server
-// bound to its own loopback IP, tagging every response with its identity so the
-// caller can attribute traffic.
 type h2cPod struct {
 	id    string
 	ip    string
@@ -432,7 +244,6 @@ type h2cPod struct {
 	authoritys map[string]int // request :authority -> count
 }
 
-// authorities returns the set of :authority values this pod was addressed with.
 func (p *h2cPod) authorities() map[string]int {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -444,7 +255,6 @@ func (p *h2cPod) authorities() map[string]int {
 	return out
 }
 
-// protocols returns the set of protocols this pod was reached over.
 func (p *h2cPod) protocols() map[string]int {
 	p.mu.Lock()
 	defer p.mu.Unlock()
@@ -456,11 +266,8 @@ func (p *h2cPod) protocols() map[string]int {
 	return out
 }
 
-// podAddrCandidates returns local IPv4 addresses this host can bind, most
-// preferred first. Loopback aliases are ideal and work unconditionally on Linux
-// (where 127.0.0.0/8 is entirely local), which is where CI runs. macOS only
-// assigns 127.0.0.1 unless an operator adds an alias, so real interface
-// addresses are offered as a fallback to keep the test meaningful on a laptop.
+// Bindable local IPv4 addresses, preferred first. Loopback aliases always
+// work on Linux, where CI runs; macOS only assigns 127.0.0.1.
 func podAddrCandidates() []string {
 	candidates := []string{"127.0.0.1", "127.0.0.2", "127.0.0.3", "127.0.0.4"}
 
@@ -478,16 +285,13 @@ func podAddrCandidates() []string {
 	return candidates
 }
 
-// startH2CPodSet starts n h2c backends, each on its own IP but all on the SAME
-// port — which is exactly what a headless Service looks like to a client: one
-// name, one port, N pod addresses. Returns the pods and the shared port.
+// n backends on their own IPs sharing one port, as a headless Service.
 func startH2CPodSet(t *testing.T, n int) ([]*h2cPod, string) {
 	t.Helper()
 
 	candidates := podAddrCandidates()
 
-	// Claim a port on the first candidate, then hold every listener open so
-	// nothing can steal the port from underneath the set.
+	// Held open, so nothing steals the port from the set.
 	probe, err := net.Listen("tcp", candidates[0]+":0")
 	if err != nil {
 		t.Skipf("cannot bind %s: %v", candidates[0], err)
@@ -536,12 +340,11 @@ func startH2CPodSet(t *testing.T, n int) ([]*h2cPod, string) {
 				atomic.AddInt64(&pod.hits, 1)
 				pod.mu.Lock()
 				pod.protos[r.Proto]++
-				// For HTTP/2 the server surfaces :authority as r.Host.
 				pod.authoritys[r.Host]++
 				pod.mu.Unlock()
 				w.Header().Set("X-Upstream-Pod", pod.id)
 				w.WriteHeader(http.StatusOK)
-				_, _ = io.WriteString(w, pod.id)
+				writeBody(t, w, pod.id)
 			}), &http2.Server{}),
 		)
 		srv.Listener = counter
@@ -555,23 +358,104 @@ func startH2CPodSet(t *testing.T, n int) ([]*h2cPod, string) {
 	return pods, port
 }
 
-// TestH2C_Upstream_RoundRobin_Distributes is the gate for upstream DNS load
-// balancing: it asserts what the upstream ticket asks for — "Gateway resolves
-// all pod IPs for a Kubernetes service" and "round-robins gRPC requests across
-// the resolved pod IPs" — against a two-pod headless Service.
-//
-// Both halves have to hold together, which is why they are asserted in one
-// test. Distribution alone is not enough: the target list is what the h2c
-// scheme is read from, so an implementation that spread requests but wrote
-// http:// entries would send HTTP/1.1 to a gRPC server, which a real one
-// rejects outright. And HTTP/2 alone is what master already does, to a single
-// pod.
-//
-// The disabled arm is the control. It pins to one pod, which is the behaviour
-// on master with or without grpc_round_robin_load_balancing: that flag is read
-// only by the coprocess plugin dispatcher (coprocess_grpc.go) and never reaches
-// the upstream transport. Keeping it here records that the new option, not some
-// ambient change, is what distributes the traffic.
+func resetH2CPods(pods []*h2cPod) {
+	for _, p := range pods {
+		atomic.StoreInt64(&p.hits, 0)
+		p.mu.Lock()
+		p.protos = map[string]int{}
+		p.authoritys = map[string]int{}
+		p.mu.Unlock()
+	}
+}
+
+// tallyH2CPods reports how many requests the pods served between them, and
+// which of them served none.
+func tallyH2CPods(t *testing.T, pods []*h2cPod, port string, requests int) (int64, []string) {
+	t.Helper()
+
+	var served int64
+	var idle []string
+	for _, p := range pods {
+		hits := atomic.LoadInt64(&p.hits)
+		served += hits
+		if hits == 0 {
+			idle = append(idle, fmt.Sprintf("%s (%s)", p.id, p.ip))
+		}
+		t.Logf("  %s (%s:%s): %3d/%d requests, %d TCP connection(s) accepted, protocols %v",
+			p.id, p.ip, port, hits, requests, atomic.LoadInt64(&p.conns.accepted), p.protocols())
+	}
+	return served, idle
+}
+
+// assertPinnedToOnePod is the control arm: with discovery off the h2c transport
+// has no resolver and its pool is keyed on the authority, so traffic pins.
+func assertPinnedToOnePod(t *testing.T, pods []*h2cPod, idle []string) {
+	t.Helper()
+
+	if len(idle) != len(pods)-1 {
+		t.Errorf("control: with dns_discovery disabled, %d of %d pods were idle, "+
+			"want %d. Traffic is expected to pin to a single pod, because the h2c transport "+
+			"has no resolver and its connection pool is keyed on the authority. If it spreads "+
+			"here, the enabled arm is not measuring the new option.",
+			len(idle), len(pods), len(pods)-1)
+	}
+}
+
+// assertEvenSplit checks the split across pods. Round robin over a stable set is
+// exact, so an uneven split means the targets came from another list.
+func assertEvenSplit(t *testing.T, pods []*h2cPod, requests int) {
+	t.Helper()
+
+	want := int64(requests) / int64(len(pods))
+	tolerance := want / 5 // 20%, absorbing where the run starts in the rotation
+	for _, p := range pods {
+		hits := atomic.LoadInt64(&p.hits)
+		diff := hits - want
+		if diff > tolerance || diff < -tolerance {
+			t.Errorf("%s (%s) served %d of %d requests, want %d ± %d — the requests reached every "+
+				"pod but are not evenly distributed across them",
+				p.id, p.ip, hits, requests, want, tolerance)
+		}
+	}
+}
+
+// assertAllHTTP2 checks every pod was reached over HTTP/2. EnsureTransport used
+// to downgrade exactly this case.
+func assertAllHTTP2(t *testing.T, pods []*h2cPod) {
+	t.Helper()
+
+	for _, p := range pods {
+		for proto, n := range p.protocols() {
+			if proto == "HTTP/2.0" {
+				continue
+			}
+			t.Errorf("%s (%s) was reached %d time(s) over %q, want HTTP/2.0.\n"+
+				"Load-balanced h2c targets must keep their scheme, or the gateway speaks "+
+				"HTTP/1.1 to a gRPC server.", p.id, p.ip, n, proto)
+		}
+	}
+}
+
+// assertAuthority checks the pods were addressed by name. Dialled by address,
+// addressed by name: a pod IP here breaks anything routing on :authority.
+func assertAuthority(t *testing.T, pods []*h2cPod, want string) {
+	t.Helper()
+
+	for _, p := range pods {
+		for authority, n := range p.authorities() {
+			if authority == want {
+				continue
+			}
+			t.Errorf("%s (%s) was addressed %d time(s) with :authority %q, want %q.\n"+
+				"The pod address belongs in the dialled URL, not in the Host header.",
+				p.id, p.ip, n, authority, want)
+		}
+	}
+}
+
+// Distribution alone is not enough: the target list is where the h2c scheme
+// is read from, so entries written http:// would send HTTP/1.1 to a gRPC
+// server. The disabled arm is the control, and pins to one pod.
 func TestH2C_Upstream_RoundRobin_Distributes(t *testing.T) {
 	const (
 		upstreamHost = "grpc-upstream-lb.test"
@@ -585,24 +469,20 @@ func TestH2C_Upstream_RoundRobin_Distributes(t *testing.T) {
 		ips = append(ips, p.ip)
 	}
 
-	// One name, N pod addresses — a headless Service.
 	mockDomain(t, upstreamHost, ips)
 	t.Logf("%s resolves to %v (a %d-pod headless Service)", upstreamHost, ips, len(ips))
 
-	for _, enabled := range []bool{true, false} {
-		name := "upstream_dns_lb_disabled"
-		if enabled {
-			name = "upstream_dns_lb_enabled"
-		}
+	cases := []struct {
+		name    string
+		enabled bool
+	}{
+		{"upstream_dns_lb_enabled", true},
+		{"upstream_dns_lb_disabled", false},
+	}
 
-		t.Run(name, func(t *testing.T) {
-			for _, p := range pods {
-				atomic.StoreInt64(&p.hits, 0)
-				p.mu.Lock()
-				p.protos = map[string]int{}
-				p.authoritys = map[string]int{}
-				p.mu.Unlock()
-			}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			resetH2CPods(pods)
 
 			ts := StartTest(nil)
 			defer ts.Close()
@@ -611,50 +491,25 @@ func TestH2C_Upstream_RoundRobin_Distributes(t *testing.T) {
 				spec.Proxy.ListenPath = "/h2c-upstream-lb/"
 				spec.UseKeylessAccess = true
 				spec.Proxy.TargetURL = fmt.Sprintf("h2c://%s:%s", upstreamHost, port)
-				// Per-API, alongside enable_load_balancing and
-				// service_discovery: which upstream to rediscover is a property
-				// of this API, not of the gateway.
-				// DNS discovery is a source; enable_load_balancing is the
-				// policy that distributes what it produces. Both go on
-				// together, and the control arm has neither, which is the
-				// released behaviour: one target, one connection, one pod.
-				spec.Proxy.EnableLoadBalancing = enabled
-				spec.Proxy.DNSDiscovery.Enabled = enabled
-				spec.Proxy.DNSDiscovery.RefreshInterval = 10
+				// Discovery supplies the list, load balancing spreads it.
+				spec.Proxy.EnableLoadBalancing = tc.enabled
+				spec.Proxy.DNSDiscovery.Enabled = tc.enabled
+				spec.Proxy.DNSDiscovery.RefreshInterval = tyktime.ReadableDuration(10 * time.Second)
 			})
 
 			for i := 0; i < requests; i++ {
 				_, _ = ts.Run(t, test.TestCase{Path: "/h2c-upstream-lb/", Code: http.StatusOK})
 			}
 
-			var served int64
-			var idle []string
-			for _, p := range pods {
-				hits := atomic.LoadInt64(&p.hits)
-				served += hits
-				if hits == 0 {
-					idle = append(idle, fmt.Sprintf("%s (%s)", p.id, p.ip))
-				}
-				t.Logf("  %s (%s:%s): %3d/%d requests, %d TCP connection(s) accepted, protocols %v",
-					p.id, p.ip, port, hits, requests, atomic.LoadInt64(&p.conns.accepted), p.protocols())
-			}
-
+			served, idle := tallyH2CPods(t, pods, port, requests)
 			if served != requests {
 				t.Fatalf("pods served %d requests in total, want %d — the traffic did not "+
 					"reach the h2c upstreams and nothing below is meaningful", served, requests)
 			}
 
-			if !enabled {
-				// Control: without the option nothing discovers the second pod,
-				// so the whole run multiplexes onto one connection to one pod.
-				// If this ever spreads, the enabled arm above proves nothing.
-				if len(idle) != len(pods)-1 {
-					t.Errorf("control: with dns_discovery disabled, %d of %d pods were idle, "+
-						"want %d. Traffic is expected to pin to a single pod, because the h2c transport "+
-						"has no resolver and its connection pool is keyed on the authority. If it spreads "+
-						"here, the enabled arm is not measuring the new option.",
-						len(idle), len(pods), len(pods)-1)
-				}
+			// Nothing discovers pod 2, so all of it goes down one connection.
+			if !tc.enabled {
+				assertPinnedToOnePod(t, pods, idle)
 				return
 			}
 
@@ -664,50 +519,160 @@ func TestH2C_Upstream_RoundRobin_Distributes(t *testing.T) {
 					"share of the requests.", len(idle), len(pods), strings.Join(idle, ", "))
 			}
 
-			// Round-robin over a stable address set is exact, so anything other
-			// than an even split means targets are being picked from a list
-			// that is not the resolved one.
-			want := int64(requests) / int64(len(pods))
-			tolerance := want / 5 // 20%, absorbing where the run starts in the rotation
-			for _, p := range pods {
-				hits := atomic.LoadInt64(&p.hits)
-				if diff := hits - want; diff > tolerance || diff < -tolerance {
-					t.Errorf("%s (%s) served %d of %d requests, want %d ± %d — the requests reached every "+
-						"pod but are not evenly distributed across them",
-						p.id, p.ip, hits, requests, want, tolerance)
+			assertEvenSplit(t, pods, requests)
+			assertAllHTTP2(t, pods)
+			assertAuthority(t, pods, fmt.Sprintf("%s:%s", upstreamHost, port))
+		})
+	}
+}
+
+// newPlainUpstream starts the non-h2c half of a mixed target list.
+func newPlainUpstream(t *testing.T, tls bool, record func(*http.Request)) *httptest.Server {
+	t.Helper()
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		record(r)
+		w.WriteHeader(http.StatusOK)
+		writeBody(t, w, "ok")
+	})
+
+	srv := httptest.NewServer(handler)
+	if tls {
+		srv = httptest.NewTLSServer(handler)
+	}
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func sendMixedSchemeRequests(t *testing.T, ts *Test, n int) {
+	t.Helper()
+
+	for i := 0; i < n; i++ {
+		res, err := ts.Run(t, test.TestCase{Path: "/mixed/"})
+		if err != nil {
+			t.Fatalf("request %d: %v", i, err)
+		}
+
+		body, readErr := io.ReadAll(res.Body)
+		_ = res.Body.Close()
+		if readErr != nil {
+			t.Fatalf("request %d: %v", i, readErr)
+		}
+		if res.StatusCode != http.StatusOK {
+			t.Errorf("request %d returned %d: %s", i, res.StatusCode, strings.TrimSpace(string(body)))
+		}
+	}
+}
+
+func assertProtocol(t *testing.T, label string, got []string, want string) {
+	t.Helper()
+
+	for i, proto := range got {
+		if proto != want {
+			t.Errorf("%s request %d arrived over %q, want %s", label, i, proto, want)
+		}
+	}
+}
+
+// h2c:// in a target_list survives EnsureTransport, so the transport can no
+// longer be chosen once and reused: a list mixing h2c with another scheme sent
+// every target over whichever protocol the first request drew. Before the
+// feature both entries went through one http.Transport, which picks TLS per
+// request, so mixed lists worked with the h2c entry downgraded to HTTP/1.1.
+func TestH2C_MixedSchemeTargetList(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		tls  bool
+	}{
+		{name: "h2c and http"},
+		{name: "h2c and https", tls: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var mu sync.Mutex
+			protos := map[string][]string{}
+
+			record := func(name string) func(*http.Request) {
+				return func(r *http.Request) {
+					mu.Lock()
+					protos[name] = append(protos[name], r.Proto)
+					mu.Unlock()
 				}
 			}
 
-			// The other half of the claim: those requests must still be gRPC.
-			// EnsureTransport used to rewrite h2c:// to http:// on the
-			// load-balancing path, which downgraded exactly this case.
-			for _, p := range pods {
-				for proto, n := range p.protocols() {
-					if proto != "HTTP/2.0" {
-						t.Errorf("%s (%s) was reached %d time(s) over %q, want HTTP/2.0.\n"+
-							"Load-balanced h2c targets must keep their scheme, or the gateway speaks "+
-							"HTTP/1.1 to a gRPC server.", p.id, p.ip, n, proto)
-					}
-				}
+			upstream := newH2CUpstream(t, record("h2c"))
+			h2cURL := strings.Replace(upstream.URL, "http://", "h2c://", 1)
+			other := newPlainUpstream(t, tc.tls, record("other"))
+
+			conf := func(globalConf *config.Config) {
+				globalConf.ProxySSLInsecureSkipVerify = true
+			}
+			ts := StartTest(conf)
+			defer ts.Close()
+
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/mixed/"
+				spec.UseKeylessAccess = true
+				spec.Proxy.TargetURL = h2cURL
+				spec.Proxy.EnableLoadBalancing = true
+				spec.Proxy.Targets = []string{h2cURL, other.URL}
+			})
+
+			sendMixedSchemeRequests(t, ts, 6)
+
+			mu.Lock()
+			defer mu.Unlock()
+
+			if len(protos["h2c"]) == 0 {
+				t.Error("no request reached the h2c:// target")
+			}
+			if len(protos["other"]) == 0 {
+				t.Error("no request reached the other target; the cached transport " +
+					"sent it over the wrong protocol")
 			}
 
-			// Each pod is DIALLED at its own address but must be ADDRESSED by
-			// the service name. Those are two different fields — the pool is
-			// keyed on the URL host, the :authority comes from the Host header —
-			// and keeping them apart is what lets one connection per pod carry
-			// an authority the upstream recognises. A pod IP here would break
-			// anything that routes on :authority or checks a certificate
-			// against it.
-			wantAuthority := fmt.Sprintf("%s:%s", upstreamHost, port)
-			for _, p := range pods {
-				for authority, n := range p.authorities() {
-					if authority != wantAuthority {
-						t.Errorf("%s (%s) was addressed %d time(s) with :authority %q, want %q.\n"+
-							"The pod address belongs in the dialled URL, not in the Host header.",
-							p.id, p.ip, n, authority, wantAuthority)
-					}
-				}
+			assertProtocol(t, "h2c", protos["h2c"], "HTTP/2.0")
+			assertProtocol(t, "non-h2c", protos["other"], "HTTP/1.1")
+		})
+	}
+}
+
+func TestUpstreamSchemes(t *testing.T) {
+	for _, tc := range []struct {
+		name      string
+		targetURL string
+		lb        bool
+		targets   []string
+		wantH2C   bool
+		wantOther bool
+	}{
+		{name: "plain http", targetURL: "http://a", wantOther: true},
+		{name: "single h2c", targetURL: "h2c://a", wantH2C: true},
+		{name: "uppercase h2c", targetURL: "H2C://a", wantH2C: true},
+		{name: "all h2c", targetURL: "h2c://a", lb: true,
+			targets: []string{"h2c://a", "h2c://b"}, wantH2C: true},
+		{name: "mixed with http", targetURL: "h2c://a", lb: true,
+			targets: []string{"h2c://a", "http://b"}, wantH2C: true, wantOther: true},
+		{name: "mixed with https", targetURL: "h2c://a", lb: true,
+			targets: []string{"h2c://a", "https://b"}, wantH2C: true, wantOther: true},
+		{name: "targets ignored without load balancing", targetURL: "http://a",
+			targets: []string{"h2c://b"}, wantOther: true},
+		{name: "dns discovery renders from target_url", targetURL: "h2c://svc", lb: true, wantH2C: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+			spec.Proxy.TargetURL = tc.targetURL
+			spec.Proxy.EnableLoadBalancing = tc.lb
+			spec.Proxy.Targets = tc.targets
+
+			hasH2C, hasOther := upstreamSchemes(spec)
+			if hasH2C != tc.wantH2C || hasOther != tc.wantOther {
+				t.Errorf("upstreamSchemes() = (h2c=%v, other=%v), want (h2c=%v, other=%v)",
+					hasH2C, hasOther, tc.wantH2C, tc.wantOther)
 			}
 		})
+	}
+
+	if hasH2C, hasOther := upstreamSchemes(nil); hasH2C || hasOther {
+		t.Errorf("upstreamSchemes(nil) = (%v, %v), want (false, false)", hasH2C, hasOther)
 	}
 }

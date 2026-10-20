@@ -44,8 +44,7 @@ type Upstream struct {
 	// Tyk classic API definition: `proxy.enable_load_balancing` and `proxy.targets`.
 	LoadBalancing *LoadBalancing `bson:"loadBalancing,omitempty" json:"loadBalancing,omitempty"`
 
-	// DNSDiscovery contains configuration for sourcing this upstream's target
-	// list from DNS, by resolving the hostname in url.
+	// DNSDiscovery contains the configuration related to DNS discovery.
 	// Tyk classic API definition: `proxy.dns_discovery`.
 	DNSDiscovery *DNSDiscovery `bson:"dnsDiscovery,omitempty" json:"dnsDiscovery,omitempty"`
 
@@ -241,8 +240,9 @@ func (u *Upstream) ExtractTo(api *apidef.APIDefinition) {
 
 	u.Authentication.ExtractTo(api)
 
-	u.loadBalancingExtractTo(api)
+	// Before load balancing, which reads the DNS discovery flag.
 	u.dnsDiscoveryExtractTo(api)
+	u.loadBalancingExtractTo(api)
 
 	if u.TLSTransport == nil {
 		u.TLSTransport = &TLSTransport{}
@@ -316,70 +316,70 @@ func (u *Upstream) loadBalancingExtractTo(api *apidef.APIDefinition) {
 	u.LoadBalancing.ExtractTo(api)
 }
 
-// DNSDiscovery sources this upstream's target list from DNS: the hostname in
-// `url` is resolved and every address it returns becomes a target.
+// DNSDiscovery is used with gRPC upstreams (`h2c://` only) to resolve the upstream hostname
+// and set the load balancing target list to the returned addresses.
+// It requires `loadBalancing.enabled` and cannot be combined with
+// `serviceDiscovery`.
 //
-// It is a source rather than a balancing policy. It sits alongside
-// `serviceDiscovery`, which sources targets from a key/value store, and the
-// static `loadBalancing.targets` written by hand. Whether the resulting list is
-// distributed across is still `loadBalancing.enabled`, so both have to be on
-// for requests to reach more than one address.
-//
-// Resolution runs in the background, on one scheduler for the gateway keyed by
-// hostname, so a backend added after the API was loaded starts receiving
-// traffic within `refreshInterval` of becoming ready whether or not the API is
-// currently receiving requests.
-//
-// Only useful against a name that resolves to one address per backend, such as
-// a headless Kubernetes Service. A ClusterIP resolves to a single virtual IP,
-// so there is nothing to distribute over.
-//
-// Example:
-//
-//	{
-//	    "enabled": true,
-//	    "refreshInterval": 10,
-//	    "staleTTL": 300
-//	}
+// Tyk classic API definition: `proxy.dns_discovery`.
 type DNSDiscovery struct {
-	// Enabled sources this upstream's target list from DNS.
-	//
-	// Tyk classic API definition: `proxy.dns_discovery.enabled`
+	// Enabled determines if DNS discovery is active.
+	// Tyk classic API definition: `proxy.dns_discovery.enabled`.
 	Enabled bool `bson:"enabled" json:"enabled"` // required
+	// RefreshInterval is how often the hostname is resolved. Defaults to 30s, minimum 5s.
+	// Tyk classic API definition: `proxy.dns_discovery.refresh_interval`.
+	RefreshInterval time.ReadableDuration `bson:"refreshInterval,omitempty" json:"refreshInterval,omitempty"`
+	// StaleTTL is how long the last known good addresses keep being used if the resolver becomes unreachable. Set as human-readable format; (e.g. `300s`).
+	// Empty or `0` means that known addresses will continue to be used until a lookup succeeds. Once expired, requests fail with 503.
+	// Tyk classic API definition: `proxy.dns_discovery.stale_ttl`.
+	StaleTTL time.ReadableDuration `bson:"staleTTL,omitempty" json:"staleTTL,omitempty"`
+	// ConnectionDraining controls the behaviour when an address is no longer returned by the DNS resolver.
+	// Disabled by default.
+	// Tyk classic API definition: `proxy.dns_discovery.connection_draining`.
+	ConnectionDraining *ConnectionDraining `bson:"connectionDraining,omitempty" json:"connectionDraining,omitempty"`
+}
 
-	// RefreshInterval is how often, in seconds, the upstream hostname is
-	// re-resolved in the background. It bounds how long a backend added by an
-	// autoscaling event waits before receiving traffic.
-	//
-	// 0 selects the default of 30 seconds; values below 5 are raised to 5.
-	//
-	// Tyk classic API definition: `proxy.dns_discovery.refresh_interval`
-	RefreshInterval int64 `bson:"refreshInterval,omitempty" json:"refreshInterval,omitempty"`
-
-	// StaleTTL is how long, in seconds, the last known good address set keeps
-	// being used while the resolver is unreachable. Past it the upstream falls
-	// back to its configured url. An authoritative answer that the name does
-	// not exist is applied at once instead, since nothing stale is worth
-	// preserving.
-	//
-	// 0 selects the default of 300 seconds; a negative value never gives up.
-	//
-	// Tyk classic API definition: `proxy.dns_discovery.stale_ttl`
-	StaleTTL int64 `bson:"staleTTL,omitempty" json:"staleTTL,omitempty"`
+// ConnectionDraining controls the behaviour when an address is no longer returned by the DNS resolver.
+//
+// Tyk classic API definition: `proxy.dns_discovery.connection_draining`.
+type ConnectionDraining struct {
+	// Enabled maintains connections for the `timeout` period after they are no longer returned by the DNS resolver. Default: false.
+	// When disabled, connections close once idle.
+	// Tyk classic API definition: `proxy.dns_discovery.connection_draining.enabled`.
+	Enabled bool `bson:"enabled" json:"enabled"` // required
+	// Timeout is how long connections to a removed address stay open. Set as human-readable format; default: 30s (when enabled).
+	// Tyk classic API definition: `proxy.dns_discovery.connection_draining.timeout`.
+	Timeout time.ReadableDuration `bson:"timeout,omitempty" json:"timeout,omitempty"`
 }
 
 // Fill populates the DNSDiscovery structure from the classic API definition.
 func (d *DNSDiscovery) Fill(api apidef.APIDefinition) {
-	d.Enabled = api.Proxy.DNSDiscovery.Enabled
-	d.RefreshInterval = api.Proxy.DNSDiscovery.RefreshInterval
-	d.StaleTTL = api.Proxy.DNSDiscovery.StaleTTL
+	conf := api.Proxy.DNSDiscovery
+	d.Enabled = conf.Enabled
+	d.RefreshInterval = conf.RefreshInterval
+	d.StaleTTL = conf.StaleTTL
+	d.ConnectionDraining = nil
+	if conf.ConnectionDraining != nil {
+		d.ConnectionDraining = &ConnectionDraining{
+			Enabled: conf.ConnectionDraining.Enabled,
+			Timeout: conf.ConnectionDraining.Timeout,
+		}
+	}
 }
 
 // ExtractTo copies the DNSDiscovery structure into the classic API definition.
 func (d *DNSDiscovery) ExtractTo(api *apidef.APIDefinition) {
-	api.Proxy.DNSDiscovery.Enabled = d.Enabled
-	api.Proxy.DNSDiscovery.RefreshInterval = d.RefreshInterval
-	api.Proxy.DNSDiscovery.StaleTTL = d.StaleTTL
+	conf := &api.Proxy.DNSDiscovery
+	conf.Enabled = d.Enabled
+	conf.RefreshInterval = d.RefreshInterval
+	conf.StaleTTL = d.StaleTTL
+	conf.ConnectionDraining = nil
+	if d.ConnectionDraining != nil {
+		conf.ConnectionDraining = &apidef.ConnectionDrainingConfig{
+			Enabled: d.ConnectionDraining.Enabled,
+			Timeout: d.ConnectionDraining.Timeout,
+		}
+	}
 }
 
 func (u *Upstream) fillDNSDiscovery(api apidef.APIDefinition) {
@@ -1448,9 +1448,7 @@ type LoadBalancingTarget struct {
 // Fill populates the LoadBalancing structure based on the provided APIDefinition, including targets and their weights.
 func (l *LoadBalancing) Fill(api apidef.APIDefinition) {
 	if len(api.Proxy.Targets) == 0 {
-		api.Proxy.EnableLoadBalancing = false
-		api.Proxy.CheckHostAgainstUptimeTests = false
-		api.Proxy.Targets = nil
+		l.fillWithoutTargets(api)
 		return
 	}
 
@@ -1498,9 +1496,30 @@ func (l *LoadBalancing) Fill(api apidef.APIDefinition) {
 	l.Targets = targets
 }
 
+func (l *LoadBalancing) fillWithoutTargets(api apidef.APIDefinition) {
+	// A DNS-sourced API has an empty list by design, so `enabled` must survive.
+	if api.Proxy.DNSDiscovery.Enabled {
+		l.Enabled = api.Proxy.EnableLoadBalancing
+		l.SkipUnavailableHosts = api.Proxy.CheckHostAgainstUptimeTests
+		return
+	}
+
+	api.Proxy.EnableLoadBalancing = false
+	api.Proxy.CheckHostAgainstUptimeTests = false
+	api.Proxy.Targets = nil
+}
+
 // ExtractTo populates an APIDefinition's proxy load balancing configuration with data from the LoadBalancing instance.
 func (l *LoadBalancing) ExtractTo(api *apidef.APIDefinition) {
 	if len(l.Targets) == 0 {
+		// See Fill. ExtractTo populates DNS discovery first.
+		if api.Proxy.DNSDiscovery.Enabled {
+			api.Proxy.EnableLoadBalancing = l.Enabled
+			api.Proxy.CheckHostAgainstUptimeTests = l.SkipUnavailableHosts
+			api.Proxy.Targets = nil
+			return
+		}
+
 		api.Proxy.EnableLoadBalancing = false
 		api.Proxy.CheckHostAgainstUptimeTests = false
 		api.Proxy.Targets = nil

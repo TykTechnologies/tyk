@@ -46,6 +46,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/roundtrippers"
 	"github.com/TykTechnologies/tyk/internal/service/core"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/storage"
@@ -141,16 +142,7 @@ func EnsureTransport(host, protocol string) string {
 		protocol = "http"
 	}
 
-	// If the host has no protocol, amend it from the API's listen protocol.
-	//
-	// Only a scheme inherited that way is coalesced to http. `protocol` is the
-	// protocol the API *listens* on, and an API may perfectly well listen on
-	// h2c while proxying to an HTTP/1.1 upstream, so "h2c" arriving from there
-	// says nothing about the upstream. An h2c:// written into the target
-	// explicitly does, and must survive: the h2c transport is selected further
-	// down on outReq.URL.Scheme == "h2c", after the Director has run, so
-	// rewriting it here downgrades a load-balanced gRPC upstream to HTTP/1.1 —
-	// which a real gRPC server rejects outright.
+	// Only an inherited h2c is coalesced to http; an explicit h2c:// target survives.
 	if !strings.Contains(host, "://") {
 		host = protocol + "://" + host
 		host = strings.Replace(host, "h2c://", "http://", 1)
@@ -161,6 +153,35 @@ func EnsureTransport(host, protocol string) string {
 		return host
 	}
 	return u.String()
+}
+
+func isH2CTarget(target string) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(target)), "h2c://")
+}
+
+func upstreamSchemes(spec *APISpec) (hasH2C, hasOther bool) {
+	if spec == nil {
+		return false, false
+	}
+
+	classify := func(target string) {
+		switch {
+		case target == "":
+		case isH2CTarget(target):
+			hasH2C = true
+		default:
+			hasOther = true
+		}
+	}
+
+	classify(spec.Proxy.TargetURL)
+	if spec.Proxy.EnableLoadBalancing {
+		for _, target := range spec.Proxy.Targets {
+			classify(target)
+		}
+	}
+
+	return hasH2C, hasOther
 }
 
 func (gw *Gateway) nextTarget(targetData *apidef.HostList, spec *APISpec) (string, error) {
@@ -205,6 +226,76 @@ func (gw *Gateway) nextTarget(targetData *apidef.HostList, spec *APISpec) (strin
 		return "", err
 	}
 	return EnsureTransport(gotHost, spec.Protocol), nil
+}
+
+type upstreamRoute struct {
+	target        *url.URL
+	query         string
+	authorityHost string
+	discovered    bool
+	selection     upstreamSelection
+}
+
+func (gw *Gateway) upstreamTargetList(spec *APISpec, logger *logrus.Entry) (*apidef.HostList, upstreamSelection) {
+	switch {
+	case spec.Proxy.ServiceDiscovery.UseDiscoveryService:
+		list, err := urlFromService(spec, gw)
+		if err != nil {
+			logger.Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", err)
+			return nil, upstreamSelection{}
+		}
+		if list == nil {
+			logger.Warning("[PROXY] [SERVICE DISCOVERY] No host list yet, refusing rather than using target_url")
+			return apidef.NewHostList(), upstreamSelection{}
+		}
+		return list, upstreamSelection{}
+
+	case upstreamDNSDiscoveryEnabled(spec):
+		return gw.urlFromDNS(spec)
+
+	default:
+		list := spec.Proxy.StructuredTargetList
+		if spec.Proxy.DNSDiscovery.Enabled && (list == nil || list.Len() == 0) {
+			return nil, upstreamSelection{}
+		}
+		return list, upstreamSelection{}
+	}
+}
+
+func (gw *Gateway) resolveUpstreamTarget(req *http.Request, spec *APISpec, logger *logrus.Entry, target *url.URL, targetQuery string) upstreamRoute {
+	route := upstreamRoute{target: target, query: targetQuery}
+
+	hostList, sel := gw.upstreamTargetList(spec, logger)
+	if hostList == nil || (!spec.Proxy.EnableLoadBalancing && !spec.Proxy.ServiceDiscovery.UseDiscoveryService) {
+		return route
+	}
+
+	var host string
+	var err error
+	if hostList.Len() == 0 {
+		logger.Debug("[PROXY] [LOAD BALANCING] No targets to choose from")
+		host = allHostsDownURL
+		ctx.SetErrorClassification(req, tykerrors.ClassifyNoHealthyUpstreamsError(target.Host))
+	} else if host, err = gw.nextTarget(hostList, spec); err != nil {
+		logger.Error("[PROXY] [LOAD BALANCING] ", err)
+		host = allHostsDownURL
+		ctx.SetErrorClassification(req, tykerrors.ClassifyNoHealthyUpstreamsError(target.Host))
+	}
+
+	lbRemote, err := url.Parse(host)
+	if err != nil {
+		logger.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", err)
+		return route
+	}
+
+	route.target = lbRemote
+	route.query = lbRemote.RawQuery
+	if plan := spec.dnsDiscovery.Load(); plan != nil && host != allHostsDownURL {
+		route.authorityHost = plan.target.Host
+		route.discovered = true
+		route.selection = sel
+	}
+	return route
 }
 
 var (
@@ -253,64 +344,8 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		target := target
 		gw := gw
 
-		// authorityHost, when set, is the Host header to send instead of the
-		// address actually being dialled. See the upstream DNS case below.
-		authorityHost := ""
-
-		hostList := spec.Proxy.StructuredTargetList
-		switch {
-		case spec.Proxy.ServiceDiscovery.UseDiscoveryService:
-			var err error
-			hostList, err = urlFromService(spec, gw)
-			if err != nil {
-				logger.Error("[PROXY] [SERVICE DISCOVERY] Failed target lookup: ", err)
-				break
-			}
-			fallthrough // implies load balancing, with replaced host list
-		case upstreamDNSDiscoveryEnabled(spec):
-			// A third source, alongside the static list and service discovery.
-			// Resolved here rather than on a timer, so an API receiving no
-			// requests costs nothing and the address set for a hostname is
-			// looked up once however many APIs point at it.
-			resolved, err := gw.urlFromDNS(spec)
-			if err != nil {
-				logger.Error("[PROXY] [DNS DISCOVERY] Failed target lookup: ", err)
-				break
-			}
-			hostList = resolved
-			fallthrough // implies load balancing, with replaced host list
-		case spec.Proxy.EnableLoadBalancing:
-			host, err := gw.nextTarget(hostList, spec)
-			if err != nil {
-				logger.Error("[PROXY] [LOAD BALANCING] ", err)
-				host = allHostsDownURL
-				ctx.SetErrorClassification(req, tykerrors.ClassifyNoHealthyUpstreamsError(target.Host))
-			}
-			lbRemote, err := url.Parse(host)
-			if err != nil {
-				logger.Error("[PROXY] [LOAD BALANCING] Couldn't parse target URL:", err)
-			} else {
-				// A DNS-sourced target list holds pod addresses, which are the
-				// right thing to dial and the wrong thing to claim. Keep the
-				// configured service name as the authority.
-				//
-				// This split is what makes the whole approach work without a
-				// new connection pool: the HTTP/2 pool is keyed on
-				// req.URL.Host, while the :authority header comes from
-				// req.Host. Varying the first across pods gives one connection
-				// per pod; holding the second at the service name means each
-				// of them still presents the name the upstream expects, which
-				// anything routing on :authority or validating a certificate
-				// against it depends on.
-				if upstreamDNSDiscoveryEnabled(spec) {
-					authorityHost = target.Host
-				}
-
-				// Only replace target if everything is OK
-				target = lbRemote
-				targetQuery = target.RawQuery
-			}
-		}
+		route := gw.resolveUpstreamTarget(req, spec, logger, target, targetQuery)
+		target, targetQuery, authorityHost := route.target, route.query, route.authorityHost
 
 		targetToUse := target
 
@@ -353,10 +388,17 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 			}
 		}
 
+		if route.discovered {
+			markUpstream(req, upstreamMark{
+				h2c:        strings.EqualFold(req.URL.Scheme, "h2c"),
+				discovered: targetToUse == target,
+				selection:  route.selection,
+			})
+		}
+
 		if !spec.Proxy.PreserveHostHeader {
 			req.Host = targetToUse.Host
-			// A URL rewrite that retained the host chose targetToUse itself, so
-			// it outranks the service name recovered above.
+
 			if authorityHost != "" && targetToUse == target {
 				req.Host = authorityHost
 			}
@@ -454,15 +496,15 @@ type ReverseProxy struct {
 
 var idleConnTimeout = 90
 
-func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
-	timeout := 30.0
-	if dialerTimeout > 0 {
-		log.Debug("Setting timeout for outbound request to: ", dialerTimeout)
-		timeout = dialerTimeout
+func (p *ReverseProxy) defaultTransport(dialTimeout float64) *http.Transport {
+	if dialTimeout == 0 {
+		dialTimeout = 30.0
 	}
 
+	log.Debug("Setting timeout for outbound request to: ", dialTimeout)
+
 	dialer := &net.Dialer{
-		Timeout:   time.Duration(float64(timeout) * float64(time.Second)),
+		Timeout:   time.Duration(dialTimeout * float64(time.Second)),
 		KeepAlive: 30 * time.Second,
 		DualStack: true,
 	}
@@ -476,11 +518,15 @@ func (p *ReverseProxy) defaultTransport(dialerTimeout float64) *http.Transport {
 	}
 
 	transport := &http.Transport{
-		DialContext:           dialContextFunc,
-		MaxIdleConns:          p.Gw.GetConfig().MaxIdleConns,
-		MaxIdleConnsPerHost:   p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
-		IdleConnTimeout:       time.Duration(idleConnTimeout) * time.Second,
-		ResponseHeaderTimeout: time.Duration(dialerTimeout) * time.Second,
+		DialContext:         dialContextFunc,
+		MaxIdleConns:        p.Gw.GetConfig().MaxIdleConns,
+		MaxIdleConnsPerHost: p.Gw.GetConfig().MaxIdleConnsPerHost, // default is 100
+		IdleConnTimeout:     time.Duration(idleConnTimeout) * time.Second,
+
+		// ResponseHeaderTimeout logic moved to roundtrippers.HeadersTimeout decorator.
+		// It was colliding with the enforced (endpoint-level/api-level) timeout.
+		// @see https://tyktech.atlassian.net/browse/TT-17873
+		ResponseHeaderTimeout: time.Duration(0),
 		TLSHandshakeTimeout:   10 * time.Second,
 	}
 
@@ -670,9 +716,8 @@ func (p *ReverseProxy) ServeHTTPForCache(rw http.ResponseWriter, req *http.Reque
 	return resp
 }
 
-const defaultProxyTimeout float64 = 30
-
 func proxyTimeout(spec *APISpec) float64 {
+	const defaultProxyTimeout float64 = 30
 	if spec.GlobalConfig.ProxyDefaultTimeout > 0 {
 		return spec.GlobalConfig.ProxyDefaultTimeout
 	}
@@ -815,9 +860,9 @@ func tlsClientConfig(s *APISpec, gw *Gateway) *tls.Config {
 	return config
 }
 
-func (p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, req *http.Request, outReq *http.Request) *TykRoundTripper {
+func (p *ReverseProxy) httpTransport(dialTimeout float64, req *http.Request, outReq *http.Request) *TykRoundTripper {
 	p.logger.Debug("Creating new transport")
-	transport := p.defaultTransport(timeOut) // modifies a newly created transport
+	transport := p.defaultTransport(dialTimeout) // modifies a newly created transport
 	transport.TLSClientConfig = &tls.Config{}
 	transport.Proxy = proxyFromAPI(p.TykAPISpec)
 
@@ -878,26 +923,28 @@ func (p *ReverseProxy) httpTransport(timeOut float64, rw http.ResponseWriter, re
 
 	p.logger.Debug("Out request url: ", outReq.URL.String())
 
-	if outReq.URL.Scheme == "h2c" {
-		p.logger.Info("Enabling h2c mode")
-		h2t := &http2.Transport{
-			// kind of a hack, but for plaintext/H2C requests, pretend to dial TLS
-			DialTLS: func(network, addr string, _ *tls.Config) (net.Conn, error) {
-				return net.Dial(network, addr)
-			},
-			AllowHTTP: true,
-			// A bare http2.Transport has no idle timeout, so its ClientConns
-			// never self-close and its readLoop goroutine keeps them reachable
-			// from GC. The pool is keyed per authority, so with a
-			// DNS-sourced target list that is one connection per pod, and a
-			// pool that never sheds departed pods accumulates them for the life
-			// of the process.
-			IdleConnTimeout: defaultH2CIdleConnTimeout,
-		}
-		return &TykRoundTripper{transport, h2t, p.logger, p.Gw}
+	if rt := p.h2cRoundTripper(outReq, transport); rt != nil {
+		return rt
 	}
 
-	return &TykRoundTripper{transport, nil, p.logger, p.Gw}
+	return &TykRoundTripper{transport: transport}
+}
+
+func (p *ReverseProxy) h2cRoundTripper(outReq *http.Request, transport *http.Transport) *TykRoundTripper {
+	hasH2C, hasOther := upstreamSchemes(p.TykAPISpec)
+	if outReq.URL.Scheme != "h2c" && !hasH2C {
+		return nil
+	}
+
+	if hasH2C && hasOther {
+		p.logger.Warning("[PROXY] Target list mixes h2c:// with another scheme; each target keeps the protocol it was declared with")
+	}
+
+	p.logger.Info("Enabling h2c mode")
+	var dialer net.Dialer
+	rt := newH2CRoundTripper(p.TykAPISpec, transport, dialer.DialContext)
+	rt.h2cOnly = hasH2C && !hasOther
+	return rt
 }
 
 func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config, hostName string) {
@@ -949,68 +996,137 @@ func (p *ReverseProxy) setCommonNameVerifyPeerCertificate(tlsConfig *tls.Config,
 	}
 }
 
+func isInternalLoop(r *http.Request) bool {
+	if r.URL == nil {
+		return false
+	}
+
+	hasInternalHeader := r.Header.Get(apidef.TykInternalApiHeader) != ""
+
+	return r.URL.Scheme == "tyk" || r.URL.Scheme == "tyk-internal" || hasInternalHeader
+}
+
+func internalLoopRoundTripperMiddleware(gw *Gateway, logger *logrus.Entry) roundtrippers.Middleware {
+	return func(next roundtrippers.RoundTripper) roundtrippers.RoundTripper {
+		return roundtrippers.RoundTripperFn(func(r *http.Request) (*http.Response, error) {
+			if !isInternalLoop(r) {
+				return next.RoundTrip(r)
+			}
+
+			r.Header.Del(apidef.TykInternalApiHeader)
+
+			handler, _, found := gw.findInternalHTTPHandlerForLoop(r.Host, nil, r)
+
+			if !found {
+				logger.WithField("looping_url", "tyk://"+r.Host).Error("Couldn't detect target")
+				return nil, errors.New("handler could")
+			}
+
+			logger.WithField("looping_url", "tyk://"+r.Host).Debug("Executing request on internal route")
+
+			return handleInMemoryLoop(handler, r)
+		})
+	}
+}
+
 type TykRoundTripper struct {
 	transport    *http.Transport
 	h2ctransport *http2.Transport
-	logger       *logrus.Entry
-	Gw           *Gateway `json:"-"`
+	h2cUnowned   *http2.Transport
+	h2cOnly      bool
 }
 
-// defaultH2CIdleConnTimeout bounds how long an unused h2c connection is kept.
 const defaultH2CIdleConnTimeout = 90 * time.Second
 
-// Retire releases the connections held by a round tripper that is being
-// superseded or discarded.
-//
-// Both transports have to be retired, not just the HTTP/1 one. They are
-// independent pools: the h2c transport is a separate http2.Transport with its
-// own ClientConns, so closing only rt.transport leaves every h2c connection
-// open, along with the readLoop goroutine that keeps it alive.
+func newH2CRoundTripper(spec *APISpec, transport *http.Transport, dial func(dialCtx context.Context, network, addr string) (net.Conn, error)) *TykRoundTripper {
+	rt := &TykRoundTripper{transport: transport}
+
+	rt.h2ctransport = newH2CTransport(func(dialCtx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
+		conn, err := dial(dialCtx, network, addr)
+		if err != nil {
+			return nil, err
+		}
+		mark, _ := upstreamMarkFrom(dialCtx)
+		return upstreamDrainRegistry(spec).track(addr, conn, mark.selection)
+	})
+	rt.h2cUnowned = newH2CTransport(func(dialCtx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
+		return dial(dialCtx, network, addr)
+	})
+
+	return rt
+}
+
+func newH2CTransport(dial func(context.Context, string, string, *tls.Config) (net.Conn, error)) *http2.Transport {
+	return &http2.Transport{
+		DialTLSContext:  dial,
+		AllowHTTP:       true,
+		IdleConnTimeout: defaultH2CIdleConnTimeout,
+	}
+}
+
+func (rt *TykRoundTripper) h2cFor(mark upstreamMark, marked bool) *http2.Transport {
+	if marked && !mark.discovered && rt.h2cUnowned != nil {
+		return rt.h2cUnowned
+	}
+	return rt.h2ctransport
+}
+
 func (rt *TykRoundTripper) Retire() {
 	if rt == nil {
 		return
 	}
+
 	if rt.transport != nil {
-		// Prevent new idle connections from being generated.
 		rt.transport.DisableKeepAlives = true
 		rt.transport.CloseIdleConnections()
 	}
 	if rt.h2ctransport != nil {
 		rt.h2ctransport.CloseIdleConnections()
 	}
+	if rt.h2cUnowned != nil {
+		rt.h2cUnowned.CloseIdleConnections()
+	}
+}
+
+type upstreamMarkKey struct{}
+
+type upstreamMark struct {
+	h2c        bool
+	discovered bool
+	selection  upstreamSelection
+}
+
+func markUpstream(r *http.Request, mark upstreamMark) {
+	core.SetContext(r, context.WithValue(r.Context(), upstreamMarkKey{}, mark))
+}
+
+func markFinalScheme(r *http.Request) {
+	h2c := strings.EqualFold(r.URL.Scheme, "h2c")
+	mark, marked := upstreamMarkOf(r)
+	if marked && mark.h2c == h2c {
+		return
+	}
+	mark.h2c = h2c
+	markUpstream(r, mark)
+}
+
+func upstreamMarkOf(r *http.Request) (upstreamMark, bool) {
+	return upstreamMarkFrom(r.Context())
+}
+
+func upstreamMarkFrom(reqCtx context.Context) (upstreamMark, bool) {
+	mark, marked := reqCtx.Value(upstreamMarkKey{}).(upstreamMark)
+	return mark, marked
 }
 
 func (rt *TykRoundTripper) RoundTrip(r *http.Request) (*http.Response, error) {
-
-	hasInternalHeader := r.Header.Get(apidef.TykInternalApiHeader) != ""
-
-	if r.URL.Scheme == "tyk" || hasInternalHeader {
-		if hasInternalHeader {
-			r.Header.Del(apidef.TykInternalApiHeader)
-		}
-
-		handler, _, found := rt.Gw.findInternalHTTPHandlerForLoop(r.Host, nil, r)
-		if !found {
-			rt.logger.WithField("looping_url", "tyk://"+r.Host).Error("Couldn't detect target")
-			return nil, errors.New("handler could")
-		}
-
-		rt.logger.WithField("looping_url", "tyk://"+r.Host).Debug("Executing request on internal route")
-
-		return handleInMemoryLoop(handler, r)
+	if rt.h2ctransport == nil {
+		return rt.transport.RoundTrip(r)
 	}
 
-	if rt.Gw.GetConfig().OpenTelemetry.TracesEnabled() {
-		var baseRoundTripper http.RoundTripper = rt.transport
-		if rt.h2ctransport != nil {
-			baseRoundTripper = rt.h2ctransport
-		}
-
-		tr := otel.HTTPRoundTripper(baseRoundTripper)
-		return tr.RoundTrip(r)
-	}
-	if rt.h2ctransport != nil {
-		return rt.h2ctransport.RoundTrip(r)
+	mark, marked := upstreamMarkOf(r)
+	if mark.h2c || (!marked && rt.h2cOnly) {
+		return rt.h2cFor(mark, marked).RoundTrip(r)
 	}
 
 	return rt.transport.RoundTrip(r)
@@ -1146,7 +1262,12 @@ func handleInMemoryLoop(handler http.Handler, r *http.Request) (resp *http.Respo
 	return memConnClient.Do(r)
 }
 
-func (p *ReverseProxy) handleOutboundRequest(roundTripper *TykRoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, latency time.Duration, err error) {
+func (p *ReverseProxy) handleOutboundRequest(
+	roundTripper http.RoundTripper,
+	outreq *http.Request,
+	w http.ResponseWriter,
+) (res *http.Response, hijacked bool, latency time.Duration, err error) {
+
 	begin := time.Now()
 	defer func() {
 		latency = time.Since(begin)
@@ -1165,7 +1286,7 @@ func isCORSPreflight(r *http.Request) bool {
 	return r.Method == http.MethodOptions
 }
 
-func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
+func (p *ReverseProxy) handleGraphQL(roundTripper http.RoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
 	isWebSocketUpgrade := ctxGetGraphQLIsWebSocketUpgrade(outreq)
 	needsEngine := needsGraphQLExecutionEngine(p.TykAPISpec)
 
@@ -1214,7 +1335,7 @@ func (p *ReverseProxy) handleGraphQL(roundTripper *TykRoundTripper, outreq *http
 	return res, hijacked, err
 }
 
-func (p *ReverseProxy) sendRequestToUpstream(roundTripper *TykRoundTripper, outreq *http.Request) (res *http.Response, err error) {
+func (p *ReverseProxy) sendRequestToUpstream(roundTripper http.RoundTripper, outreq *http.Request) (res *http.Response, err error) {
 	return roundTripper.RoundTrip(outreq)
 }
 
@@ -1336,16 +1457,10 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 
 	p.TykAPISpec.Lock()
+	dialOrHeadersTimeout := proxyTimeout(p.TykAPISpec)
+	fallbackHeadersTimeout := time.Duration(dialOrHeadersTimeout) * time.Second
 
-	enforcedTimeout, isTimeoutEnforced := p.GetEnforcedTimeoutSettings(p.TykAPISpec, outreq)
-
-	// limit request time with context timeout
-	if isTimeoutEnforced {
-		timeoutContext, cancel := context.WithTimeout(outreq.Context(), enforcedTimeout)
-		defer cancel()
-
-		outreq = outreq.WithContext(timeoutContext)
-	}
+	requestTimeout, isRequestTimeoutEnforced := p.GetEnforcedTimeoutSettings(p.TykAPISpec, outreq)
 
 	// create HTTP transport
 	createTransport := p.TykAPISpec.HTTPTransport == nil
@@ -1360,28 +1475,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 		if p.TykAPISpec.HTTPTransport != nil {
 			oldTransport = p.TykAPISpec.HTTPTransport
-			// Prevent new idle connections to be generated.
-			if oldTransport.transport != nil {
-				oldTransport.transport.DisableKeepAlives = true
-			}
 		}
 
-		timeout := proxyTimeout(p.TykAPISpec)
-		transportTimeout := timeout
-
-		// If an enforced timeout is configured for this API endpoint, we use context timeout instead of transport timeout
-		// to avoid conflicts between ResponseHeaderTimeout and context timeout
-		if isTimeoutEnforced {
-			// Don't pass the enforced timeout to transport - let context timeout handle it
-			// Use the default proxy timeout for transport instead
-			transportTimeout = proxyTimeout(p.TykAPISpec)
-			p.logger.Debug("Using context timeout for hard timeout, transport timeout: ", transportTimeout)
-		} else {
-			// For non-enforced timeouts, we can use the global timeout on transport
-			p.logger.Debug("Using transport timeout: ", timeout)
-		}
-
-		p.TykAPISpec.HTTPTransport = p.httpTransport(transportTimeout, rw, req, outreq)
+		p.TykAPISpec.HTTPTransport = p.httpTransport(dialOrHeadersTimeout, req, outreq)
 		p.TykAPISpec.HTTPTransportCreated = time.Now()
 
 		oldTransport.Retire()
@@ -1397,6 +1493,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 	}
 	p.TykAPISpec.Unlock()
 
+	if roundTripper.h2ctransport != nil {
+		markFinalScheme(outreq)
+	}
 	if outreq.URL.Scheme == "h2c" {
 		outreq.URL.Scheme = "http"
 	}
@@ -1427,6 +1526,17 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		err             error
 	)
 
+	var decoratedRoundTripper = roundtrippers.Combine(
+		roundTripper,
+		internalLoopRoundTripperMiddleware(p.Gw, p.logger),
+		roundtrippers.SkipIf(otel.HTTPRoundTripper, !p.Gw.GetConfig().OpenTelemetry.TracesEnabled()),
+		roundtrippers.Timeout(requestTimeout),
+		roundtrippers.SkipIf(
+			roundtrippers.HeadersTimeout(fallbackHeadersTimeout),
+			isRequestTimeoutEnforced,
+		),
+	)
+
 	if breakerEnforced {
 		if !breakerConf.CB.Ready() {
 			p.logger.Debug("ON REQUEST: Circuit Breaker is in OPEN state")
@@ -1437,14 +1547,14 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}
 		p.logger.Debug("ON REQUEST: Circuit Breaker is in CLOSED or HALF-OPEN state")
 
-		res, isHijacked, upstreamLatency, err = p.handleOutboundRequest(roundTripper, outreq, rw)
+		res, isHijacked, upstreamLatency, err = p.handleOutboundRequest(decoratedRoundTripper, outreq, rw)
 		if err != nil || res.StatusCode/100 == 5 {
 			breakerConf.CB.Fail()
 		} else {
 			breakerConf.CB.Success()
 		}
 	} else {
-		res, isHijacked, upstreamLatency, err = p.handleOutboundRequest(roundTripper, outreq, rw)
+		res, isHijacked, upstreamLatency, err = p.handleOutboundRequest(decoratedRoundTripper, outreq, rw)
 	}
 
 	if err != nil {
@@ -1547,7 +1657,7 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		if p.logger.Logger.IsLevelEnabled(logrus.DebugLevel) {
 			hooks = append(hooks, NewLoggingSSEHook(p.logger))
 		}
-		if filterHook := NewMCPListFilterSSEHook(p.TykAPISpec, ses); filterHook != nil {
+		if filterHook := NewMCPListFilterSSEHook(p.TykAPISpec, ses, req); filterHook != nil {
 			hooks = append(hooks, filterHook)
 		}
 		res.Body = NewSSETap(res.Body, hooks...)
@@ -2113,7 +2223,8 @@ func (p *ReverseProxy) IsUpgrade(req *http.Request) (string, bool) {
 }
 
 func (p *ReverseProxy) addAuthInfo(outReq, req *http.Request) {
-	if !p.TykAPISpec.UpstreamAuth.IsEnabled() {
+	brokerEnabled := p.TykAPISpec.MCP != nil && p.TykAPISpec.MCP.OAuthBroker != nil && p.TykAPISpec.MCP.OAuthBroker.Enabled
+	if !p.TykAPISpec.UpstreamAuth.IsEnabled() && !brokerEnabled {
 		return
 	}
 

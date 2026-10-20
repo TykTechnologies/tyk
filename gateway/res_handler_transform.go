@@ -21,6 +21,9 @@ import (
 
 const (
 	msgBodyTransformed = "Body transformed"
+	// msgTemplateExecutionFailed is deliberately generic so a rejected template
+	// path gives no hint about the filesystem.
+	msgTemplateExecutionFailed = "Template execution failed"
 )
 
 var (
@@ -123,6 +126,12 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	}
 	tmeta := meta.(*TransformSpec)
 
+	if tmeta.Blocked {
+		logger.Error("Body transform template path was rejected at load time")
+		replaceWithTemplateExecutionError(res)
+		return nil
+	}
+
 	respBody := respBodyReader(req, res)
 	defer respBody.Close()
 
@@ -205,6 +214,25 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	res.Body = ioutil.NopCloser(&bodyBuffer)
 
 	return nil
+}
+
+// replaceWithTemplateExecutionError discards the upstream response and replaces it
+// with a generic 400, so the client receives neither the upstream body nor details
+// of why the template was rejected.
+func replaceWithTemplateExecutionError(res *http.Response) {
+	if res.Body != nil {
+		res.Body.Close()
+	}
+
+	body := []byte(`{"error": "` + msgTemplateExecutionFailed + `"}`)
+
+	res.StatusCode = http.StatusBadRequest
+	res.Status = http.StatusText(http.StatusBadRequest)
+	res.Header.Del(header.ContentEncoding)
+	res.Header.Set(header.ContentType, header.ApplicationJSON)
+	res.Header.Set(header.ContentLength, strconv.Itoa(len(body)))
+	res.ContentLength = int64(len(body))
+	res.Body = io.NopCloser(bytes.NewReader(body))
 }
 
 // GetResponseBody reads the response body with size limit enforcement

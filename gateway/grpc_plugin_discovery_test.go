@@ -12,6 +12,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/coprocess"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 )
 
 // Gate for the gRPC plugin path: dynamic pod discovery.
@@ -23,16 +24,13 @@ import (
 // pod that appeared after the first successful lookup.
 
 const (
-	// pluginRefreshInterval is the shortest interval the gateway will accept:
-	// config.ResolveDNSRefreshInterval raises anything lower to
-	// config.DNSRefreshIntervalMinimum, because the added DNS load is
-	// `gateways x APIs / interval` against a shared CoreDNS. These tests
-	// therefore have to wait it out rather than dial it down.
-	pluginRefreshInterval = int64(10)
+	// pluginRefreshInterval is the shortest interval the scheduler accepts,
+	// dnsdiscovery.MinInterval.
+	pluginRefreshInterval = tyktime.ReadableDuration(5 * time.Second)
 
-	// pluginDiscoveryWait is how long to wait for a scale event to be picked
-	// up, with enough margin for the tick that observes it.
-	pluginDiscoveryWait = 13 * time.Second
+	// pluginDiscoveryWait covers one interval plus the scheduler's refresh
+	// jitter and the tick that observes the change.
+	pluginDiscoveryWait = 8 * time.Second
 )
 
 // grpcPluginPod is one replica of a gRPC plugin behind a headless Service: a
@@ -165,7 +163,10 @@ func TestGRPCPlugin_DNSRefresh_DiscoversNewPods(t *testing.T) {
 		globalConf.CoProcessOptions.EnableCoProcess = true
 		globalConf.CoProcessOptions.CoProcessGRPCServer = fmt.Sprintf("tcp://%s:%s", pluginHost, port)
 		globalConf.CoProcessOptions.GRPCRoundRobinLoadBalancing = true
-		globalConf.CoProcessOptions.GRPCDNSRefreshInterval = pluginRefreshInterval
+		globalConf.CoProcessOptions.GRPCDNSDiscovery = config.GRPCDNSDiscoveryConfig{
+			Enabled:         true,
+			RefreshInterval: pluginRefreshInterval,
+		}
 	})
 	defer ts.Close()
 
@@ -234,10 +235,20 @@ func TestGRPCPlugin_DNSRefresh_DiscoversNewPods(t *testing.T) {
 			"defect: the gateway keeps serving the pods it saw at boot.",
 			len(idle), len(added), postScaleRPCs, idle, len(allIPs))
 	}
+
+	// Round-robin gives each pod an equal share. Half a share is the floor, so
+	// a pod that received a few stray RPCs does not pass.
+	minShare := int64(postScaleRPCs / (2 * len(pods)))
+	for _, p := range added {
+		if served := atomic.LoadInt64(&p.rpcs); served < minShare {
+			t.Errorf("%s (%s) served %d of %d RPCs after the scale-up, want at least %d (half an even share across %d pods)",
+				p.id, p.ip, served, postScaleRPCs, minShare, len(pods))
+		}
+	}
 }
 
-// TestGRPCPlugin_DNSRefresh_Disabled is the control. With the refresh interval
-// negative, polling is off and the client is left with grpc-go's stock
+// TestGRPCPlugin_DNSRefresh_Disabled is the control. With grpc_dns_discovery
+// off, the client is left with grpc-go's stock
 // behaviour, which does not notice the scale-up. If this ever passes, the test
 // above is not measuring what it claims to.
 func TestGRPCPlugin_DNSRefresh_Disabled(t *testing.T) {
@@ -259,7 +270,7 @@ func TestGRPCPlugin_DNSRefresh_Disabled(t *testing.T) {
 		globalConf.CoProcessOptions.EnableCoProcess = true
 		globalConf.CoProcessOptions.CoProcessGRPCServer = fmt.Sprintf("tcp://%s:%s", pluginHost, port)
 		globalConf.CoProcessOptions.GRPCRoundRobinLoadBalancing = true
-		globalConf.CoProcessOptions.GRPCDNSRefreshInterval = -1 // polling off
+		globalConf.CoProcessOptions.GRPCDNSDiscovery.Enabled = false
 	})
 	defer ts.Close()
 
@@ -293,7 +304,7 @@ func TestGRPCPlugin_DNSRefresh_Disabled(t *testing.T) {
 
 	for _, p := range added {
 		if served := atomic.LoadInt64(&p.rpcs); served != 0 {
-			t.Errorf("control: with grpc_dns_refresh_interval disabled, %s (%s) served %d RPCs after "+
+			t.Errorf("control: with grpc_dns_discovery disabled, %s (%s) served %d RPCs after "+
 				"the scale event. Nothing should have re-resolved, so the pod should have stayed idle; "+
 				"if it did receive traffic, something other than the poller is discovering pods and the "+
 				"discovery test proves nothing.", p.id, p.ip, served)

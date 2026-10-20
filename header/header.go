@@ -49,6 +49,20 @@ const (
 	XTykAcceptExampleCode = "X-Tyk-Accept-Example-Code"
 )
 
+// Node metadata the gateway sends to the Dashboard on every register
+// (/register/node) and heartbeat (/register/ping) request. Names mirror the
+// MDCB NodeData JSON fields. The counts can be 0 on the initial register (the
+// first reload runs after registration); the heartbeat is their source of truth.
+const (
+	XTykNodeVersion   = "x-tyk-node-version"
+	XTykNodeSegmented = "x-tyk-node-segmented"
+	XTykNodeTags      = "x-tyk-node-tags" // comma-separated, omitted when empty
+	XTykAPIsCount     = "x-tyk-apis-count"
+	XTykPoliciesCount = "x-tyk-policies-count"
+	XTykNodePID       = "x-tyk-node-pid"
+	XTykNodeAddress   = "x-tyk-node-address"
+)
+
 // upgrade and websocket
 const (
 	Upgrade              = "Upgrade"

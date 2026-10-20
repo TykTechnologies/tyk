@@ -263,11 +263,15 @@ func TestReverseProxyDnsCache(t *testing.T) {
 	)
 
 	ts := StartTest(nil)
-	// Take a handle on the process-wide mock without registering anything:
-	// flakySetupTestReverseProxyDnsCache pushes etcHostsMap below, and pulls it
+	// Take a handle on the process-wide mock without registering anything.
+	// flakySetupTestReverseProxyDnsCache pushes etcHostsMap below and pulls it
 	// again on teardown. Registering here as well would append each address to
 	// itself, so every lookup would answer with the list twice over.
-	ts.MockHandle, _ = test.InitDNSMock(map[string][]string{}, nil)
+	var mockErr error
+	ts.MockHandle, mockErr = test.InitDNSMock(map[string][]string{}, nil)
+	if mockErr != nil {
+		t.Fatalf("init dns mock: %v", mockErr)
+	}
 	defer ts.Close()
 	defer func() {
 		_ = ts.MockHandle.ShutdownDnsMock()
@@ -1901,11 +1905,9 @@ func TestEnsureTransport(t *testing.T) {
 		{"http://httpbin.org:80 ", "https", "http://httpbin.org:80"},
 		{"httpbin.org:2000 ", "tls", "tls://httpbin.org:2000"},
 		{"httpbin.org:2000 ", "", "http://httpbin.org:2000"},
-		// This is the h2c proto to http conversion. Only an *inherited* h2c
-		// scheme is coalesced: `protocol` is what the API listens on, so it
-		// says nothing about the upstream. An explicitly written h2c:// target
-		// survives, because the h2c transport is chosen from the URL scheme
-		// after the Director has run.
+		// Only an inherited h2c scheme is coalesced. An explicit h2c://
+		// target survives, or enabling load balancing would downgrade an h2c
+		// upstream to HTTP/1.1.
 		{"http://httpbin.org ", "h2c", "http://httpbin.org"},
 		{"h2c://httpbin.org ", "h2c", "h2c://httpbin.org"},
 		{"httpbin.org ", "h2c", "http://httpbin.org"},
@@ -2703,6 +2705,62 @@ func TestTimeoutPrioritization(t *testing.T) {
 	})
 }
 
+func TestTimeoutCachingBugFix(t *testing.T) {
+	ts := StartTest(func(c *config.Config) {
+		c.ProxyDefaultTimeout = 0.02 // Default transport timeout: 20ms
+	})
+	defer ts.Close()
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/default") {
+			time.Sleep(10 * time.Millisecond)
+			_, err := w.Write([]byte("Default OK"))
+			assert.NoError(t, err)
+		} else if strings.HasPrefix(r.URL.Path, "/enforced") {
+			time.Sleep(30 * time.Millisecond) // Delay (30ms) is BETWEEN default (20ms) and enforced (50ms)
+			_, err := w.Write([]byte("Enforced OK"))
+			assert.NoError(t, err)
+		}
+	}))
+	defer upstream.Close()
+
+	api := BuildAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = upstream.URL
+		spec.EnforcedTimeoutEnabled = true
+		UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+			version.UseExtendedPaths = true
+			version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+				{
+					Path:            "/enforced",
+					Method:          http.MethodGet,
+					TimeoutDuration: tyktime.ReadableDuration(50 * time.Millisecond), // Enforced timeout: 50ms
+				},
+			}
+		})
+	})[0]
+	ts.Gw.LoadAPI(api)
+
+	// REQUEST 1: Endpoint WITHOUT enforced timeout.
+	// This forces the creation and caching of the transport.
+	_, _ = ts.Run(t, test.TestCase{
+		Method:    http.MethodGet,
+		Path:      "/default",
+		Code:      http.StatusOK,
+		BodyMatch: "Default OK",
+	})
+
+	// REQUEST 2: Endpoint WITH enforced timeout (50ms).
+	// Delay is 30ms. Since 30ms < 50ms, it should SUCCEED.
+	// If the bug exists, the cached transport (20ms) will kill this request, returning 504.
+	_, _ = ts.Run(t, test.TestCase{
+		Method:    http.MethodGet,
+		Path:      "/enforced",
+		Code:      http.StatusOK,
+		BodyMatch: "Enforced OK",
+	})
+}
+
 func TestAPILevelTimeout(t *testing.T) {
 	t.Parallel()
 
@@ -2948,4 +3006,49 @@ func getResponseForGivenURL(r *http.Request, sResp string, msResp string) string
 	}
 
 	return ""
+}
+
+// Master declared targetQuery outside the director closure and assigned it from
+// inside, so every request on a load-balanced API wrote one shared variable and
+// one request's query string could surface on another's. Run under -race.
+func TestDirector_TargetQueryIsPerRequest(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	targets := []string{
+		"http://upstream-a.example.com/?from=a",
+		"http://upstream-b.example.com/?from=b",
+	}
+
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	spec.Proxy.EnableLoadBalancing = true
+	spec.Proxy.Targets = targets
+	spec.Proxy.StructuredTargetList = apidef.NewHostListFromList(targets)
+
+	target, err := url.Parse("http://upstream-a.example.com/?from=configured")
+	if err != nil {
+		t.Fatal(err)
+	}
+	proxy := ts.Gw.TykNewSingleHostReverseProxy(target, spec, nil)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+
+			own := fmt.Sprintf("req=%d", i)
+			req := TestReq(t, http.MethodGet, "http://gateway/path?"+own, nil)
+			proxy.Director(req)
+
+			if !strings.Contains(req.URL.RawQuery, own) {
+				t.Errorf("request %d lost its own query string, got %q", i, req.URL.RawQuery)
+			}
+			if strings.Contains(req.URL.RawQuery, "req=") &&
+				strings.Count(req.URL.RawQuery, "req=") != 1 {
+				t.Errorf("request %d carries another request's query: %q", i, req.URL.RawQuery)
+			}
+		}(i)
+	}
+	wg.Wait()
 }

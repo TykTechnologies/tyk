@@ -10,6 +10,24 @@ import (
 )
 
 func TestServer(t *testing.T) {
+	t.Run("MCP trusted origins round trip", func(t *testing.T) {
+		input := Server{MCP: &MCP{
+			TrustedOrigins: []string{"https://client.example"},
+			OAuthBroker: &MCPOAuthBroker{
+				Enabled: true, PublicOrigin: "https://gateway.example",
+				PublicResource: "https://gateway.example/mcp/", UpstreamResource: "https://upstream.example/mcp",
+				TrustedEndpointOrigins: []string{"https://tokens.example"},
+			},
+		}}
+		var classic apidef.APIDefinition
+		input.ExtractTo(&classic)
+		assert.Equal(t, []string{"https://client.example"}, classic.MCP.TrustedOrigins)
+
+		var output Server
+		output.Fill(classic)
+		assert.Equal(t, input.MCP, output.MCP)
+	})
+
 	t.Run("empty", func(t *testing.T) {
 		t.Parallel()
 

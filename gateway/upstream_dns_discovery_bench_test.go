@@ -3,6 +3,9 @@ package gateway
 import (
 	"context"
 	"fmt"
+	"net"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
 	"time"
@@ -10,69 +13,25 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/dnsdiscovery"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 )
 
-// Benchmarks for upstream DNS discovery.
-//
-// Two claims are worth measuring, because both were arguments in choosing the
-// design and neither is obvious from reading the code.
-//
-// The request path has to be cheap. Sourcing the target list from DNS happens
-// on every proxied request for an API that has it enabled, so it must not
-// resolve, must not take a lock, and must not rebuild the target list while
-// membership is unchanged. BenchmarkUpstreamDNS_RequestPath measures the steady
-// state and BenchmarkUpstreamDNS_RequestPathRebuild the cost when a refresh has
-// actually moved the address set, which happens on the order of the refresh
-// interval rather than the request rate.
-//
-// Refresh cost has to follow the number of distinct upstream hostnames rather
-// than the number of APIs. That is the whole reason the scheduler is keyed by
-// hostname, and BenchmarkUpstreamDNS_RefreshCycle measures it directly by
-// holding the API count fixed and varying how many names those APIs share.
-
-// benchScheduler builds a scheduler with a fixed answer per hostname and no
-// background goroutine, so a benchmark measures only what it calls.
-func benchScheduler(b *testing.B, addrsPerHost int) *upstreamDNSScheduler {
+func benchGateway(b *testing.B, addrsPerHost int) *Gateway {
 	b.Helper()
+	addrs := benchAddrs(addrsPerHost)
 
-	addrs := make([]string, 0, addrsPerHost)
-	for i := 0; i < addrsPerHost; i++ {
-		addrs = append(addrs, fmt.Sprintf("10.0.%d.%d", i/250, i%250+1))
-	}
-
-	s := &upstreamDNSScheduler{
-		entries:       map[string]*dnsDiscoveryEntry{},
-		subscriptions: map[string]*dnsSubscription{},
-		running:       true, // no background loop during a benchmark
-		wake:          make(chan struct{}, 1),
-		lookup: func(_ context.Context, _ string) ([]string, error) {
-			return addrs, nil
-		},
-		jitter: func(d time.Duration) time.Duration { return d },
-	}
-	return s
-}
-
-// benchGateway wires a scheduler into a gateway in place, since the scheduler
-// holds a mutex and an atomic counter and must not be copied.
-func benchGateway(b *testing.B, addrsPerHost int) (*Gateway, *upstreamDNSScheduler) {
-	b.Helper()
-
-	template := benchScheduler(b, addrsPerHost)
 	gw := &Gateway{}
-	s := &gw.upstreamDNS
-	s.entries = map[string]*dnsDiscoveryEntry{}
-	s.subscriptions = map[string]*dnsSubscription{}
-	s.running = true
-	s.wake = make(chan struct{}, 1)
-	s.lookup = template.lookup
-	s.jitter = template.jitter
-	return gw, s
+	gw.ctx = b.Context()
+	gw.upstreamDNS.Lookup = func(_ context.Context, _ string) ([]string, error) {
+		return addrs, nil
+	}
+	gw.upstreamDNS.Jitter = func(d time.Duration) time.Duration { return d }
+	return gw
 }
 
-// benchSpec builds a spec subscribed to host, with its first address set
-// already published.
-func benchSpec(b *testing.B, scheduler *upstreamDNSScheduler, apiID, target string) *APISpec {
+func benchSpec(b *testing.B, gw *Gateway, apiID, target string) *APISpec {
 	b.Helper()
 
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
@@ -80,104 +39,81 @@ func benchSpec(b *testing.B, scheduler *upstreamDNSScheduler, apiID, target stri
 	spec.Proxy.TargetURL = target
 	spec.Proxy.EnableLoadBalancing = true
 	spec.Proxy.DNSDiscovery.Enabled = true
+	spec.Proxy.DNSDiscovery.RefreshInterval = tyktime.ReadableDuration(time.Hour)
 
 	logger := logrus.NewEntry(logrus.New())
 	logger.Logger.SetLevel(logrus.PanicLevel)
 
-	plan := planUpstreamDNSDiscovery(spec, logger)
+	gw.setupUpstreamDNSDiscovery(spec, logger)
+	plan := spec.dnsDiscovery.Load()
 	if plan == nil {
 		b.Fatalf("%s got no plan for %q", apiID, target)
 	}
-	plan.entry = scheduler.subscribe(context.Background(), apiID, plan)
-	// Production leaves the first lookup to the scheduler goroutine; a
-	// benchmark that suppresses the loop resolves it here so the measured
-	// iterations are cache hits.
-	scheduler.refresh(context.Background(), plan.entry)
-	spec.dnsDiscovery = plan
+	b.Cleanup(plan.sub.Release)
+
+	// Refresh can skip a lookup already claimed by the background loop.
+	// Warm waits for that lookup so we never measure the unresolved path.
+	ctx, cancel := context.WithTimeout(gw.ctx, 5*time.Second)
+	defer cancel()
+	if unresolved := gw.upstreamDNS.Warm(ctx); len(unresolved) != 0 {
+		b.Fatalf("unresolved benchmark hosts: %v", unresolved)
+	}
+	if !plan.sub.State().Usable() {
+		b.Fatal("benchmark hostname has no usable addresses")
+	}
+	if list, _ := gw.urlFromDNS(spec); list == nil || list.Len() == 0 {
+		b.Fatal("benchmark hostname has no rendered targets")
+	}
 	return spec
 }
 
-// BenchmarkUpstreamDNS_RequestPath is the steady state: membership has not
-// changed since the last request, which is the case for all but a handful of
-// requests between refreshes. It should be an atomic load and a comparison.
 func BenchmarkUpstreamDNS_RequestPath(b *testing.B) {
 	for _, pods := range []int{2, 10, 50} {
 		b.Run(fmt.Sprintf("pods=%d", pods), func(b *testing.B) {
-			gw, scheduler := benchGateway(b, pods)
-			spec := benchSpec(b, scheduler, "api-1", "h2c://svc:9002")
-
-			// Prime the rendered list so the loop measures cache hits.
-			if _, err := gw.urlFromDNS(spec); err != nil {
-				b.Fatal(err)
-			}
+			gw := benchGateway(b, pods)
+			spec := benchSpec(b, gw, "api-1", "h2c://svc:9002")
 
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				list, err := gw.urlFromDNS(spec)
-				if err != nil || list == nil {
-					b.Fatalf("urlFromDNS: %v", err)
+				if list, _ := gw.urlFromDNS(spec); list == nil {
+					b.Fatal("no target list")
 				}
 			}
 		})
 	}
 }
 
-// BenchmarkUpstreamDNS_RequestPathParallel runs the same read from several
-// goroutines, since the published set is shared and the point of the atomic
-// pointer is that concurrent requests do not contend.
 func BenchmarkUpstreamDNS_RequestPathParallel(b *testing.B) {
-	gw, scheduler := benchGateway(b, 10)
-	spec := benchSpec(b, scheduler, "api-1", "h2c://svc:9002")
-
-	if _, err := gw.urlFromDNS(spec); err != nil {
-		b.Fatal(err)
-	}
+	gw := benchGateway(b, 10)
+	spec := benchSpec(b, gw, "api-1", "h2c://svc:9002")
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	b.RunParallel(func(pb *testing.PB) {
 		for pb.Next() {
-			if _, err := gw.urlFromDNS(spec); err != nil {
-				b.Fatal(err)
-			}
+			gw.urlFromDNS(spec)
 		}
 	})
 }
 
-// BenchmarkUpstreamDNS_RequestPathRebuild is the cost paid when a refresh has
-// changed the address set and the target list has to be built again. It is the
-// number to compare the steady state against, and the reason the rendered list
-// is cached by version.
-//
-// Worth reading precisely: the cache means this is paid per membership change
-// rather than per request, but it is paid by every request in flight at the
-// moment the version moves, not once for the whole gateway. Several will race
-// to rebuild and the last store wins. That is bounded by the request
-// concurrency and self-corrects on the next request, so it is left as is.
 func BenchmarkUpstreamDNS_RequestPathRebuild(b *testing.B) {
 	for _, pods := range []int{2, 10, 50} {
 		b.Run(fmt.Sprintf("pods=%d", pods), func(b *testing.B) {
-			gw, scheduler := benchGateway(b, pods)
-			spec := benchSpec(b, scheduler, "api-1", "h2c://svc:9002")
-			plan := spec.dnsDiscovery
+			gw := benchGateway(b, pods)
+			spec := benchSpec(b, gw, "api-1", "h2c://svc:9002")
+			plan := spec.dnsDiscovery.Load()
 
 			b.ReportAllocs()
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				// Drop the cache so every iteration rebuilds.
 				plan.rendered.Store(nil)
-				if _, err := gw.urlFromDNS(spec); err != nil {
-					b.Fatal(err)
-				}
+				gw.urlFromDNS(spec)
 			}
 		})
 	}
 }
 
-// BenchmarkUpstreamDNS_RequestPathDisabled is the control. An API that has not
-// enabled DNS discovery must not pay for the feature existing, and the Director
-// reaches urlFromDNS only through upstreamDNSDiscoveryEnabled.
 func BenchmarkUpstreamDNS_RequestPathDisabled(b *testing.B) {
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 	spec.APIID = "api-1"
@@ -192,102 +128,6 @@ func BenchmarkUpstreamDNS_RequestPathDisabled(b *testing.B) {
 	}
 }
 
-// BenchmarkUpstreamDNS_RefreshCycle holds the API count at 1000 and varies how
-// many distinct hostnames they point at, which is what a real deployment does:
-// many APIs, far fewer upstream Services.
-//
-// One refresh cycle should cost one lookup per hostname, so the measured time
-// should track hosts and be flat in APIs. A poller per API would instead cost
-// 1000 lookups in every one of these cases.
-func BenchmarkUpstreamDNS_RefreshCycle(b *testing.B) {
-	const apis = 1000
-
-	for _, hosts := range []int{1, 10, 100, 1000} {
-		b.Run(fmt.Sprintf("apis=%d/hosts=%d", apis, hosts), func(b *testing.B) {
-			scheduler := benchScheduler(b, 4)
-			ctx := context.Background()
-
-			for i := 0; i < apis; i++ {
-				host := fmt.Sprintf("svc-%d", i%hosts)
-				scheduler.subscribe(ctx, fmt.Sprintf("api-%d", i), newPlan("h2c://"+host+":9002", 30*time.Second))
-			}
-			if got := len(scheduler.entries); got != hosts {
-				b.Fatalf("scheduler holds %d entries, want %d", got, hosts)
-			}
-
-			b.ReportAllocs()
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				for _, entry := range scheduler.entries {
-					scheduler.refresh(ctx, entry)
-				}
-			}
-			b.StopTimer()
-
-			// Report the lookups a cycle actually costs, which is the claim
-			// being made: hostnames, not APIs.
-			b.ReportMetric(float64(hosts), "lookups/cycle")
-		})
-	}
-}
-
-// BenchmarkUpstreamDNS_DueEntries measures the scan the scheduler goroutine
-// does on each wake to find what is due. It runs once per wake rather than once
-// per request or per API, but it is the part that grows with the number of
-// distinct hostnames, so it is worth knowing.
-func BenchmarkUpstreamDNS_DueEntries(b *testing.B) {
-	for _, hosts := range []int{10, 100, 1000} {
-		b.Run(fmt.Sprintf("hosts=%d", hosts), func(b *testing.B) {
-			scheduler := benchScheduler(b, 4)
-			ctx := context.Background()
-
-			for i := 0; i < hosts; i++ {
-				scheduler.subscribe(ctx, fmt.Sprintf("api-%d", i), newPlan("h2c://"+fmt.Sprintf("svc-%d", i)+":9002", time.Hour))
-			}
-
-			b.ReportAllocs()
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
-				due := scheduler.dueEntries()
-				if len(due) != 0 {
-					b.Fatalf("%d entries reported due with an hour-long interval", len(due))
-				}
-			}
-		})
-	}
-}
-
-// BenchmarkUpstreamDNS_Subscribe measures API load, not the request path. It
-// matters because every API reload runs it for every API, and a gateway with
-// thousands of APIs reloads often.
-func BenchmarkUpstreamDNS_Subscribe(b *testing.B) {
-	b.Run("new hostname", func(b *testing.B) {
-		scheduler := benchScheduler(b, 4)
-		ctx := context.Background()
-
-		b.ReportAllocs()
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			scheduler.subscribe(ctx, fmt.Sprintf("api-%d", i), newPlan("h2c://"+fmt.Sprintf("svc-%d", i)+":9002", 30*time.Second))
-		}
-	})
-
-	b.Run("shared hostname", func(b *testing.B) {
-		scheduler := benchScheduler(b, 4)
-		ctx := context.Background()
-		scheduler.subscribe(ctx, "api-seed", newPlan("h2c://"+"svc"+":9002", 30*time.Second))
-
-		b.ReportAllocs()
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
-			scheduler.subscribe(ctx, fmt.Sprintf("api-%d", i), newPlan("h2c://"+"svc"+":9002", 30*time.Second))
-		}
-	})
-}
-
-// BenchmarkUpstreamDNS_BuildTarget isolates the rendering of one address into a
-// target URL, which is the per-API half of the work and the part that runs
-// once per address on every membership change.
 func BenchmarkUpstreamDNS_BuildTarget(b *testing.B) {
 	target, err := url.Parse("h2c://my-grpc-svc:9002/base")
 	if err != nil {
@@ -302,3 +142,247 @@ func BenchmarkUpstreamDNS_BuildTarget(b *testing.B) {
 		}
 	}
 }
+
+func BenchmarkUpstreamDNS_Director(b *testing.B) {
+	newDirector := func(b *testing.B, configure func(*Gateway) *APISpec) func(*http.Request) {
+		b.Helper()
+
+		gw := &Gateway{}
+		gw.ctx = b.Context()
+		gw.SetConfig(config.Config{}, true)
+
+		spec := configure(gw)
+
+		target, err := url.Parse(spec.Proxy.TargetURL)
+		if err != nil {
+			b.Fatalf("parse target: %v", err)
+		}
+
+		logger := logrus.NewEntry(logrus.New())
+		logger.Logger.SetLevel(logrus.PanicLevel)
+
+		return gw.TykNewSingleHostReverseProxy(target, spec, logger).Director
+	}
+
+	run := func(b *testing.B, director func(*http.Request)) {
+		req := httptest.NewRequest(http.MethodPost, "http://gateway/greet", nil)
+		req.Header.Set("User-Agent", "benchmark")
+		original, originalURL := *req, *req.URL
+
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			// Reset routing and context mutations without timing request creation.
+			*req = original
+			*req.URL = originalURL
+			director(req)
+		}
+	}
+
+	for _, pods := range []int{2, 10, 50} {
+		b.Run(fmt.Sprintf("discovery/pods=%d", pods), func(b *testing.B) {
+			addrs := benchAddrs(pods)
+			director := newDirector(b, func(gw *Gateway) *APISpec {
+				gw.upstreamDNS.Lookup = func(_ context.Context, _ string) ([]string, error) { return addrs, nil }
+				gw.upstreamDNS.Jitter = func(d time.Duration) time.Duration { return d }
+
+				spec := benchSpec(b, gw, "api-1", "h2c://svc:9002")
+				return spec
+			})
+			run(b, director)
+		})
+	}
+
+	b.Run("static target list/pods=10", func(b *testing.B) {
+		director := newDirector(b, func(_ *Gateway) *APISpec {
+			targets := make([]string, 0, 10)
+			for _, addr := range benchAddrs(10) {
+				targets = append(targets, "h2c://"+addr+":9002")
+			}
+
+			spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+			spec.APIID = "api-1"
+			spec.Proxy.TargetURL = "h2c://svc:9002"
+			spec.Proxy.EnableLoadBalancing = true
+			spec.Proxy.Targets = targets
+			spec.Proxy.StructuredTargetList = apidef.NewHostListFromList(targets)
+			return spec
+		})
+		run(b, director)
+	})
+
+	b.Run("no target list at all", func(b *testing.B) {
+		director := newDirector(b, func(_ *Gateway) *APISpec {
+			spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+			spec.APIID = "api-1"
+			spec.Proxy.TargetURL = "http://svc:8080"
+			return spec
+		})
+		run(b, director)
+	})
+}
+
+func BenchmarkUpstreamConnRegistry_Track(b *testing.B) {
+	addrs := benchAddrs(10)
+
+	b.Run("serial", func(b *testing.B) {
+		registry := newUpstreamConnRegistry(nil)
+
+		b.ReportAllocs()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			addr := net.JoinHostPort(addrs[i%len(addrs)], "9002")
+			tracked, err := registry.track(addr, benchNopConn{}, upstreamSelection{})
+			if err != nil {
+				b.Fatal(err)
+			}
+			if err := tracked.Close(); err != nil {
+				b.Fatal(err)
+			}
+		}
+	})
+
+	b.Run("parallel", func(b *testing.B) {
+		registry := newUpstreamConnRegistry(nil)
+
+		b.ReportAllocs()
+		b.ResetTimer()
+		b.RunParallel(func(pb *testing.PB) {
+			i := 0
+			for pb.Next() {
+				addr := net.JoinHostPort(addrs[i%len(addrs)], "9002")
+				tracked, err := registry.track(addr, benchNopConn{}, upstreamSelection{})
+				if err != nil {
+					b.Error(err)
+					return
+				}
+				if err := tracked.Close(); err != nil {
+					b.Error(err)
+					return
+				}
+				i++
+			}
+		})
+	})
+}
+
+func BenchmarkUpstreamDNS_MembershipChange(b *testing.B) {
+	for _, pods := range []int{2, 10, 50} {
+		b.Run(fmt.Sprintf("pods=%d", pods), func(b *testing.B) {
+			addrs := benchAddrs(pods)
+
+			plan := &dnsDiscoveryPlan{
+				port:       "9002",
+				drain:      30 * time.Second,
+				conns:      newUpstreamConnRegistry(nil),
+				generation: 1,
+			}
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				plan.onAddressSet(&dnsdiscovery.State{Version: uint64(2*i + 1), Addrs: addrs[1:]})
+				plan.onAddressSet(&dnsdiscovery.State{Version: uint64(2*i + 2), Addrs: addrs})
+			}
+		})
+	}
+}
+
+func benchAddrs(n int) []string {
+	addrs := make([]string, 0, n)
+	for i := 0; i < n; i++ {
+		addrs = append(addrs, fmt.Sprintf("10.0.%d.%d", i/250, i%250+1))
+	}
+	return addrs
+}
+
+type benchNopConn struct{ net.Conn }
+
+func (benchNopConn) Close() error { return nil }
+
+var benchContextDepths = []int{0, 8, 24}
+
+func deepContextRequest(depth int) *http.Request {
+	req := httptest.NewRequest(http.MethodGet, "http://gateway/greet", nil)
+	ctx := req.Context()
+	for i := 0; i < depth; i++ {
+		ctx = context.WithValue(ctx, ctxKey(i), i)
+	}
+	return req.WithContext(ctx)
+}
+
+func benchSchemeMark(b *testing.B) {
+	for _, depth := range benchContextDepths {
+		b.Run(fmt.Sprintf("depth=%d", depth), func(b *testing.B) {
+			req := deepContextRequest(depth)
+			original := *req
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				// Each operation starts at the advertised context depth.
+				*req = original
+				markUpstream(req, upstreamMark{h2c: true, discovered: true})
+			}
+		})
+	}
+}
+
+func benchSchemeRead(b *testing.B) {
+	for _, depth := range benchContextDepths {
+		b.Run(fmt.Sprintf("depth=%d/marked", depth), func(b *testing.B) {
+			req := deepContextRequest(depth)
+			markUpstream(req, upstreamMark{h2c: true, discovered: true})
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if _, marked := upstreamMarkOf(req); !marked {
+					b.Fatal("mark not found")
+				}
+			}
+		})
+
+		b.Run(fmt.Sprintf("depth=%d/absent", depth), func(b *testing.B) {
+			req := deepContextRequest(depth)
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				if _, marked := upstreamMarkOf(req); marked {
+					b.Fatal("unexpected mark")
+				}
+			}
+		})
+	}
+}
+
+func benchSchemeClassify(b *testing.B) {
+	for _, targets := range []int{1, 10, 50} {
+		b.Run(fmt.Sprintf("targets=%d", targets), func(b *testing.B) {
+			list := make([]string, 0, targets)
+			for i := 0; i < targets; i++ {
+				list = append(list, fmt.Sprintf("h2c://10.0.0.%d:9002", i+1))
+			}
+
+			spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+			spec.Proxy.TargetURL = "h2c://svc:9002"
+			spec.Proxy.EnableLoadBalancing = true
+			spec.Proxy.Targets = list
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				upstreamSchemes(spec)
+			}
+		})
+	}
+}
+
+func BenchmarkUpstreamSchemeSelection(b *testing.B) {
+	b.Run("mark", benchSchemeMark)
+	b.Run("read", benchSchemeRead)
+	b.Run("classify targets", benchSchemeClassify)
+}
+
+type ctxKey int

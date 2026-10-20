@@ -18,6 +18,7 @@ import (
 	"github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/TykTechnologies/tyk/internal/event"
+	internalhttputil "github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/mcpadapter"
 
 	"github.com/TykTechnologies/tyk/internal/reflect"
@@ -641,67 +642,34 @@ type ResponseProcessor struct {
 	Options interface{} `bson:"options" json:"options"`
 }
 
-// DNSDiscoveryConfig configures DNS as a source for an API's target list: the
-// hostname in `target_url` is resolved and every address it returns becomes a
-// target.
-//
-// This is a source, not a balancing policy. It answers "where does the list of
-// addresses come from", the same question `service_discovery` answers from a
-// registry and `target_list` answers from hand-written configuration. Whether
-// the list is distributed across is still `enable_load_balancing`, so both have
-// to be on for requests to reach more than one address. That split is
-// deliberate: it is the model the gateway already has, and it keeps DNS from
-// becoming a second, competing balancing switch.
-//
-// It is per-API rather than gateway-level because the thing it describes is a
-// property of one upstream. Resolution itself is not per-API: one scheduler for
-// the gateway refreshes each distinct hostname once, however many APIs point at
-// it, which is how Envoy, NGINX, HAProxy and Kong all key this work.
-//
-// Only useful against a headless Kubernetes Service, or any other name that
-// resolves to one address per backend. A ClusterIP resolves to a single virtual
-// IP, so there is nothing to distribute over and the cluster dataplane binds
-// each connection to one backend regardless.
+// DNSDiscoveryConfig is used with gRPC upstreams (`h2c://` only) to resolve the upstream hostname
+// and set the load balancing target list to the returned addresses.
+// It requires `enable_load_balancing` and cannot be combined with
+// `service_discovery`.
 type DNSDiscoveryConfig struct {
-	// Enabled sources the API's target list from DNS.
+	// Enabled determines if DNS discovery is active.
 	Enabled bool `bson:"enabled" json:"enabled"`
 
-	// RefreshInterval is how often, in seconds, the upstream hostname is
-	// re-resolved in the background. It bounds how long a pod created by an
-	// autoscaling event waits before receiving traffic.
-	//
-	// 0 selects the default of 30 seconds; values below 5 are raised to 5. A
-	// small random amount is added to each cycle so that gateways started
-	// together do not resolve in lockstep.
-	//
-	// Refreshing is deliberately on a fixed interval rather than driven by the
-	// record's own TTL. A caching resolver hands one answer to every gateway
-	// behind it, so TTL-aligned refreshes arrive together and raising the TTL
-	// lowers average query load without lowering the peak. HAProxy ignores the
-	// record TTL for the same reason, and Envoy only honours it on request.
-	//
-	// Where several APIs share an upstream hostname, the shortest interval any
-	// of them asks for is the one used, since they share one refresh.
-	RefreshInterval int64 `bson:"refresh_interval" json:"refresh_interval"`
+	// RefreshInterval is how often the hostname is resolved. Defaults to 30s, minimum 5s.
+	RefreshInterval tyktime.ReadableDuration `bson:"refresh_interval" json:"refresh_interval"`
 
-	// StaleTTL is how long, in seconds, the last known good address set keeps
-	// being used while the resolver is unreachable. Past it the API falls back
-	// to its configured target, which is the behaviour it would have had
-	// without this setting, so resolution returns to the dial path.
-	//
-	// This covers resolver failures such as timeouts, not a name that has gone
-	// away: an authoritative answer that the name does not exist is applied at
-	// once, because there is nothing stale to preserve.
-	//
-	// 0 selects the default of 300 seconds. A negative value never gives up,
-	// keeping the last known good set for as long as the process runs. The
-	// default is deliberately far shorter than the equivalent in Kong, which
-	// defaults to an hour and drew reports of deleted Kubernetes endpoints
-	// still receiving traffic.
-	//
-	// Where several APIs share an upstream hostname, the shortest value any of
-	// them asks for is the one used, as with the refresh interval.
-	StaleTTL int64 `bson:"stale_ttl" json:"stale_ttl"`
+	// StaleTTL is how long the last known good addresses keep being used if the resolver becomes unreachable. Set as human-readable format; (e.g. `300s`).
+	// Empty or `0` means that known addresses will continue to be used until a lookup succeeds. Once expired, requests fail with 503.
+	StaleTTL tyktime.ReadableDuration `bson:"stale_ttl" json:"stale_ttl"`
+
+	// ConnectionDraining controls the behaviour when an address is no longer returned by the DNS resolver.
+	// Disabled by default.
+	ConnectionDraining *ConnectionDrainingConfig `bson:"connection_draining,omitempty" json:"connection_draining,omitempty"`
+}
+
+// ConnectionDrainingConfig controls the behaviour when an address is no longer returned by the DNS resolver.
+type ConnectionDrainingConfig struct {
+	// Enabled maintains connections for the `timeout` period after they are no longer returned by the DNS resolver. Default: false.
+	// When disabled, connections close once idle.
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// Timeout is how long connections to a removed address stay open. Set as human-readable format; default: 30s (when enabled).
+	Timeout tyktime.ReadableDuration `bson:"timeout" json:"timeout"`
 }
 
 type ServiceDiscoveryConfiguration struct {
@@ -760,14 +728,17 @@ type APIDefinition struct {
 	EnableProxyProtocol bool           `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
 	JsonRpcVersion      string         `bson:"json_rpc_version,omitempty" json:"json_rpc_version,omitempty"`
 	ApplicationProtocol string         `bson:"application_protocol,omitempty" json:"application_protocol,omitempty"`
-	APIID               string         `bson:"api_id" json:"api_id"`
-	OrgID               string         `bson:"org_id" json:"org_id"`
-	UseKeylessAccess    bool           `bson:"use_keyless" json:"use_keyless"`
-	UseOauth2           bool           `bson:"use_oauth2" json:"use_oauth2"`
-	ExternalOAuth       ExternalOAuth  `bson:"external_oauth" json:"external_oauth"`
-	UseOpenID           bool           `bson:"use_openid" json:"use_openid"`
-	OpenIDOptions       OpenIDOptions  `bson:"openid_options" json:"openid_options"`
-	Oauth2Meta          struct {
+	// MCP must serialize nil as BSON null: Dashboard updates use $set, so
+	// omitting it would retain a previously stored Origin configuration.
+	MCP              *MCPConfig    `bson:"mcp" json:"mcp,omitempty"`
+	APIID            string        `bson:"api_id" json:"api_id"`
+	OrgID            string        `bson:"org_id" json:"org_id"`
+	UseKeylessAccess bool          `bson:"use_keyless" json:"use_keyless"`
+	UseOauth2        bool          `bson:"use_oauth2" json:"use_oauth2"`
+	ExternalOAuth    ExternalOAuth `bson:"external_oauth" json:"external_oauth"`
+	UseOpenID        bool          `bson:"use_openid" json:"use_openid"`
+	OpenIDOptions    OpenIDOptions `bson:"openid_options" json:"openid_options"`
+	Oauth2Meta       struct {
 		AllowedAccessTypes     []osin.AccessRequestType    `bson:"allowed_access_types" json:"allowed_access_types"`
 		AllowedAuthorizeTypes  []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
 		AuthorizeLoginRedirect string                      `bson:"auth_login_redirect" json:"auth_login_redirect"`
@@ -908,6 +879,45 @@ type APIDefinition struct {
 	// ErrorOverrides contains the configurations for error response customization.
 	ErrorOverrides         ErrorOverridesMap `bson:"error_overrides" json:"error_overrides"`
 	ErrorOverridesDisabled bool              `bson:"error_overrides_disabled" json:"error_overrides_disabled" `
+}
+
+// MCPConfig contains request-security settings shared by Classic and OAS MCP
+// APIs.
+type MCPConfig struct {
+	// TrustedOrigins contains concrete HTTP(S) origins allowed to send MCP
+	// requests in addition to the API's own externally visible origin.
+	TrustedOrigins []string `bson:"trusted_origins,omitempty" json:"trusted_origins,omitempty"`
+
+	// OAuthBroker enables the Gateway-owned OAuth authorization-server identity
+	// for an MCP mirror API. It is opt-in so existing direct/static OAuth flows
+	// retain their current contract.
+	OAuthBroker *MCPOAuthBrokerConfig `bson:"oauth_broker,omitempty" json:"oauth_broker,omitempty"`
+}
+
+// MCPOAuthBrokerConfig fixes the public and upstream resource identities used
+// by the MCP OAuth broker. PublicOrigin is an origin without a path;
+// PublicResource must equal PublicOrigin plus the API listen path.
+type MCPOAuthBrokerConfig struct {
+	Enabled                bool     `bson:"enabled" json:"enabled"`
+	PublicOrigin           string   `bson:"public_origin,omitempty" json:"public_origin,omitempty"`
+	PublicResource         string   `bson:"public_resource,omitempty" json:"public_resource,omitempty"`
+	UpstreamResource       string   `bson:"upstream_resource,omitempty" json:"upstream_resource,omitempty"`
+	TrustedEndpointOrigins []string `bson:"trusted_endpoint_origins,omitempty" json:"trusted_endpoint_origins,omitempty"`
+	AllowInsecureLoopback  bool     `bson:"allow_insecure_loopback,omitempty" json:"allow_insecure_loopback,omitempty"`
+}
+
+// Validate validates MCP request-security configuration.
+func (m *MCPConfig) Validate() error {
+	if m == nil {
+		return nil
+	}
+	if _, err := internalhttputil.CanonicalOrigins(m.TrustedOrigins); err != nil {
+		return err
+	}
+	if m.OAuthBroker == nil || !m.OAuthBroker.Enabled {
+		return nil
+	}
+	return m.OAuthBroker.Validate("")
 }
 
 type JWK struct {
@@ -1160,8 +1170,9 @@ type ProxyConfig struct {
 	StructuredTargetList        *HostList                     `bson:"-" json:"-"`
 	CheckHostAgainstUptimeTests bool                          `bson:"check_host_against_uptime_tests" json:"check_host_against_uptime_tests"`
 	ServiceDiscovery            ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
-	DNSDiscovery                DNSDiscoveryConfig            `bson:"dns_discovery" json:"dns_discovery"`
-	Transport                   struct {
+	// DNSDiscovery contains the configuration related to DNS discovery.
+	DNSDiscovery DNSDiscoveryConfig `bson:"dns_discovery" json:"dns_discovery"`
+	Transport    struct {
 		SSLInsecureSkipVerify   bool     `bson:"ssl_insecure_skip_verify" json:"ssl_insecure_skip_verify"`
 		SSLCipherSuites         []string `bson:"ssl_ciphers" json:"ssl_ciphers"`
 		SSLMinVersion           uint16   `bson:"ssl_min_version" json:"ssl_min_version"`

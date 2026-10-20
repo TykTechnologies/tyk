@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strings"
 	"sync"
@@ -65,12 +66,11 @@ type APISpec struct {
 	OrgHasNoSession          bool
 	AnalyticsPluginConfig    *GoAnalyticsPlugin
 
-	// dnsDiscovery is what this API resolves when DNS is its target-list
-	// source: the upstream name, its port, and how long a resolved set is
-	// reused. Non-nil only when dns_discovery is on and the API's target is a
-	// resolvable name; it is set during load and read-only thereafter, and its
-	// presence is what turns the feature on for this API.
-	dnsDiscovery *dnsDiscoveryPlan
+	// Swapped by a reload while requests read it, so the reads stay lock-free.
+	dnsDiscovery atomic.Pointer[dnsDiscoveryPlan]
+
+	// So reconciling a spec twice does not stack unload hooks.
+	dnsDiscoveryHooked bool
 
 	unloadHooks []func()
 
@@ -122,6 +122,13 @@ type APISpec struct {
 	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
 	// Built from apidef.ErrorOverrides during gateway startup.
 	compiledErrorOverrides atomic.Pointer[CompiledErrorOverrides]
+
+	// MCP origin-security configuration is immutable for a loaded spec. Parse it
+	// once and retain the canonical origins/proxy networks off the request path.
+	mcpOriginConfigOnce     sync.Once
+	mcpTrustedOrigins       map[string]struct{}
+	mcpTrustedProxyPrefixes []netip.Prefix
+	mcpOriginConfigErr      error
 }
 
 // MCPAdapterRuntime groups runtime-only state for a synthetic REST-as-MCP

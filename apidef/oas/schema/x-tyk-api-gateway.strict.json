@@ -1447,6 +1447,57 @@
       ],
       "additionalProperties": false
     },
+    "X-Tyk-MCP": {
+      "type": "object",
+      "properties": {
+        "oauthBroker": {
+          "$ref": "#/definitions/X-Tyk-MCP-OAuthBroker"
+        },
+        "trustedOrigins": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": [
+            {
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "X-Tyk-MCP-OAuthBroker": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "publicOrigin": {
+          "type": "string"
+        },
+        "publicResource": {
+          "type": "string"
+        },
+        "upstreamResource": {
+          "type": "string"
+        },
+        "trustedEndpointOrigins": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": [
+            {
+              "type": "string"
+            }
+          ]
+        },
+        "allowInsecureLoopback": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
     "X-Tyk-Server": {
       "type": "object",
       "properties": {
@@ -1474,6 +1525,9 @@
         },
         "detailedTracing": {
           "$ref": "#/definitions/X-Tyk-DetailedTracing"
+        },
+        "mcp": {
+          "$ref": "#/definitions/X-Tyk-MCP"
         },
         "eventHandlers": {
           "type": "array",
@@ -1590,6 +1644,58 @@
           "required": [
             "loadBalancing"
           ]
+        }
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "loadBalancing": {
+                "properties": {
+                  "enabled": {
+                    "const": true
+                  }
+                },
+                "required": [
+                  "enabled"
+                ]
+              }
+            },
+            "required": [
+              "loadBalancing"
+            ],
+            "not": {
+              "properties": {
+                "dnsDiscovery": {
+                  "properties": {
+                    "enabled": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ]
+                }
+              },
+              "required": [
+                "dnsDiscovery"
+              ]
+            }
+          },
+          "then": {
+            "properties": {
+              "loadBalancing": {
+                "properties": {
+                  "targets": {
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "targets"
+                ]
+              }
+            }
+          }
         }
       ],
       "additionalProperties": false
@@ -3045,11 +3151,28 @@
           "type": "boolean"
         },
         "refreshInterval": {
-          "type": "integer",
-          "minimum": 0
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
         },
         "staleTTL": {
-          "type": "integer"
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
+        },
+        "connectionDraining": {
+          "$ref": "#/definitions/X-Tyk-ConnectionDraining"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
+    "X-Tyk-ConnectionDraining": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "timeout": {
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
         }
       },
       "required": [
@@ -3077,27 +3200,6 @@
       },
       "required": [
         "enabled"
-      ],
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "enabled": {
-                "const": true
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "targets": {
-                "minItems": 1
-              }
-            },
-            "required": [
-              "targets"
-            ]
-          }
-        }
       ],
       "additionalProperties": false
     },

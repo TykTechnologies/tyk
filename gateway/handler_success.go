@@ -18,6 +18,7 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	graphqlinternal "github.com/TykTechnologies/tyk/internal/graphql"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/request"
@@ -169,10 +170,20 @@ func recordGraphDetails(rec *analytics.AnalyticsRecord, r *http.Request, resp *h
 
 func recordMCPDetails(rec *analytics.AnalyticsRecord, r *http.Request) {
 	rec.MCPStats = analytics.MCPStats{
-		IsMCP:         true,
-		JSONRPCMethod: ctxGetMCPMethod(r),
-		PrimitiveType: ctxGetMCPPrimitiveType(r),
-		PrimitiveName: ctxGetMCPPrimitiveName(r),
+		IsMCP:            true,
+		JSONRPCErrorCode: ctxGetJSONRPCErrorCode(r),
+		JSONRPCMethod:    ctxGetMCPMethod(r),
+		PrimitiveType:    ctxGetMCPPrimitiveType(r),
+		PrimitiveName:    ctxGetMCPPrimitiveName(r),
+	}
+	if protocolContext := httpctx.GetMCPProtocolContext(r); protocolContext != nil {
+		if rec.MCPStats.JSONRPCMethod == "" && protocolContext.Envelope != nil {
+			rec.MCPStats.JSONRPCMethod = protocolContext.Envelope.Method
+			rec.MCPStats.PrimitiveType = primitiveTypeForMethod(protocolContext.Envelope.Method)
+		}
+		rec.MCPStats.EffectiveProtocolVersion = protocolContext.EffectiveProtocolVersion
+		rec.MCPStats.DeclaredProtocolVersion = protocolContext.DeclaredProtocolVersion
+		rec.MCPStats.ProtocolVersionSource = string(protocolContext.ProtocolVersionSource)
 	}
 }
 
@@ -390,15 +401,26 @@ func (s *SuccessHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) *http
 
 	addVersionHeader(w, r, s.Spec.GlobalConfig)
 
+	proxyWriter := w
+	var mcpResponseObserver *mcpCompletionObserver
+	if s.Spec.IsMCP() && !s.Spec.IsSyntheticMCPAdapter() {
+		mcpResponseObserver, proxyWriter = observeMCPCompletion(w)
+	}
+
 	t1 := time.Now()
 	var resp ProxyResponse
 	if s.Spec.GraphQL.Enabled {
-		resp = s.Proxy.ServeHTTPForCache(w, r)
+		resp = s.Proxy.ServeHTTPForCache(proxyWriter, r)
 	} else {
-		resp = s.Proxy.ServeHTTP(w, r)
+		resp = s.Proxy.ServeHTTP(proxyWriter, r)
 	}
 
 	t2 := time.Now()
+	if mcpResponseObserver != nil {
+		if code, ok := jsonRPCCompletionErrorCode(mcpResponseObserver.observedBody()); ok {
+			ctxSetJSONRPCErrorCode(r, code)
+		}
+	}
 	proxyDuration := t2.Sub(t1)
 	millisec := DurationToMillisecond(proxyDuration)
 	log.Debug("Upstream request took (ms): ", millisec)

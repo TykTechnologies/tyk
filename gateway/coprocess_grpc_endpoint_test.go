@@ -1,8 +1,10 @@
 package gateway
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/TykTechnologies/tyk/config"
 )
@@ -41,58 +43,36 @@ func TestBareGRPCEndpoint(t *testing.T) {
 	}
 }
 
-// TestDNSRefreshIntervalEnvVar pins the environment variable name down.
-//
-// It is worth a test because it is not what anyone writes by hand. Config keys
-// are derived by uppercasing the field path with no word splitting, so it is
-// TYK_GW_COPROCESSOPTIONS_GRPCDNSREFRESHINTERVAL and not
-// ..._GRPC_DNS_REFRESH_INTERVAL. Adding an envconfig tag to force the
-// underscored form is not a fix: a tag value also registers as an unprefixed
-// alias, so a bare GRPC_DNS_REFRESH_INTERVAL in the environment would silently
-// configure the gateway.
-//
-// Only the plugin path has an environment variable, and only the plugin path
-// should: coprocess_grpc_server is one gateway-level target shared by every API
-// with a gRPC plugin. The upstream equivalent is per-API
-// (proxy.dns_discovery), because which upstream to rediscover is a
-// property of one API rather than of the gateway.
-func TestDNSRefreshIntervalEnvVar(t *testing.T) {
-	t.Setenv("TYK_GW_COPROCESSOPTIONS_GRPCDNSREFRESHINTERVAL", "15")
+// TestGRPCDNSDiscoveryEnvVars pins the environment variable names down. Config
+// keys are derived by uppercasing the field path with no word splitting, and
+// refresh_interval has to parse as a duration string from the environment as
+// it does from JSON.
+func TestGRPCDNSDiscoveryEnvVars(t *testing.T) {
+	t.Setenv("TYK_GW_COPROCESSOPTIONS_GRPCDNSDISCOVERY_ENABLED", "true")
+	t.Setenv("TYK_GW_COPROCESSOPTIONS_GRPCDNSDISCOVERY_REFRESHINTERVAL", "15s")
 
-	// Load from a config file that does not exist, so only defaults and the
-	// environment are in play.
 	conf := config.Config{}
 	if err := config.Load([]string{filepath.Join(t.TempDir(), "absent.conf")}, &conf); err != nil {
 		t.Fatalf("load config: %v", err)
 	}
 
-	if got := conf.CoProcessOptions.GRPCDNSRefreshInterval; got != 15 {
-		t.Errorf("TYK_GW_COPROCESSOPTIONS_GRPCDNSREFRESHINTERVAL did not apply: got %d, want 15", got)
+	got := conf.CoProcessOptions.GRPCDNSDiscovery
+	if !got.Enabled {
+		t.Error("TYK_GW_COPROCESSOPTIONS_GRPCDNSDISCOVERY_ENABLED did not apply")
+	}
+	if time.Duration(got.RefreshInterval) != 15*time.Second {
+		t.Errorf("TYK_GW_COPROCESSOPTIONS_GRPCDNSDISCOVERY_REFRESHINTERVAL did not apply: got %v, want 15s",
+			time.Duration(got.RefreshInterval))
 	}
 }
 
-// TestResolveDNSRefreshInterval covers the sentinel and the floor. 0 cannot
-// mean "disabled" because defaults are applied as `if conf.X == 0 { ... }`, so
-// a negative value carries that meaning, as dns_cache.ttl already does.
-func TestResolveDNSRefreshInterval(t *testing.T) {
-	cases := []struct {
-		seconds     int64
-		wantSeconds float64
-		wantEnabled bool
-	}{
-		{0, 30, true},   // unset -> default
-		{-1, 0, false},  // sentinel -> off
-		{-30, 0, false}, // any negative -> off
-		{1, 10, true},   // below the floor -> floor
-		{10, 10, true},  // the floor itself
-		{45, 45, true},  // above the floor -> as configured
+func TestGRPCDNSDiscoveryConfigJSON(t *testing.T) {
+	var conf config.CoProcessConfig
+	raw := `{"grpc_dns_discovery": {"enabled": true, "refresh_interval": "10s"}}`
+	if err := json.Unmarshal([]byte(raw), &conf); err != nil {
+		t.Fatalf("unmarshal: %v", err)
 	}
-
-	for _, tc := range cases {
-		interval, enabled := config.ResolveDNSRefreshInterval(tc.seconds)
-		if enabled != tc.wantEnabled || interval.Seconds() != tc.wantSeconds {
-			t.Errorf("ResolveDNSRefreshInterval(%d) = (%v, %v), want (%vs, %v)",
-				tc.seconds, interval, enabled, tc.wantSeconds, tc.wantEnabled)
-		}
+	if !conf.GRPCDNSDiscovery.Enabled || time.Duration(conf.GRPCDNSDiscovery.RefreshInterval) != 10*time.Second {
+		t.Errorf("got %+v, want enabled with 10s", conf.GRPCDNSDiscovery)
 	}
 }

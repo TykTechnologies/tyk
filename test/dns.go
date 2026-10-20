@@ -2,7 +2,6 @@ package test
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"reflect"
 	"regexp"
@@ -75,9 +74,11 @@ func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 
 		var addresses []string
 
+		// Longest match wins: the map is process-wide and iteration order is random.
+		matched := ""
 		for d, ips := range d.domainsToAddresses {
-			if strings.HasPrefix(domain, d) {
-				addresses = ips
+			if strings.HasPrefix(domain, d) && len(d) > len(matched) {
+				matched, addresses = d, ips
 			}
 		}
 
@@ -88,7 +89,11 @@ func (d *dnsMockHandler) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 			// [[:alnum:]]+\.	match single character in [a-zA-Z0-9] minimum one time and ending in . literally
 			reg := regexp.MustCompile(`^localhost\.([[:alnum:]]+\.)*`)
 			if matched := reg.MatchString(domain); !matched {
-				panic(fmt.Sprintf("domain not mocked: %s", domain))
+				// On the server's goroutine: a panic aborts the binary.
+				m := new(dns.Msg)
+				m.SetRcode(r, dns.RcodeNameError)
+				w.WriteMsg(m)
+				return
 			}
 
 			addresses = []string{"127.0.0.1"}
@@ -116,63 +121,61 @@ var (
 	sharedErr  error
 )
 
-// PushDomains registers domainsMap and domainsErrorMap with the mock server and
-// returns a function that restores what was registered before, so a test can
-// scope its own domains and leave the server as it found it.
-//
-// A domain already registered is replaced, not added to. Appending would make
-// a second push of an overlapping set — which is how a scale event is
-// simulated: same name, more addresses — answer with the addresses it has in
-// common twice over.
+// PushDomains returns a function restoring what was registered before.
 func (h *DnsMockHandle) PushDomains(domainsMap map[string][]string, domainsErrorMap map[string]int) func() {
 	handler := h.mockServer.Handler.(*dnsMockHandler)
 	handler.muDomainsToAddresses.Lock()
 	defer handler.muDomainsToAddresses.Unlock()
 
-	dta := handler.domainsToAddresses
-	dte := handler.domainsToErrors
-
-	prevDta := map[string][]string{}
-	prevDte := map[string]int{}
-
-	for key, value := range dta {
-		prevDta[key] = value
+	// Key by key, or registrations made by others in this window are lost.
+	priorAddrs := make(map[string][]string, len(domainsMap))
+	addedAddrs := make(map[string]struct{}, len(domainsMap))
+	for key, ips := range domainsMap {
+		if existing, ok := handler.domainsToAddresses[key]; ok {
+			priorAddrs[key] = existing
+		} else {
+			addedAddrs[key] = struct{}{}
+		}
+		handler.domainsToAddresses[key] = ips
 	}
 
-	for key, value := range dte {
-		prevDte[key] = value
+	priorErrs := make(map[string]int, len(domainsErrorMap))
+	addedErrs := make(map[string]struct{}, len(domainsErrorMap))
+	for key, rCode := range domainsErrorMap {
+		if existing, ok := handler.domainsToErrors[key]; ok {
+			priorErrs[key] = existing
+		} else {
+			addedErrs[key] = struct{}{}
+		}
+		handler.domainsToErrors[key] = rCode
 	}
 
-	pullDomainsFunc := func() {
+	return func() {
 		handler := h.mockServer.Handler.(*dnsMockHandler)
 		handler.muDomainsToAddresses.Lock()
 		defer handler.muDomainsToAddresses.Unlock()
 
-		handler.domainsToAddresses = prevDta
-		handler.domainsToErrors = prevDte
-	}
+		for key := range addedAddrs {
+			delete(handler.domainsToAddresses, key)
+		}
+		for key, ips := range priorAddrs {
+			handler.domainsToAddresses[key] = ips
+		}
 
-	for key, ips := range domainsMap {
-		dta[key] = ips
+		for key := range addedErrs {
+			delete(handler.domainsToErrors, key)
+		}
+		for key, rCode := range priorErrs {
+			handler.domainsToErrors[key] = rCode
+		}
 	}
-
-	for key, rCode := range domainsErrorMap {
-		dte[key] = rCode
-	}
-
-	return pullDomainsFunc
 }
 
 // InitDNSMock initializes dns server on udp:0 address and replaces net.DefaultResolver in order
 // to route all dns queries within tests to this server.
 // InitDNSMock returns handle, which can be used to add/remove dns query mock responses or initialization error.
 //
-// Only one mock server exists per process, because net.DefaultResolver can only
-// point at one of them. Every call registers its domains with that one server
-// and returns a handle to it, so a second caller neither loses its mappings nor
-// makes the first caller's domains unresolvable. Registering the same domain
-// twice replaces the earlier mapping; use DnsMockHandle.PushDomains for a
-// scoped, restorable override.
+// One mock server per process; use PushDomains for a scoped override.
 func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int) (*DnsMockHandle, error) {
 	mockOnce.Do(func() {
 		sharedMock, sharedErr = startDNSMock()
@@ -199,8 +202,7 @@ func InitDNSMock(domainsMap map[string][]string, domainsErrorMap map[string]int)
 	return sharedMock, nil
 }
 
-// startDNSMock brings up the single process-wide mock server and points
-// net.DefaultResolver at it.
+// startDNSMock points net.DefaultResolver at the process-wide mock server.
 func startDNSMock() (*DnsMockHandle, error) {
 	addr, _ := net.ResolveUDPAddr("udp", ":0")
 	conn, err := net.ListenUDP("udp", addr)
@@ -216,8 +218,7 @@ func startDNSMock() (*DnsMockHandle, error) {
 	mockServer := &dns.Server{PacketConn: conn, NotifyStartedFunc: started}
 	handle := &DnsMockHandle{id: time.Now().String(), mockServer: mockServer}
 
-	// Both maps are non-nil for the life of the server: callers register into
-	// them rather than replacing them, and PushDomains writes into them too.
+	// Non-nil for the life of the server: callers register into them.
 	dnsMux := &dnsMockHandler{
 		domainsToAddresses: map[string][]string{},
 		domainsToErrors:    map[string]int{},
