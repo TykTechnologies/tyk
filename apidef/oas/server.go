@@ -256,16 +256,19 @@ type MCPOAuthBroker struct {
 // this path, on the port that Tyk is configured to run on and processes
 // these accordingly.
 type ListenPath struct {
-	// Value is the value of the listen path e.g. `/api/` or `/` or `/httpbin/`.
+	// Value is the listen path, for example `/api/` or `/`. It must start with
+	// a slash (`/`). Tyk Dashboard rejects a listen path without a leading slash,
+	// and Tyk Gateway adds a missing leading slash when it loads the API.
+	// See [Request Matching](/getting-started/key-concepts/url-matching) for how
+	// Tyk Gateway matches requests to the listen path.
+	//
 	// Tyk classic API definition: `proxy.listen_path`
 	Value string `bson:"value" json:"value"` // required
 
-	// Strip removes the inbound listen path (as accessed by the client) when generating the outbound request for the upstream service.
-	//
-	// For example, consider the scenario where the Tyk base address is `http://acme.com/`, the listen path is `example/` and the upstream URL is `http://httpbin.org/`:
-	//
-	// - If the client application sends a request to `http://acme.com/example/get` then the request will be proxied to `http://httpbin.org/example/get`
-	// - If stripListenPath is set to `true`, the `example` listen path is removed and the request would be proxied to `http://httpbin.org/get`.
+	// Strip removes the listen path from the request path before Tyk Gateway
+	// forwards the request to the upstream service. See
+	// [Request Forwarding](/planning-for-production/ensure-high-availability/load-balancing#the-upstream-target)
+	// for an example.
 	//
 	// Tyk classic API definition: `proxy.strip_listen_path`
 	Strip bool `bson:"strip,omitempty" json:"strip,omitempty"`
