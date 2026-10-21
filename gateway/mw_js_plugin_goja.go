@@ -12,6 +12,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
 
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -260,7 +261,7 @@ func (j *GojaJSVM) Init(spec *APISpec, logger *logrus.Entry, gw *Gateway) {
 	}
 
 	j.Log = logger
-	j.RawLog = rawLog
+	j.RawLog = tyklog.GetRaw()
 }
 
 // TestRunnerRuntime returns a fresh runtime with all programs replayed and real

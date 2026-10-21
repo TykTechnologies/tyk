@@ -30,7 +30,8 @@ require (
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.2
 	github.com/TykTechnologies/storage v1.5.0
-	github.com/TykTechnologies/tyk-pump v1.17.0-rc1.0.20261006200310-9d35063b4994
+	// todo: replace after merge pump to master
+	github.com/TykTechnologies/tyk-pump v1.17.0-rc1.0.20261016095038-3b56166854c9
 	github.com/akutz/memconn v0.1.0
 	github.com/bshuster-repo/logrus-logstash-hook v1.1.0
 	github.com/buger/jsonparser v1.1.2
@@ -615,8 +616,8 @@ require (
 	google.golang.org/api v0.287.1 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20260319201613-d00831a3d3e7 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20260819154853-08b0e4226688 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260819154853-08b0e4226688 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20260928230214-8a89bd6388cc // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260928230214-8a89bd6388cc // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
@@ -658,3 +659,6 @@ replace github.com/getkin/kin-openapi => github.com/TykTechnologies/kin-openapi 
 replace github.com/hamba/avro/v2 => github.com/iskorotkov/avro/v2 v2.34.0
 
 replace github.com/modelcontextprotocol/go-sdk => github.com/andrei-tyk/go-sdk v1.7.1-0.20260912064918-3c4261d970be
+
+// todo: remove temporary pump replace after merging pump
+replace github.com/TykTechnologies/tyk-pump => github.com/TykTechnologies/tyk-pump v1.17.0-rc1.0.20261016095038-3b56166854c9

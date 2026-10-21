@@ -27,6 +27,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/cache"
 	tyktime "github.com/TykTechnologies/tyk/internal/time"
 	"github.com/TykTechnologies/tyk/internal/uuid"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -5369,23 +5370,14 @@ func TestJWTPostExpiry(t *testing.T) {
 func Test_mapScopeToPolicies_TT5893(t *testing.T) {
 	// https://tyktech.atlassian.net/browse/TT-5893
 
-	makeLogger := func(t *testing.T) (tmpLogger *logrus.Logger, hook *logrustest.Hook) {
-		t.Helper()
-
-		tmpLogger, hook = logrustest.NewNullLogger()
-		tmpLogger.SetLevel(logrus.TraceLevel)
-
-		return
-	}
-
 	t.Run("Unmatched scopes should be logged at the DEBUG level when at least one scope successfully matches a policy", func(t *testing.T) {
 		t.Run("logs only matches with debug level", func(t *testing.T) {
-			logger, hook := makeLogger(t)
+			logger, hook := tyklog.NewNullLogger()
 
 			res := mapScopeToPolicies(map[string]string{
 				"scope1": "policy1",
 				"scope2": "policy2",
-			}, []string{"scope1", "scope2"}, logger)
+			}, []string{"scope1", "scope2"}, logger.AsLogrus())
 
 			entries := hook.AllEntries()
 
@@ -5398,12 +5390,12 @@ func Test_mapScopeToPolicies_TT5893(t *testing.T) {
 		})
 
 		t.Run("logs error if no one scope matches", func(t *testing.T) {
-			logger, hook := makeLogger(t)
+			logger, hook := tyklog.NewNullLogger()
 
 			res := mapScopeToPolicies(map[string]string{
 				"scope1": "policy1",
 				"scope2": "policy2",
-			}, []string{"scope3"}, logger)
+			}, []string{"scope3"}, logger.AsLogrus())
 
 			entries := hook.AllEntries()
 			assert.Len(t, entries, 1)
@@ -5415,12 +5407,12 @@ func Test_mapScopeToPolicies_TT5893(t *testing.T) {
 		})
 
 		t.Run("logs if at least one scope matches", func(t *testing.T) {
-			logger, hook := makeLogger(t)
+			logger, hook := tyklog.NewNullLogger()
 
 			res := mapScopeToPolicies(map[string]string{
 				"scope1": "policy1",
 				"scope2": "policy2",
-			}, []string{"scope1", "scope3"}, logger)
+			}, []string{"scope1", "scope3"}, logger.AsLogrus())
 
 			entries := hook.AllEntries()
 

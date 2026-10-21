@@ -8,13 +8,13 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/graphql-go-tools/pkg/graphql"
 
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/policy"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -121,7 +121,8 @@ func TestApplyRateLimits_PolicyLimits(t *testing.T) {
 }
 
 func TestApplyRateLimits_FromCustomPolicies(t *testing.T) {
-	svc := policy.New(nil, nil, logrus.StandardLogger())
+	logger, _ := tyklog.NewNullLogger()
+	svc := policy.New(nil, nil, logger)
 
 	session := &user.SessionState{}
 	session.SetCustomPolicies([]user.Policy{
@@ -149,7 +150,8 @@ func TestApplyRateLimits_FromCustomPolicies(t *testing.T) {
 }
 
 func TestApplyACL_FromCustomPolicies(t *testing.T) {
-	svc := policy.New(nil, nil, logrus.StandardLogger())
+	logger, _ := tyklog.NewNullLogger()
+	svc := policy.New(nil, nil, logger)
 
 	pol1 := user.Policy{
 		ID:         "pol1",
@@ -245,7 +247,8 @@ func testPrepareApplyPolicies(tb testing.TB) (*policy.Service, []testApplyPolici
 
 	store := policy.NewStoreMap(repoPols)
 	orgID := ""
-	service := policy.New(&orgID, store, logrus.StandardLogger())
+	logger, _ := tyklog.NewNullLogger()
+	service := policy.New(&orgID, store, logger)
 
 	// splitting tests for readability
 	var tests []testApplyPoliciesData
@@ -1353,7 +1356,7 @@ func TestApply_PostExpiryPropagation(t *testing.T) {
 
 	store := policy.NewStoreMap(map[string]user.Policy{polID: pol})
 	orgID := ""
-	svc := policy.New(&orgID, store, logrus.StandardLogger())
+	svc := policy.New(&orgID, store, tyklog.Get())
 
 	sess := &user.SessionState{}
 	sess.SetPolicies(polID)
@@ -1376,7 +1379,8 @@ func TestApply_PostExpiryPropagation_Scenarios(t *testing.T) {
 			},
 		}
 		store := policy.NewStoreMap(map[string]user.Policy{"pol-retain": pol})
-		svc := policy.New(&orgID, store, logrus.StandardLogger())
+		logger, _ := tyklog.NewNullLogger()
+		svc := policy.New(&orgID, store, logger)
 
 		sess := &user.SessionState{}
 		sess.SetPolicies("pol-retain")
@@ -1395,7 +1399,8 @@ func TestApply_PostExpiryPropagation_Scenarios(t *testing.T) {
 			},
 		}
 		store := policy.NewStoreMap(map[string]user.Policy{"pol-empty-action": pol})
-		svc := policy.New(&orgID, store, logrus.StandardLogger())
+		logger, _ := tyklog.NewNullLogger()
+		svc := policy.New(&orgID, store, logger)
 
 		sess := &user.SessionState{
 			PostExpiryAction: user.PostExpiryActionDelete,
@@ -1416,7 +1421,8 @@ func TestApply_PostExpiryPropagation_Scenarios(t *testing.T) {
 			},
 		}
 		store := policy.NewStoreMap(map[string]user.Policy{"pol-zero-grace": pol})
-		svc := policy.New(&orgID, store, logrus.StandardLogger())
+		logger, _ := tyklog.NewNullLogger()
+		svc := policy.New(&orgID, store, logger)
 
 		sess := &user.SessionState{
 			PostExpiryGracePeriod: 3600,
@@ -1443,7 +1449,8 @@ func TestApply_PostExpiryPropagation_Scenarios(t *testing.T) {
 			},
 		}
 		store := policy.NewStoreMap(map[string]user.Policy{"polA": polA, "polB": polB})
-		svc := policy.New(&orgID, store, logrus.StandardLogger())
+		logger, _ := tyklog.NewNullLogger()
+		svc := policy.New(&orgID, store, logger)
 
 		sess := &user.SessionState{}
 		sess.SetPolicies("polA", "polB")
@@ -1467,7 +1474,8 @@ func TestApply_PostExpiryPropagation_Scenarios(t *testing.T) {
 			},
 		}
 		store := policy.NewStoreMap(map[string]user.Policy{"polA": polA, "polB": polB})
-		svc := policy.New(&orgID, store, logrus.StandardLogger())
+		logger, _ := tyklog.NewNullLogger()
+		svc := policy.New(&orgID, store, logger)
 
 		sess := &user.SessionState{}
 		sess.SetPolicies("polA", "polB")
