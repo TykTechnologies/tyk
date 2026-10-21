@@ -88,6 +88,50 @@ func TestGetOASConfigData(t *testing.T) {
 	assert.Equal(t, expectedConfigData, configData)
 }
 
+func TestGetOASConfigData_ReturnsDeepCopy(t *testing.T) {
+	newConfigData := func() map[string]any {
+		return map[string]any{
+			"key": "value",
+			"nested": map[string]any{
+				"inner": "value",
+			},
+			"list": []any{"a", "b"},
+		}
+	}
+
+	oasDef := &oas.OAS{}
+	oasDef.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Global: &oas.Global{
+				PluginConfig: &oas.PluginConfig{
+					Data: &oas.PluginConfigData{
+						Value: newConfigData(),
+					},
+				},
+			},
+		},
+	})
+
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	ctx.SetOASDefinition(req, oasDef)
+
+	configData, err := ctx.GetOASConfigData(req)
+	assert.NoError(t, err)
+	assert.Equal(t, newConfigData(), configData)
+
+	configData["key"] = "modified"
+	configData["added"] = "new"
+	configData["nested"].(map[string]any)["inner"] = "modified"
+	configData["list"].([]any)[0] = "modified"
+
+	original := oasDef.GetTykMiddleware().Global.PluginConfig.Data.Value
+	assert.Equal(t, newConfigData(), original, "modifying returned config data must not affect the API definition")
+
+	configData, err = ctx.GetOASConfigData(req)
+	assert.NoError(t, err)
+	assert.Equal(t, newConfigData(), configData, "subsequent calls must return unmodified config data")
+}
+
 // Benchmark for GetDefinition
 func BenchmarkGetDefinition(b *testing.B) {
 	apiDef := &apidef.APIDefinition{
