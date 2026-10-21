@@ -74,7 +74,19 @@ func (x *XTykAPIGateway) ExtractTo(api *apidef.APIDefinition) {
 
 // Info contains the main metadata for the API definition.
 type Info struct {
-	// ID is the unique identifier of the API within Tyk.
+	// ID is the unique identifier of the API within Tyk, used to identify it in
+	// requests to the Tyk Gateway API and Tyk Dashboard API. It can contain only
+	// `a-z`, `A-Z`, `0-9`, `.`, `_`, `-` and `~`, and must contain at least one
+	// letter or digit. Tyk Gateway and Tyk Dashboard reject any other value with
+	// `400 Bad Request`, unless `allow_unsafe_api_ids` is enabled in their
+	// configuration.
+	//
+	// Tyk Dashboard also accepts the database ID (`dbId`) of an API in place of
+	// its API ID. If a custom API ID is exactly 24 hexadecimal characters, for
+	// example `3f32f827a4eb4457a2e3309a`, the Tyk Dashboard API treats it as a
+	// database ID, so you can't use it to read, update or delete the API. Don't
+	// use API IDs in this format.
+	//
 	// Tyk classic API definition: `api_id`
 	ID string `bson:"id" json:"id,omitempty"`
 	// DBID is the unique identifier of the API within the Tyk database.

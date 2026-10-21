@@ -781,9 +781,11 @@ type CertificatesConfig struct {
 	Upstream map[string]string `json:"upstream"`
 	// Certificates used for Control API Mutual TLS
 	ControlAPI []string `json:"control_api"`
-	// Used for communicating with the Dashboard if it is configured to use Mutual TLS
+	// Has no effect. Tyk Gateway doesn't use this setting. It verifies the server
+	// certificate of Tyk Dashboard against the system CA store.
 	Dashboard []string `json:"dashboard_api"`
-	// Certificates used for MDCB Mutual TLS
+	// Has no effect. Tyk Gateway doesn't use this setting, and MDCB doesn't
+	// support mutual TLS with Data Plane Gateways.
 	MDCB []string `json:"mdcb_api"`
 }
 
