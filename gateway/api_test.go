@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -4267,6 +4268,154 @@ func TestApplyLifetime(t *testing.T) {
 			assert.Equal(t, tc.expectedLifetime, ts.Gw.ApplyLifetime(&session, nil))
 		})
 	}
+}
+
+func TestSyncedKeyLifetime(t *testing.T) {
+	notLoaded := map[string]user.AccessDefinition{
+		"not-loaded": {APIID: "not-loaded", Versions: []string{"Default"}},
+	}
+	remote := func(ttl int64, err error) func() (int64, error) {
+		return func() (int64, error) { return ttl, err }
+	}
+
+	testCases := []struct {
+		name             string
+		conf             func(*config.Config)
+		session          user.SessionState
+		remoteTTL        func() (int64, error)
+		expectRemoteCall bool
+		expectedLifetime int64
+		expectSkip       bool
+	}{
+		{
+			name:             "API not loaded, management layer TTL is used",
+			session:          user.SessionState{AccessRights: notLoaded},
+			remoteTTL:        remote(7200, nil),
+			expectRemoteCall: true,
+			expectedLifetime: 7200,
+		},
+		{
+			name:             "API not loaded, management layer key without expiry",
+			session:          user.SessionState{SessionLifetime: 3600, AccessRights: notLoaded},
+			remoteTTL:        remote(-1, nil),
+			expectRemoteCall: true,
+			expectedLifetime: -1,
+		},
+		{
+			name:             "API not loaded, management layer error falls back to key session lifetime",
+			session:          user.SessionState{SessionLifetime: 3600, AccessRights: notLoaded},
+			remoteTTL:        remote(0, errors.New("rpc down")),
+			expectRemoteCall: true,
+			expectedLifetime: 3600,
+		},
+		{
+			name:             "API not loaded, key missing in management layer is skipped",
+			session:          user.SessionState{SessionLifetime: 3600, AccessRights: notLoaded},
+			remoteTTL:        remote(-2, nil),
+			expectRemoteCall: true,
+			expectedLifetime: 0,
+			expectSkip:       true,
+		},
+		{
+			name:             "API not loaded, no management layer lookup falls back to key session lifetime",
+			session:          user.SessionState{SessionLifetime: 3600, AccessRights: notLoaded},
+			expectedLifetime: 3600,
+		},
+		{
+			name: "API not loaded, forced global session lifetime is used",
+			conf: func(c *config.Config) {
+				c.ForceGlobalSessionLifetime = true
+				c.GlobalSessionLifetime = 1800
+			},
+			session:          user.SessionState{SessionLifetime: 3600, AccessRights: notLoaded},
+			remoteTTL:        remote(7200, nil),
+			expectedLifetime: 1800,
+		},
+		{
+			name: "API loaded, lifetime is calculated locally",
+			session: user.SessionState{AccessRights: map[string]user.AccessDefinition{
+				"loaded": {APIID: "loaded", Versions: []string{"Default"}},
+			}},
+			remoteTTL:        remote(7200, nil),
+			expectedLifetime: 1000,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := StartTest(tc.conf)
+			defer ts.Close()
+
+			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.APIID = "loaded"
+				spec.SessionLifetime = 1000
+			})
+
+			remoteCalled := false
+			var remoteTTL func() (int64, error)
+			if tc.remoteTTL != nil {
+				remoteTTL = func() (int64, error) {
+					remoteCalled = true
+					return tc.remoteTTL()
+				}
+			}
+
+			session := tc.session
+			lifetime, exists := ts.Gw.syncedKeyLifetime(&session, remoteTTL)
+			assert.Equal(t, tc.expectedLifetime, lifetime)
+			assert.Equal(t, !tc.expectSkip, exists)
+			assert.Equal(t, tc.expectRemoteCall, remoteCalled)
+		})
+	}
+}
+
+func TestHandleAddKey_SetsTTLWhenAPINotLoaded(t *testing.T) {
+	ts := StartTest(func(c *config.Config) {
+		c.HashKeys = false
+	})
+	defer ts.Close()
+
+	const keyName = "synced-key-api-not-loaded"
+	sess := user.SessionState{
+		OrgID: "default",
+		AccessRights: map[string]user.AccessDefinition{
+			"not-loaded": {APIID: "not-loaded", APIName: "not-loaded", Versions: []string{"Default"}},
+		},
+	}
+	sessionJSON, err := json.Marshal(sess)
+	require.NoError(t, err)
+
+	ts.Gw.handleAddKey(keyName, string(sessionJSON), "default", func() (int64, error) {
+		return 3600, nil
+	})
+
+	ttl, err := ts.Gw.GlobalSessionManager.Store().GetExp(keyName)
+	require.NoError(t, err)
+	assert.InDelta(t, 3600, ttl, 5)
+}
+
+func TestHandleAddKey_SkipsKeyRemovedFromManagementLayer(t *testing.T) {
+	ts := StartTest(func(c *config.Config) {
+		c.HashKeys = false
+	})
+	defer ts.Close()
+
+	const keyName = "synced-key-removed-upstream"
+	sess := user.SessionState{
+		OrgID: "default",
+		AccessRights: map[string]user.AccessDefinition{
+			"not-loaded": {APIID: "not-loaded", APIName: "not-loaded", Versions: []string{"Default"}},
+		},
+	}
+	sessionJSON, err := json.Marshal(sess)
+	require.NoError(t, err)
+
+	ts.Gw.handleAddKey(keyName, string(sessionJSON), "default", func() (int64, error) {
+		return -2, nil
+	})
+
+	_, err = ts.Gw.GlobalSessionManager.Store().GetKey(keyName)
+	assert.ErrorIs(t, err, storage.ErrKeyNotFound)
 }
 
 func TestApplyLifetime_PostExpiry(t *testing.T) {
