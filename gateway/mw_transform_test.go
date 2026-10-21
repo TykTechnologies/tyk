@@ -505,10 +505,43 @@ func TestTransformMiddleware(t *testing.T) {
 			assert.NotNil(t, api)
 
 			_, _ = ts.Run(t, test.TestCase{
-				Method: http.MethodPost,
-				Path:   "/bad-template",
-				Data:   `{"name":"tyk"}`,
-				Code:   http.StatusInternalServerError,
+				Method:       http.MethodPost,
+				Path:         "/bad-template",
+				Data:         `{"name":"tyk"}`,
+				Code:         http.StatusInternalServerError,
+				BodyMatch:    msgTemplateExecutionFailed,
+				BodyNotMatch: "unclosed",
+			})
+		})
+
+		t.Run("template execution error returns StatusInternalServerError without details", func(t *testing.T) {
+			api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/"
+				spec.Proxy.TargetURL = mockEchoServer.URL
+				UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+					v.ExtendedPaths.Transform = []apidef.TemplateMeta{
+						{
+							Path:   "/out-of-range",
+							Method: http.MethodPost,
+							TemplateData: apidef.TemplateData{
+								Input:          apidef.RequestJSON,
+								Mode:           apidef.UseBlob,
+								TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{"out":"{{ index .items 5 }}"}`)),
+							},
+						},
+					}
+				})
+			})[0]
+
+			assert.NotNil(t, api)
+
+			_, _ = ts.Run(t, test.TestCase{
+				Method:       http.MethodPost,
+				Path:         "/out-of-range",
+				Data:         `{"items":[1]}`,
+				Code:         http.StatusInternalServerError,
+				BodyMatch:    msgTemplateExecutionFailed,
+				BodyNotMatch: "index out of range",
 			})
 		})
 
@@ -541,7 +574,6 @@ func TestTransformMiddleware(t *testing.T) {
 		})
 
 		t.Run("malformed request body returns StatusInternalServerError", func(t *testing.T) {
-
 			api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.Proxy.ListenPath = "/"
 				spec.Proxy.TargetURL = mockEchoServer.URL
@@ -645,7 +677,7 @@ func TestTransformRequestBody_OASFileTemplatePath(t *testing.T) {
 
 			_, _ = ts.Run(t, test.TestCase{Method: http.MethodPost, Path: "/post", Data: body,
 				BodyMatch: `"error": "Template execution failed"`, BodyNotMatch: "TOPSECRET",
-				Code: http.StatusBadRequest})
+				Code: http.StatusInternalServerError})
 		}
 	})
 

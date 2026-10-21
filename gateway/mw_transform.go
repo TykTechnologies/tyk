@@ -57,7 +57,7 @@ func (t *TransformMiddleware) ProcessRequest(_ http.ResponseWriter, r *http.Requ
 
 	if err := t.transformBody(r, tMeta); err != nil {
 		t.Logger().WithError(err).Error("Body transform failure")
-		return fmt.Errorf("body transform failure: %w", err), http.StatusInternalServerError
+		return errors.New(msgTemplateExecutionFailed), http.StatusInternalServerError
 	}
 
 	t.Logger().Debugf("%s", msgBodyTransformed)
