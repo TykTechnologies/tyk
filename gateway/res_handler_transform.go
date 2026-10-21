@@ -201,9 +201,11 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	var bodyBuffer bytes.Buffer
 	if err := tpl.Execute(&bodyBuffer, bodyData); err != nil {
 		logger.WithError(err).Error("Failed to apply template to request")
-	} else {
-		logger.Debugf("%s", msgBodyTransformed)
+		r.handleError(rw, req, http.StatusInternalServerError, msgTemplateExecutionFailed)
+		return err
 	}
+
+	logger.Debugf("%s", msgBodyTransformed)
 
 	// Re-compress if original upstream response was compressed
 	encoding := res.Header.Get("Content-Encoding")
