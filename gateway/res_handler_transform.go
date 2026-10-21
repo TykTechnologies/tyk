@@ -126,20 +126,13 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	}
 	tmeta := meta.(*TransformSpec)
 
-	if tmeta.Blocked {
-		logger.Error("Body transform template path was rejected at load time")
-		replaceWithTemplateExecutionError(res)
-		return nil
-	}
-
 	respBody := respBodyReader(req, res)
 	defer respBody.Close()
 
 	body, err := r.GetResponseBody(respBody, logger)
 	if err != nil {
 		if errors.Is(err, ErrResponseSizeLimitExceeded) {
-			handler := ErrorHandler{&BaseMiddleware{Spec: r.Spec, Gw: r.Gw}}
-			handler.HandleError(rw, req, "Response body too large", http.StatusInternalServerError, true)
+			r.handleError(rw, req, http.StatusInternalServerError, "Response body too large")
 		}
 
 		return err
@@ -197,13 +190,22 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 		}
 	}
 
+	tpl, err := tmeta.Template.Get()
+	if err != nil {
+		logger.WithError(err).Error("Body transform failure")
+		r.handleError(rw, req, http.StatusInternalServerError, msgTemplateExecutionFailed)
+		return err
+	}
+
 	// Apply to template
 	var bodyBuffer bytes.Buffer
-	if err := tmeta.Template.Execute(&bodyBuffer, bodyData); err != nil {
+	if err := tpl.Execute(&bodyBuffer, bodyData); err != nil {
 		logger.WithError(err).Error("Failed to apply template to request")
-	} else {
-		logger.Debugf("%s", msgBodyTransformed)
+		r.handleError(rw, req, http.StatusInternalServerError, msgTemplateExecutionFailed)
+		return err
 	}
+
+	logger.Debugf("%s", msgBodyTransformed)
 
 	// Re-compress if original upstream response was compressed
 	encoding := res.Header.Get("Content-Encoding")
@@ -214,25 +216,6 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	res.Body = ioutil.NopCloser(&bodyBuffer)
 
 	return nil
-}
-
-// replaceWithTemplateExecutionError discards the upstream response and replaces it
-// with a generic 400, so the client receives neither the upstream body nor details
-// of why the template was rejected.
-func replaceWithTemplateExecutionError(res *http.Response) {
-	if res.Body != nil {
-		res.Body.Close()
-	}
-
-	body := []byte(`{"error": "` + msgTemplateExecutionFailed + `"}`)
-
-	res.StatusCode = http.StatusBadRequest
-	res.Status = http.StatusText(http.StatusBadRequest)
-	res.Header.Del(header.ContentEncoding)
-	res.Header.Set(header.ContentType, header.ApplicationJSON)
-	res.Header.Set(header.ContentLength, strconv.Itoa(len(body)))
-	res.ContentLength = int64(len(body))
-	res.Body = io.NopCloser(bytes.NewReader(body))
 }
 
 // GetResponseBody reads the response body with size limit enforcement
@@ -260,4 +243,9 @@ func (r *ResponseTransformMiddleware) GetResponseBody(respBody io.Reader, logger
 	}
 
 	return body, nil
+}
+
+func (r *ResponseTransformMiddleware) handleError(rw http.ResponseWriter, req *http.Request, code int, message string) {
+	handler := ErrorHandler{&BaseMiddleware{Spec: r.Spec, Gw: r.Gw}}
+	handler.HandleError(rw, req, message, code, true)
 }

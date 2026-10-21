@@ -2,8 +2,10 @@ package gateway
 
 import (
 	"encoding/base64"
+	"io"
 	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,11 +13,13 @@ import (
 	texttemplate "text/template"
 
 	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/result"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -28,7 +32,7 @@ func testPrepareTransformNonAscii() (*TransformSpec, string) {
 	tmpl := `[{{range $x, $s := .names.name}}"{{$s}}"{{if not $x}}, {{end}}{{end}}]`
 	tmeta := &TransformSpec{}
 	tmeta.TemplateData.Input = apidef.RequestXML
-	tmeta.Template = texttemplate.Must(texttemplate.New("blob").Parse(tmpl))
+	tmeta.Template = result.Ok(texttemplate.Must(texttemplate.New("blob").Parse(tmpl)))
 	return tmeta, in
 }
 
@@ -49,7 +53,7 @@ func TestTransformNonAscii(t *testing.T) {
 
 	transform := TransformMiddleware{base}
 
-	if err := transformBody(r, tmeta, &transform); err != nil {
+	if err := transform.transformBody(r, tmeta); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
 	gotBs, err := ioutil.ReadAll(r.Body)
@@ -78,7 +82,7 @@ func BenchmarkTransformNonAscii(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		r := TestReq(b, "GET", "/", in)
 
-		if err := transformBody(r, tmeta, transform); err != nil {
+		if err := transform.transformBody(r, tmeta); err != nil {
 			b.Fatalf("wanted nil error, got %v", err)
 		}
 	}
@@ -91,7 +95,7 @@ func TestTransformXMLCrash(t *testing.T) {
 	r := TestReq(t, "GET", "/", in)
 	tmeta := &TransformSpec{}
 	tmeta.TemplateData.Input = apidef.RequestXML
-	tmeta.Template = texttemplate.Must(apidef.Template.New("").Parse(""))
+	tmeta.Template = result.Ok(texttemplate.Must(apidef.Template.New("").Parse("")))
 
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -102,7 +106,7 @@ func TestTransformXMLCrash(t *testing.T) {
 
 	transform := TransformMiddleware{base}
 
-	if err := transformBody(r, tmeta, &transform); err == nil {
+	if err := transform.transformBody(r, tmeta); err == nil {
 		t.Fatalf("wanted error, got nil")
 	}
 }
@@ -111,7 +115,7 @@ func testPrepareTransformJSONMarshal(inputType string) (tmeta *TransformSpec, in
 	tmeta = &TransformSpec{}
 	tmpl := `[{{range $x, $s := .names.name}}{{$s | jsonMarshal}}{{if not $x}}, {{end}}{{end}}]`
 	tmeta.TemplateData.Input = apidef.RequestXML
-	tmeta.Template = texttemplate.Must(apidef.Template.New("").Parse(tmpl))
+	tmeta.Template = result.Ok(texttemplate.Must(apidef.Template.New("").Parse(tmpl)))
 
 	switch inputType {
 	case "json":
@@ -130,7 +134,7 @@ func testPrepareTransformJSONMarshal(inputType string) (tmeta *TransformSpec, in
 
 func testPrepareTransformXMLMarshal(tmpl string, inputType apidef.RequestInputType) (tmeta *TransformSpec) {
 	tmeta = &TransformSpec{}
-	tmeta.Template = texttemplate.Must(apidef.Template.New("").Parse(tmpl))
+	tmeta.Template = result.Ok(texttemplate.Must(apidef.Template.New("").Parse(tmpl)))
 
 	switch inputType {
 	case apidef.RequestJSON:
@@ -157,7 +161,7 @@ func TestTransformJSONMarshalXMLInput(t *testing.T) {
 
 	transform := TransformMiddleware{base}
 
-	if err := transformBody(r, tmeta, &transform); err != nil {
+	if err := transform.transformBody(r, tmeta); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
 	gotBs, err := ioutil.ReadAll(r.Body)
@@ -184,7 +188,7 @@ func TestTransformJSONMarshalJSONInput(t *testing.T) {
 
 	transform := TransformMiddleware{base}
 
-	if err := transformBody(r, tmeta, &transform); err != nil {
+	if err := transform.transformBody(r, tmeta); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
 	gotBs, err := ioutil.ReadAll(r.Body)
@@ -200,7 +204,7 @@ func testPrepareTransformJSONMarshalArray(tb testing.TB) (tmeta *TransformSpec, 
 	tmeta = &TransformSpec{}
 	tmpl := `[{{ range $key, $value := .array }}{{ if $key }},{{ end }}{{ .abc }}{{ end }}]`
 	tmeta.TemplateData.Input = apidef.RequestXML
-	tmeta.Template = texttemplate.Must(apidef.Template.New("").Parse(tmpl))
+	tmeta.Template = result.Ok(texttemplate.Must(apidef.Template.New("").Parse(tmpl)))
 
 	tmeta.TemplateData.Input = apidef.RequestJSON
 	in = `[{"abc": 123}, {"abc": 456}]`
@@ -223,7 +227,7 @@ func TestTransformJSONMarshalJSONArrayInput(t *testing.T) {
 
 	transform := TransformMiddleware{base}
 
-	if err := transformBody(r, tmeta, &transform); err != nil {
+	if err := transform.transformBody(r, tmeta); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
 	gotBs, err := ioutil.ReadAll(r.Body)
@@ -250,7 +254,7 @@ func BenchmarkTransformJSONMarshal(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		r := TestReq(b, "GET", "/", in)
-		if err := transformBody(r, tmeta, &transform); err != nil {
+		if err := transform.transformBody(r, tmeta); err != nil {
 			b.Fatalf("wanted nil error, got %v", err)
 		}
 	}
@@ -271,7 +275,7 @@ func TestTransformXMLMarshal(t *testing.T) {
 
 		transform := TransformMiddleware{base}
 
-		if err := transformBody(r, tmeta, &transform); err != nil {
+		if err := transform.transformBody(r, tmeta); err != nil {
 			t.Fatalf("wanted nil error, got %v", err)
 		}
 		gotBs, err := ioutil.ReadAll(r.Body)
@@ -397,6 +401,209 @@ func TestTransformRequestBody(t *testing.T) {
 	})
 }
 
+func TestTransformMiddleware(t *testing.T) {
+	t.Run("ProcessRequest", func(t *testing.T) {
+		mockEchoServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, err := io.Copy(w, r.Body)
+			assert.NoError(t, err)
+		}))
+		t.Cleanup(mockEchoServer.Close)
+
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		t.Run("unmatched path passes through with StatusOK", func(t *testing.T) {
+			api := BuildAPI(func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/"
+				UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+					v.ExtendedPaths.Transform = []apidef.TemplateMeta{
+						{
+							Path:   "/transform",
+							Method: http.MethodPost,
+							TemplateData: apidef.TemplateData{
+								Input:          apidef.RequestJSON,
+								Mode:           apidef.UseBlob,
+								TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{"hello":"{{.name}}"}`)),
+							},
+						},
+					}
+				})
+			})[0]
+			ts.Gw.LoadAPI(api)
+
+			mw := &TransformMiddleware{
+				BaseMiddleware: &BaseMiddleware{
+					Spec: api,
+					Gw:   ts.Gw,
+				},
+			}
+
+			req := TestReq(t, http.MethodPost, "/unmatched", `{"name":"world"}`)
+			err, code := mw.ProcessRequest(nil, req, nil)
+			assert.NoError(t, err)
+			assert.Equal(t, http.StatusOK, code)
+		})
+
+		t.Run("successful transformation updates request body and returns StatusOK", func(t *testing.T) {
+			ts.Gw.BuildAndLoadAPI(
+				func(spec *APISpec) {
+					spec.Proxy.TargetURL = mockEchoServer.URL
+					spec.Proxy.ListenPath = "/"
+
+					UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+						v.ExtendedPaths.Transform = []apidef.TemplateMeta{
+							{
+								Path:   "/transform",
+								Method: http.MethodPost,
+								TemplateData: apidef.TemplateData{
+									Input:          apidef.RequestJSON,
+									Mode:           apidef.UseBlob,
+									TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{"greeting":"hello {{.name}}"}`)),
+								},
+							},
+						}
+					})
+				},
+			)
+
+			resp, err := ts.Run(t, test.TestCase{
+				Method:    http.MethodPost,
+				Path:      "/transform",
+				Data:      `{"name":"tyk"}`,
+				Code:      http.StatusOK,
+				BodyMatch: `{"greeting":"hello tyk"}`,
+			})
+
+			assert.NoError(t, err)
+			assert.NotNil(t, resp)
+
+			body, err := io.ReadAll(resp.Body)
+			assert.NoError(t, err)
+			assert.Equal(t, `{"greeting":"hello tyk"}`, string(body))
+		})
+
+		t.Run("template compilation error in Result returns StatusInternalServerError", func(t *testing.T) {
+			api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/"
+				spec.Proxy.TargetURL = mockEchoServer.URL
+				UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+					v.ExtendedPaths.Transform = []apidef.TemplateMeta{
+						{
+							Path:   "/bad-template",
+							Method: http.MethodPost,
+							TemplateData: apidef.TemplateData{
+								Input:          apidef.RequestJSON,
+								Mode:           apidef.UseBlob,
+								TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{{ .unclosed`)),
+							},
+						},
+					}
+				})
+			})[0]
+
+			assert.NotNil(t, api)
+
+			_, _ = ts.Run(t, test.TestCase{
+				Method:       http.MethodPost,
+				Path:         "/bad-template",
+				Data:         `{"name":"tyk"}`,
+				Code:         http.StatusInternalServerError,
+				BodyMatch:    msgTemplateExecutionFailed,
+				BodyNotMatch: "unclosed",
+			})
+		})
+
+		t.Run("template execution error returns StatusInternalServerError without details", func(t *testing.T) {
+			api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/"
+				spec.Proxy.TargetURL = mockEchoServer.URL
+				UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+					v.ExtendedPaths.Transform = []apidef.TemplateMeta{
+						{
+							Path:   "/out-of-range",
+							Method: http.MethodPost,
+							TemplateData: apidef.TemplateData{
+								Input:          apidef.RequestJSON,
+								Mode:           apidef.UseBlob,
+								TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{"out":"{{ index .items 5 }}"}`)),
+							},
+						},
+					}
+				})
+			})[0]
+
+			assert.NotNil(t, api)
+
+			_, _ = ts.Run(t, test.TestCase{
+				Method:       http.MethodPost,
+				Path:         "/out-of-range",
+				Data:         `{"items":[1]}`,
+				Code:         http.StatusInternalServerError,
+				BodyMatch:    msgTemplateExecutionFailed,
+				BodyNotMatch: "index out of range",
+			})
+		})
+
+		t.Run("invalid template mode in Result returns StatusInternalServerError", func(t *testing.T) {
+			api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/"
+				spec.Proxy.TargetURL = mockEchoServer.URL
+				UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+					v.ExtendedPaths.Transform = []apidef.TemplateMeta{
+						{
+							Path:   "/invalid-mode",
+							Method: http.MethodPost,
+							TemplateData: apidef.TemplateData{
+								Input: apidef.RequestJSON,
+								Mode:  "invalid_mode",
+							},
+						},
+					}
+				})
+			})[0]
+
+			assert.NotNil(t, api)
+
+			_, _ = ts.Run(t, test.TestCase{
+				Method: http.MethodPost,
+				Path:   "/invalid-mode",
+				Data:   `{"name":"tyk"}`,
+				Code:   http.StatusInternalServerError,
+			})
+		})
+
+		t.Run("malformed request body returns StatusInternalServerError", func(t *testing.T) {
+			api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+				spec.Proxy.ListenPath = "/"
+				spec.Proxy.TargetURL = mockEchoServer.URL
+				UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+					v.ExtendedPaths.Transform = []apidef.TemplateMeta{
+						{
+							Path:   "/transform",
+							Method: http.MethodPost,
+							TemplateData: apidef.TemplateData{
+								Input:          apidef.RequestJSON,
+								Mode:           apidef.UseBlob,
+								TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{"hello":"{{.name}}"}`)),
+							},
+						},
+					}
+				})
+			})[0]
+
+			assert.NotNil(t, api)
+
+			_, _ = ts.Run(t, test.TestCase{
+				Method: http.MethodPost,
+				Path:   "/transform",
+				Data:   `{malformed-json`,
+				Code:   http.StatusInternalServerError,
+			})
+		})
+	})
+}
+
 func TestTransformRequestBody_LegacyWorkingDirectoryPath(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -470,7 +677,7 @@ func TestTransformRequestBody_OASFileTemplatePath(t *testing.T) {
 
 			_, _ = ts.Run(t, test.TestCase{Method: http.MethodPost, Path: "/post", Data: body,
 				BodyMatch: `"error": "Template execution failed"`, BodyNotMatch: "TOPSECRET",
-				Code: http.StatusBadRequest})
+				Code: http.StatusInternalServerError})
 		}
 	})
 
