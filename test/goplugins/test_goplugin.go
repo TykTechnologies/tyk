@@ -271,7 +271,8 @@ func MyAnalyticsPluginAddTag(record *analytics.AnalyticsRecord) {
 }
 
 // MyPluginAccessingOASConfigData reads the API's config_data from the OAS
-// definition using ctx.GetOASConfigData (no deep copy of the whole OAS doc,
+// definition using ctx.GetOASConfigData (deep copies only the config data,
+// not the whole OAS doc).
 func MyPluginAccessingOASConfigData(rw http.ResponseWriter, r *http.Request) {
 	configData, err := ctx.GetOASConfigData(r)
 	if err != nil {
