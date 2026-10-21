@@ -142,9 +142,6 @@ type EndPointCacheMeta struct {
 type TransformSpec struct {
 	apidef.TemplateMeta
 	Template result.Result[*texttemplate.Template]
-	// Blocked is set when the template path was rejected at load time. Matching
-	// requests fail with a generic error instead of skipping the transform.
-	Blocked bool
 }
 
 type ExtendedCircuitBreakerMeta struct {
