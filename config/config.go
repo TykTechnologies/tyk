@@ -17,6 +17,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	internalhttputil "github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	tyktime "github.com/TykTechnologies/tyk/internal/time"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 )
@@ -765,11 +766,24 @@ type CoProcessConfig struct {
 	// GRPCRoundRobinLoadBalancing enables round robin load balancing for gRPC services; you must provide the address of the load balanced service using `dns:///` protocol in `coprocess_grpc_server`.
 	GRPCRoundRobinLoadBalancing bool `json:"grpc_round_robin_load_balancing"`
 
+	// GRPCDNSDiscovery resolves the hostname in `coprocess_grpc_server` in the background, so that gRPC plugin pods created by an autoscaling event receive traffic.
+	// Requires `grpc_round_robin_load_balancing` and a headless Kubernetes Service.
+	GRPCDNSDiscovery GRPCDNSDiscoveryConfig `json:"grpc_dns_discovery"`
+
 	// Sets the path to built-in Tyk modules. This will be part of the Python module lookup path. The value used here is the default one for most installations.
 	PythonPathPrefix string `json:"python_path_prefix"`
 
 	// If you have multiple Python versions installed you can specify your version.
 	PythonVersion string `json:"python_version"`
+}
+
+// GRPCDNSDiscoveryConfig configures DNS discovery of gRPC plugin pods.
+type GRPCDNSDiscoveryConfig struct {
+	// Enabled determines if DNS discovery is active. Default: false.
+	Enabled bool `json:"enabled"`
+
+	// RefreshInterval is how often the hostname is resolved. Set as human-readable format; defaults to 30s, minimum 5s.
+	RefreshInterval tyktime.ReadableDuration `json:"refresh_interval"`
 }
 
 type CertificatesConfig struct {
