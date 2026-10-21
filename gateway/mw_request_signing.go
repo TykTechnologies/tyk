@@ -56,7 +56,20 @@ func generateHeaderList(r *http.Request, headerList []string) []string {
 		result = make([]string, 0, len(headerList))
 
 		for _, v := range headerList {
-			if r.Header.Get(v) != "" {
+			switch {
+			case strings.EqualFold(v, "(request-target)"):
+				// Pseudo-header derived from method + path, not a real request
+				// header, so include it regardless of what r.Header contains.
+				result = append(result, v)
+			case strings.EqualFold(v, "date"):
+				// The Date header is required by the Signing HTTP Messages draft;
+				// add it if the client did not send one, then include it.
+				if r.Header.Get("date") == "" {
+					refDate := "Mon, 02 Jan 2006 15:04:05 MST"
+					r.Header.Set("date", time.Now().Format(refDate))
+				}
+				result = append(result, v)
+			case r.Header.Get(v) != "":
 				result = append(result, v)
 			}
 		}
