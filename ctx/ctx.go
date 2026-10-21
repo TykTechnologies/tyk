@@ -181,8 +181,9 @@ func GetOASDefinition(r *http.Request) *oas.OAS {
 	return nil
 }
 
-// GetOASConfigData returns the config data of the OAS API definition valid for the request.
-// It does not deep copy the whole API definition, making it faster than GetOASDefinition.
+// GetOASConfigData returns a deep copy of the config data of the OAS API definition valid for the request.
+// Only the config data is copied, not the whole API definition, making it faster than GetOASDefinition.
+// Modifying the returned map does not affect the loaded API definition.
 func GetOASConfigData(r *http.Request) (map[string]interface{}, error) {
 	oasDef, ok := r.Context().Value(OASDefinition).(*oas.OAS)
 	if !ok || oasDef == nil {
@@ -194,7 +195,7 @@ func GetOASConfigData(r *http.Request) (map[string]interface{}, error) {
 		return nil, errors.New("config data is nil")
 	}
 
-	return mw.Global.PluginConfig.Data.Value, nil
+	return reflect.Clone(mw.Global.PluginConfig.Data.Value), nil
 }
 
 // SetErrorClassification sets the error classification for the request context.
