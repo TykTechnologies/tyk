@@ -30,7 +30,7 @@ The following variables are set as defaults:
 | Variable name | Default value                        |
 | ------------- | ------------------------------------ |
 | tag           | v0.0.0                               |
-| base          | tykio/golang-cross:1.22-bullseye     |
+| base          | tykio/golang-cross:1.27-bullseye     |
 | dockerfile    | ci/images/plugin-compiler/Dockerfile |
 | image         | internal/plugin-compiler             |
 | sha           | `$(git rev-parse HEAD)`              |
@@ -52,7 +52,7 @@ you must issue `task build` in this folder.
 To override the base image, you would issue:
 
 ```
-task base=golang:1.20
+task base=golang:1.27
 ```
 
 The default action runs `build` and `test` targets.
