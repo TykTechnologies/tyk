@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"os"
 	"reflect"
 	"strings"
 	"time"
@@ -18,6 +17,7 @@ import (
 
 	"github.com/TykTechnologies/tyk-pump/analytics"
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/assetloader"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -53,19 +53,35 @@ func (d *VirtualEndpoint) Name() string {
 	return "VirtualEndpoint"
 }
 
+// loadVirtualEndpointScript reads the script file behind meta through the
+// confined JSAssetLoader, logging failures itself. A rejected path is logged
+// without the error, which would otherwise reveal the host filesystem layout.
+func (gw *Gateway) loadVirtualEndpointScript(meta *apidef.VirtualMeta, logger *logrus.Entry) ([]byte, bool) {
+	data, err := gw.JSAssetLoader.Load(meta.FunctionSourceURI)
+	if errors.Is(err, assetloader.ErrPathRejected) {
+		logger.Warning("Virtual endpoint script path rejected: it must point inside middleware_path")
+		return nil, false
+	}
+
+	if err != nil {
+		logger.WithError(err).Error("Failed to open Endpoint JS")
+		return nil, false
+	}
+
+	return data, true
+}
+
 func (gw *Gateway) preLoadVirtualMetaCode(meta *apidef.VirtualMeta, j *JSVM) {
 	// the only call site uses (&foo, &bar) so meta and j won't be
 	// nil.
 	var src interface{}
 	switch meta.FunctionSourceType {
 	case apidef.UseFile:
-		j.Log.Debug("Loading JS Endpoint File: ", meta.FunctionSourceURI)
-		f, err := os.Open(meta.FunctionSourceURI)
-		if err != nil {
-			j.Log.WithError(err).Error("Failed to open Endpoint JS")
+		data, ok := gw.loadVirtualEndpointScript(meta, j.Log)
+		if !ok {
 			return
 		}
-		src = f
+		src = data
 	case apidef.UseBlob:
 		if gw.GetConfig().DisableVirtualPathBlobs {
 			j.Log.Error("[JSVM] Blobs not allowed on this node")
@@ -92,10 +108,8 @@ func (gw *Gateway) preLoadVirtualMetaCodeGoja(meta *apidef.VirtualMeta, j *GojaJ
 	var src string
 	switch meta.FunctionSourceType {
 	case apidef.UseFile:
-		j.Log.Debug("Loading JS Endpoint File: ", meta.FunctionSourceURI)
-		data, err := os.ReadFile(meta.FunctionSourceURI)
-		if err != nil {
-			j.Log.WithError(err).Error("Failed to open Endpoint JS")
+		data, ok := gw.loadVirtualEndpointScript(meta, j.Log)
+		if !ok {
 			return
 		}
 		src = string(data)
