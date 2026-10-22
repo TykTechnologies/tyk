@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"errors"
+	"io"
 	"strconv"
 	"time"
 
@@ -27,11 +28,29 @@ var (
 
 // SlidingLog implements sliding log storage in redis.
 type SlidingLog struct {
-	conn redis.UniversalClient
+	conn   redis.UniversalClient
+	logger logrus.FieldLogger
 
 	// smoothingFn will evaluate the current rate and must return true if
 	// the request should be blocked. It's required.
 	smoothingFn SmoothingFn
+}
+
+// Option configures a SlidingLog.
+type Option func(*SlidingLog)
+
+// WithLogger sets the logger. By default nothing is logged.
+func WithLogger(logger logrus.FieldLogger) Option {
+	return func(r *SlidingLog) {
+		r.logger = logger
+	}
+}
+
+func discardLogger() logrus.FieldLogger {
+	logger := logrus.New()
+	logger.SetOutput(io.Discard)
+
+	return logger
 }
 
 // ErrRedisClientProvider is returned if NewSlidingLog isn't passed a valid RedisClientProvider parameter.
@@ -39,7 +58,7 @@ var ErrRedisClientProvider = errors.New("Client doesn't implement RedisClientPro
 
 // NewSlidingLog creates a new SlidingLog instance with a storage.Handler. In case
 // the storage is offline, it's expected to return nil and an error to handle.
-func NewSlidingLog(client interface{}, smoothingFn SmoothingFn) (*SlidingLog, error) {
+func NewSlidingLog(client any, smoothingFn SmoothingFn, opts ...Option) (*SlidingLog, error) {
 	cluster, ok := client.(model.RedisClientProvider)
 	if !ok {
 		return nil, ErrRedisClientProvider
@@ -50,15 +69,22 @@ func NewSlidingLog(client interface{}, smoothingFn SmoothingFn) (*SlidingLog, er
 		return nil, err
 	}
 
-	return NewSlidingLogRedis(conn, smoothingFn), nil
+	return NewSlidingLogRedis(conn, smoothingFn, opts...), nil
 }
 
 // NewSlidingLogRedis creates a new SlidingLog instance with a redis.UniversalClient.
-func NewSlidingLogRedis(conn redis.UniversalClient, smoothingFn SmoothingFn) *SlidingLog {
-	return &SlidingLog{
+func NewSlidingLogRedis(conn redis.UniversalClient, smoothingFn SmoothingFn, opts ...Option) *SlidingLog {
+	r := &SlidingLog{
 		conn:        conn,
+		logger:      discardLogger(),
 		smoothingFn: smoothingFn,
 	}
+
+	for _, opt := range opts {
+		opt(r)
+	}
+
+	return r
 }
 
 // Do will return two values, the first indicates if a request should be blocked, and the second
@@ -78,18 +104,19 @@ func (r *SlidingLog) Do(ctx context.Context, key string, maxAllowed, per int64) 
 // invokeSlidingLogAdd records a hit and returns the window occupation before it.
 // Time comes from the redis server, so gateways with skewed clocks agree on the window.
 func (r *SlidingLog) invokeSlidingLogAdd(ctx context.Context, key string, maxAllowed, per int64) (Stats, error) {
-	cmd := slidingLogAdd.Run(ctx, r.conn, []string{key}, maxAllowed, per)
-	if cmd.Err() != nil {
-		return NewEmptyStats(), cmd.Err()
-	}
-
-	res, err := cmd.Slice()
+	res, err := slidingLogAdd.Run(ctx, r.conn, []string{key}, maxAllowed, per).Slice()
 	if err != nil {
 		return NewEmptyStats(), err
 	}
 
-	count := res[0].(int64)     // nolint:errcheck
-	remaining := res[1].(int64) // nolint:errcheck
+	return r.statsFromReply(res, key, maxAllowed, per)
+}
+
+// statsFromReply turns the result of sliding_log_add.lua into Stats.
+func (r *SlidingLog) statsFromReply(res []any, key string, maxAllowed, per int64) (Stats, error) {
+	count := res[0].(int64)      // nolint:errcheck
+	remaining := res[1].(int64)  // nolint:errcheck
+	collisions := res[4].(int64) // nolint:errcheck
 
 	earliestNano, err := strconv.ParseInt(res[2].(string), 10, 64) // nolint:errcheck
 	if err != nil {
@@ -101,8 +128,8 @@ func (r *SlidingLog) invokeSlidingLogAdd(ctx context.Context, key string, maxAll
 		return NewEmptyStats(), err
 	}
 
-	if collisions := res[4].(int64); collisions > 0 { // nolint:errcheck
-		logrus.WithField("key", key).WithField("collisions", collisions).Debug("sliding log: hits in the same microsecond")
+	if collisions > 0 {
+		r.logger.WithField("key", key).WithField("collisions", collisions).Debug("sliding log: hits in the same microsecond")
 	}
 
 	var reset time.Duration
