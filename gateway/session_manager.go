@@ -151,7 +151,7 @@ func (l *SessionLimiter) limitRedis(r *http.Request, session *user.SessionState,
 		return currentRate > allowedRate-subtractor
 	}
 
-	ratelimit := rate.NewSlidingLogRedis(l.limiterStorage, smoothingFn)
+	ratelimit := rate.NewSlidingLogRedis(l.limiterStorage, smoothingFn, rate.WithLogger(log))
 	stats, shouldBlock, err := ratelimit.Do(ctx, rateLimiterKey, int64(cost), int64(per))
 
 	if shouldBlock && !dryRun && (l.config.EnableSentinelRateLimiter || l.config.DRLEnableSentinelRateLimiter) {

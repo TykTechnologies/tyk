@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -261,6 +263,75 @@ func (s *SlidingLogSuite) TestMemberCollisionJump() {
 	count, err := s.db.ZCard(s.ctx(), s.key).Result()
 	s.Require().NoError(err)
 	s.Equal(int64(9), count)
+}
+
+func (s *SlidingLogSuite) TestStatsFromReply() {
+	const sec = int64(time.Second)
+	now := int64(1700000000000005000)
+	reply := func(count, remaining, earliest, collisions int64) []interface{} {
+		return []interface{}{count, remaining, strconv.FormatInt(earliest, 10), strconv.FormatInt(now, 10), collisions}
+	}
+
+	logger, hook := logrustest.NewNullLogger()
+	logger.SetLevel(logrus.DebugLevel)
+	rl := NewSlidingLogRedis(nil, nil, WithLogger(logger))
+
+	for name, tc := range map[string]struct {
+		res  []interface{}
+		want Stats
+	}{
+		"slots left":      {reply(1, 1, now, 0), Stats{Count: 1, Remaining: 1, Limit: 3, Reset: 0}},
+		"last slot":       {reply(2, 0, now, 0), Stats{Count: 2, Remaining: 0, Limit: 3, Reset: 10 * time.Second}},
+		"blocked":         {reply(3, 0, now-6*sec, 0), Stats{Count: 3, Remaining: 0, Limit: 3, Reset: 4 * time.Second}},
+		"stale earliest":  {reply(3, 0, now-11*sec, 0), Stats{Count: 3, Remaining: 0, Limit: 3, Reset: 0}},
+		"with collisions": {reply(1, 1, now, 2), Stats{Count: 1, Remaining: 1, Limit: 3, Reset: 0}},
+	} {
+		s.Run(name, func() {
+			hook.Reset()
+
+			got, err := rl.statsFromReply(tc.res, s.key, 3, 10)
+			s.Require().NoError(err)
+			s.Equal(tc.want, got)
+
+			if tc.res[4].(int64) > 0 {
+				s.Require().Len(hook.Entries, 1)
+				s.Equal(logrus.DebugLevel, hook.LastEntry().Level)
+				s.Equal(s.key, hook.LastEntry().Data["key"])
+			} else {
+				s.Empty(hook.Entries)
+			}
+		})
+	}
+
+	for name, index := range map[string]int{"earliest": 2, "now": 3} {
+		s.Run(name+" not a number", func() {
+			bad := reply(1, 1, now, 0)
+			bad[index] = "nope"
+
+			got, err := rl.statsFromReply(bad, s.key, 3, 10)
+			s.Error(err)
+			s.Equal(NewEmptyStats(), got)
+		})
+	}
+}
+
+func (s *SlidingLogSuite) TestNewSlidingLog() {
+	conf, err := config.New()
+	s.Require().NoError(err)
+
+	rc := storage.NewConnectionHandler(s.ctx())
+	go rc.Connect(s.ctx(), nil, conf)
+
+	timeout, cancel := context.WithTimeout(s.ctx(), time.Second)
+	defer cancel()
+	s.Require().True(rc.WaitConnect(timeout), "redis not reachable")
+
+	rl, err := NewSlidingLog(&storage.RedisCluster{KeyPrefix: "test-cluster", ConnectionHandler: rc}, allowAll)
+	s.Require().NoError(err)
+
+	_, blocked, err := rl.Do(s.ctx(), s.key, 3, 10)
+	s.Require().NoError(err)
+	s.False(blocked)
 }
 
 // TestUniqueMembers checks that every hit lands in the log, even when the redis
