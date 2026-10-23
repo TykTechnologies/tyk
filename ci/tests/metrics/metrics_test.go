@@ -108,9 +108,9 @@ func TestREDMetrics_HistogramBuckets(t *testing.T) {
 	assertMetricExists(t, `tyk_upstream_request_duration_seconds_bucket{tyk_api_id="3"}`)
 
 	// Verify _sum metric exists for all 3 histograms.
-	assertMetricExists(t, `http_server_request_duration_seconds_sum{tyk_api_id="3"}`)
-	assertMetricExists(t, `tyk_gateway_request_duration_seconds_sum{tyk_api_id="3"}`)
-	assertMetricExists(t, `tyk_upstream_request_duration_seconds_sum{tyk_api_id="3"}`)
+	assertMetricPresent(t, `http_server_request_duration_seconds_sum{tyk_api_id="3"}`)
+	assertMetricPresent(t, `tyk_gateway_request_duration_seconds_sum{tyk_api_id="3"}`)
+	assertMetricPresent(t, `tyk_upstream_request_duration_seconds_sum{tyk_api_id="3"}`)
 }
 
 func TestREDMetrics_MethodDimension(t *testing.T) {
@@ -327,7 +327,7 @@ func TestCustomProfile_Instruments(t *testing.T) {
 				assertMetricExists(t, `custom_request_duration_seconds_count{tyk_api_id="3",tenant="acme"}`)
 				assertMetricExists(t, `custom_request_duration_seconds_bucket{tyk_api_id="3",tenant="acme"}`)
 				// Verify _sum metric exists for custom histogram.
-				assertMetricExists(t, `custom_request_duration_seconds_sum{tyk_api_id="3",tenant="acme"}`)
+				assertMetricPresent(t, `custom_request_duration_seconds_sum{tyk_api_id="3",tenant="acme"}`)
 			},
 		},
 		{
@@ -1210,6 +1210,23 @@ func assertMetricExists(t *testing.T, query string) {
 	}
 	val, _ := queryPrometheus(t, query)
 	t.Fatalf("%s = %.0f, expected > 0", query, val)
+}
+
+// assertMetricPresent polls Prometheus until the series exists. Unlike
+// assertMetricExists it accepts a value of 0: latency histograms record whole
+// milliseconds, so on a fast runner every observation can be 0 and a _sum of 0
+// is legitimate.
+func assertMetricPresent(t *testing.T, query string) {
+	t.Helper()
+	deadline := time.Now().Add(pollTimeout)
+	for time.Now().Before(deadline) {
+		if val, ok := queryPrometheus(t, query); ok {
+			t.Logf("%s = %g (present)", query, val)
+			return
+		}
+		time.Sleep(pollInterval)
+	}
+	t.Fatalf("%s not found in Prometheus", query)
 }
 
 // assertMetricGTE polls Prometheus until metric >= expected or times out.
