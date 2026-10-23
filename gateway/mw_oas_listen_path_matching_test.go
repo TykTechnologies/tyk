@@ -72,9 +72,9 @@ func TestOASAllowList_ListenPathPrefixOfEndpoints(t *testing.T) {
 		}...)
 	})
 
-	t.Run("apply_legacy_oas_path_matching restores the full URL fallback", func(t *testing.T) {
+	t.Run("allow_unsafe_listen_path_matching restores the full URL fallback", func(t *testing.T) {
 		ts := StartTest(func(globalConf *config.Config) {
-			globalConf.ApplyLegacyOASPathMatching = true
+			globalConf.AllowUnsafeListenPathMatching = true
 		})
 		defer ts.Close()
 
@@ -95,10 +95,10 @@ func TestOASAllowList_ListenPathPrefixOfEndpoints(t *testing.T) {
 // path still matches the full request URL, and the upstream receives the
 // stripped path.
 func TestClassicAllowList_ListenPathInEndpointPathUnchanged(t *testing.T) {
-	for _, legacy := range []bool{false, true} {
-		t.Run("apply_legacy_oas_path_matching="+jsonMarshalString(legacy), func(t *testing.T) {
+	for _, unsafe := range []bool{false, true} {
+		t.Run("allow_unsafe_listen_path_matching="+jsonMarshalString(unsafe), func(t *testing.T) {
 			ts := StartTest(func(globalConf *config.Config) {
-				globalConf.ApplyLegacyOASPathMatching = legacy
+				globalConf.AllowUnsafeListenPathMatching = unsafe
 			})
 			defer ts.Close()
 
