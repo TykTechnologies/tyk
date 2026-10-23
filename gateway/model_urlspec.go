@@ -188,7 +188,7 @@ func (u *URLSpec) matchesMethod(method string) bool {
 // it will match the regex against the clean URL with stripped listen path first,
 // then it will match against the full URL including the listen path as provided.
 // For Tyk OAS APIs the last step, matching with the listen path still in
-// place, is skipped unless apply_legacy_oas_path_matching is enabled, so the
+// place, is skipped unless allow_unsafe_listen_path_matching is enabled, so the
 // matched path is the path proxied upstream. Version stripping is unaffected.
 // APISpec to provide URL sanitization of the input is passed along.
 func (a *URLSpec) matchesPath(reqPath string, api *APISpec) bool {
@@ -204,7 +204,7 @@ func (a *URLSpec) matchesPath(reqPath string, api *APISpec) bool {
 	}
 	// VEM paths are internal looping targets without a listen path, so the
 	// full URL is the only form they can be matched against.
-	if api.IsOAS && !api.GlobalConfig.ApplyLegacyOASPathMatching && !agentprotocol.IsProtocolVEMPath(reqPath) {
+	if api.IsOAS && !api.GlobalConfig.AllowUnsafeListenPathMatching && !agentprotocol.IsProtocolVEMPath(reqPath) {
 		return false
 	}
 	// match /listenpath/v3/users
