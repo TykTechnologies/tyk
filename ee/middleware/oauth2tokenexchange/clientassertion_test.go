@@ -138,7 +138,7 @@ func TestExchangeAtIdP_PrivateKeyJWT(t *testing.T) {
 		ClientAuth:    &oas.OAuth2ClientAuth{Method: oas.OAuth2ClientAuthPrivateKeyJWT, ClientID: "app-id", CertID: "cert-1"},
 	}
 
-	tok, _, err := m.exchangeAtIdP(context.Background(), provider, "inbound-user-token", target)
+	tok, _, err := m.exchangeAtIdP(context.Background(), provider, "inbound-user-token", "", target)
 	require.NoError(t, err)
 	assert.Equal(t, "exchanged", tok)
 
@@ -166,6 +166,6 @@ func TestExchangeAtIdP_PrivateKeyJWT_CertError(t *testing.T) {
 		TokenEndpoint: "https://idp.example/token",
 		ClientAuth:    &oas.OAuth2ClientAuth{Method: oas.OAuth2ClientAuthPrivateKeyJWT, ClientID: "app-id", CertID: "missing"},
 	}
-	_, _, err := m.exchangeAtIdP(context.Background(), provider, "inbound", &oauth2common.Target{Audience: "api://x", Scopes: []string{"api://x/.default"}})
+	_, _, err := m.exchangeAtIdP(context.Background(), provider, "inbound", "", &oauth2common.Target{Audience: "api://x", Scopes: []string{"api://x/.default"}})
 	require.Error(t, err)
 }
