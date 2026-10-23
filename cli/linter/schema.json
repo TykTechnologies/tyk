@@ -628,7 +628,7 @@
       "type": "boolean",
       "default": false
     },
-    "apply_legacy_oas_path_matching": {
+    "allow_unsafe_listen_path_matching": {
       "type": "boolean",
       "default": false
     },
