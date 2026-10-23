@@ -218,7 +218,7 @@ type OAuth2TokenExchangeProvider struct {
 	// when the matched operation has no per-op exchange override.
 	DefaultTarget *OAuth2DefaultTarget `bson:"defaultTarget,omitempty" json:"defaultTarget,omitempty"`
 
-	// ActorToken, when set, makes exchange requests carry `actor_token`
+	// ActorToken makes exchange requests carry `actor_token` when set
 	// (RFC 8693 delegation intent). When omitted, requests carry only
 	// `subject_token` (impersonation); removing the block reverts to
 	// impersonation with no migration.
@@ -264,8 +264,8 @@ type OAuth2ActorToken struct {
 	// Static — used when Source=="static". Testing only.
 	Static *OAuth2ActorStatic `bson:"static,omitempty" json:"static,omitempty"`
 
-	// RequireMayAct, when true, makes the gateway verify the inbound subject
-	// token carries a `may_act` claim (RFC 8693 §4.4) authorizing the
+	// RequireMayAct makes the gateway verify, when true, that the inbound
+	// subject token carries a `may_act` claim (RFC 8693 §4.4) authorizing the
 	// configured actor BEFORE calling the IdP — a clear 403 instead of an
 	// opaque IdP rejection. Defaults false: the IdP is the authoritative
 	// enforcement point, and multi-hop/central-policy tokens (e.g. PingFederate
@@ -277,10 +277,19 @@ type OAuth2ActorToken struct {
 // uses to mint a gateway-as-actor token. The acquired token is cached for its
 // own lifetime. ClientSecret accepts env://, secrets://, vault://, consul://.
 type OAuth2ActorClientCredentials struct {
-	TokenEndpoint string   `bson:"tokenEndpoint" json:"tokenEndpoint"`
-	ClientID      string   `bson:"clientId" json:"clientId"`
-	ClientSecret  string   `bson:"clientSecret,omitempty" json:"clientSecret,omitempty"`
-	Scopes        []string `bson:"scopes,omitempty" json:"scopes,omitempty"`
+	// TokenEndpoint is the IdP token endpoint used to mint the actor token.
+	TokenEndpoint string `bson:"tokenEndpoint" json:"tokenEndpoint"`
+
+	// ClientID is the OAuth2 client identifier the gateway presents when
+	// acquiring its own actor token.
+	ClientID string `bson:"clientId" json:"clientId"`
+
+	// ClientSecret accepts env://, secrets://, vault:// and consul:// prefixes.
+	ClientSecret string `bson:"clientSecret,omitempty" json:"clientSecret,omitempty"`
+
+	// Scopes are requested on the client-credentials call that mints the
+	// actor token.
+	Scopes []string `bson:"scopes,omitempty" json:"scopes,omitempty"`
 }
 
 // OAuth2ActorHeader pulls the actor token from a request header presented by
@@ -298,6 +307,8 @@ type OAuth2ActorHeader struct {
 // OAuth2ActorStatic carries a pre-configured static actor token. Testing only —
 // static tokens don't rotate. Token accepts env://, secrets://, vault://, consul://.
 type OAuth2ActorStatic struct {
+	// Token is a fixed actor token sent verbatim on every exchange. Testing
+	// only - it does not refresh and will fail once the token expires.
 	Token string `bson:"token" json:"token"`
 }
 
