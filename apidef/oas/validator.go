@@ -2,17 +2,23 @@ package oas
 
 import (
 	"embed"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/buger/jsonparser"
 	"github.com/hashicorp/go-multierror"
 	pkgver "github.com/hashicorp/go-version"
 
+	"github.com/TykTechnologies/storage/kv/resolver"
+
+	"github.com/TykTechnologies/tyk/internal/dnsdiscovery"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 	logger "github.com/TykTechnologies/tyk/log"
@@ -119,16 +125,14 @@ func loadOASSchema() error {
 }
 
 func validateJSON(schema, document []byte) error {
+	registerKVAwareFormatsOnce.Do(registerKVAwareFormats)
+
 	schemaLoader := gojsonschema.NewBytesLoader(schema)
 	documentLoader := gojsonschema.NewBytesLoader(document)
 	result, err := gojsonschema.Validate(schemaLoader, documentLoader)
 
 	if err != nil {
 		return err
-	}
-
-	if result.Valid() {
-		return nil
 	}
 
 	combinedErr := &multierror.Error{}
@@ -138,8 +142,17 @@ func validateJSON(schema, document []byte) error {
 	for _, validationErr := range validationErrs {
 		combinedErr = multierror.Append(combinedErr, errors.New(validationErr.String()))
 	}
-	return combinedErr.ErrorOrNil()
 
+	// The format-scoped checkers only see uri/uri-reference fields, but the
+	// gateway resolves KV references in every string of the definition. Validate
+	// the whole document so a malformed reference in a non-URL field (e.g. a
+	// request-header transform value) is rejected here rather than failing
+	// the resolver at gateway load.
+	if kvErr := resolver.ValidateSyntaxAll(document); kvErr != nil {
+		combinedErr = multierror.Append(combinedErr, kvErr)
+	}
+
+	return combinedErr.ErrorOrNil()
 }
 
 // ValidateOASObject validates an OAS document against a particular OAS version.
@@ -149,7 +162,81 @@ func ValidateOASObject(documentBody []byte, oasVersion string) error {
 		return err
 	}
 
-	return validateJSON(oasSchema, documentBody)
+	if err := validateJSON(oasSchema, documentBody); err != nil {
+		return err
+	}
+
+	return validateTykExtension(documentBody)
+}
+
+type validator interface {
+	Validate(x *XTykAPIGateway) error
+}
+
+var validationRules = []validator{
+	&ruleUpstreamSources{},
+}
+
+var (
+	errDNSDiscoveryWithServiceDiscovery = errors.New(
+		"upstream.dnsDiscovery and upstream.serviceDiscovery both supply the target list and cannot be enabled together")
+
+	errDNSDiscoveryRequiresLoadBalancing = errors.New(
+		"upstream.dnsDiscovery supplies the target list but does not distribute across it; upstream.loadBalancing must be enabled too")
+
+	errDNSDiscoveryInvalidRefreshInterval = errors.New(
+		"upstream.dnsDiscovery.refreshInterval must be empty for the 30s default, or at least 5s")
+)
+
+func validateTykExtension(documentBody []byte) error {
+	raw, dataType, _, err := jsonparser.Get(documentBody, ExtensionTykAPIGateway)
+	if err != nil || dataType != jsonparser.Object {
+		return nil //nolint:nilerr // absent or malformed extension: schema validation reports it
+	}
+
+	var x XTykAPIGateway
+	if err := json.Unmarshal(raw, &x); err != nil {
+		return fmt.Errorf("invalid %s: %w", ExtensionTykAPIGateway, err)
+	}
+
+	combinedErr := &multierror.Error{}
+	combinedErr.ErrorFormat = tykerrors.Formatter
+
+	for _, rule := range validationRules {
+		if ruleErr := rule.Validate(&x); ruleErr != nil {
+			combinedErr = multierror.Append(combinedErr, ruleErr)
+		}
+	}
+
+	return combinedErr.ErrorOrNil()
+}
+
+// ruleUpstreamSources is the OAS counterpart of apidef.RuleDNSDiscovery.
+type ruleUpstreamSources struct{}
+
+func (r *ruleUpstreamSources) Validate(x *XTykAPIGateway) error {
+	upstream := x.Upstream
+
+	if upstream.DNSDiscovery == nil || !upstream.DNSDiscovery.Enabled {
+		return nil
+	}
+
+	combinedErr := &multierror.Error{}
+	combinedErr.ErrorFormat = tykerrors.Formatter
+
+	if upstream.ServiceDiscovery != nil && upstream.ServiceDiscovery.Enabled {
+		combinedErr = multierror.Append(combinedErr, errDNSDiscoveryWithServiceDiscovery)
+	}
+
+	if upstream.LoadBalancing == nil || !upstream.LoadBalancing.Enabled {
+		combinedErr = multierror.Append(combinedErr, errDNSDiscoveryRequiresLoadBalancing)
+	}
+
+	if interval := time.Duration(upstream.DNSDiscovery.RefreshInterval); interval < 0 || (interval > 0 && interval < dnsdiscovery.MinInterval) {
+		combinedErr = multierror.Append(combinedErr, errDNSDiscoveryInvalidRefreshInterval)
+	}
+
+	return combinedErr.ErrorOrNil()
 }
 
 // ValidateOASTemplate checks a Tyk OAS API template for necessary fields,
@@ -259,4 +346,42 @@ func getMinorVersion(version string) (string, error) {
 
 	segments := v.Segments()
 	return fmt.Sprintf("%d.%d", segments[0], segments[1]), nil
+}
+
+// inlineKVRe matches an inline KV reference token, e.g. "$kv{env:API_HOST}".
+var inlineKVRe = regexp.MustCompile(`\$kv\{[^}]+\}`)
+
+// kvAwareFormatChecker wraps a stock gojsonschema format checker so that KV
+// references ($kv{...} inline tokens and kv:// whole-value references) are
+// accepted inside URI fields, while every other value is validated exactly as
+// before.
+type kvAwareFormatChecker struct {
+	base gojsonschema.FormatChecker
+}
+
+func (c kvAwareFormatChecker) IsFormat(input any) bool {
+	s, ok := input.(string)
+	if !ok {
+		return c.base.IsFormat(input)
+	}
+
+	if err := resolver.ValidateSyntax(s); err != nil {
+		return false
+	}
+
+	if inlineKVRe.MatchString(s) {
+		s = inlineKVRe.ReplaceAllString(s, "kvref")
+	}
+
+	return c.base.IsFormat(s)
+}
+
+var registerKVAwareFormatsOnce sync.Once
+
+// registerKVAwareFormats overrides the stock "uri" and "uri-reference" format
+// checkers on the registry with the KV-aware variant.
+func registerKVAwareFormats() {
+	gojsonschema.FormatCheckers.
+		Add("uri", kvAwareFormatChecker{gojsonschema.URIFormatChecker{}}).
+		Add("uri-reference", kvAwareFormatChecker{gojsonschema.URIReferenceFormatChecker{}})
 }

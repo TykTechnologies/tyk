@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"errors"
+	"fmt"
 	htmltemplate "html/template"
 	"io"
 	"io/ioutil"
@@ -17,6 +18,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	tykctx "github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/header"
+	internalerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
 	"github.com/TykTechnologies/tyk/request"
@@ -97,17 +99,36 @@ type TemplateExecutor interface {
 
 // HandleError is the actual error handler and will store the error details in analytics if analytics processing is enabled.
 func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMsg string, errCode int, writeResponse bool) {
+	e.handleErrorExtended(w, r, fmt.Errorf("%s", errMsg), errCode, writeResponse)
+}
+
+func (e *ErrorHandler) handleErrorExtended(w http.ResponseWriter, r *http.Request, err error, errCode int, writeResponse bool) {
 	defer e.Base().UpdateRequestSession(r)
 	response := &http.Response{}
+	errMsg := err.Error()
 
 	if writeResponse {
+		var toResp internalerrors.ToResponseWriter
+
 		if e.Spec.IsMCP() && e.shouldWriteJSONRPCError(r) {
 			response = e.writeJSONRPCErrorResponse(w, r, errMsg, errCode)
 		} else if resp := e.tryWriteOverride(w, r, errMsg, errCode); resp != nil {
 			response = resp
+		} else if errors.As(err, &toResp) {
+			if resp, err := writeToResponse(toResp, w, errCode); err != nil {
+				log.WithError(err).Error("Failed to write response to self write object")
+			} else {
+				response = resp
+			}
 		} else {
 			response = e.writeTemplateErrorResponse(w, r, errMsg, errCode)
 		}
+	}
+	if rpcCode := ctxGetJSONRPCErrorCode(r); e.Spec.IsMCP() && rpcCode != 0 {
+		e.Logger().WithField("jsonrpc_error_code", rpcCode).
+			WithField("api_id", e.Spec.APIID).
+			WithField("path", r.URL.Path).
+			Debug("MCP request rejected")
 	}
 
 	// Calculate latency for error responses (needed for both API metrics and analytics).
@@ -143,7 +164,11 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 			version = "Non Versioned"
 		}
 
-		if e.Spec.Proxy.StripListenPath {
+		// A paired MCP proxy owns the public completion record. Keep routed
+		// JSON-RPC errors on that same client-facing path, matching successful
+		// paired completions instead of exposing the stripped proxy path.
+		pairedMCPCompletion := e.Spec.IsPairedMCPAdapterProxy() && httpctx.GetJSONRPCRoutingState(r) != nil
+		if e.Spec.Proxy.StripListenPath && !pairedMCPCompletion {
 			r.URL.Path = e.Spec.StripListenPath(r.URL.Path)
 		}
 
@@ -225,11 +250,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 		rawResponse := ""
 		if recordDetail(r, e.Spec) {
 
-			// Get the wire format representation
-
-			var wireFormatReq bytes.Buffer
-			r.Write(&wireFormatReq)
-			rawRequest = base64.StdEncoding.EncodeToString(wireFormatReq.Bytes())
+			rawRequest = getRawRequest(r, e.Spec)
 
 			var wireFormatRes bytes.Buffer
 			response.Write(&wireFormatRes)
@@ -350,14 +371,16 @@ func (e *ErrorHandler) writeTemplateErrorResponse(w http.ResponseWriter, r *http
 		var tmplExecutor TemplateExecutor
 		tmplExecutor = tmpl
 
-		apiError := APIError{htmltemplate.HTML(htmltemplate.JSEscapeString(errMsg))}
+		apiError := APIError{}
 
 		if contentType == header.ApplicationXML || contentType == header.TextXML || contentType == header.ApplicationSoapXML {
-			apiError.Message = htmltemplate.HTML(errMsg)
+			apiError.Message = htmltemplate.HTML(htmltemplate.HTMLEscapeString(errMsg))
 
 			//we look up in the last defined templateName to obtain the template.
 			rawTmpl := e.Gw.templatesRaw.Lookup(templateName)
 			tmplExecutor = rawTmpl
+		} else {
+			apiError.Message = htmltemplate.HTML(jsonEscapeString(errMsg))
 		}
 
 		var log bytes.Buffer
@@ -389,9 +412,9 @@ func (e *ErrorHandler) writeJSONRPCErrorResponse(w http.ResponseWriter, r *http.
 		requestID = state.ID
 	}
 
-	ctxSetJSONRPCErrorCode(r, jsonrpcerrors.MapHTTPStatusToJSONRPCCode(httpCode))
+	rpcCode := selectAndStoreMCPJSONRPCCode(r, httpCode)
 
-	responseBody := jsonrpcerrors.WriteJSONRPCError(w, requestID, httpCode, errMsg)
+	responseBody := jsonrpcerrors.WriteJSONRPCErrorWithCode(w, requestID, httpCode, rpcCode, errMsg)
 
 	return &http.Response{
 		StatusCode: httpCode,
@@ -479,4 +502,33 @@ func (e *ErrorHandler) writeDirectOverrideResponse(w http.ResponseWriter, result
 		Header:     respHeader,
 		Body:       io.NopCloser(bytes.NewReader(bodyBytes)),
 	}
+}
+
+type responseWriterProxy struct {
+	http.ResponseWriter
+	writer io.Writer
+}
+
+func (r responseWriterProxy) Write(data []byte) (int, error) {
+	return r.writer.Write(data)
+}
+
+func writeToResponse(
+	selfWroteError internalerrors.ToResponseWriter,
+	w http.ResponseWriter,
+	statusCode int,
+) (*http.Response, error) {
+
+	var buf bytes.Buffer
+	rec := &responseWriterProxy{ResponseWriter: w, writer: io.MultiWriter(w, &buf)}
+
+	if err := selfWroteError.WriteToResponse(rec, statusCode); err != nil {
+		return nil, err
+	}
+
+	return &http.Response{
+		StatusCode: statusCode,
+		Header:     w.Header(),
+		Body:       io.NopCloser(&buf),
+	}, nil
 }

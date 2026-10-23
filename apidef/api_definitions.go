@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"path"
+	"strings"
 	"text/template"
 	"time"
 
@@ -16,6 +18,8 @@ import (
 	"github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/TykTechnologies/tyk/internal/event"
+	internalhttputil "github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/mcpadapter"
 
 	"github.com/TykTechnologies/tyk/internal/reflect"
 	tyktime "github.com/TykTechnologies/tyk/internal/time"
@@ -64,11 +68,12 @@ const (
 	RequestXML  RequestInputType = "xml"
 	RequestJSON RequestInputType = "json"
 
-	OttoDriver     MiddlewareDriver = "otto"
-	PythonDriver   MiddlewareDriver = "python"
-	LuaDriver      MiddlewareDriver = "lua"
-	GrpcDriver     MiddlewareDriver = "grpc"
-	GoPluginDriver MiddlewareDriver = "goplugin"
+	OttoDriver       MiddlewareDriver = "otto"
+	JavaScriptDriver MiddlewareDriver = "javascript"
+	PythonDriver     MiddlewareDriver = "python"
+	LuaDriver        MiddlewareDriver = "lua"
+	GrpcDriver       MiddlewareDriver = "grpc"
+	GoPluginDriver   MiddlewareDriver = "goplugin"
 
 	BodySource        IdExtractorSource = "body"
 	HeaderSource      IdExtractorSource = "header"
@@ -134,6 +139,13 @@ const (
 	OAuthAuthorizationTypeClientCredentials = "clientCredentials"
 	// OAuthAuthorizationTypePassword is the authorization type for password flow.
 	OAuthAuthorizationTypePassword = "password"
+
+	// OAuth2ClientAuthBasic and OAuth2ClientAuthPost are the client authentication
+	// methods defined by RFC 6749 Section 2.3.1 (the `token_endpoint_auth_method`
+	// values IdPs publish). Shared by upstream OAuth (ClientAuthData.Method) and
+	// the OAS OAuth2 token-exchange feature (oas.OAuth2ClientAuth.Method).
+	OAuth2ClientAuthBasic = "client_secret_basic"
+	OAuth2ClientAuthPost  = "client_secret_post"
 
 	// JSON-RPC protocol versions
 	JsonRPC20 = "2.0"
@@ -571,8 +583,15 @@ type MiddlewareDefinition struct {
 	Disabled       bool   `bson:"disabled" json:"disabled"`
 	Name           string `bson:"name" json:"name"`
 	Path           string `bson:"path" json:"path"`
+	Code           string `bson:"code,omitempty" json:"code,omitempty"`
 	RequireSession bool   `bson:"require_session" json:"require_session"`
 	RawBodyOnly    bool   `bson:"raw_body_only" json:"raw_body_only"`
+
+	// RuntimeHandlerName is set by the gateway at API-load time when the JS
+	// driver rebrands handler globals to per-(file, name) unique aliases.
+	// Dispatch reads this when non-empty and falls back to Name otherwise.
+	// Transient — never serialized.
+	RuntimeHandlerName string `bson:"-" json:"-"`
 }
 
 // IDExtractorConfig specifies the configuration for ID extractor
@@ -602,6 +621,7 @@ type MiddlewareSection struct {
 	Post        []MiddlewareDefinition `bson:"post" json:"post"`
 	PostKeyAuth []MiddlewareDefinition `bson:"post_key_auth" json:"post_key_auth"`
 	AuthCheck   MiddlewareDefinition   `bson:"auth_check" json:"auth_check"`
+	TrafficLogs MiddlewareDefinition   `bson:"traffic_logs" json:"traffic_logs"`
 	Response    []MiddlewareDefinition `bson:"response" json:"response"`
 	Driver      MiddlewareDriver       `bson:"driver" json:"driver"`
 	IdExtractor MiddlewareIdExtractor  `bson:"id_extractor" json:"id_extractor"`
@@ -620,6 +640,36 @@ type CacheOptions struct {
 type ResponseProcessor struct {
 	Name    string      `bson:"name" json:"name"`
 	Options interface{} `bson:"options" json:"options"`
+}
+
+// DNSDiscoveryConfig is used with gRPC upstreams (`h2c://` only) to resolve the upstream hostname
+// and set the load balancing target list to the returned addresses.
+// It requires `enable_load_balancing` and cannot be combined with
+// `service_discovery`.
+type DNSDiscoveryConfig struct {
+	// Enabled determines if DNS discovery is active.
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// RefreshInterval is how often the hostname is resolved. Defaults to 30s, minimum 5s.
+	RefreshInterval tyktime.ReadableDuration `bson:"refresh_interval" json:"refresh_interval"`
+
+	// StaleTTL is how long the last known good addresses keep being used if the resolver becomes unreachable. Set as human-readable format; (e.g. `300s`).
+	// Empty or `0` means that known addresses will continue to be used until a lookup succeeds. Once expired, requests fail with 503.
+	StaleTTL tyktime.ReadableDuration `bson:"stale_ttl" json:"stale_ttl"`
+
+	// ConnectionDraining controls the behaviour when an address is no longer returned by the DNS resolver.
+	// Disabled by default.
+	ConnectionDraining *ConnectionDrainingConfig `bson:"connection_draining,omitempty" json:"connection_draining,omitempty"`
+}
+
+// ConnectionDrainingConfig controls the behaviour when an address is no longer returned by the DNS resolver.
+type ConnectionDrainingConfig struct {
+	// Enabled maintains connections for the `timeout` period after they are no longer returned by the DNS resolver. Default: false.
+	// When disabled, connections close once idle.
+	Enabled bool `bson:"enabled" json:"enabled"`
+
+	// Timeout is how long connections to a removed address stay open. Set as human-readable format; default: 30s (when enabled).
+	Timeout tyktime.ReadableDuration `bson:"timeout" json:"timeout"`
 }
 
 type ServiceDiscoveryConfiguration struct {
@@ -678,14 +728,17 @@ type APIDefinition struct {
 	EnableProxyProtocol bool           `bson:"enable_proxy_protocol" json:"enable_proxy_protocol"`
 	JsonRpcVersion      string         `bson:"json_rpc_version,omitempty" json:"json_rpc_version,omitempty"`
 	ApplicationProtocol string         `bson:"application_protocol,omitempty" json:"application_protocol,omitempty"`
-	APIID               string         `bson:"api_id" json:"api_id"`
-	OrgID               string         `bson:"org_id" json:"org_id"`
-	UseKeylessAccess    bool           `bson:"use_keyless" json:"use_keyless"`
-	UseOauth2           bool           `bson:"use_oauth2" json:"use_oauth2"`
-	ExternalOAuth       ExternalOAuth  `bson:"external_oauth" json:"external_oauth"`
-	UseOpenID           bool           `bson:"use_openid" json:"use_openid"`
-	OpenIDOptions       OpenIDOptions  `bson:"openid_options" json:"openid_options"`
-	Oauth2Meta          struct {
+	// MCP must serialize nil as BSON null: Dashboard updates use $set, so
+	// omitting it would retain a previously stored Origin configuration.
+	MCP              *MCPConfig    `bson:"mcp" json:"mcp,omitempty"`
+	APIID            string        `bson:"api_id" json:"api_id"`
+	OrgID            string        `bson:"org_id" json:"org_id"`
+	UseKeylessAccess bool          `bson:"use_keyless" json:"use_keyless"`
+	UseOauth2        bool          `bson:"use_oauth2" json:"use_oauth2"`
+	ExternalOAuth    ExternalOAuth `bson:"external_oauth" json:"external_oauth"`
+	UseOpenID        bool          `bson:"use_openid" json:"use_openid"`
+	OpenIDOptions    OpenIDOptions `bson:"openid_options" json:"openid_options"`
+	Oauth2Meta       struct {
 		AllowedAccessTypes     []osin.AccessRequestType    `bson:"allowed_access_types" json:"allowed_access_types"`
 		AllowedAuthorizeTypes  []osin.AuthorizeRequestType `bson:"allowed_authorize_types" json:"allowed_authorize_types"`
 		AuthorizeLoginRedirect string                      `bson:"auth_login_redirect" json:"auth_login_redirect"`
@@ -713,39 +766,47 @@ type APIDefinition struct {
 	// CertificatePinningDisabled disables public key pinning
 	CertificatePinningDisabled bool `bson:"certificate_pinning_disabled" json:"certificate_pinning_disabled,omitempty"`
 
-	EnableJWT                            bool                   `bson:"enable_jwt" json:"enable_jwt"`
-	UseStandardAuth                      bool                   `bson:"use_standard_auth" json:"use_standard_auth"`
-	UseGoPluginAuth                      bool                   `bson:"use_go_plugin_auth" json:"use_go_plugin_auth"`       // Deprecated. Use CustomPluginAuthEnabled instead.
-	EnableCoProcessAuth                  bool                   `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"` // Deprecated. Use CustomPluginAuthEnabled instead.
-	CustomPluginAuthEnabled              bool                   `bson:"custom_plugin_auth_enabled" json:"custom_plugin_auth_enabled"`
-	JWTSigningMethod                     string                 `bson:"jwt_signing_method" json:"jwt_signing_method"`
-	JWTSource                            string                 `bson:"jwt_source" json:"jwt_source"`
-	JWTJwksURIs                          []JWK                  `bson:"jwt_jwks_uris" json:"jwt_jwks_uris"`
-	JWTIdentityBaseField                 string                 `bson:"jwt_identit_base_field" json:"jwt_identity_base_field"`
-	JWTClientIDBaseField                 string                 `bson:"jwt_client_base_field" json:"jwt_client_base_field"`
-	JWTPolicyFieldName                   string                 `bson:"jwt_policy_field_name" json:"jwt_policy_field_name"`
-	JWTDefaultPolicies                   []string               `bson:"jwt_default_policies" json:"jwt_default_policies"`
-	JWTIssuedAtValidationSkew            uint64                 `bson:"jwt_issued_at_validation_skew" json:"jwt_issued_at_validation_skew"`
-	JWTExpiresAtValidationSkew           uint64                 `bson:"jwt_expires_at_validation_skew" json:"jwt_expires_at_validation_skew"`
-	JWTNotBeforeValidationSkew           uint64                 `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
-	JWTSkipKid                           bool                   `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
-	Scopes                               Scopes                 `bson:"scopes" json:"scopes,omitempty"`
-	IDPClientIDMappingDisabled           bool                   `bson:"idp_client_id_mapping_disabled" json:"idp_client_id_mapping_disabled"`
-	JWTScopeToPolicyMapping              map[string]string      `bson:"jwt_scope_to_policy_mapping" json:"jwt_scope_to_policy_mapping"` // Deprecated: use Scopes.JWT.ScopeToPolicy or Scopes.OIDC.ScopeToPolicy
-	JWTScopeClaimName                    string                 `bson:"jwt_scope_claim_name" json:"jwt_scope_claim_name"`               // Deprecated: use Scopes.JWT.ScopeClaimName or Scopes.OIDC.ScopeClaimName
-	NotificationsDetails                 NotificationsManager   `bson:"notifications" json:"notifications"`
-	EnableSignatureChecking              bool                   `bson:"enable_signature_checking" json:"enable_signature_checking"`
-	HmacAllowedClockSkew                 float64                `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
-	HmacAllowedAlgorithms                []string               `bson:"hmac_allowed_algorithms" json:"hmac_allowed_algorithms"`
-	RequestSigning                       RequestSigningMeta     `bson:"request_signing" json:"request_signing"`
-	BaseIdentityProvidedBy               AuthTypeEnum           `bson:"base_identity_provided_by" json:"base_identity_provided_by"`
-	VersionDefinition                    VersionDefinition      `bson:"definition" json:"definition"`
-	VersionData                          VersionData            `bson:"version_data" json:"version_data"` // Deprecated. Use VersionDefinition instead.
-	UptimeTests                          UptimeTests            `bson:"uptime_tests" json:"uptime_tests"`
-	Proxy                                ProxyConfig            `bson:"proxy" json:"proxy"`
-	DisableRateLimit                     bool                   `bson:"disable_rate_limit" json:"disable_rate_limit"`
-	DisableQuota                         bool                   `bson:"disable_quota" json:"disable_quota"`
-	CustomMiddleware                     MiddlewareSection      `bson:"custom_middleware" json:"custom_middleware"`
+	EnableJWT                  bool                 `bson:"enable_jwt" json:"enable_jwt"`
+	UseStandardAuth            bool                 `bson:"use_standard_auth" json:"use_standard_auth"`
+	UseGoPluginAuth            bool                 `bson:"use_go_plugin_auth" json:"use_go_plugin_auth"`       // Deprecated. Use CustomPluginAuthEnabled instead.
+	EnableCoProcessAuth        bool                 `bson:"enable_coprocess_auth" json:"enable_coprocess_auth"` // Deprecated. Use CustomPluginAuthEnabled instead.
+	CustomPluginAuthEnabled    bool                 `bson:"custom_plugin_auth_enabled" json:"custom_plugin_auth_enabled"`
+	JWTSigningMethod           string               `bson:"jwt_signing_method" json:"jwt_signing_method"`
+	JWTSource                  string               `bson:"jwt_source" json:"jwt_source"`
+	JWTJwksURIs                []JWK                `bson:"jwt_jwks_uris" json:"jwt_jwks_uris"`
+	JWTIdentityBaseField       string               `bson:"jwt_identit_base_field" json:"jwt_identity_base_field"`
+	JWTClientIDBaseField       string               `bson:"jwt_client_base_field" json:"jwt_client_base_field"`
+	JWTPolicyFieldName         string               `bson:"jwt_policy_field_name" json:"jwt_policy_field_name"`
+	JWTDefaultPolicies         []string             `bson:"jwt_default_policies" json:"jwt_default_policies"`
+	JWTIssuedAtValidationSkew  uint64               `bson:"jwt_issued_at_validation_skew" json:"jwt_issued_at_validation_skew"`
+	JWTExpiresAtValidationSkew uint64               `bson:"jwt_expires_at_validation_skew" json:"jwt_expires_at_validation_skew"`
+	JWTNotBeforeValidationSkew uint64               `bson:"jwt_not_before_validation_skew" json:"jwt_not_before_validation_skew"`
+	JWTSkipKid                 bool                 `bson:"jwt_skip_kid" json:"jwt_skip_kid"`
+	Scopes                     Scopes               `bson:"scopes" json:"scopes,omitempty"`
+	IDPClientIDMappingDisabled bool                 `bson:"idp_client_id_mapping_disabled" json:"idp_client_id_mapping_disabled"`
+	JWTScopeToPolicyMapping    map[string]string    `bson:"jwt_scope_to_policy_mapping" json:"jwt_scope_to_policy_mapping"` // Deprecated: use Scopes.JWT.ScopeToPolicy or Scopes.OIDC.ScopeToPolicy
+	JWTScopeClaimName          string               `bson:"jwt_scope_claim_name" json:"jwt_scope_claim_name"`               // Deprecated: use Scopes.JWT.ScopeClaimName or Scopes.OIDC.ScopeClaimName
+	NotificationsDetails       NotificationsManager `bson:"notifications" json:"notifications"`
+	EnableSignatureChecking    bool                 `bson:"enable_signature_checking" json:"enable_signature_checking"`
+	HmacAllowedClockSkew       float64              `bson:"hmac_allowed_clock_skew" json:"hmac_allowed_clock_skew"`
+	HmacAllowedAlgorithms      []string             `bson:"hmac_allowed_algorithms" json:"hmac_allowed_algorithms"`
+	RequestSigning             RequestSigningMeta   `bson:"request_signing" json:"request_signing"`
+	BaseIdentityProvidedBy     AuthTypeEnum         `bson:"base_identity_provided_by" json:"base_identity_provided_by"`
+	VersionDefinition          VersionDefinition    `bson:"definition" json:"definition"`
+	VersionData                VersionData          `bson:"version_data" json:"version_data"` // Deprecated. Use VersionDefinition instead.
+	UptimeTests                UptimeTests          `bson:"uptime_tests" json:"uptime_tests"`
+	Proxy                      ProxyConfig          `bson:"proxy" json:"proxy"`
+	DisableRateLimit           bool                 `bson:"disable_rate_limit" json:"disable_rate_limit"`
+	DisableQuota               bool                 `bson:"disable_quota" json:"disable_quota"`
+	CustomMiddleware           MiddlewareSection    `bson:"custom_middleware" json:"custom_middleware"`
+	// CustomMiddlewareBundle is the bundle filename (or comma-separated list of
+	// bundle filenames) resolved against the gateway's bundle_base_url. A single
+	// name takes the legacy single-bundle load path unchanged. Two or more
+	// comma-separated names enable multi-bundle composition: each bundle is
+	// fetched into its own subdirectory under the API's bundle root, and the
+	// manifests are merged into the effective custom_middleware section in
+	// declaration order — array hooks (pre/post/post_key_auth/response)
+	// concatenate; auth_check may be set by at most one bundle.
 	CustomMiddlewareBundle               string                 `bson:"custom_middleware_bundle" json:"custom_middleware_bundle"`
 	CustomMiddlewareBundleDisabled       bool                   `bson:"custom_middleware_bundle_disabled" json:"custom_middleware_bundle_disabled"`
 	CacheOptions                         CacheOptions           `bson:"cache_options" json:"cache_options"`
@@ -818,6 +879,45 @@ type APIDefinition struct {
 	// ErrorOverrides contains the configurations for error response customization.
 	ErrorOverrides         ErrorOverridesMap `bson:"error_overrides" json:"error_overrides"`
 	ErrorOverridesDisabled bool              `bson:"error_overrides_disabled" json:"error_overrides_disabled" `
+}
+
+// MCPConfig contains request-security settings shared by Classic and OAS MCP
+// APIs.
+type MCPConfig struct {
+	// TrustedOrigins contains concrete HTTP(S) origins allowed to send MCP
+	// requests in addition to the API's own externally visible origin.
+	TrustedOrigins []string `bson:"trusted_origins,omitempty" json:"trusted_origins,omitempty"`
+
+	// OAuthBroker enables the Gateway-owned OAuth authorization-server identity
+	// for an MCP mirror API. It is opt-in so existing direct/static OAuth flows
+	// retain their current contract.
+	OAuthBroker *MCPOAuthBrokerConfig `bson:"oauth_broker,omitempty" json:"oauth_broker,omitempty"`
+}
+
+// MCPOAuthBrokerConfig fixes the public and upstream resource identities used
+// by the MCP OAuth broker. PublicOrigin is an origin without a path;
+// PublicResource must equal PublicOrigin plus the API listen path.
+type MCPOAuthBrokerConfig struct {
+	Enabled                bool     `bson:"enabled" json:"enabled"`
+	PublicOrigin           string   `bson:"public_origin,omitempty" json:"public_origin,omitempty"`
+	PublicResource         string   `bson:"public_resource,omitempty" json:"public_resource,omitempty"`
+	UpstreamResource       string   `bson:"upstream_resource,omitempty" json:"upstream_resource,omitempty"`
+	TrustedEndpointOrigins []string `bson:"trusted_endpoint_origins,omitempty" json:"trusted_endpoint_origins,omitempty"`
+	AllowInsecureLoopback  bool     `bson:"allow_insecure_loopback,omitempty" json:"allow_insecure_loopback,omitempty"`
+}
+
+// Validate validates MCP request-security configuration.
+func (m *MCPConfig) Validate() error {
+	if m == nil {
+		return nil
+	}
+	if _, err := internalhttputil.CanonicalOrigins(m.TrustedOrigins); err != nil {
+		return err
+	}
+	if m.OAuthBroker == nil || !m.OAuthBroker.Enabled {
+		return nil
+	}
+	return m.OAuthBroker.Validate("")
 }
 
 type JWK struct {
@@ -907,6 +1007,16 @@ type ClientAuthData struct {
 	ClientID string `bson:"client_id" json:"client_id"`
 	// ClientSecret is the application's secret.
 	ClientSecret string `bson:"client_secret,omitempty" json:"client_secret,omitempty"` // client secret is optional for password flow
+	// Method controls how the client credentials are sent to the upstream token
+	// endpoint (RFC 6749 Section 2.3.1). Valid values are `client_secret_basic`
+	// (credentials in the Authorization header only, no fallback) and
+	// `client_secret_post` (credentials in the request body only, no fallback).
+	// When empty, Tyk keeps the historical auto-detect behaviour: it tries the
+	// header first and falls back to the body on failure. Unlike the OAuth2
+	// token-exchange clientAuth.method, empty deliberately does NOT default to
+	// client_secret_basic — existing APIs pointed at body-only IdPs rely on the
+	// fallback.
+	Method string `bson:"method,omitempty" json:"method,omitempty"`
 }
 
 // ClientCredentials holds the client credentials for upstream OAuth2 authentication.
@@ -1060,7 +1170,9 @@ type ProxyConfig struct {
 	StructuredTargetList        *HostList                     `bson:"-" json:"-"`
 	CheckHostAgainstUptimeTests bool                          `bson:"check_host_against_uptime_tests" json:"check_host_against_uptime_tests"`
 	ServiceDiscovery            ServiceDiscoveryConfiguration `bson:"service_discovery" json:"service_discovery"`
-	Transport                   struct {
+	// DNSDiscovery contains the configuration related to DNS discovery.
+	DNSDiscovery DNSDiscoveryConfig `bson:"dns_discovery" json:"dns_discovery"`
+	Transport    struct {
 		SSLInsecureSkipVerify   bool     `bson:"ssl_insecure_skip_verify" json:"ssl_insecure_skip_verify"`
 		SSLCipherSuites         []string `bson:"ssl_ciphers" json:"ssl_ciphers"`
 		SSLMinVersion           uint16   `bson:"ssl_min_version" json:"ssl_min_version"`
@@ -1464,6 +1576,38 @@ func (a *APIDefinition) GetAPIDomain() string {
 	return a.Domain
 }
 
+// listenPathTemplatePrefixes are KV/secret reference schemes (resolved elsewhere in the load
+// pipeline) that ValidListenPath must leave untouched rather than mangling with a leading slash.
+var listenPathTemplatePrefixes = []string{"env://", "secrets://", "consul://", "vault://", "file://"}
+
+// ValidListenPath returns Proxy.ListenPath normalized with a leading slash and cleaned of any
+// "." / ".." segments. Trailing slash is preserved, as it's significant for strict-route
+// matching. Empty values and KV/secret template references are returned unchanged.
+func (a *APIDefinition) ValidListenPath() string {
+	listenPath := a.Proxy.ListenPath
+
+	if listenPath == "" {
+		return listenPath
+	}
+
+	for _, prefix := range listenPathTemplatePrefixes {
+		if strings.HasPrefix(listenPath, prefix) {
+			return listenPath
+		}
+	}
+
+	if !strings.HasPrefix(listenPath, "/") {
+		listenPath = "/" + listenPath
+	}
+
+	cleaned := path.Clean(listenPath)
+	if strings.HasSuffix(listenPath, "/") && cleaned != "/" {
+		cleaned += "/"
+	}
+
+	return cleaned
+}
+
 // SetProtocol configures the transport and application protocol for the API.
 func (a *APIDefinition) SetProtocol(transport, application string) {
 	a.JsonRpcVersion = transport
@@ -1478,6 +1622,31 @@ func (a *APIDefinition) IsMCP() bool {
 // MarkAsMCP configures the API definition as a Model Context Protocol (MCP) API.
 func (a *APIDefinition) MarkAsMCP() {
 	a.SetProtocol(JsonRPC20, AppProtocolMCP)
+}
+
+// IsPairedMCPAdapterProxy returns true if this API is a REST-as-MCP proxy
+// whose upstream loops into a REST-as-MCP adapter target for a REST API.
+func (a *APIDefinition) IsPairedMCPAdapterProxy() bool {
+	if a == nil {
+		return false
+	}
+
+	host, path, ok := mcpadapter.ParseTarget(a.Proxy.TargetURL)
+	if !ok {
+		return false
+	}
+	if mcpadapter.IsAPIID(host) {
+		return path == "" || path == "/"
+	}
+	return mcpadapter.IsLoopPath(path)
+}
+
+// IsMCPManaged reports whether this API belongs to the MCP management surface.
+func (a *APIDefinition) IsMCPManaged() bool {
+	if a == nil {
+		return false
+	}
+	return a.IsMCP() || a.IsPairedMCPAdapterProxy()
 }
 
 // IsChildAPI returns true if this API is a child API in a versioning hierarchy.
@@ -1671,6 +1840,7 @@ func DummyAPI() APIDefinition {
 			Pre:         []MiddlewareDefinition{},
 			PostKeyAuth: []MiddlewareDefinition{},
 			AuthCheck:   MiddlewareDefinition{},
+			TrafficLogs: MiddlewareDefinition{},
 			IdExtractor: MiddlewareIdExtractor{
 				ExtractorConfig: map[string]interface{}{},
 			},

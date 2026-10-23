@@ -15,6 +15,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/storage/kv"
+
 	"github.com/TykTechnologies/tyk/apidef"
 )
 
@@ -95,6 +97,42 @@ func TestDefaultValueAndWriteDefaultConf(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestKVStoresFromEnv(t *testing.T) {
+	t.Setenv("TYK_GW_KV_STORES", `{
+		"vault-prod": {
+			"type": "hashicorp_vault",
+			"required": true,
+			"config": {"address": "http://localhost:8200", "namespace": "team-a"}
+		}
+	}`)
+
+	conf := &Config{}
+	require.NoError(t, FillEnv(conf))
+
+	require.Len(t, conf.KV.Stores, 1)
+	sc, ok := conf.KV.Stores["vault-prod"]
+	require.True(t, ok, "TYK_GW_KV_STORES must define vault-prod")
+	require.Equal(t, kv.Vault, sc.Type)
+	require.True(t, sc.Required)
+	require.JSONEq(t, `{"address": "http://localhost:8200", "namespace": "team-a"}`, string(sc.Config))
+}
+
+func TestKVStoresFromEnvOverridesFile(t *testing.T) {
+	t.Setenv("TYK_GW_KV_STORES", `{"vault-prod": {"type": "hashicorp_vault", "config": {"namespace": "from-env"}}}`)
+
+	conf := &Config{}
+	conf.KV.Stores = kv.Stores{
+		"vault-prod": {Type: kv.Vault, Config: []byte(`{"namespace": "from-file"}`)},
+		"local-file": {Type: kv.File, Config: []byte(`{"base_path": "/etc/secrets"}`)},
+	}
+
+	require.NoError(t, FillEnv(conf))
+
+	require.Len(t, conf.KV.Stores, 2)
+	require.JSONEq(t, `{"namespace": "from-env"}`, string(conf.KV.Stores["vault-prod"].Config), "env overrides the file entry")
+	require.Equal(t, kv.File, conf.KV.Stores["local-file"].Type, "entry absent from env JSON is retained")
 }
 
 func TestConfigFiles(t *testing.T) {
@@ -315,6 +353,17 @@ func TestCustomCertsDataDecoder(t *testing.T) {
 
 	assert.Len(t, c.HttpServerOptions.Certificates, 1, "TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES should have len 1")
 	assert.Equal(t, "testCerts", c.HttpServerOptions.Certificates[0].Name, "TYK_GW_HTTPSERVEROPTIONS_CERTIFICATES domain_name should be equals to testCerts")
+}
+
+func TestTrustedProxyCIDRsEnvironmentAndValidation(t *testing.T) {
+	var c Config
+	t.Setenv("TYK_GW_HTTPSERVEROPTIONS_TRUSTEDPROXYCIDRS", "10.0.0.0/8,2001:db8::/32")
+	require.NoError(t, envconfig.Process("TYK_GW", &c))
+	assert.Equal(t, []string{"10.0.0.0/8", "2001:db8::/32"}, c.HttpServerOptions.TrustedProxyCIDRs)
+	require.NoError(t, c.HttpServerOptions.ValidateTrustedProxyCIDRs())
+
+	c.HttpServerOptions.TrustedProxyCIDRs = []string{"not-a-cidr"}
+	assert.Error(t, c.HttpServerOptions.ValidateTrustedProxyCIDRs())
 }
 
 // TestSecretsDecoder tests env variable decoding for TYK_GW_SECRETS.

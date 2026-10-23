@@ -52,6 +52,20 @@ var tests = []struct {
 	},
 	{"Empty", `{}`, nil},
 	{"Default", onDefaults(`{}`), nil},
+	{
+		"TrustedProxyCIDRs", `{"http_server_options":{"trusted_proxy_cidrs":["10.0.0.0/8","2001:db8::/32"]}}`, nil,
+	},
+	{
+		"NullTrustedProxyCIDRs", `{"http_server_options":{"trusted_proxy_cidrs":null}}`, nil,
+	},
+	{
+		"WrongTrustedProxyCIDRsType", `{"http_server_options":{"trusted_proxy_cidrs":"10.0.0.0/8"}}`,
+		"cannot unmarshal string into Go struct field HttpServerOptionsConfig.http_server_options.trusted_proxy_cidrs of type []string",
+	},
+	{
+		"WrongTrustedProxyCIDRItemType", `{"http_server_options":{"trusted_proxy_cidrs":[42]}}`,
+		"cannot unmarshal number into Go struct field HttpServerOptionsConfig.http_server_options.trusted_proxy_cidrs of type string",
+	},
 	{"OldMonitor", `{"Monitor": {}}`, nil},
 	{"NullObject", `{"event_handlers": null}`, nil},
 	{
@@ -80,6 +94,16 @@ var tests = []struct {
 	},
 	{
 		"KVFileBasePath", `{"kv": {"file": {"base_path": "/etc/tyk/secrets"}}}`, nil,
+	},
+	{
+		"KVStores",
+		`{"kv": {"stores": {"vault": {"type": "hashicorp_vault", "required": false, "config": {"address": "https://vault.internal:8200", "token": "kv://env/VAULT_TOKEN", "kv_version": 2}}}}}`,
+		nil,
+	},
+	{
+		"KVStoreFieldTypo",
+		`{"kv": {"stores": {"x": {"typ": "env"}}}}`,
+		`Additional property typ is not allowed`,
 	},
 	{
 		"MalformedDnsCacheEntry", `{"dns_cache": { "enabled": true, "tttl": 10} }`,

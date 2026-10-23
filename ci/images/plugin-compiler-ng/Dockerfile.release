@@ -1,0 +1,139 @@
+# syntax=docker/dockerfile:1.7
+ARG GOLANG_IMAGE=tykio/golang-cross:1.26-bullseye
+ARG BASE_IMAGE
+# The exact Go version the gateway is built with, e.g. go1.26.4, as reported by
+# GOLANG_IMAGE. A compiler whose Go differs from the gateway's by so much as a
+# patch release produces plugins that fail at plugin.Open, so wherever the
+# toolchain does not come from GOLANG_IMAGE itself this has to be stated.
+#
+# Empty is legitimate and means "whatever GOLANG_IMAGE carries": on amd64 the
+# toolchain is COPYed out of that image, so the two agree by construction and
+# there is nothing to assert. Platforms that fetch Go elsewhere require it, and
+# say so where they use it.
+ARG GO_VERSION=
+ARG GO_TARBALL_SHA256_ARM64=
+
+# amd64 takes the toolchain straight from golang-cross, exactly as before. The
+# gateway release runs that same image, so on this architecture the two are
+# identical by construction rather than by assertion.
+FROM --platform=linux/amd64 ${GOLANG_IMAGE} AS go-src-amd64
+
+# golang-cross is published for amd64 only, so arm64 fetches the stock go.dev
+# tarball at the version golang-cross reports. The version still originates from
+# the same image the gateway uses; only the bits come from upstream.
+#
+# Pinned to BUILDPLATFORM so the download and unpack run on the build host and
+# are never emulated -- the same approach Dockerfile.base uses for the sysroots.
+FROM --platform=$BUILDPLATFORM debian:bookworm-slim AS go-src-arm64
+ARG GO_VERSION
+ARG GO_TARBALL_SHA256_ARM64
+RUN set -eux; \
+    if [ -z "$GO_VERSION" ] || [ -z "$GO_TARBALL_SHA256_ARM64" ]; then \
+        echo "ERROR: building for arm64 needs GO_VERSION and GO_TARBALL_SHA256_ARM64." >&2; \
+        echo "ERROR: golang-cross is amd64-only, so there is nothing to copy from." >&2; \
+        exit 1; \
+    fi; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends ca-certificates curl; \
+    rm -rf /var/lib/apt/lists/*; \
+    curl -fsSL --retry 3 --proto '=https' --tlsv1.2 \
+        -o /tmp/go.tgz "https://go.dev/dl/${GO_VERSION}.linux-arm64.tar.gz"; \
+    echo "${GO_TARBALL_SHA256_ARM64}  /tmp/go.tgz" | sha256sum -c -; \
+    tar -C /usr/local -xzf /tmp/go.tgz; \
+    rm /tmp/go.tgz; \
+    test "$(head -1 /usr/local/go/VERSION)" = "$GO_VERSION"
+
+# Selects one of the two stages above. Any other TARGETARCH fails here with
+# "failed to find stage go-src-<arch>", which is the intent: a platform with
+# no toolchain source must not silently fall through to one that has.
+FROM go-src-${TARGETARCH} AS go-toolchain
+
+FROM ${BASE_IMAGE}
+ARG GO_VERSION
+
+COPY --from=go-toolchain /usr/local/go /usr/local/go
+
+# When set, this is the gateway's Go version as declared from outside the image.
+# build.sh prefers it over `go version`, so validate-plugin.sh compares a built
+# plugin against the gateway's version rather than restating the image's own.
+ENV GOTOOLCHAIN=local \
+    TYK_GATEWAY_GO_VERSION=${GO_VERSION}
+
+# The toolchain that ends up here must be the gateway's, whichever stage it came
+# from. Unset means it was COPYed from GOLANG_IMAGE, where that holds by
+# construction; set means it was fetched independently and has to be proven.
+RUN set -eux; \
+    have="$(go version | awk '{print $3}')"; \
+    case "$have" in go1.*) ;; *) echo "ERROR: no usable Go toolchain: $have" >&2; exit 1 ;; esac; \
+    if [ -n "$GO_VERSION" ] && [ "$have" != "$GO_VERSION" ]; then \
+        echo "ERROR: image Go $have does not match the gateway's $GO_VERSION" >&2; \
+        echo "ERROR: plugins built here would fail to load." >&2; \
+        exit 1; \
+    fi
+
+COPY go.mod go.sum $TYK_GW_PATH/
+WORKDIR $TYK_GW_PATH
+
+RUN --mount=type=cache,mode=0755,target=/go/pkg/mod \
+    --mount=type=cache,mode=0755,target=/root/.cache/go-build \
+    go mod download
+
+COPY . $TYK_GW_PATH
+
+ARG GITHUB_SHA
+ARG GITHUB_TAG
+ARG BUILD_TAG
+ARG GOEXPERIMENT
+ARG GOFIPS140
+ARG SELFTEST_BUILD_TAG
+ARG SELFTEST_GOEXPERIMENT
+ARG SELFTEST_GOFIPS140
+ARG GATEWAY_TRIMPATH=true
+ARG GATEWAY_SRC_ROOT=
+ARG DEFAULT_EDITION=ce
+ARG EE_AVAILABLE=false
+ARG EE_BUILD_TAG=
+ARG FIPS_AVAILABLE=false
+ARG FIPS_GOFIPS140=
+ARG FIPS_GOEXPERIMENT=
+ARG FIPS_BUILD_TAG=
+ARG CE_ARCHS=amd64,arm64,s390x
+ARG EE_ARCHS=amd64,arm64
+ARG FIPS_ARCHS=amd64,arm64
+
+ENV GITHUB_SHA=${GITHUB_SHA} \
+    GITHUB_TAG=${GITHUB_TAG} \
+    TYK_GATEWAY_TRIMPATH=${GATEWAY_TRIMPATH} \
+    TYK_GATEWAY_SRC_ROOT=${GATEWAY_SRC_ROOT} \
+    EDITION=${DEFAULT_EDITION} \
+    TYK_EE_AVAILABLE=${EE_AVAILABLE} \
+    TYK_EE_BUILD_TAG=${EE_BUILD_TAG} \
+    TYK_FIPS_AVAILABLE=${FIPS_AVAILABLE} \
+    TYK_FIPS_GOFIPS140=${FIPS_GOFIPS140} \
+    TYK_FIPS_GOEXPERIMENT=${FIPS_GOEXPERIMENT} \
+    TYK_FIPS_BUILD_TAG=${FIPS_BUILD_TAG} \
+    TYK_CE_ARCHS=${CE_ARCHS} \
+    TYK_EE_ARCHS=${EE_ARCHS} \
+    TYK_FIPS_ARCHS=${FIPS_ARCHS}
+
+ARG WITH_GATEWAY_SELFTEST=0
+RUN --mount=type=cache,mode=0755,target=/go/pkg/mod \
+    --mount=type=cache,mode=0755,target=/root/.cache/go-build \
+    if [ "$WITH_GATEWAY_SELFTEST" = "1" ]; then \
+      GOEXPERIMENT=${SELFTEST_GOEXPERIMENT} GOFIPS140=${SELFTEST_GOFIPS140} \
+        GOBIN=/usr/local/bin go install -tags=goplugin${SELFTEST_BUILD_TAG:+,$SELFTEST_BUILD_TAG} -trimpath .; \
+    else \
+      echo "skipping gateway self-test binary (WITH_GATEWAY_SELFTEST=0)"; \
+      test ! -e /usr/local/bin/tyk; \
+      test ! -e "$TYK_GW_PATH/tyk"; \
+    fi
+
+LABEL description="Next-generation image for Tyk plugin development" \
+      org.opencontainers.image.title="tyk-plugin-compiler-ng" \
+      org.opencontainers.image.description="Next-generation plugin compiler for the Tyk API Gateway" \
+      org.opencontainers.image.source="https://github.com/TykTechnologies/tyk" \
+      org.opencontainers.image.licenses="MPL-2.0" \
+      org.opencontainers.image.revision="${GITHUB_SHA}" \
+      org.opencontainers.image.version="${GITHUB_TAG}"
+
+WORKDIR $TYK_GW_PATH

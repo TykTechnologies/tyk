@@ -5,15 +5,19 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"net/url"
+	"reflect"
 	"strconv"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/jsonrpc"
 	"github.com/TykTechnologies/tyk/internal/mcp"
+	restmcpadapter "github.com/TykTechnologies/tyk/internal/mcp/adapter"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	otelmcp "github.com/TykTechnologies/tyk/internal/otel/mcp"
@@ -25,6 +29,8 @@ const (
 	httpHeaderContentLength = "Content-Length"
 )
 
+const mcpIngressReadLimit = 1 << 20
+
 // JSONRPCMiddleware handles JSON-RPC 2.0 request detection and routing.
 // When a client sends a JSON-RPC request to a JSON-RPC endpoint, the middleware detects it,
 // extracts the method, routes to the correct VEM, and enables the middleware chain to execute
@@ -33,13 +39,9 @@ type JSONRPCMiddleware struct {
 	*BaseMiddleware
 }
 
-// JSONRPCRequest represents a JSON-RPC 2.0 request structure.
-type JSONRPCRequest struct {
-	JSONRPC string          `json:"jsonrpc"`
-	Method  string          `json:"method"`
-	Params  json.RawMessage `json:"params,omitempty"`
-	ID      any             `json:"id,omitempty"`
-}
+// JSONRPCRequest is retained as an alias for callers while MCP ingress owns
+// the canonical parsed envelope.
+type JSONRPCRequest = mcp.RequestEnvelope
 
 // JSONRPCError represents a JSON-RPC 2.0 error object.
 type JSONRPCError struct {
@@ -63,7 +65,8 @@ func (m *JSONRPCMiddleware) Name() string {
 // EnabledForSpec returns true if this middleware should be enabled for the API spec.
 // It requires the API to use JSON-RPC 2.0 protocol.
 func (m *JSONRPCMiddleware) EnabledForSpec() bool {
-	return m.Spec.IsMCP() && m.Spec.JsonRpcVersion == apidef.JsonRPC20
+	return m.Spec.IsPairedMCPAdapterProxy() ||
+		(m.Spec.IsMCP() && m.Spec.JsonRpcVersion == apidef.JsonRPC20)
 }
 
 // validateJSONRPCRequest checks if the request is a valid POST with JSON content type.
@@ -74,8 +77,18 @@ func (m *JSONRPCMiddleware) validateJSONRPCRequest(r *http.Request) bool {
 		return false
 	}
 
-	contentType := r.Header.Get(headerContentType)
-	return strings.HasPrefix(contentType, contentTypeJSON)
+	var contentTypes []string
+	for name, values := range r.Header {
+		if strings.EqualFold(name, headerContentType) {
+			contentTypes = append(contentTypes, values...)
+		}
+	}
+	if len(contentTypes) != 1 {
+		return false
+	}
+
+	mediaType, _, err := mime.ParseMediaType(contentTypes[0])
+	return err == nil && mediaType == contentTypeJSON
 }
 
 // readAndParseJSONRPC reads the request body and parses it as JSON-RPC 2.0.
@@ -84,20 +97,43 @@ func (m *JSONRPCMiddleware) validateJSONRPCRequest(r *http.Request) bool {
 // read) can resolve a configured body path without re-reading the request.
 // Request body size limits are enforced at the gateway level (proxy_muxer).
 func (m *JSONRPCMiddleware) readAndParseJSONRPC(w http.ResponseWriter, r *http.Request) (*JSONRPCRequest, []byte, error) {
-	// Read the request body (already size-limited by gateway if configured)
-	body, err := io.ReadAll(r.Body)
+	if ingress := httpctx.GetMCPProtocolContext(r); ingress != nil && ingress.Envelope != nil {
+		return ingress.Envelope, ingress.RawBody, nil
+	}
+
+	// Bound the single ingress read even when no API-level limit is configured.
+	body, err := io.ReadAll(io.LimitReader(r.Body, mcpIngressReadLimit+1))
 	if err != nil {
+		httpctx.SetMCPProtocolContext(r, mcp.NewProtocolContext(
+			r.Header.Get(mcp.HeaderProtocolVersion), r.Header.Get(mcp.HeaderSessionID), nil, body,
+		))
 		m.writeJSONRPCError(w, r, nil, mcp.JSONRPCParseError, mcp.ErrMsgParseError, nil)
 		return nil, nil, err
 	}
 	// Restore body for upstream
-	r.Body = io.NopCloser(bytes.NewReader(body))
+	r.Body = struct {
+		io.Reader
+		io.Closer
+	}{Reader: bytes.NewReader(body), Closer: r.Body}
+	if len(body) > mcpIngressReadLimit {
+		httpctx.SetMCPProtocolContext(r, mcp.NewProtocolContext(
+			r.Header.Get(mcp.HeaderProtocolVersion), r.Header.Get(mcp.HeaderSessionID), nil, body,
+		))
+		m.writeJSONRPCError(w, r, nil, mcp.JSONRPCInvalidRequest, mcp.ErrMsgInvalidRequest, nil)
+		return nil, nil, fmt.Errorf("MCP request exceeds %d bytes", mcpIngressReadLimit)
+	}
 
 	var rpcReq JSONRPCRequest
 	if err := json.Unmarshal(body, &rpcReq); err != nil {
+		httpctx.SetMCPProtocolContext(r, mcp.NewProtocolContext(
+			r.Header.Get(mcp.HeaderProtocolVersion), r.Header.Get(mcp.HeaderSessionID), nil, body,
+		))
 		m.writeJSONRPCError(w, r, nil, mcp.JSONRPCParseError, mcp.ErrMsgParseError, nil)
 		return nil, nil, err
 	}
+	httpctx.SetMCPProtocolContext(r, mcp.NewProtocolContext(
+		r.Header.Get(mcp.HeaderProtocolVersion), r.Header.Get(mcp.HeaderSessionID), &rpcReq, body,
+	))
 
 	// Validate JSON-RPC 2.0 structure
 	if rpcReq.JSONRPC != apidef.JsonRPC20 || rpcReq.Method == "" {
@@ -105,6 +141,9 @@ func (m *JSONRPCMiddleware) readAndParseJSONRPC(w http.ResponseWriter, r *http.R
 		return nil, nil, fmt.Errorf("invalid JSON-RPC request")
 	}
 
+	if ingress := httpctx.GetMCPProtocolContext(r); ingress != nil {
+		ingress.Validation.Checked = true
+	}
 	return &rpcReq, body, nil
 }
 
@@ -116,6 +155,7 @@ func (m *JSONRPCMiddleware) setupSequentialRouting(r *http.Request, rpcReq *JSON
 	}
 
 	method := rpcReq.Method
+	primitiveType, primitiveName := primitiveInfoForMethod(method, result.PrimitiveName)
 
 	var nextVEM string
 	if len(result.VEMChain) > 1 {
@@ -130,8 +170,8 @@ func (m *JSONRPCMiddleware) setupSequentialRouting(r *http.Request, rpcReq *JSON
 		OriginalPath:  r.URL.Path,
 		VEMChain:      result.VEMChain,
 		VisitedVEMs:   []string{},
-		PrimitiveType: primitiveTypeForMethod(method),
-		PrimitiveName: result.PrimitiveName,
+		PrimitiveType: primitiveType,
+		PrimitiveName: primitiveName,
 	}
 
 	httpctx.SetJSONRPCRoutingState(r, state)
@@ -150,6 +190,10 @@ func (m *JSONRPCMiddleware) setupSequentialRouting(r *http.Request, rpcReq *JSON
 // Returns the primitive type string or "" for non-primitive methods.
 func primitiveTypeForMethod(method string) string {
 	switch method {
+	case "server/discover":
+		return "discovery"
+	case "subscriptions/listen":
+		return "subscription"
 	case mcp.MethodToolsCall:
 		return mcp.PrimitiveTypeTool
 	case mcp.MethodResourcesRead:
@@ -161,18 +205,43 @@ func primitiveTypeForMethod(method string) string {
 	}
 }
 
+// primitiveInfoForMethod keeps non-primitive operations from inheriting router
+// metadata as a primitive name in policy and analytics contexts.
+func primitiveInfoForMethod(method, primitiveName string) (string, string) {
+	primitiveType := primitiveTypeForMethod(method)
+	if primitiveType == "" {
+		return "", ""
+	}
+	return primitiveType, primitiveName
+}
+
 // ProcessRequest handles JSON-RPC request detection and routing.
 //
 //nolint:staticcheck // ST1008: middleware interface requires (error, int) return order
 func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ any) (error, int) {
 	// Skip if routing already initialized (we're at a VEM path, not the listen path)
 	// This middleware should only run ONCE at the listen path to parse and route the request
-	if httpctx.GetJSONRPCRoutingState(r) != nil {
+	if httpctx.GetJSONRPCRoutingState(r) != nil && !m.Spec.IsSyntheticMCPAdapter() {
 		return nil, http.StatusOK
 	}
 
 	// Validate request type
 	if !m.validateJSONRPCRequest(r) {
+		if httpctx.GetMCPProtocolContext(r) == nil {
+			httpctx.SetMCPProtocolContext(r, mcp.NewProtocolContext(
+				r.Header.Get(mcp.HeaderProtocolVersion), r.Header.Get(mcp.HeaderSessionID), nil, nil,
+			))
+		}
+		if r.Method == http.MethodPost && m.Spec.IsMCPManaged() {
+			m.writeJSONRPCError(w, r, nil, mcp.JSONRPCInvalidRequest, "MCP POST requires application/json", nil)
+			return nil, middleware.StatusRespond
+		}
+		if rejectUnsupportedMCPHTTPMethod(w, r, m.Spec) {
+			return nil, middleware.StatusRespond
+		}
+		if m.Spec.IsSyntheticMCPAdapter() {
+			return m.processSyntheticMCPAdapterRequest(w, r)
+		}
 		return nil, http.StatusOK
 	}
 
@@ -181,6 +250,26 @@ func (m *JSONRPCMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		// Error response already written by readAndParseJSONRPC
 		return nil, middleware.StatusRespond //nolint:nilerr
+	}
+	ctxSetMCPMethod(r, rpcReq.Method)
+	ctxSetMCPPrimitiveType(r, primitiveTypeForMethod(rpcReq.Method))
+	switch rpcReq.Method {
+	case mcp.MethodToolsCall, mcp.MethodPromptsGet:
+		ctxSetMCPPrimitiveName(r, mcp.ExtractStringField(rpcReq.Params, "name"))
+	case mcp.MethodResourcesRead:
+		ctxSetMCPPrimitiveName(r, mcp.ExtractStringField(rpcReq.Params, "uri"))
+	}
+	if !m.validateMCPIngress(w, r) {
+		return nil, middleware.StatusRespond
+	}
+	if m.Spec.IsSyntheticMCPAdapter() {
+		return m.processSyntheticMCPAdapterRequest(w, r)
+	}
+	if m.Spec.IsPairedMCPAdapterProxy() && m.Spec.JSONRPCRouter == nil {
+		// Paired proxies without caller VEM routing forward validated ingress
+		// directly to their internal adapter.
+		m.bridgeMCPTraceContext(r, rpcReq, body)
+		return nil, http.StatusOK
 	}
 
 	// Route based on method
@@ -258,7 +347,10 @@ func (m *JSONRPCMiddleware) writeMCPTraceContext(r *http.Request, body []byte) {
 
 // writeJSONRPCError writes a JSON-RPC 2.0 error response.
 func (m *JSONRPCMiddleware) writeJSONRPCError(w http.ResponseWriter, r *http.Request, id any, code int, message string, data any) {
-	ctxSetJSONRPCErrorCode(r, code)
+	ctxSetJSONRPCErrorCode(r, int64(code))
+	if ingress := httpctx.GetMCPProtocolContext(r); ingress != nil {
+		ingress.Validation = mcp.ProtocolValidation{Checked: true, Code: code, Message: message, HTTPStatus: m.mapJSONRPCErrorToHTTP(code)}
+	}
 
 	response := JSONRPCErrorResponse{
 		JSONRPC: apidef.JsonRPC20,
@@ -284,6 +376,8 @@ func (m *JSONRPCMiddleware) mapJSONRPCErrorToHTTP(code int) int {
 		return http.StatusBadRequest
 	case code == mcp.JSONRPCMethodNotFound:
 		return http.StatusNotFound
+	case code == mcp.CodeHeaderMismatch || code == mcp.CodeMissingRequiredClientCapabilities || code == mcp.CodeUnsupportedProtocolVersion:
+		return http.StatusBadRequest
 	case code == mcp.JSONRPCInvalidParams:
 		return http.StatusBadRequest
 	case code >= -32099 && code <= -32000:
@@ -291,5 +385,213 @@ func (m *JSONRPCMiddleware) mapJSONRPCErrorToHTTP(code int) int {
 		return http.StatusForbidden
 	default:
 		return http.StatusInternalServerError
+	}
+}
+
+//nolint:staticcheck // ST1008: middleware helper mirrors ProcessRequest's (error, int) convention.
+func (m *JSONRPCMiddleware) processSyntheticMCPAdapterRequest(w http.ResponseWriter, r *http.Request) (error, int) {
+	if m.Spec == nil || m.Spec.MCPAdapter.SDKAdapter == nil {
+		http.Error(w, "REST-as-MCP adapter is not initialized", http.StatusInternalServerError)
+		return nil, middleware.StatusRespond
+	}
+	if r.Method != http.MethodPost {
+		// Modern GET and DELETE were rejected before this function. Keep the
+		// stateful transport surface available to established legacy sessions.
+		normaliseMCPStreamableAccept(r)
+		if !installMCPAdapterRequestBinding(r, m.Gw, m.Spec) {
+			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			return nil, middleware.StatusRespond
+		}
+		mcpAdapterHTTPHandler(r, m.Spec.MCPAdapter.SDKAdapter).ServeHTTP(w, requestForMCPAdapterSDK(r))
+		return nil, middleware.StatusRespond
+	}
+
+	policyCtx, responded := m.prepareRESTAsMCPPolicy(w, r)
+	if responded {
+		return nil, middleware.StatusRespond
+	}
+
+	method := ""
+	if policyCtx != nil && policyCtx.rpcReq != nil {
+		method = policyCtx.rpcReq.Method
+	} else {
+		method = syntheticJSONRPCMethod(r)
+	}
+	normaliseMCPStreamableAccept(r)
+	if !installMCPAdapterRequestBinding(r, m.Gw, m.Spec) {
+		http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+		return nil, middleware.StatusRespond
+	}
+	sdkRequest := requestForMCPAdapterSDK(r)
+
+	if method == mcp.MethodToolsList || (policyCtx != nil && policyCtx.listConfig != nil) {
+		rec := newBufferedResponseWriter()
+		mcpAdapterHTTPHandler(r, m.Spec.MCPAdapter.SDKAdapter).ServeHTTP(rec, sdkRequest)
+		view, ok := m.syntheticMCPToolViewForCaller(r)
+		m.writeSyntheticMCPToolsListResponse(w, r, rec, view, ok, policyCtx)
+		return nil, middleware.StatusRespond
+	}
+
+	mcpAdapterHTTPHandler(r, m.Spec.MCPAdapter.SDKAdapter).ServeHTTP(w, sdkRequest)
+	return nil, middleware.StatusRespond
+}
+
+// mcpAdapterHTTPHandler selects only from the already-validated ingress
+// context. All unambiguously modern traffic is stateless; legacy initialize
+// and established/fallback sessions remain on the stateful handler.
+func mcpAdapterHTTPHandler(r *http.Request, sdkAdapter *restmcpadapter.SDKAdapter) http.Handler {
+	protocolContext := httpctx.GetMCPProtocolContext(r)
+	return sdkAdapter.ProtocolHTTPHandler(mcpAdapterUsesStatelessHandler(protocolContext))
+}
+
+func mcpAdapterUsesStatelessHandler(protocolContext *mcp.ProtocolContext) bool {
+	return protocolContext != nil && protocolContext.IsModern()
+}
+
+func syntheticJSONRPCMethod(r *http.Request) string {
+	if r == nil {
+		return ""
+	}
+	if state := httpctx.GetJSONRPCRoutingState(r); state != nil && state.Method != "" {
+		return state.Method
+	}
+	if ingress := httpctx.GetMCPProtocolContext(r); ingress != nil && ingress.Envelope != nil {
+		return ingress.Envelope.Method
+	}
+	return ""
+}
+
+func normaliseMCPStreamableAccept(r *http.Request) {
+	if r == nil {
+		return
+	}
+	accept := r.Header.Get("Accept")
+	if strings.Contains(accept, "application/json") && strings.Contains(accept, "text/event-stream") {
+		return
+	}
+	r.Header.Set("Accept", "application/json, text/event-stream")
+}
+
+func (m *JSONRPCMiddleware) syntheticMCPToolViewForCaller(r *http.Request) (oas.MCPToolView, bool) {
+	callerProxyID := ctxGetMCPAdapterCallerProxyID(r)
+	if callerProxyID == "" || m.Spec == nil || m.Spec.MCPAdapter.ToolViews == nil {
+		return oas.MCPToolView{}, false
+	}
+	view, ok := m.Spec.MCPAdapter.ToolViews[callerProxyID]
+	return view, ok
+}
+
+func (m *JSONRPCMiddleware) writeSyntheticMCPToolsListResponse(w http.ResponseWriter, r *http.Request, rec *bufferedResponseWriter, view oas.MCPToolView, filter bool, policyCtx *restAsMCPPolicyContext) {
+	body := rec.body.Bytes()
+	if filter && rec.statusCode < http.StatusBadRequest {
+		rewritten, changed, err := rewriteMCPToolsListResponse(body, view)
+		if err != nil {
+			m.Logger().WithError(err).Warn("failed to rewrite REST-as-MCP tools/list response")
+			m.writeJSONRPCError(w, r, nil, mcp.JSONRPCInternalError, "Internal error", nil)
+			return
+		}
+		body = rewritten
+		if changed {
+			markMCPResponseEdited(r)
+		}
+	}
+	if rec.statusCode < http.StatusBadRequest {
+		if filtered, ok := filterRESTAsMCPListResponse(body, policyCtx); ok {
+			body = filtered
+			markMCPResponseEdited(r)
+		}
+	}
+	rec.writeTo(w, body)
+}
+
+func rewriteMCPToolsListResponse(body []byte, view oas.MCPToolView) ([]byte, bool, error) {
+	var envelope mcp.JSONRPCResponse
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return nil, false, err
+	}
+	var result map[string]json.RawMessage
+	if err := json.Unmarshal(envelope.Result, &result); err != nil {
+		return nil, false, err
+	}
+	callerTools, err := json.Marshal(view.Tools)
+	if err != nil {
+		return nil, false, err
+	}
+	if jsonBytesEqual(result["tools"], callerTools) {
+		return body, false, nil
+	}
+	result["tools"] = callerTools
+	mcp.SetPrivateCacheHints(result)
+	envelope.Result, err = json.Marshal(result)
+	if err != nil {
+		return nil, false, err
+	}
+	rewritten, err := json.Marshal(envelope)
+	return rewritten, err == nil, err
+}
+
+func jsonBytesEqual(left, right []byte) bool {
+	var leftValue, rightValue any
+	if json.Unmarshal(left, &leftValue) != nil || json.Unmarshal(right, &rightValue) != nil {
+		return false
+	}
+	return reflect.DeepEqual(leftValue, rightValue)
+}
+
+// bufferedResponseWriter is intentionally local to synthetic REST-as-MCP
+// tools/list handling. It captures only the response pieces we need to rewrite
+// SDK JSON responses before forwarding them to the caller.
+type bufferedResponseWriter struct {
+	header      http.Header
+	body        bytes.Buffer
+	statusCode  int
+	wroteHeader bool
+}
+
+func newBufferedResponseWriter() *bufferedResponseWriter {
+	return &bufferedResponseWriter{
+		header:     http.Header{},
+		statusCode: http.StatusOK,
+	}
+}
+
+func (w *bufferedResponseWriter) Header() http.Header {
+	return w.header
+}
+
+func (w *bufferedResponseWriter) WriteHeader(statusCode int) {
+	if w.wroteHeader {
+		return
+	}
+	w.statusCode = statusCode
+	w.wroteHeader = true
+}
+
+func (w *bufferedResponseWriter) Write(data []byte) (int, error) {
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+	return w.body.Write(data)
+}
+
+func (w *bufferedResponseWriter) Flush() {
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+}
+
+func (w *bufferedResponseWriter) writeTo(dst http.ResponseWriter, body []byte) {
+	for key, values := range w.header {
+		for _, value := range values {
+			dst.Header().Add(key, value)
+		}
+	}
+	if dst.Header().Get(headerContentType) == "" {
+		dst.Header().Set(headerContentType, contentTypeJSON+"; charset=utf-8")
+	}
+	dst.Header().Set("X-Content-Type-Options", "nosniff")
+	dst.WriteHeader(w.statusCode)
+	if _, err := dst.Write(body); err != nil {
+		log.WithError(err).Debug("failed to write REST-as-MCP response")
 	}
 }

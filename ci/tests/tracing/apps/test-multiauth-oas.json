@@ -77,7 +77,7 @@
             }
         },
         "upstream": {
-            "url": "http://httpbin:80/"
+            "url": "http://httpbin.org/"
         },
         "middleware": {
             "global": {

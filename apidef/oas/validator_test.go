@@ -10,6 +10,9 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
+	"github.com/TykTechnologies/tyk/internal/time"
 )
 
 //go:embed testdata/*-oas-template.json
@@ -505,5 +508,328 @@ func TestGetOASSchema(t *testing.T) {
 		// Verify it's the 3.1 schema
 		defsKey := GetDefinitionsKey(schema)
 		assert.Equal(t, "$defs", defsKey)
+	})
+}
+
+func TestUpstreamURL_KVReferences(t *testing.T) {
+	base := func(url string) []byte {
+		return []byte(`{
+			"openapi": "3.0.3",
+			"info": {"title": "t", "version": "1"},
+			"paths": {},
+			"x-tyk-api-gateway": {
+				"info": {"name": "t", "state": {"active": true}},
+				"server": {"listenPath": {"value": "/t"}},
+				"upstream": {"url": "` + url + `"}
+			}
+		}`)
+	}
+
+	t.Run("inline kv reference in host position", func(t *testing.T) {
+		err := ValidateOASObject(base(`http://$kv{random-consul:target_url_host}:8888`), "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	t.Run("inline kv reference as the whole host", func(t *testing.T) {
+		err := ValidateOASObject(base(`http://$kv{consul:host}`), "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	t.Run("inline kv reference in the path", func(t *testing.T) {
+		err := ValidateOASObject(base(`https://example.com/$kv{consul:path}`), "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	t.Run("whole-value kv reference", func(t *testing.T) {
+		err := ValidateOASObject(base(`kv://consul/services/redis`), "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	t.Run("whole-value kv reference with fragment", func(t *testing.T) {
+		err := ValidateOASObject(base(`kv://consul/services/redis#host`), "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	t.Run("rejects malformed url around an inline kv token", func(t *testing.T) {
+		err := ValidateOASObject(base(`http://$kv{consul:host}:8888 broken`), "3.0.3")
+		require.Error(t, err)
+	})
+
+	t.Run("rejects a plain invalid url with no kv reference", func(t *testing.T) {
+		err := ValidateOASObject(base(`http://exa mple.com`), "3.0.3")
+		require.Error(t, err)
+	})
+
+	t.Run("accepts an ordinary url with no kv reference", func(t *testing.T) {
+		err := ValidateOASObject(base(`https://example.com/api`), "3.0.3")
+		assert.NoError(t, err)
+	})
+}
+
+func TestUpstreamURL_KVReferences_RejectsMalformed(t *testing.T) {
+	base := func(url string) []byte {
+		return []byte(`{
+			"openapi": "3.0.3",
+			"info": {"title": "t", "version": "1"},
+			"paths": {},
+			"x-tyk-api-gateway": {
+				"info": {"name": "t", "state": {"active": true}},
+				"server": {"listenPath": {"value": "/t"}},
+				"upstream": {"url": "` + url + `"}
+			}
+		}`)
+	}
+
+	tests := map[string]string{
+		"inline unclosed token in path (reviewer point 1)": `https://example.com/$kv{unclosed`,
+		"inline token missing store separator":             `https://example.com/$kv{missingcolon}`,
+		"inline token empty store":                         `https://$kv{:onlypath}/x`,
+		"inline token empty path":                          `https://$kv{store:}/x`,
+		"whole-value kv reference without path separator":  `kv://no-path-separator`,
+		"whole-value kv reference empty path":              `kv://vault/`,
+	}
+
+	for name, url := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := ValidateOASObject(base(url), "3.0.3")
+			require.Error(t, err, "malformed KV reference %q must be rejected by validation", url)
+		})
+	}
+}
+
+func TestValidateOASObject_KVSyntaxInNonURLField(t *testing.T) {
+	doc := func(headerValue string) []byte {
+		return []byte(`{
+			"openapi": "3.0.3",
+			"info": {"title": "t", "version": "1"},
+			"paths": {},
+			"x-tyk-api-gateway": {
+				"info": {"name": "t", "state": {"active": true}},
+				"server": {"listenPath": {"value": "/t"}},
+				"upstream": {"url": "http://upstream.url"},
+				"middleware": {
+					"operations": {
+						"getOp": {
+							"transformRequestHeaders": {
+								"enabled": true,
+								"add": [{"name": "X-KV", "value": "` + headerValue + `"}]
+							}
+						}
+					}
+				}
+			}
+		}`)
+	}
+
+	t.Run("accepts a well-formed kv reference in a header value", func(t *testing.T) {
+		err := ValidateOASObject(doc(`kv://vault/db/password`), "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	t.Run("rejects a malformed kv reference in a header value", func(t *testing.T) {
+		err := ValidateOASObject(doc(`kv://random-gcpdb-password`), "3.0.3")
+		require.Error(t, err)
+	})
+}
+
+func TestKVAwareFormatChecker(t *testing.T) {
+	c := kvAwareFormatChecker{base: gojsonschema.URIReferenceFormatChecker{}}
+
+	tests := []struct {
+		name  string
+		input any
+		valid bool
+	}{
+		{"inline token in host", "http://$kv{consul:host}:8888", true},
+		{"inline token as the whole host", "http://$kv{consul:host}", true},
+		{"inline token in path", "https://example.com/$kv{consul:path}", true},
+		{"inline token in query", "https://example.com/api?h=$kv{consul:host}", true},
+		{"inline token with #fragment", "http://$kv{consul:host#field}:8888", true},
+		{"multiple inline tokens", "https://example.com/$kv{a:b}/$kv{c:d}", true},
+
+		{"whole-value kv reference", "kv://consul/services/redis", true},
+		{"whole-value kv reference with fragment", "kv://consul/services/redis#host", true},
+
+		{"ordinary url without a kv reference", "https://example.com/api", true},
+		{"invalid url with a space", "http://exa mple.com", false},
+		{"backslash rejected even alongside a token", `http://$kv{a:b}\x`, false},
+		{"backslash rejected without a token", `http://a\b`, false},
+		{"non-string input", 123, false},
+
+		// Known limitation: a token standing in for the whole port becomes the
+		// non-numeric placeholder "kvref", which url.Parse rejects as a port.
+		{"token as the whole port is not supported", "http://host:$kv{consul:port}", false},
+
+		{"inline unclosed token in path", "https://example.com/$kv{unclosed", false},
+		{"inline token missing store separator", "https://example.com/$kv{missingcolon}", false},
+		{"inline token empty store", "https://$kv{:onlypath}/x", false},
+		{"inline token empty path", "https://$kv{store:}/x", false},
+		{"whole-value kv reference without path separator", "kv://no-path-separator", false},
+		{"whole-value kv reference empty path", "kv://vault/", false},
+		{"whole-value kv reference empty everything", "kv://", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.valid, c.IsFormat(tt.input))
+		})
+	}
+}
+
+func TestKVAwareFormatChecker_URIBase(t *testing.T) {
+	c := kvAwareFormatChecker{base: gojsonschema.URIFormatChecker{}}
+
+	tests := []struct {
+		name  string
+		input string
+		valid bool
+	}{
+		// valid: a scheme is present (either the URL's own or kv://)
+		{"inline token in host with scheme", "http://$kv{consul:host}:8888", true},
+		{"inline token in path with scheme", "https://example.com/$kv{consul:path}", true},
+		{"ordinary absolute url", "https://example.com/api", true},
+		{"whole-value kv reference has kv scheme", "kv://consul/services/redis", true},
+		{"whole-value kv reference with fragment", "kv://consul/services/redis#host", true},
+
+		// invalid: no scheme (the uri-vs-uri-reference distinction)
+		{"bare inline token as whole value has no scheme", "$kv{consul:host}/path", false},
+		{"bare inline token only has no scheme", "$kv{consul:host}", false},
+		{"scheme-relative reference has no scheme", "example.com/api", false},
+
+		// invalid: malformed KV reference, rejected before the scheme check
+		{"inline unclosed token", "https://example.com/$kv{unclosed", false},
+		{"inline token missing store separator", "https://example.com/$kv{missingcolon}", false},
+		{"inline token empty path", "https://$kv{store:}/x", false},
+		{"whole-value kv reference without path separator", "kv://no-path-separator", false},
+		{"whole-value kv reference empty path", "kv://vault/", false},
+
+		// invalid: plain bad url, no KV involved
+		{"invalid url with a space", "http://exa mple.com", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.valid, c.IsFormat(tt.input))
+		})
+	}
+}
+
+// TestValidateOASObject_DNSDiscovery covers the rules about where an API's
+// target list comes from. They are checked in Go rather than by the schema,
+// which declares draft-04 and has no if/then.
+func TestValidateOASObject_DNSDiscovery(t *testing.T) {
+	t.Parallel()
+
+	build := func(upstream Upstream) []byte {
+		oasObject := OAS{
+			openapi3.T{
+				OpenAPI: "3.0.3",
+				Info:    &openapi3.Info{},
+				Paths:   openapi3.NewPaths(),
+			},
+		}
+		oasObject.SetTykExtension(&XTykAPIGateway{
+			Info:     Info{Name: "oas-api", State: State{Active: true}},
+			Server:   Server{ListenPath: ListenPath{Value: "/oas-api"}},
+			Upstream: upstream,
+		})
+
+		definition, err := oasObject.MarshalJSON()
+		require.NoError(t, err)
+		return definition
+	}
+
+	t.Run("DNS discovery supplies the targets load balancing would require", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(build(Upstream{
+			URL:           "h2c://my-grpc-svc:9002",
+			LoadBalancing: &LoadBalancing{Enabled: true},
+			DNSDiscovery:  &DNSDiscovery{Enabled: true, RefreshInterval: ReadableDuration(10 * time.Second)},
+		}), "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	t.Run("DNS discovery needs load balancing to distribute what it supplies", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(build(Upstream{
+			URL:          "h2c://my-grpc-svc:9002",
+			DNSDiscovery: &DNSDiscovery{Enabled: true},
+		}), "3.0.3")
+		assert.Error(t, err)
+	})
+
+	t.Run("two sources for one target list are refused", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(build(Upstream{
+			URL:              "h2c://my-grpc-svc:9002",
+			LoadBalancing:    &LoadBalancing{Enabled: true},
+			DNSDiscovery:     &DNSDiscovery{Enabled: true},
+			ServiceDiscovery: &ServiceDiscovery{Enabled: true, QueryEndpoint: "http://consul:8500/v1/catalog/service/svc"},
+		}), "3.0.3")
+		assert.Error(t, err)
+	})
+
+	t.Run("refresh interval under the minimum names the OAS field", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(build(Upstream{
+			URL:           "h2c://my-grpc-svc:9002",
+			LoadBalancing: &LoadBalancing{Enabled: true},
+			DNSDiscovery:  &DNSDiscovery{Enabled: true, RefreshInterval: ReadableDuration(time.Second)},
+		}), "3.0.3")
+		require.Error(t, err)
+		assert.ErrorContains(t, err, "upstream.dnsDiscovery.refreshInterval must be empty for the 30s default, or at least 5s")
+		assert.NotContains(t, err.Error(), "proxy.dns_discovery")
+	})
+
+	t.Run("refresh interval at the minimum is accepted", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(build(Upstream{
+			URL:           "h2c://my-grpc-svc:9002",
+			LoadBalancing: &LoadBalancing{Enabled: true},
+			DNSDiscovery:  &DNSDiscovery{Enabled: true, RefreshInterval: ReadableDuration(5 * time.Second)},
+		}), "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	t.Run("refresh interval under the minimum is ignored while disabled", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(build(Upstream{
+			URL:          "h2c://my-grpc-svc:9002",
+			DNSDiscovery: &DNSDiscovery{Enabled: false, RefreshInterval: ReadableDuration(time.Second)},
+		}), "3.0.3")
+		assert.NoError(t, err)
+	})
+
+	malformed := map[string]string{
+		"refreshInterval":            `{"enabled": true, "refreshInterval": "invalid"}`,
+		"staleTTL":                   `{"enabled": true, "staleTTL": "-10s"}`,
+		"connectionDraining.timeout": `{"enabled": true, "connectionDraining": {"enabled": true, "timeout": "30sec"}}`,
+	}
+
+	for field, dnsDiscovery := range malformed {
+		t.Run("malformed "+field+" is refused by the schema", func(t *testing.T) {
+			t.Parallel()
+			definition := build(Upstream{
+				URL:           "h2c://my-grpc-svc:9002",
+				LoadBalancing: &LoadBalancing{Enabled: true},
+			})
+			definition, err := jsonparser.Set(definition, []byte(dnsDiscovery), ExtensionTykAPIGateway, "upstream", "dnsDiscovery")
+			require.NoError(t, err)
+
+			err = ValidateOASObject(definition, "3.0.3")
+			require.Error(t, err)
+			assert.ErrorContains(t, err, "dnsDiscovery")
+			assert.ErrorContains(t, err, "Does not match pattern")
+		})
+	}
+
+	t.Run("service discovery on its own is untouched", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateOASObject(build(Upstream{
+			URL:              "h2c://my-grpc-svc:9002",
+			LoadBalancing:    &LoadBalancing{Enabled: true, Targets: []LoadBalancingTarget{{URL: "h2c://a:9002", Weight: 1}}},
+			ServiceDiscovery: &ServiceDiscovery{Enabled: true, QueryEndpoint: "http://consul:8500/v1/catalog/service/svc"},
+		}), "3.0.3")
+		assert.NoError(t, err)
 	})
 }

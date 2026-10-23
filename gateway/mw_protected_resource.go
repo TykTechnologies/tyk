@@ -43,10 +43,7 @@ func (m *PRMMiddleware) Name() string {
 }
 
 func (m *PRMMiddleware) EnabledForSpec() bool {
-	if name, _ := m.Spec.GetOAuth2PRMConfig(); name != "" {
-		return true
-	}
-	return m.Spec.GetPRMConfig() != nil
+	return m.Spec.IsPRMEnabled()
 }
 
 //nolint:staticcheck // ST1008: middleware interface requires (error, int) return order
@@ -71,7 +68,7 @@ func (m *PRMMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 	}
 
 	// Mirror mode: fetch from upstream, rewrite resource, serve.
-	if prm.IsMirrorMode(m.Spec.IsMCP()) {
+	if prm.IsMirrorMode(m.Spec.IsMCPManaged()) {
 		if err := m.serveMirroredPRM(w, r); err != nil {
 			log.WithError(err).Warn("PRM mirror failed; passing through to upstream")
 			return nil, http.StatusOK
@@ -107,11 +104,11 @@ func (m *PRMMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 //
 //nolint:staticcheck // ST1008: middleware interface requires (error, int) return order
 func (m *PRMMiddleware) serveOAuth2PRM(w http.ResponseWriter, r *http.Request, name string, prm *oas.OAuth2PRM) (error, int) {
-	// Mirror mode (MCP, no static fields): serve the upstream's PRM doc,
-	// same as the deprecated top-level block. The new block wins over the
-	// old one, so the mirror path must live here too — otherwise a migrated
-	// mirror-shape MCP API serves an empty static document.
-	if prm.IsMirrorMode(m.Spec.IsMCP()) {
+	// Mirror mode (MCP-managed, no static fields): serve the upstream's
+	// PRM doc, same as the deprecated top-level block. The new block wins
+	// over the old one, so the mirror path must live here too — otherwise
+	// a migrated mirror-shape MCP API serves an empty static document.
+	if prm.IsMirrorMode(m.Spec.IsMCPManaged()) {
 		if err := m.serveMirroredPRM(w, r); err != nil {
 			log.WithError(err).Warn("PRM mirror failed; passing through to upstream")
 			return nil, http.StatusOK
@@ -150,14 +147,18 @@ func (m *PRMMiddleware) serveMirroredPRM(w http.ResponseWriter, r *http.Request)
 		return err
 	}
 
-	// Rewrite resource to the gateway URL — what the client connected to.
-	doc.SetResource(gatewayResourceURL(r, m.Spec))
+	brokerEnabled := m.Spec.MCP != nil && m.Spec.MCP.OAuthBroker != nil && m.Spec.MCP.OAuthBroker.Enabled
+	if brokerEnabled {
+		doc.SetResource(m.Spec.MCP.OAuthBroker.PublicResource)
+		doc.Raw["authorization_servers"] = []any{m.Spec.MCP.OAuthBroker.PublicOrigin + mcpASProxyPathPrefix + m.Spec.APIID}
+	} else {
+		// Rewrite resource to the gateway URL — what the client connected to.
+		doc.SetResource(gatewayResourceURL(r, m.Spec))
 
-	// Redirect the AS to Tyk's per-API proxy so we can rewrite the
-	// `resource` parameter (RFC 8707) on its way to the upstream AS.
-	// Strict authorization servers (Notion) reject the gateway URL as
-	// `invalid_target` otherwise.
-	doc.Raw["authorization_servers"] = []any{mcpASProxyBaseURL(r, m.Spec)}
+		// Redirect the AS to Tyk's per-API proxy so we can rewrite the
+		// `resource` parameter (RFC 8707) on its way to the upstream AS.
+		doc.Raw["authorization_servers"] = []any{mcpASProxyBaseURL(r, m.Spec)}
+	}
 
 	w.Header().Set(header.ContentType, header.ApplicationJSON)
 	w.WriteHeader(http.StatusOK)

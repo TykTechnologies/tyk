@@ -20,6 +20,7 @@ import (
 	"github.com/cenkalti/backoff/v4"
 	"github.com/samber/lo"
 	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
@@ -68,6 +69,25 @@ func TestGateway_afterConfSetup(t *testing.T) {
 		ReadinessCheckEndpointName: "ready",
 	}
 	fileBackendExpected.KV.File.BasePath = fileKVDir
+
+	// base_path configures the file store, which the registry snapshots at
+	// NewGateway time (SetConfig does not rebuild it). So it must be present in
+	// the config the gateway is constructed with — setting it post-construction
+	// is invisible. Built as a var because KV is an anonymous struct that can't
+	// be set in a composite literal.
+	fileInitialConfig := config.Config{
+		ExternalServices: config.ExternalServiceConfig{
+			OAuth: config.ServiceConfig{
+				MTLS: config.MTLSConfig{
+					Enabled:  true,
+					CertFile: "file://cert.pem",
+					KeyFile:  "file://key.pem",
+					CAFile:   "file://ca.pem",
+				},
+			},
+		},
+	}
+	fileInitialConfig.KV.File.BasePath = fileKVDir
 
 	tests := []struct {
 		name            string
@@ -248,21 +268,23 @@ func TestGateway_afterConfSetup(t *testing.T) {
 					OAuth: config.ServiceConfig{
 						MTLS: config.MTLSConfig{
 							Enabled:  true,
-							CertFile: "vault://secret/oauth/cert_file",
-							KeyFile:  "vault://secret/oauth/key_file",
-							CAFile:   "vault://secret/oauth/ca_file",
+							CertFile: "vault://secret/oauth.cert_file",
+							KeyFile:  "vault://secret/oauth.key_file",
+							CAFile:   "vault://secret/oauth.ca_file",
 						},
 					},
 				},
 			},
-			setup: func(_ *testing.T, gw *Gateway) {
-				gw.vaultKVStore = &mockKVStore{
-					store: map[string]string{
-						"secret/oauth/cert_file": "/vault/path/to/cert.pem",
-						"secret/oauth/key_file":  "/vault/path/to/key.pem",
-						"secret/oauth/ca_file":   "/vault/path/to/ca.pem",
+			setup: func(t *testing.T, gw *Gateway) {
+				installFakeKVStores(t, gw, map[string]map[string]string{
+					"vault": {
+						"secret/oauth": `{
+							"cert_file": "/vault/path/to/cert.pem",
+							"key_file":  "/vault/path/to/key.pem",
+							"ca_file":   "/vault/path/to/ca.pem"
+						}`,
 					},
-				}
+				})
 			},
 			expectedConfig: config.Config{
 				ExternalServices: config.ExternalServiceConfig{
@@ -296,14 +318,14 @@ func TestGateway_afterConfSetup(t *testing.T) {
 					},
 				},
 			},
-			setup: func(_ *testing.T, gw *Gateway) {
-				gw.consulKVStore = &mockKVStore{
-					store: map[string]string{
+			setup: func(t *testing.T, gw *Gateway) {
+				installFakeKVStores(t, gw, map[string]map[string]string{
+					"consul": {
 						"oauth/cert_file": "/consul/path/to/cert.pem",
 						"oauth/key_file":  "/consul/path/to/key.pem",
 						"oauth/ca_file":   "/consul/path/to/ca.pem",
 					},
-				}
+				})
 			},
 			expectedConfig: config.Config{
 				ExternalServices: config.ExternalServiceConfig{
@@ -324,19 +346,8 @@ func TestGateway_afterConfSetup(t *testing.T) {
 			},
 		},
 		{
-			name:          "oauth mtls kv store - file backend",
-			initialConfig: config.Config{},
-			setup: func(t *testing.T, gw *Gateway) {
-				t.Helper()
-
-				conf := gw.GetConfig()
-				conf.KV.File.BasePath = fileKVDir
-				conf.ExternalServices.OAuth.MTLS.Enabled = true
-				conf.ExternalServices.OAuth.MTLS.CertFile = "file://cert.pem"
-				conf.ExternalServices.OAuth.MTLS.KeyFile = "file://key.pem"
-				conf.ExternalServices.OAuth.MTLS.CAFile = "file://ca.pem"
-				gw.SetConfig(conf)
-			},
+			name:           "oauth mtls kv store - file backend",
+			initialConfig:  fileInitialConfig,
 			expectedConfig: fileBackendExpected,
 		},
 		{
@@ -519,53 +530,52 @@ func TestGateway_afterConfSetup(t *testing.T) {
 }
 
 func TestGateway_kvResolvers_hotReload(t *testing.T) {
-	initialCert := "secrets://oauth_cert"
-	initialKey := "secrets://oauth_key"
-	initialCA := "secrets://oauth_ca"
+	dir := t.TempDir()
+	writeFile := func(name, content string) {
+		t.Helper()
+		require.NoError(t, os.WriteFile(filepath.Join(dir, name), []byte(content), 0o600))
+	}
+	writeFile("cert.pem", "-----INITIAL CERT-----")
+	writeFile("key.pem", "-----INITIAL KEY-----")
+	writeFile("ca.pem", "-----INITIAL CA-----")
 
-	gw := NewGateway(config.Config{
-		Secrets: map[string]string{
-			"oauth_cert": "/initial/cert.pem",
-			"oauth_key":  "/initial/key.pem",
-			"oauth_ca":   "/initial/ca.pem",
-		},
+	conf := config.Config{
 		ExternalServices: config.ExternalServiceConfig{
 			OAuth: config.ServiceConfig{
 				MTLS: config.MTLSConfig{
 					Enabled:  true,
-					CertFile: initialCert,
-					KeyFile:  initialKey,
-					CAFile:   initialCA,
+					CertFile: "file://cert.pem",
+					KeyFile:  "file://key.pem",
+					CAFile:   "file://ca.pem",
 				},
 			},
 		},
-	}, context.Background())
+	}
+	conf.KV.File.BasePath = dir
 
+	gw := NewGateway(conf, t.Context())
 	require.NoError(t, gw.afterConfSetup())
 
-	conf := gw.GetConfig()
-	assert.Equal(t, "/initial/cert.pem", conf.ExternalServices.OAuth.MTLS.CertFile)
-	assert.Equal(t, "/initial/key.pem", conf.ExternalServices.OAuth.MTLS.KeyFile)
-	assert.Equal(t, "/initial/ca.pem", conf.ExternalServices.OAuth.MTLS.CAFile)
-	assert.Len(t, gw.kvResolvers, 3)
+	got := gw.GetConfig()
+	assert.Equal(t, "-----INITIAL CERT-----", got.ExternalServices.OAuth.MTLS.CertFile)
+	assert.Equal(t, "-----INITIAL KEY-----", got.ExternalServices.OAuth.MTLS.KeyFile)
+	assert.Equal(t, "-----INITIAL CA-----", got.ExternalServices.OAuth.MTLS.CAFile)
+	assert.Len(t, gw.kvResolvers, 3, "each resolved file:// field registers a hot-reload closure")
 
-	// simulate updated secrets
-	updatedConf := gw.GetConfig()
-	updatedConf.Secrets = map[string]string{
-		"oauth_cert": "/updated/cert.pem",
-		"oauth_key":  "/updated/key.pem",
-		"oauth_ca":   "/updated/ca.pem",
-	}
-	gw.SetConfig(updatedConf)
+	// Rotate the certs on disk — no config change, no process restart.
+	writeFile("cert.pem", "-----ROTATED CERT-----")
+	writeFile("key.pem", "-----ROTATED KEY-----")
+	writeFile("ca.pem", "-----ROTATED CA-----")
 
 	for _, resolve := range gw.kvResolvers {
 		require.NoError(t, resolve())
 	}
 
-	conf = gw.GetConfig()
-	assert.Equal(t, "/updated/cert.pem", conf.ExternalServices.OAuth.MTLS.CertFile)
-	assert.Equal(t, "/updated/key.pem", conf.ExternalServices.OAuth.MTLS.KeyFile)
-	assert.Equal(t, "/updated/ca.pem", conf.ExternalServices.OAuth.MTLS.CAFile)
+	got = gw.GetConfig()
+	assert.Equal(t, "-----ROTATED CERT-----", got.ExternalServices.OAuth.MTLS.CertFile,
+		"the closure re-reads rotated file content on hot reload")
+	assert.Equal(t, "-----ROTATED KEY-----", got.ExternalServices.OAuth.MTLS.KeyFile)
+	assert.Equal(t, "-----ROTATED CA-----", got.ExternalServices.OAuth.MTLS.CAFile)
 }
 
 func TestGateway_kvResolvers_notRegisteredWhenMTLSDisabled(t *testing.T) {
@@ -600,6 +610,87 @@ func TestGateway_kvResolvers_notRegisteredForPlainValues(t *testing.T) {
 
 	require.NoError(t, gw.afterConfSetup())
 	assert.Empty(t, gw.kvResolvers)
+}
+
+func TestAfterConfSetup_NewSyntaxFieldRegistersClosure(t *testing.T) {
+	live := config.Config{
+		Secrets: map[string]string{"oauth_cert": "/resolved/cert.pem"},
+	}
+	live.ExternalServices.OAuth.MTLS.Enabled = true
+	// The field holds a kv:// reference, as it does after Load — the config is
+	// no longer resolved up front, so afterConfSetup resolves it in place.
+	live.ExternalServices.OAuth.MTLS.CertFile = "kv://secrets/oauth_cert"
+
+	gw := NewGateway(live, t.Context())
+	require.NoError(t, gw.afterConfSetup())
+
+	require.Len(t, gw.kvResolvers, 1,
+		"a field holding a kv:// reference must register a hot-reload closure")
+
+	got := gw.GetConfig()
+	require.Equal(t, "/resolved/cert.pem", got.ExternalServices.OAuth.MTLS.CertFile,
+		"the reference must be resolved into the live config")
+}
+
+func TestAfterConfSetup_SlaveAPIKeyOriginalIsCaptured(t *testing.T) {
+	live := config.Config{
+		Secrets: map[string]string{"edge_api_key": "/resolved/api-key"},
+	}
+	// The field holds the original kv:// reference, as it does after Load.
+	live.SlaveOptions.APIKey = "kv://secrets/edge_api_key"
+
+	gw := NewGateway(live, t.Context())
+	require.NoError(t, gw.afterConfSetup())
+
+	got := gw.GetConfig()
+	require.Equal(t, "kv://secrets/edge_api_key", got.Private.EdgeOriginalAPIKeyPath,
+		"EdgeOriginalAPIKeyPath must hold the ORIGINAL reference, captured before the field is resolved")
+	require.Equal(t, "/resolved/api-key", got.SlaveOptions.APIKey,
+		"the live APIKey must be the resolved value")
+}
+
+func TestAfterConfSetup_MTLS_MissingStoreDoesNotFailStartup(t *testing.T) {
+	live := config.Config{}
+	live.ExternalServices.OAuth.MTLS.Enabled = true
+	// vault is NOT configured
+	live.ExternalServices.OAuth.MTLS.CertFile = "kv://vault/secret/cert#value"
+
+	gw := NewGateway(live, t.Context())
+	require.NoError(t, gw.afterConfSetup(),
+		"an enabled mTLS reference to an unconfigured store must not fail startup")
+
+	got := gw.GetConfig()
+	require.Equal(t, "kv://vault/secret/cert#value", got.ExternalServices.OAuth.MTLS.CertFile,
+		"the unresolved reference must be left in place, not blanked")
+	require.Empty(t, gw.kvResolvers,
+		"an unresolved reference registers no hot-reload closure (resolved == original)")
+}
+
+func TestAfterConfSetup_MTLS_ConfiguredStoreMissingKeyFailsStartup(t *testing.T) {
+	live := config.Config{
+		Secrets: map[string]string{"present": "x"},
+	}
+	live.ExternalServices.OAuth.MTLS.Enabled = true
+	live.ExternalServices.OAuth.MTLS.CertFile = "kv://secrets/absent_key"
+
+	gw := NewGateway(live, t.Context())
+	require.Error(t, gw.afterConfSetup(),
+		"a reference to a configured store with a missing key must stay a hard startup error")
+}
+
+func TestAfterConfSetup_MTLS_DisabledSectionNeverResolvesKV(t *testing.T) {
+	live := config.Config{}
+	live.ExternalServices.OAuth.MTLS.Enabled = false
+	live.ExternalServices.OAuth.MTLS.CertFile = "kv://vault/secret/cert#value"
+
+	gw := NewGateway(live, t.Context())
+	require.NoError(t, gw.afterConfSetup(),
+		"a disabled mTLS section must never fail startup on its KV reference")
+
+	got := gw.GetConfig()
+	require.Equal(t, "kv://vault/secret/cert#value", got.ExternalServices.OAuth.MTLS.CertFile,
+		"a disabled section's reference must be left untouched")
+	require.Empty(t, gw.kvResolvers)
 }
 
 func TestGateway_apisByIDLen(t *testing.T) {
@@ -2087,15 +2178,14 @@ func TestDoReload_RuntimeReloadLoopUnaffected(t *testing.T) {
 		"DoReload should make exactly 1 request with RetryAttempts=0, got %d", callCount)
 }
 
-// TestRegister_DoReloadWithRetry_OnStartup verifies that when Register() is called
-// and the initial DoReloadWithRetry fails (dashboard returns 500 for APIs/policies),
-// the gateway keeps retrying until the upstream recovers, then marks the reload
-// as successful — without re-registering the node.
-func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
-	const succeedOnCall = 3
+// TestRegister_DoesNotReload verifies that registration only renews node state.
+// The caller that owns the registration flow remains responsible for reloading
+// APIs and policies.
+func TestRegister_DoesNotReload(t *testing.T) {
 	var (
 		registerCount int
 		policyCount   int
+		apiCount      int
 	)
 
 	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -2112,17 +2202,12 @@ func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
 
 		case strings.Contains(r.URL.Path, "/system/policies"):
 			policyCount++
-			if policyCount < succeedOnCall {
-				w.WriteHeader(http.StatusInternalServerError)
-				_, err := w.Write([]byte(`{"Status":"Error","Message":"db unavailable","Meta":null}`))
-				require.NoError(t, err)
-				return
-			}
 			w.Header().Set("Content-Type", "application/json")
 			_, err := w.Write([]byte(`{"Message":[],"Nonce":"ok"}`))
 			require.NoError(t, err)
 
 		case strings.Contains(r.URL.Path, "/system/apis"):
+			apiCount++
 			w.Header().Set("Content-Type", "application/json")
 			_, err := w.Write([]byte(`{"Status":"OK","Nonce":"ok","Message":[]}`))
 			require.NoError(t, err)
@@ -2140,11 +2225,6 @@ func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
 		conf.NodeSecret = "test-secret"
 	})
 	defer ts.Close()
-
-	// Use a fast retry interval so retries happen in milliseconds during the test.
-	ts.Gw.reloadRetryBackoff = func() backoff.BackOff {
-		return backoff.NewConstantBackOff(50 * time.Millisecond)
-	}
 
 	// Enable dashboard mode and wire up the mock dashboard.
 	conf := ts.Gw.GetConfig()
@@ -2167,10 +2247,80 @@ func TestRegister_DoReloadWithRetry_OnStartup(t *testing.T) {
 	err := ts.Gw.DashService.Register(ctx)
 
 	assert.NoError(t, err, "Register should not return an error")
-	assert.True(t, ts.Gw.performedSuccessfulReload,
-		"performedSuccessfulReload should be true after recovery")
+	assert.False(t, ts.Gw.performedSuccessfulReload,
+		"Register should not mark a reload as successful")
 	assert.Equal(t, 1, registerCount,
-		"/register/node must be called exactly once — DoReloadWithRetry must not re-register")
-	assert.GreaterOrEqual(t, policyCount, succeedOnCall,
-		"policy endpoint should have been retried at least %d times", succeedOnCall)
+		"/register/node must be called exactly once")
+	assert.Zero(t, policyCount, "Register should not fetch policies")
+	assert.Zero(t, apiCount, "Register should not fetch APIs")
+	assert.Equal(t, "test-node-id", ts.Gw.GetNodeID())
+	ts.Gw.ServiceNonceMutex.RLock()
+	assert.Equal(t, "nonce-1", ts.Gw.ServiceNonce)
+	ts.Gw.ServiceNonceMutex.RUnlock()
+}
+
+func TestNewGateway_OSRootInitialization(t *testing.T) {
+	t.Run("successful initialization with valid TemplatePath", func(t *testing.T) {
+		tempDir := t.TempDir()
+
+		cfg := config.Config{
+			TemplatePath: tempDir,
+		}
+
+		gw := NewGateway(cfg, context.Background())
+
+		require.NotNil(t, gw.OSRoot, "OSRoot should be initialized when TemplatePath is valid")
+
+		safePath, err := gw.OSRoot.Ensure("test.tmpl")
+		require.NoError(t, err)
+		// OSRoot resolves symlinks, so compare against the resolved root rather
+		// than the raw TemplatePath (on macOS /var resolves to /private/var).
+		assert.Equal(t, filepath.Join(gw.OSRoot.RootPath(), "test.tmpl"), safePath)
+	})
+
+	t.Run("initialization fails with invalid TemplatePath", func(t *testing.T) {
+		cfg := config.Config{
+			TemplatePath: "/path/that/does/not/exist/12345",
+		}
+
+		gw := NewGateway(cfg, context.Background())
+
+		assert.Nil(t, gw.OSRoot, "OSRoot should be nil when TemplatePath is invalid")
+	})
+}
+
+func TestAfterConfSetup_AllowUnsafeBodyTransformTemplatePathsWarning(t *testing.T) {
+	const warning = "allow_unsafe_body_transform_template_paths is enabled"
+
+	hasWarning := func(t *testing.T, allowUnsafe bool) bool {
+		t.Helper()
+
+		// Other tests that go through StartTest drop the level to Error,
+		// which silences the Warn entries this test is checking for.
+		origLevel := log.GetLevel()
+		log.SetLevel(logrus.WarnLevel)
+		defer log.SetLevel(origLevel)
+
+		hook := &logrustest.Hook{}
+		log.AddHook(hook)
+		defer log.ReplaceHooks(make(logrus.LevelHooks))
+
+		gw := NewGateway(config.Config{AllowUnsafeBodyTransformTemplatePaths: allowUnsafe}, context.Background())
+		require.NoError(t, gw.afterConfSetup())
+
+		for _, e := range hook.AllEntries() {
+			if e.Level == logrus.WarnLevel && strings.Contains(e.Message, warning) {
+				return true
+			}
+		}
+		return false
+	}
+
+	t.Run("warns when enabled", func(t *testing.T) {
+		assert.True(t, hasWarning(t, true), "expected warning log about unsafe body transform template paths")
+	})
+
+	t.Run("does not warn when disabled", func(t *testing.T) {
+		assert.False(t, hasWarning(t, false), "unexpected warning log about unsafe body transform template paths")
+	})
 }

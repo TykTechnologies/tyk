@@ -154,7 +154,7 @@ type ErrorResponse struct {
 	// Body is the HTTP response body (literal or inline template).
 	Body string `bson:"body,omitempty" json:"body,omitempty"`
 
-	// Message is the semantic error message passed to templates as {{.Message}}.
+	// Message is the semantic error message passed to templates as `{{.Message}}`.
 	Message string `bson:"message,omitempty" json:"message,omitempty"`
 
 	// Template references an error template file in the templates/ directory.

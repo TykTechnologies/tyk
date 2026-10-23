@@ -35,11 +35,13 @@ output:
 # Tag linters with: testing, dev, or message with reason.
 linters:
   enable:
+    - depguard # debt: block deprecated imports that should not re-enter product code
     - forbidigo # debt: measure API leaks / dev: extend the list
     - govet # debt: don't want these defects in product
     - gochecknoinits # same, but exclusions apply for tests
     - errcheck # debt: measure checking errors
     - errorlint # debt: measure error handling improvements
+    - gosec # debt: measure security-sensitive filesystem and crypto usage
     - nilerr # debt: measure code that returns nil on non-nil error
     - revive # keep - measured for stats, shows code smells
     - gomodguard # keep - for dependency management/enforcement
@@ -63,6 +65,14 @@ linters:
         - time.Parse
         - strconv.ParseBool
         - strconv.ParseInt
+    depguard:
+      rules:
+        deprecated-stdlib:
+          files:
+            - "$all"
+          deny:
+            - pkg: "io/ioutil"
+              desc: "Use os and io packages instead (deprecated since Go 1.16)"
     forbidigo:
       forbid:
         - pattern: ^fmt\.Print.*$

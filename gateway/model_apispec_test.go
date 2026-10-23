@@ -180,3 +180,62 @@ func TestGetOAuth2Config_AcceptsDuplicatesAndReturnsOne(t *testing.T) {
 	assert.True(t, cfg.Enabled)
 	assert.Contains(t, []string{"corpOAuth", "altOAuth"}, name)
 }
+
+func TestAPISpecValidate_AllowsMCPServerExtensionOnPairedProxy(t *testing.T) {
+	doc := pairedMCPProxyOAS("proxy-1", "org-1", "rest-1")
+	doc.SetTykMCPServerExtension(&oas.TykMCPServer{
+		Primitives: []oas.TykMCPServerPrimitive{
+			{Source: oas.TykMCPServerSource{OperationID: "list_orders"}, Name: "orders"},
+		},
+	})
+
+	spec := &APISpec{
+		APIDefinition: &apidef.APIDefinition{
+			APIID: "proxy-1",
+			OrgID: "org-1",
+			IsOAS: true,
+			Proxy: apidef.ProxyConfig{TargetURL: oas.AdapterLoopURL("rest-1")},
+		},
+		OAS: *doc,
+	}
+
+	require.False(t, spec.IsMCP())
+	require.True(t, spec.IsMCPManaged())
+	require.NoError(t, spec.Validate(config.OASConfig{}))
+}
+
+func TestAPISpecValidate_ClassicMCPTrustedOrigins(t *testing.T) {
+	valid := &APISpec{APIDefinition: &apidef.APIDefinition{
+		ApplicationProtocol: apidef.AppProtocolMCP,
+		MCP:                 &apidef.MCPConfig{TrustedOrigins: []string{"https://client.example"}},
+	}}
+	require.NoError(t, valid.Validate(config.OASConfig{}))
+
+	invalid := &APISpec{APIDefinition: &apidef.APIDefinition{
+		ApplicationProtocol: apidef.AppProtocolMCP,
+		MCP:                 &apidef.MCPConfig{TrustedOrigins: []string{"null"}},
+	}}
+	assert.Error(t, invalid.Validate(config.OASConfig{}))
+
+	nonMCP := &APISpec{APIDefinition: &apidef.APIDefinition{
+		MCP: &apidef.MCPConfig{TrustedOrigins: []string{"https://client.example"}},
+	}}
+	assert.Error(t, nonMCP.Validate(config.OASConfig{}))
+
+	emptyNonMCP := &APISpec{APIDefinition: &apidef.APIDefinition{
+		MCP: &apidef.MCPConfig{},
+	}}
+	require.NoError(t, emptyNonMCP.Validate(config.OASConfig{}))
+
+	brokerNonMCP := &APISpec{APIDefinition: &apidef.APIDefinition{
+		MCP: &apidef.MCPConfig{OAuthBroker: &apidef.MCPOAuthBrokerConfig{}},
+	}}
+	require.NoError(t, brokerNonMCP.Validate(config.OASConfig{}))
+
+	configuredBrokerNonMCP := &APISpec{APIDefinition: &apidef.APIDefinition{
+		MCP: &apidef.MCPConfig{OAuthBroker: &apidef.MCPOAuthBrokerConfig{
+			PublicOrigin: "https://gateway.example",
+		}},
+	}}
+	assert.Error(t, configuredBrokerNonMCP.Validate(config.OASConfig{}))
+}

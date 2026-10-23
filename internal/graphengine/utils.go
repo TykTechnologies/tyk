@@ -2,6 +2,7 @@ package graphengine
 
 import (
 	"errors"
+	"io"
 	"net"
 	"net/http"
 
@@ -81,14 +82,14 @@ func granularAccessFailReasonAsHttpStatusCode(logger abstractlogger.Logger, resu
 		logger.Error(restrictedFieldValidationFailedLogMsg, abstractlogger.Error(result.InternalErr))
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	case GranularAccessFailReasonValidationError:
-		w.Header().Set(header.ContentType, header.ApplicationJSON)
-		w.WriteHeader(http.StatusBadRequest)
-		if result.writeErrorResponse != nil {
-			_, _ = result.writeErrorResponse(w, result.ValidationError)
-		}
-
 		logger.Debug(restrictedFieldValidationFailedLogMsg, abstractlogger.Error(result.ValidationError))
-		return errCustomBodyResponse, http.StatusBadRequest
+		write := result.writeErrorResponse
+		if write == nil {
+			write = func(w io.Writer, err error) (int, error) {
+				return graphql.RequestErrorsFromError(err).WriteResponse(w)
+			}
+		}
+		return GraphQlError{err: result.ValidationError, write: write}, http.StatusBadRequest
 	case GranularAccessFailReasonIntrospectionDisabled:
 		w.WriteHeader(http.StatusForbidden)
 		logger.Debug("introspection disabled")
@@ -141,10 +142,14 @@ func additionalUpstreamHeaders(logger abstractlogger.Logger, outreq *http.Reques
 	}
 
 	// When StripAuthData is false, propagate auth headers from the original request
-	// to the upstream. For regular proxy-only queries the transport layer also
-	// forwards headers via setProxyOnlyHeaders, but the headerModifier guards
-	// against double-writes (only sets when absent). For proxy-only subscriptions,
-	// the transport path is not used so this is the only propagation point.
+	// to the upstream. This is the only propagation point for a proxy-only websocket
+	// upgrade, where the transport is not involved at all.
+	//
+	// Every other proxy-only path also reaches setProxyOnlyHeaders, which forwards the
+	// consumer's headers again, so this writes a value that is about to be written a
+	// second time. The only-when-absent guard in the header modifier does not prevent
+	// that: it runs while the fetch input is built, long before the transport adds
+	// anything. setProxyOnlyHeaders is what drops the duplicate.
 	if !apiDefinition.StripAuthData {
 		propagateAuthHeaders(outreq, upstreamHeaders, apiDefinition)
 	}

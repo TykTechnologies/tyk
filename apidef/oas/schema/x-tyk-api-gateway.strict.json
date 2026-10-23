@@ -1,6 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-04/schema#",
   "type": "object",
+  "description": "Tyk Gateway API configuration extension. Note: OAuth 2.0 security features (OAuth2ScopeCheck, OAuth2TokenExchange, OAuth2ProtectedResourceMetadata) have been moved to the security scheme level. Configure them under components.securitySchemes[<name>].x-tyk-api-gateway.oauth2 instead of the top-level extension.",
   "properties": {
     "info": {
       "$ref": "#/definitions/X-Tyk-Info"
@@ -276,7 +277,8 @@
             "python",
             "lua",
             "grpc",
-            "goplugin"
+            "goplugin",
+            "javascript"
           ]
         },
         "bundle": {
@@ -315,6 +317,15 @@
         },
         "path": {
           "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "pluginId": {
+          "type": "string"
+        },
+        "pluginHash": {
+          "type": "string"
         }
       },
       "required": [
@@ -350,6 +361,15 @@
           "type": "string"
         },
         "path": {
+          "type": "string"
+        },
+        "code": {
+          "type": "string"
+        },
+        "pluginId": {
+          "type": "string"
+        },
+        "pluginHash": {
           "type": "string"
         },
         "rawBodyOnly": {
@@ -1427,6 +1447,57 @@
       ],
       "additionalProperties": false
     },
+    "X-Tyk-MCP": {
+      "type": "object",
+      "properties": {
+        "oauthBroker": {
+          "$ref": "#/definitions/X-Tyk-MCP-OAuthBroker"
+        },
+        "trustedOrigins": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": [
+            {
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "X-Tyk-MCP-OAuthBroker": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "publicOrigin": {
+          "type": "string"
+        },
+        "publicResource": {
+          "type": "string"
+        },
+        "upstreamResource": {
+          "type": "string"
+        },
+        "trustedEndpointOrigins": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": [
+            {
+              "type": "string"
+            }
+          ]
+        },
+        "allowInsecureLoopback": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
     "X-Tyk-Server": {
       "type": "object",
       "properties": {
@@ -1454,6 +1525,9 @@
         },
         "detailedTracing": {
           "$ref": "#/definitions/X-Tyk-DetailedTracing"
+        },
+        "mcp": {
+          "$ref": "#/definitions/X-Tyk-MCP"
         },
         "eventHandlers": {
           "type": "array",
@@ -1541,6 +1615,9 @@
         "loadBalancing": {
           "$ref": "#/definitions/X-Tyk-LoadBalancing"
         },
+        "dnsDiscovery": {
+          "$ref": "#/definitions/X-Tyk-DNSDiscovery"
+        },
         "preserveHostHeader": {
           "$ref": "#/definitions/X-Tyk-PreserveHostHeader"
         },
@@ -1567,6 +1644,58 @@
           "required": [
             "loadBalancing"
           ]
+        }
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "loadBalancing": {
+                "properties": {
+                  "enabled": {
+                    "const": true
+                  }
+                },
+                "required": [
+                  "enabled"
+                ]
+              }
+            },
+            "required": [
+              "loadBalancing"
+            ],
+            "not": {
+              "properties": {
+                "dnsDiscovery": {
+                  "properties": {
+                    "enabled": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "enabled"
+                  ]
+                }
+              },
+              "required": [
+                "dnsDiscovery"
+              ]
+            }
+          },
+          "then": {
+            "properties": {
+              "loadBalancing": {
+                "properties": {
+                  "targets": {
+                    "minItems": 1
+                  }
+                },
+                "required": [
+                  "targets"
+                ]
+              }
+            }
+          }
         }
       ],
       "additionalProperties": false
@@ -2167,7 +2296,10 @@
         },
         "grantType": {
           "type": "string",
-          "enum": ["token-exchange", "jwt-bearer"],
+          "enum": [
+            "token-exchange",
+            "jwt-bearer"
+          ],
           "description": "Grant the exchange request uses. Defaults to token-exchange (the RFC 8693 grant). Set jwt-bearer (RFC 7523) for identity providers that implement delegation on that grant: the inbound token is sent as assertion and the target audience/scopes are rendered into scope."
         },
         "issuers": {
@@ -2904,6 +3036,13 @@
             "clientSecret": {
               "$ref": "#/definitions/X-Tyk-NonEmptyString"
             },
+            "method": {
+              "type": "string",
+              "enum": [
+                "client_secret_basic",
+                "client_secret_post"
+              ]
+            },
             "tokenUrl": {
               "$ref": "#/definitions/X-Tyk-NonEmptyString"
             },
@@ -2937,6 +3076,13 @@
             },
             "clientSecret": {
               "$ref": "#/definitions/X-Tyk-NonEmptyString"
+            },
+            "method": {
+              "type": "string",
+              "enum": [
+                "client_secret_basic",
+                "client_secret_post"
+              ]
             },
             "tokenUrl": {
               "$ref": "#/definitions/X-Tyk-NonEmptyString"
@@ -3059,6 +3205,42 @@
       ],
       "additionalProperties": false
     },
+    "X-Tyk-DNSDiscovery": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "refreshInterval": {
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
+        },
+        "staleTTL": {
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
+        },
+        "connectionDraining": {
+          "$ref": "#/definitions/X-Tyk-ConnectionDraining"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
+    "X-Tyk-ConnectionDraining": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "timeout": {
+          "$ref": "#/definitions/X-Tyk-ReadableDuration"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "additionalProperties": false
+    },
     "X-Tyk-LoadBalancing": {
       "type": "object",
       "properties": {
@@ -3079,27 +3261,6 @@
       },
       "required": [
         "enabled"
-      ],
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "enabled": {
-                "const": true
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "targets": {
-                "minItems": 1
-              }
-            },
-            "required": [
-              "targets"
-            ]
-          }
-        }
       ],
       "additionalProperties": false
     },

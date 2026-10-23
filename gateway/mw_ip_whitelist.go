@@ -5,6 +5,8 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/TykTechnologies/tyk/ctx"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/request"
 )
 
@@ -49,6 +51,7 @@ func (i *IPWhiteListMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Re
 	}
 
 	// Fire Authfailed Event
+	ctx.SetErrorClassification(r, tykerrors.NewErrorClassification(tykerrors.IPB, "ip_not_allowed").WithSource(i.Name()))
 	AuthFailed(i, r, remoteIP.String())
 	// Report in health check
 	reportHealthValue(i.Spec, KeyFailure, "-1")

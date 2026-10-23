@@ -1,16 +1,55 @@
 package gateway
 
 import (
+	"net/http"
 	stdregexp "regexp"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/jsonrpc"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/user"
 )
 
 const oasJSONRPCMethodOperationPrefix = "json-rpc-method:"
+
+func credentialSpecificMCPFilteringApplies(spec *APISpec, req *http.Request, ses *user.SessionState) bool {
+	if spec == nil || req == nil || ses == nil || !spec.IsMCP() {
+		return false
+	}
+
+	state := httpctx.GetJSONRPCRoutingState(req)
+	if state == nil {
+		return false
+	}
+	if cfg := listConfigForMCPMethod(state.Method); cfg != nil {
+		return !sessionMCPRules(spec, ses, cfg).IsEmpty()
+	}
+	if state.Method == mcp.MethodInitialize {
+		return !sessionJSONRPCMethodRules(spec, ses).IsEmpty()
+	}
+	if state.Method == mcp.MethodServerDiscover {
+		return !sessionJSONRPCMethodRules(spec, ses).IsEmpty()
+	}
+	return false
+}
+
+func discoveryJSONRPCRuleSets(spec *APISpec, ses *user.SessionState) (global, credential []user.AccessControlRules) {
+	if rules := oasJSONRPCMethodRules(spec); !rules.IsEmpty() {
+		global = append(global, rules)
+	}
+	if rules := sessionJSONRPCMethodRules(spec, ses); !rules.IsEmpty() {
+		credential = append(credential, rules)
+	}
+	return global, credential
+}
+
+func markMCPResponseEdited(req *http.Request) {
+	if options := ctxGetCacheOptions(req); options != nil {
+		options.responseEdited = true
+	}
+}
 
 func effectiveMCPListRuleSets(spec *APISpec, ses *user.SessionState, cfg *mcp.ListFilterConfig) []user.AccessControlRules {
 	ruleSets := make([]user.AccessControlRules, 0, 2)

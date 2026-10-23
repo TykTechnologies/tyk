@@ -909,6 +909,106 @@ func TestReverseProxyPreHandlerV1_PreHandle(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, ReverseProxyTypePreFlight, result)
 	})
+
+	t.Run("should attach the round tripper and the headers config to the request context", func(t *testing.T) {
+		request, err := http.NewRequest(http.MethodPost, "http://example.com", nil)
+		require.NoError(t, err)
+
+		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t, apidef.GraphQLExecutionModeProxyOnly)
+		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(_ *http.Request) *graphql.Request {
+			return &graphql.Request{Query: `{ hello }`}
+		}
+		headersConfig := ReverseProxyHeadersConfig{
+			ProxyOnly: ProxyOnlyHeadersConfig{UseImmutableHeaders: true},
+		}
+
+		_, err = reverseProxyPreHandler.PreHandle(ReverseProxyParams{
+			OutRequest:    request,
+			NeedsEngine:   true,
+			RoundTripper:  taggedRoundTripper("caller"),
+			HeadersConfig: headersConfig,
+		})
+		require.NoError(t, err)
+
+		// The values have to be readable through the request the caller owns.
+		values := getGraphQLEngineTransportContextValue(request.Context())
+		require.NotNil(t, values)
+		assert.Equal(t, taggedRoundTripper("caller"), values.roundTripper)
+		assert.Equal(t, headersConfig, values.headersConfig)
+	})
+
+	t.Run("should attach the round tripper on a request that does not reach the engine", func(t *testing.T) {
+		request, err := http.NewRequest(http.MethodOptions, "http://example.com", nil)
+		require.NoError(t, err)
+
+		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t, apidef.GraphQLExecutionModeProxyOnly)
+		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(_ *http.Request) *graphql.Request {
+			return nil
+		}
+
+		result, err := reverseProxyPreHandler.PreHandle(ReverseProxyParams{
+			OutRequest:      request,
+			IsCORSPreflight: true,
+			RoundTripper:    taggedRoundTripper("caller"),
+		})
+		require.NoError(t, err)
+		require.Equal(t, ReverseProxyTypePreFlight, result)
+
+		values := getGraphQLEngineTransportContextValue(request.Context())
+		require.NotNil(t, values)
+		assert.Equal(t, taggedRoundTripper("caller"), values.roundTripper)
+	})
+
+	t.Run("should not modify the transport of the shared http client", func(t *testing.T) {
+		request, err := http.NewRequest(http.MethodPost, "http://example.com", nil)
+		require.NoError(t, err)
+
+		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t, apidef.GraphQLExecutionModeProxyOnly)
+		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(_ *http.Request) *graphql.Request {
+			return &graphql.Request{Query: `{ hello }`}
+		}
+		configureGraphQLEngineHTTPClient(
+			reverseProxyPreHandler.httpClient,
+			DetermineGraphQLEngineTransportType(reverseProxyPreHandler.apiDefinition),
+			testReusableReadCloser,
+		)
+		configuredTransport := reverseProxyPreHandler.httpClient.Transport
+
+		_, err = reverseProxyPreHandler.PreHandle(ReverseProxyParams{
+			OutRequest:   request,
+			NeedsEngine:  true,
+			RoundTripper: taggedRoundTripper("caller"),
+		})
+		require.NoError(t, err)
+
+		assert.Same(t, configuredTransport, reverseProxyPreHandler.httpClient.Transport)
+	})
+
+	t.Run("should keep the round tripper of every request when called more than once", func(t *testing.T) {
+		reverseProxyPreHandler := newTestReverseProxyPreHandlerV1(t, apidef.GraphQLExecutionModeProxyOnly)
+		reverseProxyPreHandler.ctxRetrieveGraphQLRequest = func(_ *http.Request) *graphql.Request {
+			return &graphql.Request{Query: `{ hello }`}
+		}
+
+		requests := make([]*http.Request, 0, 2)
+		for _, tag := range []string{"caller-a", "caller-b"} {
+			request, err := http.NewRequest(http.MethodPost, "http://example.com", nil)
+			require.NoError(t, err)
+			_, err = reverseProxyPreHandler.PreHandle(ReverseProxyParams{
+				OutRequest:   request,
+				NeedsEngine:  true,
+				RoundTripper: taggedRoundTripper(tag),
+			})
+			require.NoError(t, err)
+			requests = append(requests, request)
+		}
+
+		for i, tag := range []string{"caller-a", "caller-b"} {
+			values := getGraphQLEngineTransportContextValue(requests[i].Context())
+			require.NotNil(t, values)
+			assert.Equal(t, taggedRoundTripper(tag), values.roundTripper)
+		}
+	})
 }
 
 func newTestGraphqlRequestProcessorV1(t *testing.T) *graphqlRequestProcessorV1 {

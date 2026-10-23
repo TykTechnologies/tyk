@@ -263,7 +263,15 @@ func TestReverseProxyDnsCache(t *testing.T) {
 	)
 
 	ts := StartTest(nil)
-	ts.MockHandle, _ = test.InitDNSMock(etcHostsMap, nil)
+	// Take a handle on the process-wide mock without registering anything.
+	// flakySetupTestReverseProxyDnsCache pushes etcHostsMap below and pulls it
+	// again on teardown. Registering here as well would append each address to
+	// itself, so every lookup would answer with the list twice over.
+	var mockErr error
+	ts.MockHandle, mockErr = test.InitDNSMock(map[string][]string{}, nil)
+	if mockErr != nil {
+		t.Fatalf("init dns mock: %v", mockErr)
+	}
 	defer ts.Close()
 	defer func() {
 		_ = ts.MockHandle.ShutdownDnsMock()
@@ -1116,7 +1124,13 @@ func TestGraphQL_UDGHeaders(t *testing.T) {
 					strings.Contains(string(b), `{"name":"Context","value":"request-context"}`) &&
 					strings.Contains(string(b), `{"name":"Global-Static","value":"foobar"}`) &&
 					strings.Contains(string(b), `{"name":"Global-Context","value":"follow-up-request-global-context"}`) &&
-					strings.Contains(string(b), `{"name":"Does-Exist-Already","value":"ds-does-exist-already"}`)
+					strings.Contains(string(b), `{"name":"Does-Exist-Already","value":"ds-does-exist-already"}`) &&
+					// A header with more than one value has to keep all of them. The round
+					// tripper that used to resolve variables on the way to the upstream read
+					// with Get and wrote with Set, so it collapsed this to gzip alone.
+					strings.Contains(string(b), `{"name":"Accept-Encoding","value":"gzip"}`) &&
+					strings.Contains(string(b), `{"name":"Accept-Encoding","value":"deflate"}`) &&
+					strings.Contains(string(b), `{"name":"Accept-Encoding","value":"br"}`)
 			},
 		},
 	}...)
@@ -1187,6 +1201,107 @@ func TestGraphQL_ProxyOnlyHeaders(t *testing.T) {
 			Path: "/",
 			Headers: map[string]string{
 				"Test-Header": "test-value",
+			},
+			Method: http.MethodPost,
+			Data: graphql.Request{
+				Query: gqlContinentQuery,
+			},
+		})
+		assert.NoError(t, err)
+	})
+
+	t.Run("test context variable request headers rewrite", func(t *testing.T) {
+		// request_headers_rewrite is applied by the engine transport, after the header
+		// modifier has already finalised the fetch headers, so it is resolved where the
+		// rules are built instead. See handleGraphQL.
+		spec := defaultSpec
+		spec.GraphQL.Proxy.RequestHeadersRewrite = map[string]apidef.RequestHeadersRewriteConfig{
+			"X-Rewritten": {Value: "$tyk_context.headers_Test_Header"},
+		}
+		spec.EnableContextVars = true
+		g.Gw.LoadAPI(spec)
+		g.AddDynamicHandler("/dynamic", func(writer http.ResponseWriter, r *http.Request) {
+			if !headerCheck("X-Rewritten", "test-value", r.Header) {
+				t.Errorf("rewritten header not resolved, got %q", r.Header.Get("X-Rewritten"))
+			}
+		})
+		_, err := g.Run(t, test.TestCase{
+			Path: "/",
+			Headers: map[string]string{
+				"Test-Header": "test-value",
+			},
+			Method: http.MethodPost,
+			Data: graphql.Request{
+				Query: gqlContinentQuery,
+			},
+		})
+		assert.NoError(t, err)
+	})
+
+	t.Run("the consumer's credential reaches the upstream once", func(t *testing.T) {
+		// Two writers put it there and neither knows about the other: with strip_auth_data
+		// off the engine adds the consumer's auth header to the fetch input through
+		// propagateAuthHeaders, and setProxyOnlyHeaders then forwards the consumer's
+		// headers again. The upstream used to receive the credential twice.
+		spec := defaultSpec
+		spec.GraphQL.Proxy.RequestHeadersRewrite = nil
+		spec.UseKeylessAccess = false
+		spec.UseStandardAuth = true
+		spec.StripAuthData = false
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			apidef.AuthTokenType: {AuthHeaderName: "X-API-KEY"},
+		}
+		g.Gw.LoadAPI(spec)
+
+		_, authKey := g.CreateSession(func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{
+				spec.APIID: {APIName: spec.Name, APIID: spec.APIID, Versions: []string{"Default"}},
+			}
+			s.OrgID = spec.OrgID
+		})
+
+		g.AddDynamicHandler("/dynamic", func(writer http.ResponseWriter, r *http.Request) {
+			values := r.Header.Values("X-Api-Key")
+			if len(values) != 1 {
+				t.Errorf("upstream received X-Api-Key %d times: %v", len(values), values)
+				return
+			}
+			if values[0] != authKey {
+				t.Errorf("upstream received the wrong credential: %q", values[0])
+			}
+		})
+		_, err := g.Run(t, test.TestCase{
+			Path: "/",
+			Headers: map[string]string{
+				"X-API-KEY": authKey,
+			},
+			Method: http.MethodPost,
+			Data: graphql.Request{
+				Query: gqlContinentQuery,
+			},
+		})
+		assert.NoError(t, err)
+	})
+
+	t.Run("a variable inside a header the caller sent is not expanded", func(t *testing.T) {
+		// Only values that come from the API definition are resolved. A round tripper that
+		// walked every outgoing header used to sit on this path and expanded whatever the
+		// caller had put in one, which let a caller read the context of their own session
+		// back out of the upstream request. See handleGraphQL.
+		spec := defaultSpec
+		spec.GraphQL.Proxy.RequestHeadersRewrite = nil
+		spec.EnableContextVars = true
+		g.Gw.LoadAPI(spec)
+		g.AddDynamicHandler("/dynamic", func(writer http.ResponseWriter, r *http.Request) {
+			if !headerCheck("X-Injection-Probe", "$tyk_context.headers_Test_Header", r.Header) {
+				t.Errorf("caller supplied variable was expanded, got %q", r.Header.Get("X-Injection-Probe"))
+			}
+		})
+		_, err := g.Run(t, test.TestCase{
+			Path: "/",
+			Headers: map[string]string{
+				"Test-Header":       "test-value",
+				"X-Injection-Probe": "$tyk_context.headers_Test_Header",
 			},
 			Method: http.MethodPost,
 			Data: graphql.Request{
@@ -1790,9 +1905,11 @@ func TestEnsureTransport(t *testing.T) {
 		{"http://httpbin.org:80 ", "https", "http://httpbin.org:80"},
 		{"httpbin.org:2000 ", "tls", "tls://httpbin.org:2000"},
 		{"httpbin.org:2000 ", "", "http://httpbin.org:2000"},
-		// This is the h2c proto to http conversion
+		// Only an inherited h2c scheme is coalesced. An explicit h2c://
+		// target survives, or enabling load balancing would downgrade an h2c
+		// upstream to HTTP/1.1.
 		{"http://httpbin.org ", "h2c", "http://httpbin.org"},
-		{"h2c://httpbin.org ", "h2c", "http://httpbin.org"},
+		{"h2c://httpbin.org ", "h2c", "h2c://httpbin.org"},
 		{"httpbin.org ", "h2c", "http://httpbin.org"},
 		// This is the default parse section
 		{"https://httpbin.org ", "https", "https://httpbin.org"},
@@ -2588,6 +2705,62 @@ func TestTimeoutPrioritization(t *testing.T) {
 	})
 }
 
+func TestTimeoutCachingBugFix(t *testing.T) {
+	ts := StartTest(func(c *config.Config) {
+		c.ProxyDefaultTimeout = 0.02 // Default transport timeout: 20ms
+	})
+	defer ts.Close()
+
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if strings.HasPrefix(r.URL.Path, "/default") {
+			time.Sleep(10 * time.Millisecond)
+			_, err := w.Write([]byte("Default OK"))
+			assert.NoError(t, err)
+		} else if strings.HasPrefix(r.URL.Path, "/enforced") {
+			time.Sleep(30 * time.Millisecond) // Delay (30ms) is BETWEEN default (20ms) and enforced (50ms)
+			_, err := w.Write([]byte("Enforced OK"))
+			assert.NoError(t, err)
+		}
+	}))
+	defer upstream.Close()
+
+	api := BuildAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/"
+		spec.Proxy.TargetURL = upstream.URL
+		spec.EnforcedTimeoutEnabled = true
+		UpdateAPIVersion(spec, "", func(version *apidef.VersionInfo) {
+			version.UseExtendedPaths = true
+			version.ExtendedPaths.HardTimeouts = []apidef.HardTimeoutMeta{
+				{
+					Path:            "/enforced",
+					Method:          http.MethodGet,
+					TimeoutDuration: tyktime.ReadableDuration(50 * time.Millisecond), // Enforced timeout: 50ms
+				},
+			}
+		})
+	})[0]
+	ts.Gw.LoadAPI(api)
+
+	// REQUEST 1: Endpoint WITHOUT enforced timeout.
+	// This forces the creation and caching of the transport.
+	_, _ = ts.Run(t, test.TestCase{
+		Method:    http.MethodGet,
+		Path:      "/default",
+		Code:      http.StatusOK,
+		BodyMatch: "Default OK",
+	})
+
+	// REQUEST 2: Endpoint WITH enforced timeout (50ms).
+	// Delay is 30ms. Since 30ms < 50ms, it should SUCCEED.
+	// If the bug exists, the cached transport (20ms) will kill this request, returning 504.
+	_, _ = ts.Run(t, test.TestCase{
+		Method:    http.MethodGet,
+		Path:      "/enforced",
+		Code:      http.StatusOK,
+		BodyMatch: "Enforced OK",
+	})
+}
+
 func TestAPILevelTimeout(t *testing.T) {
 	t.Parallel()
 
@@ -2833,4 +3006,49 @@ func getResponseForGivenURL(r *http.Request, sResp string, msResp string) string
 	}
 
 	return ""
+}
+
+// Master declared targetQuery outside the director closure and assigned it from
+// inside, so every request on a load-balanced API wrote one shared variable and
+// one request's query string could surface on another's. Run under -race.
+func TestDirector_TargetQueryIsPerRequest(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	targets := []string{
+		"http://upstream-a.example.com/?from=a",
+		"http://upstream-b.example.com/?from=b",
+	}
+
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	spec.Proxy.EnableLoadBalancing = true
+	spec.Proxy.Targets = targets
+	spec.Proxy.StructuredTargetList = apidef.NewHostListFromList(targets)
+
+	target, err := url.Parse("http://upstream-a.example.com/?from=configured")
+	if err != nil {
+		t.Fatal(err)
+	}
+	proxy := ts.Gw.TykNewSingleHostReverseProxy(target, spec, nil)
+
+	var wg sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+
+			own := fmt.Sprintf("req=%d", i)
+			req := TestReq(t, http.MethodGet, "http://gateway/path?"+own, nil)
+			proxy.Director(req)
+
+			if !strings.Contains(req.URL.RawQuery, own) {
+				t.Errorf("request %d lost its own query string, got %q", i, req.URL.RawQuery)
+			}
+			if strings.Contains(req.URL.RawQuery, "req=") &&
+				strings.Count(req.URL.RawQuery, "req=") != 1 {
+				t.Errorf("request %d carries another request's query: %q", i, req.URL.RawQuery)
+			}
+		}(i)
+	}
+	wg.Wait()
 }

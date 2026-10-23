@@ -9,15 +9,16 @@ import (
 	"strings"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	temporalmodel "github.com/TykTechnologies/storage/temporal/model"
+
 	"github.com/TykTechnologies/tyk/certs"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/pkg/errpack"
 	"github.com/TykTechnologies/tyk/rpc"
-
 	"github.com/TykTechnologies/tyk/storage"
-
-	"github.com/sirupsen/logrus"
 )
 
 var (
@@ -178,26 +179,23 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 	}
 
 	r.Gw.getHostDetails()
+	meta := r.Gw.nodeMetadata()
 	node := model.NodeData{
 		NodeID:          r.Gw.GetNodeID(),
 		GroupID:         config.SlaveOptions.GroupID,
 		APIKey:          config.SlaveOptions.APIKey,
-		NodeVersion:     VERSION,
+		NodeVersion:     meta.Version,
 		TTL:             intCheckDuration,
-		NodeIsSegmented: config.DBAppConfOptions.NodeIsSegmented,
-		Tags:            config.DBAppConfOptions.Tags,
+		NodeIsSegmented: meta.IsSegmented,
+		Tags:            meta.Tags,
 		Health:          r.Gw.getHealthCheckInfo(),
 		Stats: model.GWStats{
-			APIsCount:      r.Gw.apisByIDLen(),
-			PoliciesCount:  r.Gw.policies.PolicyCount(),
+			APIsCount:      meta.APIsCount,
+			PoliciesCount:  meta.PoliciesCount,
 			LoadedAPIs:     r.Gw.GetLoadedAPIIDs(),
 			LoadedPolicies: r.Gw.GetLoadedPolicyIDs(),
 		},
-		HostDetails: model.HostDetails{
-			Hostname: r.Gw.hostDetails.Hostname,
-			PID:      r.Gw.hostDetails.PID,
-			Address:  r.Gw.hostDetails.Address,
-		},
+		HostDetails: meta.HostDetails,
 	}
 
 	data, err := json.Marshal(node)
@@ -400,6 +398,16 @@ func (r *RPCStorageHandler) SetKey(keyName, session string, timeout int64) error
 
 func (r *RPCStorageHandler) SetRawKey(keyName, session string, timeout int64) error {
 	return nil
+}
+
+func (r *RPCStorageHandler) SetKeyEx(keyName, session string, timeout int64) error {
+	_, _, _ = keyName, session, timeout
+	return errpack.ErrNotImplemented
+}
+
+func (r *RPCStorageHandler) SetRawKeyEx(keyName, session string, timeout int64) error {
+	_, _, _ = keyName, session, timeout
+	return errpack.ErrNotImplemented
 }
 
 // Decrement will decrement a key in redis

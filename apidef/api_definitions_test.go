@@ -271,6 +271,48 @@ func TestAPIDefinition_MarkAsMCP(t *testing.T) {
 	})
 }
 
+func TestAPIDefinition_IsPairedMCPAdapterProxy(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		target string
+		want   bool
+	}{
+		{
+			name:   "canonical mcp path target",
+			target: "tyk://rest-1/mcp",
+			want:   true,
+		},
+		{
+			name:   "id-prefixed mcp path target",
+			target: "tyk://id:rest-1/mcp/",
+			want:   true,
+		},
+		{
+			name:   "fallback suffix target",
+			target: "tyk://rest-1__mcp-server",
+			want:   true,
+		},
+		{
+			name:   "non mcp path target",
+			target: "tyk://rest-1/not-mcp",
+			want:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			api := &APIDefinition{Proxy: ProxyConfig{TargetURL: tt.target}}
+
+			assert.Equal(t, tt.want, api.IsPairedMCPAdapterProxy())
+		})
+	}
+}
+
 func TestSchema(t *testing.T) {
 	schemaLoader := gojsonschema.NewBytesLoader([]byte(Schema))
 
@@ -346,6 +388,92 @@ func TestSchema_GlobalEnforceTimeout(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, result.Valid(), result.Errors())
 	})
+}
+
+func TestSchema_DNSDiscovery(t *testing.T) {
+	schemaLoader := gojsonschema.NewBytesLoader([]byte(Schema))
+
+	validate := func(t *testing.T, dnsDiscovery string) *gojsonschema.Result {
+		t.Helper()
+
+		spec := DummyAPI()
+		data, err := json.Marshal(spec)
+		require.NoError(t, err)
+
+		var doc map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(data, &doc))
+
+		var proxy map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(doc["proxy"], &proxy))
+		proxy["dns_discovery"] = json.RawMessage(dnsDiscovery)
+
+		doc["proxy"], err = json.Marshal(proxy)
+		require.NoError(t, err)
+		data, err = json.Marshal(doc)
+		require.NoError(t, err)
+
+		result, err := gojsonschema.Validate(schemaLoader, gojsonschema.NewBytesLoader(data))
+		require.NoError(t, err)
+		return result
+	}
+
+	t.Run("default definition passes schema", func(t *testing.T) {
+		spec := DummyAPI()
+		spec.Proxy.DNSDiscovery = DNSDiscoveryConfig{
+			Enabled:            true,
+			RefreshInterval:    tyktime.ReadableDuration(10 * time.Second),
+			ConnectionDraining: &ConnectionDrainingConfig{Enabled: true},
+		}
+
+		result, err := gojsonschema.Validate(schemaLoader, gojsonschema.NewGoLoader(spec))
+		require.NoError(t, err)
+		assert.True(t, result.Valid(), result.Errors())
+	})
+
+	validCases := map[string]string{
+		"valid durations": `{"enabled": true, "refresh_interval": "10s", "stale_ttl": "2m", "connection_draining": {"enabled": true, "timeout": "1m30s"}}`,
+		"empty durations": `{"enabled": true, "refresh_interval": "", "stale_ttl": "", "connection_draining": {"enabled": true, "timeout": ""}}`,
+		"zero durations":  `{"enabled": true, "refresh_interval": "0s", "stale_ttl": "0s"}`,
+		"null block":      `null`,
+	}
+
+	for name, dnsDiscovery := range validCases {
+		t.Run(name+" pass schema", func(t *testing.T) {
+			result := validate(t, dnsDiscovery)
+			assert.True(t, result.Valid(), result.Errors())
+		})
+	}
+
+	invalidCases := map[string]struct {
+		dnsDiscovery string
+		field        string
+	}{
+		"malformed refresh_interval": {
+			dnsDiscovery: `{"enabled": true, "refresh_interval": "invalid"}`,
+			field:        "proxy.dns_discovery.refresh_interval",
+		},
+		"negative stale_ttl": {
+			dnsDiscovery: `{"enabled": true, "stale_ttl": "-10s"}`,
+			field:        "proxy.dns_discovery.stale_ttl",
+		},
+		"malformed connection_draining.timeout": {
+			dnsDiscovery: `{"enabled": true, "connection_draining": {"enabled": true, "timeout": "30sec"}}`,
+			field:        "proxy.dns_discovery.connection_draining.timeout",
+		},
+		"non-string refresh_interval": {
+			dnsDiscovery: `{"enabled": true, "refresh_interval": 10}`,
+			field:        "proxy.dns_discovery.refresh_interval",
+		},
+	}
+
+	for name, tc := range invalidCases {
+		t.Run(name+" fails schema", func(t *testing.T) {
+			result := validate(t, tc.dnsDiscovery)
+			require.False(t, result.Valid())
+			require.Len(t, result.Errors(), 1)
+			assert.Equal(t, tc.field, result.Errors()[0].Field())
+		})
+	}
 }
 
 func TestStringRegexMap(t *testing.T) {
@@ -462,6 +590,49 @@ func TestAPIDefinition_GenerateAPIID(t *testing.T) {
 	a := APIDefinition{}
 	a.GenerateAPIID()
 	assert.NotEmpty(t, a.APIID)
+}
+
+func TestAPIDefinition_ValidListenPath(t *testing.T) {
+	tests := []struct {
+		name       string
+		listenPath string
+		want       string
+	}{
+		{"empty", "", ""},
+		{"already has leading slash", "/foo", "/foo"},
+		{"missing leading slash", "foo", "/foo"},
+		{"root", "/", "/"},
+		{"env reference", "env://FOO", "env://FOO"},
+		{"secrets reference", "secrets://foo", "secrets://foo"},
+		{"consul reference", "consul://foo", "consul://foo"},
+		{"vault reference", "vault://secret/data/foo", "vault://secret/data/foo"},
+		{"file reference", "file:///etc/tyk/foo", "file:///etc/tyk/foo"},
+		{"env reference containing traversal is left untouched", "env://../FOO", "env://../FOO"},
+
+		// trailing slash is preserved, since it's significant for strict-route matching
+		{"trailing slash preserved", "/foo/", "/foo/"},
+		{"missing leading slash with trailing slash", "foo/", "/foo/"},
+
+		// "." / ".." segments are resolved
+		{"traversal to root", "..", "/"},
+		{"traversal to root with leading slash", "/..", "/"},
+		{"traversal above root collapses to root", "/../..", "/"},
+		{"traversal within path", "/foo/../bar", "/bar"},
+		{"traversal within path with trailing slash", "/foo/../bar/", "/bar/"},
+		{"traversal to root with trailing slash stays root", "/../", "/"},
+		{"current dir segment resolved", "/foo/./bar", "/foo/bar"},
+		{"trailing current dir segment resolved", "/foo/.", "/foo"},
+		{"duplicate slashes collapsed", "//foo//bar", "/foo/bar"},
+		{"traversal substring without dot segment is untouched", "/foo..bar", "/foo..bar"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			a := &APIDefinition{}
+			a.Proxy.ListenPath = tt.listenPath
+			assert.Equal(t, tt.want, a.ValidListenPath())
+		})
+	}
 }
 
 func TestAPIDefinition_GetScopeClaimName(t *testing.T) {

@@ -509,6 +509,9 @@
         "enable_detailed_recording": {
           "type": "boolean"
         },
+        "allow_unsafe_detailed_logs": {
+          "type": "boolean"
+        },
         "purge_interval": {
           "type": "number"
         },
@@ -620,6 +623,10 @@
     },
     "proxy_close_connections": {
       "type": "boolean"
+    },
+    "apply_strip_listen_path_to_url_rewrite": {
+      "type": "boolean",
+      "default": false
     },
     "close_idle_connections": {
       "type": "boolean"
@@ -954,6 +961,12 @@
         },
         "xff_depth": {
           "type": "integer"
+        },
+        "trusted_proxy_cidrs": {
+          "type": ["array", "null"],
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -1630,6 +1643,24 @@
               "type": "string"
             }
           }
+        },
+        "stores": {
+          "type": ["object", "null"],
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "type": {
+                "type": "string"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "config": {
+                "type": ["object", "null"]
+              }
+            }
+          }
         }
       }
     },
@@ -1695,6 +1726,18 @@
       "default": "quotas"
     },
     "allow_unsafe_policy_ids": {
+      "type": ["boolean", "null"],
+      "additionalProperties": false
+    },
+    "allow_unsafe_webhook_template_paths": {
+      "type": ["boolean", "null"],
+      "additionalProperties": false
+    },
+    "allow_unsafe_api_ids": {
+      "type": ["boolean", "null"],
+      "additionalProperties": false
+    },
+    "allow_unsafe_body_transform_template_paths": {
       "type": ["boolean", "null"],
       "additionalProperties": false
     },

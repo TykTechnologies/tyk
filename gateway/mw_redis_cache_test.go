@@ -6,8 +6,10 @@ import (
 	"encoding/hex"
 	"fmt"
 	"hash"
+	"io"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -24,6 +26,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/otel"
+	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
@@ -120,11 +123,7 @@ func TestRedisCacheMiddleware(t *testing.T) {
 	check := func(t *testing.T, p params) {
 		subCheck := func(t *testing.T, cachingActive bool, p params) {
 			t.Helper()
-			headersMatch := make(map[string]string)
-			if cachingActive {
-				headersMatch["x-tyk-cached-response"] = "1"
-				p.transferEncoding = nil
-			}
+			requestPath := p.path + "?cache-test=" + uuid.NewHex()
 
 			ts.Gw.Analytics.mockRecordHit = func(record *analytics.AnalyticsRecord) {
 				response, err := base64.StdEncoding.DecodeString(record.RawResponse)
@@ -133,10 +132,45 @@ func TestRedisCacheMiddleware(t *testing.T) {
 				assert.Contains(t, string(response), p.bodyMatch)
 			}
 
-			resp, _ := ts.Run(t, []test.TestCase{
-				{Path: p.path, BodyMatch: p.bodyMatch, Code: http.StatusOK},
-				{Path: p.path, HeadersMatch: headersMatch, BodyMatch: p.bodyMatch, Code: http.StatusOK},
-			}...)
+			resp, _ := ts.Run(t, test.TestCase{
+				Path: requestPath, BodyMatch: p.bodyMatch, Code: http.StatusOK,
+			})
+
+			if cachingActive {
+				client := &http.Client{}
+				defer client.CloseIdleConnections()
+
+				var cachedBody string
+				require.Eventually(t, func() bool {
+					req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, ts.URL+requestPath, nil)
+					if err != nil {
+						return false
+					}
+
+					candidate, err := client.Do(req)
+					if err != nil {
+						return false
+					}
+
+					body, readErr := io.ReadAll(candidate.Body)
+					closeErr := candidate.Body.Close()
+					if readErr != nil || closeErr != nil || candidate.Header.Get(cachedResponseHeader) != "1" {
+						return false
+					}
+
+					resp = candidate
+					cachedBody = string(body)
+					return true
+				}, 5*time.Second, 10*time.Millisecond, "response was not stored in cache")
+
+				p.transferEncoding = nil
+				require.Equal(t, http.StatusOK, resp.StatusCode)
+				require.Contains(t, cachedBody, p.bodyMatch)
+			} else {
+				resp, _ = ts.Run(t, test.TestCase{
+					Path: requestPath, BodyMatch: p.bodyMatch, Code: http.StatusOK,
+				})
+			}
 
 			assert.Equal(t, p.transferEncoding, resp.TransferEncoding)
 			assert.Equal(t, p.uncompressed, resp.Uncompressed)
@@ -556,4 +590,71 @@ func countAccessLogEntries(hook *logrustest.Hook) int {
 		}
 	}
 	return count
+}
+
+func TestRedisCacheMiddleware_AnalyticsPath(t *testing.T) {
+	// Test covers bug described here https://tyktech.atlassian.net/browse/TT-14684
+
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.AnalyticsConfig.EnableDetailedRecording = true
+	})
+	defer ts.Close()
+
+	setTestValue(t, &ts.Gw.Analytics.mockEnabled, true)
+
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.Proxy.ListenPath = "/my-cache-api/"
+		spec.Proxy.StripListenPath = true
+		spec.Proxy.TargetURL = TestHttpAny + "/anything"
+		spec.CacheOptions.CacheTimeout = 60
+		spec.CacheOptions.EnableCache = true
+		spec.CacheOptions.CacheAllSafeRequests = true
+	})
+
+	var hits struct {
+		calls []*analytics.AnalyticsRecord
+		mu    sync.Mutex
+	}
+
+	ts.Gw.Analytics.mockRecordHit = func(record *analytics.AnalyticsRecord) {
+		hits.mu.Lock()
+		defer hits.mu.Unlock()
+		hits.calls = append(hits.calls, record)
+	}
+
+	requestPath := "/my-cache-api/get?cache-test=" + uuid.NewHex()
+
+	resp1, _ := ts.Run(t, test.TestCase{
+		Path: requestPath, Code: http.StatusOK,
+	})
+	require.Equal(t, http.StatusOK, resp1.StatusCode)
+
+	client := &http.Client{}
+	defer client.CloseIdleConnections()
+
+	require.Eventually(t, func() bool {
+		req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, ts.URL+requestPath, nil)
+		if err != nil {
+			return false
+		}
+
+		candidate, err := client.Do(req)
+		if err != nil {
+			return false
+		}
+		defer candidate.Body.Close()
+
+		return candidate.Header.Get("X-Tyk-Cached-Response") == "1"
+	}, 5*time.Second, 10*time.Millisecond, "response was not stored in cache")
+
+	hits.mu.Lock()
+	defer hits.mu.Unlock()
+
+	require.Len(t, hits.calls, 2, "expected 2 analytics hits")
+
+	assert.Equal(t, "/anything/get", hits.calls[0].Path, "first request should have upstream path")
+	assert.Equal(t, "/anything/get", hits.calls[0].RawPath, "first request should have upstream raw path")
+
+	assert.Equal(t, "/anything/get", hits.calls[1].Path, "cached request should have upstream path")
+	assert.Equal(t, "/anything/get", hits.calls[1].RawPath, "cached request should have upstream raw path")
 }

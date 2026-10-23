@@ -49,6 +49,89 @@ func TestGetOASDefinition(t *testing.T) {
 	assert.Equal(t, oasDef, cloned)
 }
 
+func TestGetOASConfigData(t *testing.T) {
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+
+	// Test when OAS definition is not in context
+	configData, err := ctx.GetOASConfigData(req)
+	assert.Nil(t, configData)
+	assert.Error(t, err)
+	assert.Equal(t, "OAS definition not found in request context", err.Error())
+
+	// Test when OAS definition is in context but no config data
+	oasDef := &oas.OAS{}
+	ctx.SetOASDefinition(req, oasDef)
+	configData, err = ctx.GetOASConfigData(req)
+	assert.Nil(t, configData)
+	assert.Error(t, err)
+	assert.Equal(t, "config data is nil", err.Error())
+
+	// Test when config data is present
+	expectedConfigData := map[string]any{
+		"key": "value",
+	}
+	oasDefWithConfig := &oas.OAS{}
+	oasDefWithConfig.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Global: &oas.Global{
+				PluginConfig: &oas.PluginConfig{
+					Data: &oas.PluginConfigData{
+						Value: expectedConfigData,
+					},
+				},
+			},
+		},
+	})
+	ctx.SetOASDefinition(req, oasDefWithConfig)
+	configData, err = ctx.GetOASConfigData(req)
+	assert.NoError(t, err)
+	assert.Equal(t, expectedConfigData, configData)
+}
+
+func TestGetOASConfigData_ReturnsDeepCopy(t *testing.T) {
+	newConfigData := func() map[string]any {
+		return map[string]any{
+			"key": "value",
+			"nested": map[string]any{
+				"inner": "value",
+			},
+			"list": []any{"a", "b"},
+		}
+	}
+
+	oasDef := &oas.OAS{}
+	oasDef.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Global: &oas.Global{
+				PluginConfig: &oas.PluginConfig{
+					Data: &oas.PluginConfigData{
+						Value: newConfigData(),
+					},
+				},
+			},
+		},
+	})
+
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	ctx.SetOASDefinition(req, oasDef)
+
+	configData, err := ctx.GetOASConfigData(req)
+	assert.NoError(t, err)
+	assert.Equal(t, newConfigData(), configData)
+
+	configData["key"] = "modified"
+	configData["added"] = "new"
+	configData["nested"].(map[string]any)["inner"] = "modified"
+	configData["list"].([]any)[0] = "modified"
+
+	original := oasDef.GetTykMiddleware().Global.PluginConfig.Data.Value
+	assert.Equal(t, newConfigData(), original, "modifying returned config data must not affect the API definition")
+
+	configData, err = ctx.GetOASConfigData(req)
+	assert.NoError(t, err)
+	assert.Equal(t, newConfigData(), configData, "subsequent calls must return unmodified config data")
+}
+
 // Benchmark for GetDefinition
 func BenchmarkGetDefinition(b *testing.B) {
 	apiDef := &apidef.APIDefinition{
@@ -60,7 +143,7 @@ func BenchmarkGetDefinition(b *testing.B) {
 	ctx.SetDefinition(req, apiDef)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		cloned := ctx.GetDefinition(req)
 		assert.Equal(b, apiDef, cloned)
 	}
@@ -79,9 +162,38 @@ func BenchmarkGetOASDefinition(b *testing.B) {
 	ctx.SetOASDefinition(req, oasDef)
 
 	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		cloned := ctx.GetOASDefinition(req)
 		assert.Equal(b, oasDef, cloned)
+	}
+}
+
+// Benchmark for GetOASConfigData
+func BenchmarkGetOASConfigData(b *testing.B) {
+	expectedConfigData := map[string]interface{}{
+		"key": "value",
+	}
+	oasDefWithConfig := &oas.OAS{}
+	oasDefWithConfig.SetTykExtension(&oas.XTykAPIGateway{
+		Middleware: &oas.Middleware{
+			Global: &oas.Global{
+				PluginConfig: &oas.PluginConfig{
+					Data: &oas.PluginConfigData{
+						Value: expectedConfigData,
+					},
+				},
+			},
+		},
+	})
+
+	req := httptest.NewRequest("GET", "http://example.com", nil)
+	ctx.SetOASDefinition(req, oasDefWithConfig)
+
+	b.ResetTimer()
+	for b.Loop() {
+		configData, err := ctx.GetOASConfigData(req)
+		assert.NoError(b, err)
+		assert.Equal(b, expectedConfigData, configData)
 	}
 }
 
@@ -129,6 +241,7 @@ func TestContextKeyUniqueness(t *testing.T) {
 		ctx.MCPPrimitiveType:          "MCPPrimitiveType",
 		ctx.MCPPrimitiveName:          "MCPPrimitiveName",
 		ctx.JSONRPCErrorCode:          "JSONRPCErrorCode",
+		ctx.MCPProtocolContext:        "MCPProtocolContext",
 	}
 
 	seen := make(map[ctx.Key]bool)

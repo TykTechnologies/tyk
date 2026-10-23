@@ -1,0 +1,276 @@
+# syntax=docker/dockerfile:1.7
+#
+# tyk-plugin-compiler-BASE - the STABLE layer (slow cadence).
+# Contains everything that does NOT change per Gateway release:
+#   modern hardened base (DHI), C toolchains (native + amd64/arm64/s390x cross),
+#   glibc link sysroots (2.17 default), build.sh, validate-plugin.sh, env.
+# It deliberately ships NO Go toolchain and NO Gateway source - those are
+# release-specific and added by Dockerfile.release on top of this image.
+#
+# The trusted workflow rebuilds this content from its once-resolved DHI digest
+# on every run so a moving DHI security update is picked up atomically. Registry
+# caching keeps unchanged toolchain and sysroot layers inexpensive.
+
+ARG SYSROOT_SUITE=bullseye
+# glibc link floor. 2.17 (DEFAULT) = RHEL 7 / CentOS 7, from manylinux2014 - maximally
+# portable (loads on RHEL 7 ELS through any newer glibc) and matches how the Gateway itself
+# is built (its cgo is linked with the CentOS 7 gcc 4.8.5 / glibc 2.17 toolchain). 2.31 =
+# Debian bullseye - opt-in, for plugins whose C code needs a glibc 2.18-2.31 function.
+ARG GLIBC_TARGET=2.17
+# Shared Docker-managed DHI base with the compiler package closure pre-provisioned.
+# This base is supply-chain hardening, not a claim that every compiler variant is FIPS compliant;
+# FIPS plugin crypto still comes from the matching Gateway Go toolchain and edition settings.
+ARG BASE_IMAGE=tykio/dhi-busybox-plugin-compiler:1.37.0-debian13-fips_plugin-compiler-ng-toolchain
+
+############################################################################
+# Stage 1 - glibc link sysroots (amd64 + arm64 + s390x). Two sources, selected by
+# GLIBC_TARGET; only the selected one is built. Both assembled on the native BUILD host
+# (arch-independent target files COPYed into both final-stage arches) - never emulated.
+############################################################################
+
+# --- 2.31 sysroots, from Debian bullseye cross packages (opt-in) -----------
+FROM --platform=$BUILDPLATFORM debian:${SYSROOT_SUITE}-slim AS sysroots-2.31
+ARG GLIBC_TARGET
+ARG SYSROOT_SUITE
+RUN set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends \
+        libc6-dev-amd64-cross  libc6-dev-arm64-cross  libc6-dev-s390x-cross \
+        linux-libc-dev-amd64-cross linux-libc-dev-arm64-cross linux-libc-dev-s390x-cross \
+        gcc-x86-64-linux-gnu   gcc-aarch64-linux-gnu  gcc-s390x-linux-gnu; \
+    rm -rf /var/lib/apt/lists/*
+RUN set -eux; \
+    for spec in "amd64 x86_64-linux-gnu ld-linux-x86-64.so.2" \
+                "arm64 aarch64-linux-gnu ld-linux-aarch64.so.1" \
+                "s390x s390x-linux-gnu ld64.so.1"; do \
+      set -- $spec; arch=$1; triplet=$2; loader=$3; \
+      SR=/opt/tyk/sysroots/linux-${arch}-glibc-${GLIBC_TARGET}; \
+      mkdir -p "$SR/usr/include" "$SR/usr/lib" "$SR/lib"; \
+      cp -a /usr/${triplet}/include/. "$SR/usr/include/"; \
+      cp -a /usr/${triplet}/lib/.     "$SR/usr/lib/"; \
+      cp -a "$SR/usr/lib/${loader}"   "$SR/lib/" 2>/dev/null || true; \
+      for f in $(grep -rIl "/usr/${triplet}/lib" "$SR/usr/lib" || true); do \
+        sed -i "s#/usr/${triplet}/lib#/usr/lib#g" "$f"; \
+      done; \
+      test -f "$SR/usr/lib/libc.so.6"; test -f "$SR/usr/include/stdlib.h"; \
+    done; \
+    echo "glibc ${GLIBC_TARGET} from debian ${SYSROOT_SUITE} cross packages" > /opt/tyk/sysroots/PROVENANCE.txt
+
+# --- 2.17 sysroots, from manylinux2014 = CentOS 7 = RHEL 7 ABI (default) ----
+# COPY (filesystem only, no exec) so foreign-arch glibc trees extract without QEMU.
+# Pinned by digest (source of truth + full arch ceiling: data/sysroot-2.17-digests.txt).
+# glibc 2.17's ABI is frozen, so these never need bumping for the floor itself; re-pin only
+# to refresh the (unused-at-runtime) userspace. CentOS 7 is EOL but the perennial
+# manylinux2014 tag stays published; UBI7 is a maintained fallback.
+# buildkit fetches only the layers backing the COPYed /usr/lib64+/lib64+/usr/include, and this
+# whole stage is registry-cached by the base job - so manylinux is pulled once, not per build.
+FROM --platform=linux/amd64 quay.io/pypa/manylinux2014_x86_64@sha256:5e3012db7af44490157351ba6726fd92e8dba9b421ea819ac7925b4478ad3f17  AS ml-amd64
+FROM --platform=linux/arm64 quay.io/pypa/manylinux2014_aarch64@sha256:88be65bf6654ffb068b2c07fb321ce1a128ccc092b62bbb79027217dbdec12ae AS ml-arm64
+FROM --platform=linux/s390x quay.io/pypa/manylinux2014_s390x@sha256:554ae29bc5aa3dbb1ce3062114180b6c4b9d7f5c555ede43652baf4f5d71959c   AS ml-s390x
+FROM --platform=$BUILDPLATFORM debian:bookworm-slim AS sysroots-2.17
+ARG GLIBC_TARGET
+# CentOS 7 is PRE-usrmerge: the -ldev symlinks (libresolv.so etc.) live in /usr/lib64 but point at
+# the RUNTIME libs in /lib64 (../../lib64/libX.so.N). So we need BOTH trees, or those symlinks dangle
+# and a cgo link that pulls e.g. -lresolv (net DNS) fails "cannot open .../libresolv.so".
+COPY --from=ml-amd64 /usr/lib64   /ml/amd64/lib
+COPY --from=ml-amd64 /lib64       /ml/amd64/lib64
+COPY --from=ml-amd64 /usr/include /ml/amd64/include
+COPY --from=ml-arm64 /usr/lib64   /ml/arm64/lib
+COPY --from=ml-arm64 /lib64       /ml/arm64/lib64
+COPY --from=ml-arm64 /usr/include /ml/arm64/include
+COPY --from=ml-s390x /usr/lib64   /ml/s390x/lib
+COPY --from=ml-s390x /lib64       /ml/s390x/lib64
+COPY --from=ml-s390x /usr/include /ml/s390x/include
+RUN set -eux; \
+    for spec in "amd64 ld-linux-x86-64.so.2" "arm64 ld-linux-aarch64.so.1" "s390x ld64.so.1"; do \
+      set -- $spec; arch=$1; loader=$2; \
+      SR=/opt/tyk/sysroots/linux-${arch}-glibc-${GLIBC_TARGET}; \
+      mkdir -p "$SR/usr/include" "$SR/usr/lib" "$SR/lib"; \
+      cp -a /ml/${arch}/include/. "$SR/usr/include/"; \
+      # full copy so .so->.so.N->lib-2.17.so symlink chains stay intact. Merge BOTH /usr/lib64 \
+      # (dev symlinks + static + ld scripts) and /lib64 (runtime libX.so.N) into one flat usr/lib, \
+      # then prune the CentOS userspace bloat (manylinux /usr/lib64 is a whole distro). \
+      cp -a /ml/${arch}/lib/.   "$SR/usr/lib/"; \
+      cp -a /ml/${arch}/lib64/. "$SR/usr/lib/"; \
+      rm -rf "$SR/usr/lib/python"* "$SR/usr/lib/libpython"*.so* "$SR/usr/lib/"*.py \
+             "$SR/usr/lib/rpm" "$SR/usr/lib/dracut" "$SR/usr/lib/dnf"* \
+             "$SR/usr/lib/systemd" "$SR/usr/lib/udev" 2>/dev/null || true; \
+      # Preserve the existing sysroot header inventory, but never ship the Python runtime library: \
+      # the Gateway has no libpython, so a plugin linked to it cannot load in the official image. \
+      test -z "$(find "$SR/usr/lib" -maxdepth 1 -name 'libpython*.so*' -print -quit)"; \
+      # manylinux also carries Kerberos linker inputs and runtime plugins that the official \
+      # Gateway does not ship. Remove that family while preserving unrelated generic libraries. \
+      rm -f "$SR/usr/lib"/libkrb5* "$SR/usr/lib"/libgssapi_krb5* \
+            "$SR/usr/lib"/libk5crypto* "$SR/usr/lib"/libgssrpc* \
+            "$SR/usr/lib"/libkadm5* "$SR/usr/lib"/libkdb5* "$SR/usr/lib"/libkrad*; \
+      rm -rf "$SR/usr/lib/krb5"; \
+      test -z "$(find "$SR/usr/lib" -maxdepth 1 \( -name 'libkrb5*' -o -name 'libgssapi_krb5*' -o -name 'libk5crypto*' -o -name 'libgssrpc*' -o -name 'libkadm5*' -o -name 'libkdb5*' -o -name 'libkrad*' \) -print -quit)"; \
+      test ! -e "$SR/usr/lib/krb5"; \
+      # repoint any dev symlink that still targets the old split /lib64 path (e.g. \
+      # libresolv.so -> ../../lib64/libresolv.so.2) to the basename now present in this flat dir. \
+      for l in $(find "$SR/usr/lib" -maxdepth 1 -type l 2>/dev/null || true); do \
+        t="$(readlink "$l")"; case "$t" in *lib64/*) ln -sf "$(basename "$t")" "$l" ;; esac; \
+      done; \
+      # drop any STILL-dangling symlinks - leftover non-glibc manylinux cruft (cracklib/nss/dbus/ \
+      # p11-kit); safe because the glibc dev links were just repointed and now resolve. \
+      find "$SR" -xtype l -delete 2>/dev/null || true; \
+      # the loader is runtime-only (a -buildmode=plugin .so has no interp) - best-effort, deref symlinks \
+      cp -aL "/ml/${arch}/lib/${loader}" "$SR/lib/${loader}" 2>/dev/null || true; \
+      # rewrite GROUP/AS_NEEDED absolute paths in the REAL ld scripts only (OUTPUT_FORMAT marks them) \
+      for f in $(grep -rIl 'OUTPUT_FORMAT' "$SR/usr/lib" 2>/dev/null || true); do \
+        sed -i -e 's#/usr/lib64/#/usr/lib/#g' -e 's#/lib64/lib#/usr/lib/lib#g' -e 's#/lib64/ld#/lib/ld#g' "$f"; \
+      done; \
+      # sanity: libc + a representative split-out dev symlink must RESOLVE (not dangle) \
+      test -f "$SR/usr/lib/libc.so.6"; test -f "$SR/usr/include/stdlib.h"; \
+      test -e "$SR/usr/lib/libresolv.so"; test -e "$SR/usr/lib/libnsl.so"; \
+    done; \
+    echo "glibc ${GLIBC_TARGET} from manylinux2014 (CentOS 7 / RHEL 7 ABI)" > /opt/tyk/sysroots/PROVENANCE.txt
+
+# --- pick the sysroot set by GLIBC_TARGET (only this one is built) ----------
+FROM sysroots-${GLIBC_TARGET} AS sysroots
+
+############################################################################
+# Stage 2 - the base toolchain image (no Go, no Gateway source)
+############################################################################
+FROM ${BASE_IMAGE} AS base
+# DHI bases default to a non-root user; the compiler needs root to write build artifacts and the
+# mounted /plugin-source volume at run time.
+USER 0
+ARG BASE_IMAGE
+ARG GLIBC_TARGET
+ARG WITH_CXX=1
+ARG WITH_GIT=1
+# Immutable DHI source digest recorded on the image for audit and promotion tooling.
+ARG DHI_DIGEST=unknown
+# The release workflow resolves this once and records it on the workflow-local
+# base so every downstream gate and publish build has the same toolchain identity.
+ARG GO_TOOLCHAIN_IMAGE_REF=unknown
+# Two orthogonal axes:
+#   CROSS (default 0) -> native-only image: host-arch toolchain only = the :V images (build for
+#     their own arch). CROSS=1 -> the -x image: adds the amd64/arm64/s390x cross toolchains =
+#     the :V-x images (cross-compile to any target).
+#   SLIM (default 0) -> no extra filesystem cleanup. When explicitly set to 1, remove documentation
+#     and package-manager caches without changing the installed package closure. The compiler keeps
+#     Git and its declared Perl dependency because Go's direct/private-module fallback needs it.
+ARG SLIM=0
+ARG CROSS=0
+# The compiler toolchain is NEVER installed at build time. It must arrive pre-provisioned in the
+# Docker Hardened Images customization named by BASE_IMAGE, built by Docker from Tyk's declared
+# package list. This is a security requirement, not a convenience: only packages Docker provisions
+# are covered by Docker's maintenance obligation and carry +dhi versions with published DHI
+# vulnerability decisions. A package installed here by apt/apk would be an ordinary upstream build
+# that nobody is obliged to patch and that no DHI advisory covers.
+#
+# Consequence: changing the toolchain package list requires Docker to rebuild the customization
+# first. There is deliberately no fallback -- a base missing the toolchain fails the build.
+RUN set -eux; \
+    echo "Using pre-provisioned compiler toolchain from ${BASE_IMAGE}"; \
+    missing=""; \
+    for tool in gcc ld ar make file bash jq; do \
+        command -v "$tool" >/dev/null || missing="$missing $tool"; \
+    done; \
+    if [ "$WITH_CXX" = "1" ]; then command -v g++ >/dev/null || missing="$missing g++"; fi; \
+    if [ "$WITH_GIT" = "1" ]; then command -v git >/dev/null || missing="$missing git"; fi; \
+    if [ "$CROSS" = "1" ]; then \
+        for t in x86_64 aarch64 s390x; do \
+            command -v "$t-linux-gnu-gcc" >/dev/null || missing="$missing $t-linux-gnu-gcc"; \
+        done; \
+    fi; \
+    if [ -n "$missing" ]; then \
+        echo "ERROR: BASE_IMAGE ${BASE_IMAGE} is missing pre-provisioned toolchain components:$missing" >&2; \
+        echo "ERROR: the toolchain must be provisioned by the DHI customization, not installed here." >&2; \
+        exit 1; \
+    fi
+
+# --- Safe filesystem slimming + package-integrity gate ----------------------
+# Git's Debian package depends on Perl and apt depends on gpgv. They are part of the compiler's
+# real package closure and must stay installed and visible to scanners. SLIM therefore removes only
+# non-executable documentation and caches; it never force-purges packages or edits dpkg/DHI package
+# records. Full Debian images run dpkg and apt dependency audits. Runtime DHI variants intentionally
+# omit those package-manager tools, so validate every recorded package state, required executable,
+# and trust bundle instead; Docker's signed customized-image SBOM records the resolved closure.
+RUN set -eux; \
+    case "$SLIM" in 0|1) ;; *) echo "ERROR: SLIM must be 0 or 1 (got $SLIM)" >&2; exit 1 ;; esac; \
+    if [ "$SLIM" = "1" ]; then \
+      rm -rf /usr/share/doc/* /usr/share/info/* /usr/share/man/* /var/cache/apt/*; \
+    fi; \
+    needs="gcc ld ld.gold readelf jq file make bash sed awk grep tar find"; \
+    [ "$WITH_GIT" = "1" ] && needs="$needs git"; \
+    [ "$WITH_CXX" = "1" ] && needs="$needs g++"; \
+    [ "$CROSS" = "1" ] && needs="$needs x86_64-linux-gnu-gcc aarch64-linux-gnu-gcc s390x-linux-gnu-gcc"; \
+    [ "$CROSS" = "1" ] && [ "$WITH_CXX" = "1" ] && needs="$needs x86_64-linux-gnu-g++ aarch64-linux-gnu-g++ s390x-linux-gnu-g++"; \
+    for need in $needs; do \
+      command -v "$need" >/dev/null 2>&1 || { echo "ERROR: missing required tool: $need" >&2; exit 1; }; \
+    done; \
+    test -s /etc/ssl/certs/ca-certificates.crt; \
+    if command -v dpkg >/dev/null; then \
+      if dpkg --help 2>&1 | grep -q -- '--audit'; then \
+        test -z "$(dpkg --audit)"; \
+      else \
+        awk '\
+          /^Package: / { packages++ } \
+          /^Status: / { \
+            statuses++; \
+            if ($0 != "Status: install ok installed") bad++; \
+          } \
+          END { exit !(packages > 0 && packages == statuses && bad == 0) } \
+        ' /var/lib/dpkg/status; \
+      fi; \
+    fi; \
+    if command -v apt-get >/dev/null; then \
+      apt-get check; \
+    fi
+
+COPY --from=sysroots /opt/tyk/sysroots /opt/tyk/sysroots
+COPY data/build.sh           /build.sh
+COPY data/validate-plugin.sh /usr/local/bin/validate-plugin.sh
+RUN chmod +x /build.sh /usr/local/bin/validate-plugin.sh
+
+# --- boringcrypto-FIPS stdint.h overlay (glibc-2.17 only) -------------------
+# glibc-2.17's <stdint.h> declares the fixed-width ints DIRECTLY (e.g. `typedef unsigned char
+# uint8_t;`); glibc >=2.24 - and the Tyk FIPS Gateway - route them via __intN_t/__uintN_t. cgo
+# bakes that typedef spelling into crypto/internal/boring's generated type, so a boringcrypto
+# plugin built on the raw 2.17 header gets a DIFFERENT package build-ID than the Gateway and is
+# rejected by plugin.Open ("different version of package crypto/internal/boring"). We pre-build a
+# header-ONLY overlay that re-aliases the fixed-width types the modern way (sourcing the real
+# __intN_t from the sysroot's own bits/types.h). build.sh -isystem's it AHEAD of the sysroot
+# include for ee-fips+boringcrypto ONLY; CE/EE and native-GOFIPS140 FIPS never see it, and the
+# LINK still uses the real 2.17 sysroot - so the glibc floor is unchanged. Pure type ALIAS: no
+# ABI/layout/runtime effect. The build FAILS if the rewrite did not apply (no silent regression).
+# See docs/maintenance.md.
+RUN set -eux; \
+    if [ "${GLIBC_TARGET}" = "2.17" ]; then \
+      for SR in /opt/tyk/sysroots/linux-*-glibc-2.17; do \
+        [ -f "$SR/usr/include/stdint.h" ] || continue; \
+        rel="${SR#/opt/tyk/sysroots/}"; \
+        OV="/opt/tyk/sysroot-overlays/boringcrypto/${rel}/usr/include"; \
+        mkdir -p "$OV"; \
+        { echo '#include <bits/types.h>'; cat "$SR/usr/include/stdint.h"; } > "$OV/stdint.h"; \
+        sed -i -E 's/typedef[[:space:]]+[^;]*[[:space:]](u?int(8|16|32|64)_t)[[:space:]]*;/typedef __\1 \1;/' "$OV/stdint.h"; \
+        n="$(grep -cE 'typedef[[:space:]]+__(u?int(8|16|32|64)_t)[[:space:]]+(u?int(8|16|32|64)_t)[[:space:]]*;' "$OV/stdint.h")"; \
+        [ "$n" -ge 8 ] || { echo "ERROR: stdint overlay rewrite failed for $SR ($n routed typedefs)"; exit 1; }; \
+      done; \
+    fi
+
+# /usr/local/go/bin is on PATH ahead of time; Dockerfile.release drops Go there.
+ENV PATH=/go/bin:/usr/local/go/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+    GOTOOLCHAIN=local \
+    GOPATH=/go \
+    GO111MODULE=on \
+    TYK_GW_PATH=/go/src/github.com/TykTechnologies/tyk \
+    PLUGIN_SOURCE_PATH=/plugin-source \
+    TYK_PLUGIN_SYSROOT_BASE=/opt/tyk/sysroots \
+    TYK_PLUGIN_OVERLAY_BASE=/opt/tyk/sysroot-overlays \
+    TYK_GLIBC_TARGET=${GLIBC_TARGET}
+RUN mkdir -p $TYK_GW_PATH $PLUGIN_SOURCE_PATH /go/bin
+
+LABEL org.opencontainers.image.title="tyk-plugin-compiler-ng-base" \
+      org.opencontainers.image.description="Stable toolchain and sysroot base for the next-generation Tyk plugin compiler (no Go, no Gateway source)." \
+      org.opencontainers.image.licenses="MPL-2.0" \
+      io.tyk.plugin-compiler.glibc-target="${GLIBC_TARGET}" \
+      io.tyk.plugin-compiler.base-image="${BASE_IMAGE}" \
+      io.tyk.plugin-compiler.dhi-base-digest="${DHI_DIGEST}" \
+      io.tyk.plugin-compiler.go-toolchain-image="${GO_TOOLCHAIN_IMAGE_REF}"
+
+WORKDIR $TYK_GW_PATH
+ENTRYPOINT ["/build.sh"]

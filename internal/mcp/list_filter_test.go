@@ -270,6 +270,28 @@ func TestFilterItemsWithRuleSets(t *testing.T) {
 }
 
 func TestFilterJSONRPCBody(t *testing.T) {
+	t.Run("unchanged list preserves original bytes and cache hints", func(t *testing.T) {
+		body := []byte("{\n  \"jsonrpc\": \"2.0\", \"id\": 1, \"result\": {\"tools\": [{\"name\": \"allowed\"}], \"cacheScope\": \"public\", \"ttlMs\": 3000}\n}")
+		result, changed := FilterJSONRPCBody(body, ListFilterConfigs["tools"], user.AccessControlRules{})
+		assert.False(t, changed)
+		assert.Nil(t, result, "caller must retain the original bytes when no rules apply")
+	})
+
+	t.Run("edited paginated list receives private zero-TTL hints", func(t *testing.T) {
+		body := []byte(`{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"allowed"},{"name":"secret"}],"nextCursor":"page-2","cacheScope":"public","ttlMs":3000,"extension":{"kept":true}}}`)
+		result, changed := FilterJSONRPCBody(body, ListFilterConfigs["tools"], user.AccessControlRules{Allowed: []string{"allowed"}})
+		require.True(t, changed)
+
+		var envelope JSONRPCResponse
+		require.NoError(t, json.Unmarshal(result, &envelope))
+		var responseResult map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(envelope.Result, &responseResult))
+		assert.JSONEq(t, `"private"`, string(responseResult["cacheScope"]))
+		assert.JSONEq(t, `0`, string(responseResult["ttlMs"]))
+		assert.JSONEq(t, `"page-2"`, string(responseResult["nextCursor"]))
+		assert.JSONEq(t, `{"kept":true}`, string(responseResult["extension"]))
+	})
+
 	t.Run("batch JSON-RPC array passes through (returns false)", func(t *testing.T) {
 		// JSON-RPC batch = top-level array. Not supported for filtering.
 		batch := `[{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"a"}]}},{"jsonrpc":"2.0","id":2,"result":{"tools":[{"name":"b"}]}}]`
@@ -322,7 +344,7 @@ func TestFilterInitializeCapabilitiesBody(t *testing.T) {
 	body := []byte(`{"jsonrpc":"2.0","id":1,"result":{"protocolVersion":"2025-03-26","capabilities":{"tools":{"listChanged":true},"resources":{"subscribe":true},"prompts":{},"sampling":{}},"serverInfo":{"name":"test","version":"1.0.0"}}}`)
 
 	result, ok := FilterInitializeCapabilitiesBody(body, []user.AccessControlRules{
-		{Blocked: []string{MethodSamplingCreate, MethodToolsList}},
+		{Blocked: []string{MethodSamplingCreateMessage, MethodToolsList}},
 	})
 	require.True(t, ok)
 
@@ -339,6 +361,58 @@ func TestFilterInitializeCapabilitiesBody(t *testing.T) {
 	assert.NotContains(t, capabilities, "tools")
 	assert.Contains(t, capabilities, "resources")
 	assert.Contains(t, capabilities, "prompts")
+	assert.JSONEq(t, `"private"`, string(responseResult["cacheScope"]))
+	assert.JSONEq(t, `0`, string(responseResult["ttlMs"]))
+
+	t.Run("unchanged capabilities preserve original response", func(t *testing.T) {
+		unchangedBody := []byte("{\n\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"capabilities\":{\"tools\":{}},\"cacheScope\":\"public\",\"ttlMs\":42}}")
+		unchanged, changed := FilterInitializeCapabilitiesBody(unchangedBody, nil)
+		assert.False(t, changed)
+		assert.Nil(t, unchanged)
+	})
+}
+
+func TestSamplingCapabilityUsesCreateMessageMethod(t *testing.T) {
+	body := []byte(`{"jsonrpc":"2.0","id":1,"result":{"capabilities":{"sampling":{"extension":"kept"},"tools":{"listChanged":true},"vendor":{"enabled":true}},"serverInfo":{"name":"test","version":"1.0.0"}}}`)
+	tests := []struct {
+		name         string
+		rules        user.AccessControlRules
+		wantChanged  bool
+		wantSampling bool
+		wantPrivate  bool
+	}{
+		{name: "no rule preserves original", wantSampling: true},
+		{name: "correct createMessage block removes sampling", rules: user.AccessControlRules{Blocked: []string{MethodSamplingCreateMessage}}, wantChanged: true, wantPrivate: true},
+		{name: "obsolete create block keeps sampling", rules: user.AccessControlRules{Blocked: []string{"sampling/create"}}, wantChanged: true, wantSampling: true, wantPrivate: true},
+		{name: "correct createMessage allow keeps sampling", rules: user.AccessControlRules{Allowed: []string{MethodSamplingCreateMessage, MethodToolsList, MethodToolsCall}}, wantChanged: true, wantSampling: true, wantPrivate: true},
+		{name: "blocked takes precedence over allowed", rules: user.AccessControlRules{Allowed: []string{MethodSamplingCreateMessage, MethodToolsList, MethodToolsCall}, Blocked: []string{MethodSamplingCreateMessage}}, wantChanged: true, wantPrivate: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filtered, changed := FilterInitializeCapabilitiesBody(body, []user.AccessControlRules{tt.rules})
+			assert.Equal(t, tt.wantChanged, changed)
+			if !tt.wantChanged {
+				assert.Nil(t, filtered)
+				return
+			}
+
+			var envelope JSONRPCResponse
+			require.NoError(t, json.Unmarshal(filtered, &envelope))
+			var result map[string]json.RawMessage
+			require.NoError(t, json.Unmarshal(envelope.Result, &result))
+			var capabilities map[string]json.RawMessage
+			require.NoError(t, json.Unmarshal(result["capabilities"], &capabilities))
+			assert.Equal(t, tt.wantSampling, capabilities["sampling"] != nil)
+			assert.Contains(t, capabilities, "tools")
+			assert.JSONEq(t, `{"enabled":true}`, string(capabilities["vendor"]))
+			assert.JSONEq(t, `{"name":"test","version":"1.0.0"}`, string(result["serverInfo"]))
+			if tt.wantPrivate {
+				assert.JSONEq(t, `"private"`, string(result["cacheScope"]))
+				assert.JSONEq(t, `0`, string(result["ttlMs"]))
+			}
+		})
+	}
 }
 
 func TestInferListConfigFromResult(t *testing.T) {

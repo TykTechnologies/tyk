@@ -378,6 +378,102 @@ func TestEngineV2_HandleReverseProxy(t *testing.T) {
 	})
 }
 
+func TestEngineV2_HandleReverseProxyIsolatesCallerAuthorization(t *testing.T) {
+	engine := newIsolationEngineV2(t,
+		newUDGApiDefinition(apidef.GraphQLConfigVersion2, "http://upstream.example/graphql"),
+		"query { hello }")
+
+	upstream := newAuthorizationRecordingRoundTripper()
+	for _, token := range []string{"Bearer AAA", "Bearer BBB"} {
+		callAs(t, engine, upstream, "", token)
+	}
+
+	assert.Equal(t, []string{"Bearer AAA", "Bearer BBB"}, upstream.values())
+}
+
+func TestEngineV2_SSESubscriptionIsolatesCallerAuthorization(t *testing.T) {
+	upstream := newAuthorizationRecorder("")
+	server := newRecordingSSEUpstream(t, upstream)
+	engine := newIsolationEngineV2(t,
+		newUDGSubscriptionApiDefinition(t, apidef.GraphQLConfigVersion2, apidef.GQLSubscriptionSSE, server.URL),
+		"subscription { count }")
+
+	for _, token := range []string{"Bearer AAA", "Bearer BBB"} {
+		callAs(t, engine, http.DefaultTransport, "", token)
+	}
+
+	assert.Equal(t, []string{"Bearer AAA", "Bearer BBB"}, upstream.values())
+}
+
+func TestEngineV2_WebSocketSubscriptionIsolatesCallerAuthorization(t *testing.T) {
+	upstream := newAuthorizationRecorder("")
+	server := newRecordingWSUpstream(t, upstream, protocolGraphQLWS, messageTypeData)
+	engine := newIsolationEngineV2(t,
+		newUDGSubscriptionApiDefinition(t, apidef.GraphQLConfigVersion2, apidef.GQLSubscriptionWS, server.URL),
+		"subscription { count }")
+
+	for _, token := range []string{"Bearer AAA", "Bearer BBB"} {
+		callAs(t, engine, http.DefaultTransport, "", token)
+	}
+
+	assert.Equal(t, []string{"Bearer AAA", "Bearer BBB"}, upstream.values())
+}
+
+func TestNewEngineV2_ConfiguresHTTPClients(t *testing.T) {
+	newEngine := func(t *testing.T, httpClient, streamingClient *http.Client) *EngineV2 {
+		t.Helper()
+		logger := logrus.New()
+		logger.SetOutput(io.Discard)
+		engine, err := NewEngineV2(EngineV2Options{
+			Logger:          logger,
+			ApiDefinition:   newTestApiDefinitionV2(apidef.GraphQLExecutionModeExecutionEngine, "http://upstream.example/graphql"),
+			HttpClient:      httpClient,
+			StreamingClient: streamingClient,
+			Injections: EngineV2Injections{
+				ContextRetrieveRequest: func(*http.Request) *graphql.Request {
+					return &graphql.Request{Query: "query { hello }"}
+				},
+				NewReusableBodyReadCloser: testReusableReadCloser,
+			},
+		})
+		require.NoError(t, err)
+		t.Cleanup(engine.Cancel)
+		return engine
+	}
+
+	t.Run("should configure both the http client and the streaming client", func(t *testing.T) {
+		httpClient := &http.Client{Transport: taggedRoundTripper("http")}
+		streamingClient := &http.Client{Transport: taggedRoundTripper("streaming")}
+
+		newEngine(t, httpClient, streamingClient)
+
+		httpTransport, ok := httpClient.Transport.(*GraphQLEngineTransport)
+		require.True(t, ok, "the http client transport should be wrapped")
+		assert.Equal(t, taggedRoundTripper("http"), httpTransport.originalTransport)
+		streamingTransport, ok := streamingClient.Transport.(*GraphQLEngineTransport)
+		require.True(t, ok, "the streaming client transport should be wrapped")
+		assert.Equal(t, taggedRoundTripper("streaming"), streamingTransport.originalTransport)
+	})
+
+	t.Run("should wrap a client that is shared between both roles only once", func(t *testing.T) {
+		// The gateway passes one client per API as both the http and the streaming client,
+		// see gateway/mw_graphql.go.
+		client := &http.Client{Transport: taggedRoundTripper("shared")}
+
+		newEngine(t, client, client)
+
+		transport, ok := client.Transport.(*GraphQLEngineTransport)
+		require.True(t, ok, "the client transport should be wrapped")
+		assert.Equal(t, taggedRoundTripper("shared"), transport.originalTransport)
+	})
+
+	t.Run("should not fail when a client is nil", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			newEngine(t, nil, nil)
+		})
+	})
+}
+
 type testEngineV2Options struct {
 	targetURL     string
 	apiDefinition *apidef.APIDefinition

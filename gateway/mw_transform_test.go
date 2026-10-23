@@ -4,13 +4,19 @@ import (
 	"encoding/base64"
 	"io/ioutil"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	texttemplate "text/template"
 
-	"github.com/TykTechnologies/tyk/test"
+	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/test"
 )
 
 func testPrepareTransformNonAscii() (*TransformSpec, string) {
@@ -388,5 +394,105 @@ func TestTransformRequestBody(t *testing.T) {
 		ts.Gw.LoadAPI(api)
 
 		_, _ = ts.Run(t, test.TestCase{Path: "/get", Data: body, BodyNotMatch: bodyMatch, Code: http.StatusOK})
+	})
+}
+
+func TestTransformRequestBody_LegacyWorkingDirectoryPath(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	// Documented form: relative to the gateway's working directory, which holds
+	// the template root.
+	t.Chdir(filepath.Dir(ts.Gw.GetConfig().TemplatePath))
+
+	body := `{"value1":"a","value2":"b","value_list":["x"]}`
+
+	for _, path := range []string{"templates/transform_test.tmpl", "./templates/transform_test.tmpl"} {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.ExtendedPaths.Transform = []apidef.TemplateMeta{{
+					Path:   "/post",
+					Method: http.MethodPost,
+					TemplateData: apidef.TemplateData{
+						Input:          apidef.RequestJSON,
+						Mode:           apidef.UseFile,
+						TemplateSource: path,
+					},
+				}}
+			})
+		})
+
+		_, _ = ts.Run(t, test.TestCase{Method: http.MethodPost, Path: "/post", Data: body,
+			BodyMatch: `transformed_list`, Code: http.StatusOK})
+	}
+}
+
+func TestTransformRequestBody_OASFileTemplatePath(t *testing.T) {
+	// A file outside the configured template root that the transform must never read.
+	secretPath := filepath.Join(t.TempDir(), "secret.tmpl")
+	require.NoError(t, os.WriteFile(secretPath, []byte("TOPSECRET"), 0o644))
+
+	buildAPI := func(templatePath string) *APISpec {
+		return BuildOASAPI(func(oasDef *oas.OAS) {
+			tykExt := oasDef.GetTykExtension()
+			tykExt.Info.State.Active = true
+			tykExt.Server.ListenPath = oas.ListenPath{Value: "/", Strip: false}
+			tykExt.Middleware = &oas.Middleware{Operations: oas.Operations{
+				"postpost": &oas.Operation{
+					TransformRequestBody: &oas.TransformBody{
+						Enabled: true,
+						Format:  apidef.RequestJSON,
+						Path:    templatePath,
+					},
+				},
+			}}
+
+			responses := openapi3.NewResponses()
+			oasDef.Paths = openapi3.NewPaths()
+			oasDef.Paths.Set("/post", &openapi3.PathItem{
+				Post: &openapi3.Operation{OperationID: "postpost", Responses: responses},
+			})
+		})[0]
+	}
+
+	body := `{"value1":"a","value2":"b","value_list":["x"]}`
+
+	t.Run("unsafe paths fail the request", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		relSecret, err := filepath.Rel(ts.Gw.GetConfig().TemplatePath, secretPath)
+		require.NoError(t, err)
+
+		for _, path := range []string{secretPath, relSecret} {
+			ts.Gw.LoadAPI(buildAPI(path))
+
+			_, _ = ts.Run(t, test.TestCase{Method: http.MethodPost, Path: "/post", Data: body,
+				BodyMatch: `"error": "Template execution failed"`, BodyNotMatch: "TOPSECRET",
+				Code: http.StatusBadRequest})
+		}
+	})
+
+	t.Run("path inside the template root is loaded", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ts.Gw.LoadAPI(buildAPI("transform_test.tmpl"))
+
+		_, _ = ts.Run(t, test.TestCase{Method: http.MethodPost, Path: "/post", Data: body,
+			BodyMatch: `transformed_list`, Code: http.StatusOK})
+	})
+
+	t.Run("flag allows unsafe paths", func(t *testing.T) {
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.AllowUnsafeBodyTransformTemplatePaths = true
+		})
+		defer ts.Close()
+
+		ts.Gw.LoadAPI(buildAPI(secretPath))
+
+		_, _ = ts.Run(t, test.TestCase{Method: http.MethodPost, Path: "/post", Data: body,
+			BodyMatch: "TOPSECRET", Code: http.StatusOK})
 	})
 }

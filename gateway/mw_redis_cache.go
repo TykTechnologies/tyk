@@ -147,11 +147,19 @@ type cacheOptions struct {
 	key                    string
 	cacheOnlyResponseCodes []int
 	timeout                int64
+	responseEdited         bool
 }
 
 // ProcessRequest will run any checks on the request on the way through the system, return an error to have the chain fail
 func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
 	t1 := time.Now()
+	if credentialSpecificMCPFilteringApplies(m.Spec, r, ctxGetSession(r)) {
+		// An internal loop may carry cache state armed by an earlier API.
+		// Credential-dependent MCP representations must not reuse that writer.
+		ctxSetCacheOptions(r, nil)
+		m.Logger().Debug("Bypassing response cache for credential-specific MCP filtering")
+		return nil, http.StatusOK
+	}
 
 	var stat RequestStatus
 	var cacheKeyRegex string
@@ -268,6 +276,7 @@ func (m *RedisCacheMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	if !m.Spec.DoNotTrack {
 		ms := DurationToMillisecond(time.Since(t1))
 		latency := analytics.Latency{Total: int64(ms), Upstream: 0, Gateway: int64(ms)}
+		r = m.Spec.PrepareRequestToLogShallowClone(r)
 		m.sh.RecordHit(r, latency, newRes.StatusCode, newRes, true)
 		m.sh.RecordAccessLog(r, newRes, latency)
 		m.sh.Base().RecordMetrics(w, r, newRes.StatusCode, latency, newRes)

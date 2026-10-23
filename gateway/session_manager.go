@@ -85,7 +85,14 @@ func NewSessionLimiter(
 
 	switch storageConf.Type {
 	case "redis":
-		sessionLimiter.limiterStorage = rate.NewStorage(storageConf, externalServicesConfig)
+		limiterStorage, err := rate.NewStorage(storageConf, externalServicesConfig)
+		if err != nil {
+			// A misconfigured IAM credentials provider is an unrecoverable
+			// startup error: without storage the redis rate limiter would nil
+			// panic at request time, so fail loudly here instead.
+			log.WithError(err).Fatal("[RATELIMIT] failed to initialise rate limiter redis storage")
+		}
+		sessionLimiter.limiterStorage = limiterStorage
 	}
 
 	sessionLimiter.smoothing = rate.NewSmoothing(sessionLimiter.limiterStorage)
@@ -220,6 +227,11 @@ func (l *SessionLimiter) RateLimitInfo(r *http.Request, api *APISpec, endpoints 
 	urlPaths := []string{
 		api.StripListenPath(r.URL.Path),
 		r.URL.Path,
+	}
+	if isMCPJSONRPCVirtualEndpointLoop(api, r) {
+		// Virtual endpoint paths do not contain the public listen path. For
+		// example, stripping /mcp from /mcp-tool:name would corrupt the match.
+		urlPaths = []string{r.URL.Path}
 	}
 
 	for _, endpoint := range endpoints {
@@ -496,6 +508,7 @@ func (l *SessionLimiter) RedisQuotaExceeded(
 
 	increment := func() bool {
 		var res *redis.IntCmd
+		// todo: change to lua script, it does not works like author suppose
 		_, err := conn.Pipelined(ctx, func(pipe redis.Pipeliner) error {
 			res = pipe.Incr(ctx, rawKey)
 			if res.Val() == 1 && quotaRenewalRate > 0 {

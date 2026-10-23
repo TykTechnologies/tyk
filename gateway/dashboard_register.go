@@ -236,6 +236,7 @@ func (h *HTTPDashboardHandler) Register(ctx context.Context) error {
 func (h *HTTPDashboardHandler) attemptRegistration(ctx context.Context) (registered bool, err error) {
 	req := h.newRequestWithContext(ctx, http.MethodGet, h.RegistrationEndpoint)
 	req.Header.Set(header.XTykSessionID, h.Gw.SessionID)
+	h.Gw.nodeMetadata().setHeaders(req.Header)
 
 	resp, err := h.Gw.initialiseClient().Do(req)
 	if err != nil {
@@ -266,7 +267,6 @@ func (h *HTTPDashboardHandler) attemptRegistration(ctx context.Context) (registe
 	h.Gw.ServiceNonce = val.Nonce
 	h.Gw.ServiceNonceMutex.Unlock()
 	dashLog.Debug("Registration Finished: Nonce Set: ", val.Nonce)
-	h.Gw.DoReloadWithRetry(ctx)
 
 	return true, nil
 }
@@ -364,6 +364,8 @@ func (h *HTTPDashboardHandler) doHeartBeat(req *http.Request, client *http.Clien
 	h.Gw.ServiceNonceMutex.RLock()
 	req.Header.Set(header.XTykNonce, h.Gw.ServiceNonce)
 	h.Gw.ServiceNonceMutex.RUnlock()
+	// Refreshed on every send: StartBeating reuses req across heartbeats.
+	h.Gw.nodeMetadata().setHeaders(req.Header)
 
 	resp, err := client.Do(req)
 	if err != nil {

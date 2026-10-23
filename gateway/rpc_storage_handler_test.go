@@ -8,7 +8,9 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -24,6 +26,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/pkg/errpack"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
@@ -1397,4 +1400,40 @@ func TestLoadApps_PendingCertsDrain_Extended(t *testing.T) {
 		ts.Gw.loadApps([]*APISpec{spec})
 		// no assertion needed beyond mock expectation: GetRaw must not be called
 	})
+}
+
+func TestRPCStorageHandler_SetKeyEx(t *testing.T) {
+	rpcListener := RPCStorageHandler{}
+	err := rpcListener.SetKeyEx("test_key", "test_session", 100)
+	assert.ErrorIs(t, err, errpack.ErrNotImplemented, "rpc storage handler should not be called")
+}
+
+func TestRPCStorageHandler_SetRawKeyEx(t *testing.T) {
+	rpcListener := RPCStorageHandler{}
+	err := rpcListener.SetRawKeyEx("test_key", "test_session", 100)
+	assert.ErrorIs(t, err, errpack.ErrNotImplemented, "rpc storage handler should not be called")
+}
+
+// TestRPCStorageHandler_BuildNodeInfo_GoldenWireShape pins the JSON key names
+// sent to MDCB. The byte-equal table above marshals the same struct for its
+// expectation, so it would not notice a renamed or dropped key.
+func TestRPCStorageHandler_BuildNodeInfo_GoldenWireShape(t *testing.T) {
+	ts := StartTest(withoutDRLNotifier)
+	defer ts.Close()
+
+	var got map[string]any
+	require.NoError(t, json.Unmarshal((&RPCStorageHandler{Gw: ts.Gw}).buildNodeInfo(), &got))
+
+	keysOf := func(v any) []string {
+		m, ok := v.(map[string]any)
+		require.True(t, ok, "expected a JSON object, got %T", v)
+		return slices.Collect(maps.Keys(m))
+	}
+	assert.ElementsMatch(t, []string{
+		"node_id", "api_key", "group_id", "node_version", "ttl",
+		"node_is_segmented", "tags", "health", "stats", "host_details",
+	}, keysOf(got))
+	// loaded_apis / loaded_policies are omitempty and the fixture loads none.
+	assert.ElementsMatch(t, []string{"apis_count", "policies_count"}, keysOf(got["stats"]))
+	assert.ElementsMatch(t, []string{"Hostname", "PID", "Address"}, keysOf(got["host_details"]))
 }

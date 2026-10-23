@@ -42,6 +42,8 @@ import (
 	gas "github.com/TykTechnologies/goautosocket"
 	"github.com/TykTechnologies/gorpc"
 	"github.com/TykTechnologies/goverify"
+	"github.com/TykTechnologies/storage/kv/registry"
+	"github.com/TykTechnologies/storage/kv/resolver"
 	persistentmodel "github.com/TykTechnologies/storage/persistent/model"
 
 	"github.com/TykTechnologies/tyk-pump/serializer"
@@ -55,8 +57,10 @@ import (
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/compression"
 	"github.com/TykTechnologies/tyk/internal/crypto"
+	"github.com/TykTechnologies/tyk/internal/dnsdiscovery"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/mcp"
+	"github.com/TykTechnologies/tyk/internal/mcp/pairing"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -65,12 +69,12 @@ import (
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	tyklog "github.com/TykTechnologies/tyk/log"
+	"github.com/TykTechnologies/tyk/pkg/osutil"
 	"github.com/TykTechnologies/tyk/pkg/validator"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/rpc"
 	"github.com/TykTechnologies/tyk/storage"
-	"github.com/TykTechnologies/tyk/storage/kv"
 	"github.com/TykTechnologies/tyk/tcp"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/trace"
@@ -128,6 +132,10 @@ type Gateway struct {
 	DRLManager *drl.DRL
 	reloadMu   sync.Mutex
 
+	// Keyed by hostname, so query volume scales with upstreams, not APIs.
+	upstreamDNS   dnsdiscovery.Scheduler
+	upstreamConns upstreamConnRegistries
+
 	Analytics            RedisAnalyticsHandler
 	GlobalEventsJSVM     JSVM
 	MainNotifier         RedisNotifier
@@ -172,6 +180,7 @@ type Gateway struct {
 	apiSpecs        []*APISpec
 	apisByID        map[string]*APISpec
 	apisHandlesByID *sync.Map
+	mcpPairingIndex pairing.Index
 
 	// prmCache memoises upstream Protected Resource Metadata (RFC 9728) docs
 	// for MCP APIs running in mirror mode. Lazily initialised on first use.
@@ -184,9 +193,6 @@ type Gateway struct {
 	pendingCerts     sync.Map          // certID -> struct{}, certs skipped due to tracker miss
 
 	dnsCacheManager dnscache.IDnsCacheManager
-
-	consulKVStore kv.Store
-	vaultKVStore  kv.Store
 
 	// signatureVerifier is used to verify signatures with config.PublicKeyPath.
 	signatureVerifier atomic.Pointer[goverify.Verifier]
@@ -260,6 +266,24 @@ type Gateway struct {
 	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
 	// Built from apidef.ErrorOverrides during gateway startup.
 	compiledErrorOverrides atomic.Pointer[CompiledErrorOverrides]
+
+	// kvRegistry holds the initialized KV provider stores (env, inline, file,
+	// and — outside test mode — vault/consul and any enterprise providers) that
+	// back secret resolution. In a real startup it is the registry returned by
+	// config.LoadAndInitKVRegistry and owned by the gateway, which closes it on
+	// shutdown. In test mode, where LoadAndInitKVRegistry never runs,
+	// NewGateway installs a minimal local-only registry instead. It is
+	// guaranteed non-nil after construction.
+	kvRegistry *registry.Registry
+
+	// kvResolver resolves kv:// and $kv{} references against kvRegistry. It is
+	// the single entry point the resolution contexts use, so legacy-syntax
+	// shims and new-syntax references share one code path. Guaranteed non-nil
+	// after construction, alongside kvRegistry.
+	kvResolver resolver.Resolver
+
+	// manage safe file paths
+	OSRoot *osutil.Root
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
@@ -319,6 +343,24 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw.jwkCache = buildJWKSCache(config)
 	gw.idpRegistry = newIdPRegistry(gw)
 	gw.BundleChecksumVerifier = defaultBundleVerifyFunction
+
+	// Establish the "kvRegistry and kvResolver are never nil" invariant at
+	// construction. Every resolution context (kvStore, ReplaceTykVariables,
+	// replaceSecrets) dereferences these without a nil check, so a nil here
+	// would turn the first secret lookup into a panic deep in request or
+	// startup paths rather than a clear failure. We Fatal instead of returning
+	// the error because NewGateway has no error return and a gateway that
+	// cannot even build its local stores is unusable.
+	if err := gw.ensureKVRegistry(config); err != nil {
+		log.WithError(err).Fatal("could not initialize KV registry")
+	}
+
+	// Initialize the OSRoot with your desired base path
+	if root, err := osutil.NewRoot(config.TemplatePath); err == nil {
+		gw.OSRoot = root
+	} else {
+		log.WithError(err).Error("Failed to initialize Gateway OSRoot")
+	}
 
 	return gw
 }
@@ -943,6 +985,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	}
 
 	r.HandleFunc("/debug", gw.traceHandler).Methods("POST")
+	r.HandleFunc("/plugins/test", gw.pluginTestHandler).Methods("POST")
 	r.HandleFunc("/cache/jwks/{apiID}", gw.invalidateJWKSCacheForAPIID).Methods("DELETE")
 	r.HandleFunc("/cache/jwks", gw.invalidateJWKSCacheForAllAPIs).Methods("DELETE")
 	r.HandleFunc("/cache/{apiID}", gw.invalidateCacheHandler).Methods("DELETE")
@@ -1054,7 +1097,7 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 	// Set AuthCheck hook
 	if !spec.CustomMiddleware.AuthCheck.Disabled && spec.CustomMiddleware.AuthCheck.Name != "" {
 		mwAuthCheckFunc = spec.CustomMiddleware.AuthCheck
-		if spec.CustomMiddleware.AuthCheck.Path != "" {
+		if spec.CustomMiddleware.AuthCheck.Code == "" && spec.CustomMiddleware.AuthCheck.Path != "" {
 			// Feed a JS file to Otto
 			mwPaths = append(mwPaths, spec.CustomMiddleware.AuthCheck.Path)
 		}
@@ -1066,7 +1109,9 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 			continue
 		}
 
-		mwPaths = append(mwPaths, mwObj.Path)
+		if mwObj.Code == "" {
+			mwPaths = append(mwPaths, mwObj.Path)
+		}
 		mwPreFuncs = append(mwPreFuncs, mwObj)
 		mainLog.Debug("Loading custom PRE-PROCESSOR middleware: ", mwObj.Name)
 	}
@@ -1075,7 +1120,9 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 			continue
 		}
 
-		mwPaths = append(mwPaths, mwObj.Path)
+		if mwObj.Code == "" {
+			mwPaths = append(mwPaths, mwObj.Path)
+		}
 		mwPostFuncs = append(mwPostFuncs, mwObj)
 		mainLog.Debug("Loading custom POST-PROCESSOR middleware: ", mwObj.Name)
 	}
@@ -1143,6 +1190,9 @@ func (gw *Gateway) loadCustomMiddleware(spec *APISpec) ([]string, apidef.Middlew
 			continue
 		}
 
+		if mw.Path != "" {
+			mwPaths = append(mwPaths, mw.Path)
+		}
 		mwResponseFuncs = append(mwResponseFuncs, mw)
 	}
 
@@ -1203,6 +1253,8 @@ func (gw *Gateway) createResponseMiddlewareChain(
 		//is it goplugin or other middleware
 		if strings.HasSuffix(mw.Path, ".so") {
 			processor = gw.responseProcessorByName("goplugin_res_hook", baseHandler)
+		} else if isJSDriver(spec.CustomMiddleware.Driver) {
+			processor = gw.responseProcessorByName("custom_mw_js_res_hook", baseHandler)
 		} else {
 			processor = gw.responseProcessorByName("custom_mw_res_hook", baseHandler)
 		}
@@ -1353,9 +1405,9 @@ const (
 )
 
 // DoReloadWithRetry calls DoReloadWithError in an exponential-backoff retry
-// loop (5s → 10s → 20s → 40s → 60s cap). It is used at the two startup call
-// sites (Register and startServer) where a failed reload means the gateway has
-// zero APIs and policies and must keep retrying until the upstream recovers.
+// loop (5s → 10s → 20s → 40s → 60s cap). It is used during startServer where
+// a failed initial reload means the gateway has zero APIs and policies and must
+// keep retrying until the upstream recovers.
 //
 // The loop is intentionally NOT used in reloadLoop (the runtime hot-reload
 // path) because that goroutine must remain unblocked so that subsequent
@@ -1628,6 +1680,9 @@ func (gw *Gateway) initSystem() error {
 	defer globalMu.Unlock()
 
 	gwConfig := gw.GetConfig()
+	if err := gwConfig.HttpServerOptions.ValidateTrustedProxyCIDRs(); err != nil {
+		return fmt.Errorf("invalid http_server_options.trusted_proxy_cidrs: %w", err)
+	}
 
 	// Initialize the appropriate log formatter
 	if !gw.isRunningTests() && os.Getenv("TYK_LOGFORMAT") == "" && !*cli.DebugMode {
@@ -1676,9 +1731,22 @@ func (gw *Gateway) initSystem() error {
 
 	if !gw.isRunningTests() {
 		gwConfig := config.Config{}
-		if err := config.Load(confPaths, &gwConfig); err != nil {
+
+		reg, err := config.LoadAndInitKVRegistry(
+			gw.ctx,
+			confPaths,
+			&gwConfig,
+			enterpriseKVFactories(),
+		)
+		if err != nil {
 			return err
 		}
+
+		mainLog.Debug("Replacing bootstrap KV registry")
+		gw.closeKVRegistry(gw.ctx)
+
+		gw.kvRegistry = reg
+		gw.kvResolver = resolver.NewResolver(gw.kvRegistry)
 
 		// Compile error override regex patterns and build indexed lookup
 		// Compilation failures are logged as warnings and those rules are skipped
@@ -1804,6 +1872,7 @@ func (gw *Gateway) initSystem() error {
 func (gw *Gateway) initMembers(cfg config.Config) {
 	gw.validator = validator.New(
 		validator.WithAllowUnsafePolicyIds(cfg.AllowUnsafePolicyIds),
+		validator.WithAllowUnsafeApiIds(cfg.AllowUnsafeApiIds),
 	)
 }
 
@@ -1932,6 +2001,16 @@ func (gw *Gateway) afterConfSetup() error {
 	regexp.Configure(cacheOpts)
 	httputil.ConfigurePathRegexpCache(maxEntries, conf.DisableRegexpCacheBound, mainLog.Warnf)
 
+	if conf.AllowUnsafeApiIds {
+		mainLog.Warn("allow_unsafe_api_ids is enabled: API IDs with non-standard characters will be accepted. " +
+			"This can cause unpredictable behavior and is not recommended.")
+	}
+
+	if conf.AllowUnsafeBodyTransformTemplatePaths {
+		mainLog.Warn("allow_unsafe_body_transform_template_paths is enabled: body transform template paths are not confined to template_path. " +
+			"Risk: API definitions can read arbitrary files from the gateway filesystem.")
+	}
+
 	if conf.HealthCheckEndpointName == "" {
 		conf.HealthCheckEndpointName = "hello"
 	}
@@ -2020,108 +2099,6 @@ func (gw *Gateway) afterConfSetup() error {
 
 	gw.SetConfig(conf)
 	return nil
-}
-
-func (gw *Gateway) resolveKV(original string, set func(*config.Config, string), hotReload bool) (string, error) {
-	resolved, err := gw.kvStore(original)
-	if err != nil {
-		return original, err
-	}
-	if hotReload && resolved != original {
-		gw.kvResolvers = append(gw.kvResolvers, func() error {
-			val, err := gw.kvStore(original)
-			if err != nil {
-				return err
-			}
-			conf := gw.GetConfig()
-			set(&conf, val)
-			gw.SetConfig(conf)
-			return nil
-		})
-	}
-	return resolved, nil
-}
-
-func (gw *Gateway) kvStore(value string) (string, error) {
-
-	if strings.HasPrefix(value, "secrets://") {
-		key := strings.TrimPrefix(value, "secrets://")
-		log.Debugf("Retrieving %s from secret store in config", key)
-		val, ok := gw.GetConfig().Secrets[key]
-		if !ok {
-			return "", fmt.Errorf("secrets does not exist in config.. %s not found", key)
-		}
-		return val, nil
-	}
-
-	if strings.HasPrefix(value, "env://") {
-		key := strings.TrimPrefix(value, "env://")
-		log.Debugf("Retrieving %s from environment", key)
-		return os.Getenv(fmt.Sprintf("TYK_SECRET_%s", strings.ToUpper(key))), nil
-	}
-
-	if strings.HasPrefix(value, "consul://") {
-		key := strings.TrimPrefix(value, "consul://")
-		log.Debugf("Retrieving %s from consul", key)
-		if err := gw.setUpConsul(); err != nil {
-			log.Error("Failed to setup consul: ", err)
-
-			// Return value as is. If consul cannot be set up
-			return value, nil
-		}
-
-		return gw.consulKVStore.Get(key)
-	}
-
-	if strings.HasPrefix(value, "vault://") {
-		key := strings.TrimPrefix(value, "vault://")
-		log.Debugf("Retrieving %s from vault", key)
-		if err := gw.setUpVault(); err != nil {
-			log.Error("Failed to setup vault: ", err)
-			// Return value as is If vault cannot be set up
-			return value, nil
-		}
-
-		return gw.vaultKVStore.Get(key)
-	}
-
-	if strings.HasPrefix(value, "file://") {
-		path := strings.TrimPrefix(value, "file://")
-		log.Debugf("Retrieving %s from kv file", path)
-		return ResolveFileKV(gw.GetConfig().KV.File.BasePath, path)
-	}
-
-	return value, nil
-}
-
-func (gw *Gateway) setUpVault() error {
-	if gw.vaultKVStore != nil {
-		return nil
-	}
-
-	var err error
-
-	gw.vaultKVStore, err = kv.NewVault(gw.GetConfig().KV.Vault)
-	if err != nil {
-		log.Debugf("an error occurred while setting up vault... %v", err)
-	}
-
-	return err
-}
-
-func (gw *Gateway) setUpConsul() error {
-	if gw.consulKVStore != nil {
-		return nil
-	}
-
-	var err error
-
-	gw.consulKVStore, err = kv.NewConsul(gw.GetConfig().KV.Consul)
-	if err != nil {
-		log.Debugf("an error occurred while setting up consul.. %v", err)
-	}
-
-	return err
 }
 
 var getIpAddress = netutil.GetIpAddress
@@ -2682,6 +2659,9 @@ func (gw *Gateway) gracefulShutdown(ctx context.Context) error {
 	mainLog.Info("Closing cache stores and other resources...")
 
 	gw.cacheClose()
+
+	mainLog.Info("Closing KV registry provider connections")
+	gw.closeKVRegistry(ctx)
 
 	// Check if there were any errors during shutdown
 	close(errChan)

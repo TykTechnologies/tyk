@@ -44,10 +44,56 @@ func IsHashType(t string) bool {
 	return false
 }
 
+// AccessCondition is an additional constraint that a request has to satisfy
+// before the enclosing AccessSpec grants access. It mirrors
+// apidef.RoutingTrigger, minus the RewriteTo field which has no meaning here.
+type AccessCondition struct {
+	// On decides how the options below combine: apidef.All requires every
+	// configured option to match, apidef.Any requires just one of them.
+	On apidef.RoutingTriggerOnType `json:"on" msg:"on"`
+	// Options holds the header, query, path part, session meta, request
+	// context, payload and body field matches to evaluate against the request.
+	Options AccessConditionOptions `json:"options" msg:"options"`
+}
+
+// AccessConditionOptions are the matches an AccessCondition evaluates. They
+// are the URL Rewrite trigger options, which serialise inline, plus matches
+// that only make sense for an access decision. Keeping the extra matches here
+// rather than on apidef.RoutingTriggerOptions means a URL Rewrite trigger
+// cannot be configured with a match it would silently ignore.
+type AccessConditionOptions struct {
+	apidef.RoutingTriggerOptions `bson:",inline"`
+	// BodyFieldMatches holds the rules to apply to fields of a JSON request
+	// body. Each names the field by its path in gjson syntax, e.g.
+	// "customer.id", the same path syntax error overrides use for body_field.
+	//
+	// A list rather than a map keyed by path, because paths contain dots and
+	// a map key is stored as a field name, which some databases refuse to
+	// store. It also lets one path carry more than one rule.
+	//
+	// Paths are case sensitive. A body that repeats a key, in any case, or that
+	// is not valid JSON fails the match. A path through an array such as
+	// "items.#.sku" checks the elements that have the field and skips those
+	// that do not, so pair it with a match on the field being present where
+	// every element has to carry it.
+	BodyFieldMatches []BodyFieldMatch `bson:"body_field_matches,omitempty" json:"body_field_matches,omitempty" msg:"body_field_matches"`
+}
+
+// BodyFieldMatch is a rule applied to one field of a JSON request body.
+type BodyFieldMatch struct {
+	// Path addresses the field in gjson syntax, e.g. "customer.id".
+	Path string `bson:"path" json:"path" msg:"path"`
+	// The rule itself, serialised inline beside the path.
+	apidef.StringRegexMap `bson:",inline"`
+}
+
 // AccessSpecs define what URLS a user has access to an what methods are enabled
 type AccessSpec struct {
 	URL     string   `json:"url" msg:"url"`
 	Methods []string `json:"methods" msg:"methods"`
+	// Conditions further restrict the matched URL. When set, every condition
+	// has to be satisfied by the request for access to be granted.
+	Conditions []AccessCondition `json:"conditions,omitempty" msg:"conditions"`
 }
 
 // RateLimit holds rate limit configuration.
@@ -348,6 +394,11 @@ type SessionState struct {
 	// modified holds the hint if a session has been modified for update.
 	// use Touch() to set it, and IsModified() to get it.
 	modified bool
+
+	// isRestored
+	// The flag holds information if session was restored or not.
+	// Use MarkAsRestored() to mark session as restored, and IsRestored() to get it.
+	isRestored bool
 }
 
 func NewSessionState() *SessionState {
@@ -379,6 +430,21 @@ func (s *SessionState) Touch() {
 // Reset marks the session as not modified, skipping related updates.
 func (s *SessionState) Reset() {
 	s.modified = false
+}
+
+// MarkAsRestored marks the session as restored.
+func (s *SessionState) MarkAsRestored() {
+	s.isRestored = true
+}
+
+// MarkAsNew marks the session as new.
+func (s *SessionState) MarkAsNew() {
+	s.isRestored = false
+}
+
+// IsRestored informs if session is a new one.
+func (s *SessionState) IsRestored() bool {
+	return s.isRestored
 }
 
 // IsModified will return true if session has been modified to trigger an update.

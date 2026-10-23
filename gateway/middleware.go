@@ -24,6 +24,7 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/event"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil/accesslog"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/otel"
@@ -172,12 +173,27 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 			startTime := time.Now()
 			logger.WithField("ts", startTime.UnixNano()).WithField("mw", mw.Name()).Debug("Started")
 
-			if mw.Base().Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
+			// Browser preflights still require MCP Origin validation.
+			_, originGuard := actualMW.(*MCPOriginValidationMiddleware)
+			if !originGuard && mw.Base().Spec.CORS.OptionsPassthrough && r.Method == "OPTIONS" {
 				next.ServeHTTP(w, r)
 				return
 			}
 
 			err, errCode := mw.ProcessRequest(w, r, mwConf)
+
+			// Direct JSON-RPC rejections have already written their response. Record
+			// them through the normal error analytics path exactly once.
+			ingress := httpctx.GetMCPProtocolContext(r)
+			protocolRejected := ingress != nil && ingress.Validation.HTTPStatus >= 400
+			if err == nil && errCode == middleware.StatusRespond && mw.Base().Spec.IsMCP() && (ctxGetJSONRPCErrorCode(r) != 0 || protocolRejected) {
+				status, message := http.StatusForbidden, "MCP request rejected"
+				if ingress := httpctx.GetMCPProtocolContext(r); ingress != nil && ingress.Validation.HTTPStatus != 0 {
+					status, message = ingress.Validation.HTTPStatus, ingress.Validation.Message
+				}
+				handler := ErrorHandler{mw.Base()}
+				handler.HandleError(w, r, message, status, false)
+			}
 
 			// Workaround
 			// ProcessRequest signature is too narrow it has to be extended to handle cases like this
@@ -193,8 +209,7 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 					writeResponse = false
 				}
 
-				handler := ErrorHandler{mw.Base()}
-				handler.HandleError(w, r, err.Error(), errCode, writeResponse)
+				(&ErrorHandler{mw.Base()}).handleErrorExtended(w, r, err, errCode, writeResponse)
 
 				meta["error"] = err.Error()
 
@@ -205,11 +220,14 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 					job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
 				}
 
-				logger.
+				finishedLogger := logger.
 					WithError(err).
 					WithField("code", errCode).
-					WithField("ns", finishTime.Nanoseconds()).
-					Log(errpack.LogLevel(err, logrus.DebugLevel), "Finished")
+					WithField("ns", finishTime.Nanoseconds())
+				if rpcCode := ctxGetJSONRPCErrorCode(r); rpcCode != 0 {
+					finishedLogger = finishedLogger.WithField("jsonrpc_error_code", rpcCode)
+				}
+				finishedLogger.Log(errpack.LogLevel(err, logrus.DebugLevel), "Finished")
 
 				return
 			}
@@ -221,7 +239,11 @@ func (gw *Gateway) createMiddleware(actualMW TykMiddleware) func(http.Handler) h
 				job.TimingKv(eventName+".exec_time", finishTime.Nanoseconds(), meta)
 			}
 
-			logger.WithField("code", errCode).WithField("ns", finishTime.Nanoseconds()).Debug("Finished")
+			finishedLogger := logger.WithField("code", errCode).WithField("ns", finishTime.Nanoseconds())
+			if rpcCode := ctxGetJSONRPCErrorCode(r); rpcCode != 0 {
+				finishedLogger = finishedLogger.WithField("jsonrpc_error_code", rpcCode)
+			}
+			finishedLogger.Debug("Finished")
 
 			mw.Base().UpdateRequestSession(r)
 			// Special code, bypasses all other execution
@@ -242,12 +264,7 @@ func (gw *Gateway) isDisabledForMCP(mw TykMiddleware) bool {
 		return false
 	}
 
-	switch mw.(type) {
-	case *RedisCacheMiddleware:
-		return true
-	default:
-		return false
-	}
+	return false
 }
 
 func (gw *Gateway) mwAppendEnabled(chain *[]alice.Constructor, mw TykMiddleware) bool {
@@ -260,6 +277,29 @@ func (gw *Gateway) mwAppendEnabled(chain *[]alice.Constructor, mw TykMiddleware)
 		return true
 	}
 	return false
+}
+
+// mwAppendEnabledForRequest evaluates the request predicate before entering the
+// traced middleware handler, so skipped requests emit no middleware telemetry.
+func (gw *Gateway) mwAppendEnabledForRequest(chain *[]alice.Constructor, mw TykMiddleware, enabled func(*http.Request) bool) bool {
+	if gw.isDisabledForMCP(mw) || !mw.EnabledForSpec() {
+		return false
+	}
+
+	tracedConstructor := gw.createMiddleware(mw)
+	*chain = append(*chain, func(next http.Handler) http.Handler {
+		tracedHandler := tracedConstructor(next)
+
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if !enabled(r) {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			tracedHandler.ServeHTTP(w, r)
+		})
+	})
+	return true
 }
 
 func (gw *Gateway) responseMWAppendEnabled(chain *[]TykResponseHandler, responseMW TykResponseHandler) bool {
@@ -468,6 +508,8 @@ func (t *BaseMiddleware) UpdateRequestSession(r *http.Request) bool {
 
 	// Reset session state, useful for benchmarks when request object stays the same.
 	session.Reset()
+	// Mark session as restored; (makes invoke `SET key val XX` in further calls)
+	session.MarkAsRestored()
 
 	if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
 		t.Gw.SessionCache.Set(session.KeyHash(), session.Clone(), cache.DefaultExpiration)
@@ -607,6 +649,13 @@ func copyAllowedURLs(input []user.AccessSpec) []user.AccessSpec {
 			copied[i].Methods = make([]string, len(as.Methods))
 			copy(copied[i].Methods, as.Methods)
 		}
+		// Conditions decide access, so a copy that dropped them would widen
+		// it. They are copied by value: AccessCondition holds maps, which are
+		// shared with the input, but nothing mutates them after load.
+		if as.Conditions != nil {
+			copied[i].Conditions = make([]user.AccessCondition, len(as.Conditions))
+			copy(copied[i].Conditions, as.Conditions)
+		}
 	}
 
 	return copied
@@ -651,6 +700,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 		if found {
 			t.Logger().Debug("--> Key found in local cache")
 			session := cachedVal.(user.SessionState).Clone()
+			session.MarkAsRestored()
 			if err := t.ApplyPolicies(&session); err != nil {
 				t.Logger().Error(err)
 				return session, false
@@ -697,11 +747,22 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 	session, found = t.Spec.AuthManager.SessionDetail(t.Spec.OrgID, key, false)
 	if found {
 		key = session.KeyID
-
 		session := session.Clone()
 		session.SetKeyHash(keyHash)
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
 		t.Logger().Info("Recreating session for key: ", t.Gw.obfuscateKey(key))
+
+		// insert new session
+		if t.Gw.GlobalSessionManager.Store() != t.Spec.AuthManager.Store() {
+			clonedSession := session.Clone()
+			clonedSession.MarkAsNew()
+
+			lifetime := clonedSession.Lifetime(t.Spec.GetSessionLifetimeRespectsKeyExpiration(), t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime)
+			if err := t.Gw.GlobalSessionManager.UpdateSession(key, &clonedSession, lifetime, false); err != nil {
+				t.Logger().WithError(err).Error("Cant copy session from AuthManager into GlobalSessionManager")
+				return user.SessionState{}, false
+			}
+		}
 
 		// cache it
 		if !t.Spec.GlobalConfig.LocalSessionCache.DisableCacheSessionState {
@@ -724,6 +785,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 
 	// session not found
 	session.KeyID = key
+
 	return session, false
 }
 
@@ -871,6 +933,8 @@ func (gw *Gateway) responseProcessorByName(name string, baseHandler BaseTykRespo
 		return &HeaderTransform{BaseTykResponseHandler: baseHandler}
 	case "custom_mw_res_hook":
 		return &CustomMiddlewareResponseHook{BaseTykResponseHandler: baseHandler}
+	case "custom_mw_js_res_hook":
+		return &JSResponseMiddleware{BaseTykResponseHandler: baseHandler}
 	case "goplugin_res_hook":
 		return &ResponseGoPluginMiddleware{BaseTykResponseHandler: baseHandler}
 	}
@@ -889,7 +953,7 @@ func handleResponseChain(chain []TykResponseHandler, rw http.ResponseWriter, res
 	for _, rh := range chain {
 		if err := handleResponse(rh, rw, res, req, ses, traceIsEnabled); err != nil {
 			// Abort the request if this handler is a response middleware hook:
-			if rh.Name() == "CustomMiddlewareResponseHook" {
+			if rh.Name() == "CustomMiddlewareResponseHook" || rh.Name() == "JSResponseMiddleware" {
 				rh.HandleError(rw, req)
 				return true, err
 			}

@@ -98,7 +98,7 @@ type Authentication struct {
 	// for authorization server discovery. This is used by MCP clients to discover which
 	// authorization server to use for accessing the API.
 	//
-	// Deprecated: Use SecuritySchemes[<name>].OAuth2.ProtectedResourceMetadata instead.
+	// Deprecated: Use `SecuritySchemes[<name>].OAuth2.ProtectedResourceMetadata` instead.
 	// The new per-scheme location is the runtime source of truth; this top-level
 	// field is kept for downgrade safety and will be removed in a future major version.
 	ProtectedResourceMetadata *ProtectedResourceMetadata `bson:"protectedResourceMetadata,omitempty" json:"protectedResourceMetadata,omitempty"`
@@ -121,7 +121,7 @@ type Authentication struct {
 //
 // On non-MCP APIs only static is meaningful; mirror is a no-op.
 //
-// Deprecated: Use OAuth2PRM (under SecuritySchemes[<name>].OAuth2) instead.
+// Deprecated: Use OAuth2PRM (under `SecuritySchemes[<name>].OAuth2`) instead.
 // This type backs the legacy top-level Authentication.ProtectedResourceMetadata
 // field; the new per-scheme location is the runtime source of truth and the
 // legacy block is kept only for downgrade safety.
@@ -370,7 +370,7 @@ func (a *Authentication) ExtractTo(api *apidef.APIDefinition) {
 	a.CustomKeyLifetime.ExtractTo(api)
 }
 
-// SecuritySchemes holds security scheme values, filled with Import().
+// SecuritySchemes holds security scheme values keyed by the scheme name declared in `components.securitySchemes`. Each value can be an `oauth2` scheme — see [OAuth2](#oauth2) for the full configuration contract.
 type SecuritySchemes map[string]interface{}
 
 // SecurityScheme defines an Importer interface for security schemes.

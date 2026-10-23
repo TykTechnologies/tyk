@@ -12,7 +12,10 @@ import (
 
 	"github.com/kelseyhightower/envconfig"
 
+	"github.com/TykTechnologies/storage/kv"
+
 	"github.com/TykTechnologies/tyk/apidef"
+	internalhttputil "github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -224,6 +227,31 @@ type StorageOptionsConf struct {
 	// This limit prevents memory exhaustion during decompression.
 	// Defaults to 104857600 (100MB).
 	MaxDecompressedSize int64 `json:"max_decompressed_size"`
+
+	// Configure the cloud provider's Identity and Access Management (IAM)
+	// authentication solution for temporal storage (for example, GCP MemoryStore IAM)
+	// instead of the traditional fixed username and password.
+	IAMAuth IAMAuthConfig `json:"iam_auth"`
+}
+
+// Configure the cloud provider's Identity and Access Management (IAM) authentication
+// for temporal storage (Redis/Valkey). If enabled, the standard username and password are ignored.
+type IAMAuthConfig struct {
+	// Set to true to use IAM-based authentication for this storage connection.
+	Enabled bool `json:"enabled"`
+	// Provider selects the cloud IAM provider. Currently supported: "gcp"
+	// (GCP Memorystore for Valkey and Redis Cluster).
+	Provider string `json:"provider"`
+	// ServiceAccount, for GCP, optionally impersonates this service account to
+	// mint tokens instead of using the ambient Application Default Credentials
+	// identity. Leave empty to use the workload's own identity (Workload Identity
+	// on GKE, or GOOGLE_APPLICATION_CREDENTIALS).
+	ServiceAccount string `json:"service_account"`
+	// The access token issued by the IAM will be refreshed before expiry.
+	// Set the time period before expiry when that refresh will take place as
+	// a human readable duration (for example "2m30s", "5m").
+	// Defaults to "5m" (five minutes) when empty.
+	TokenRefreshBeforeExpiry string `json:"token_refresh_before_expiry"`
 }
 
 type NormalisedURLConfig struct {
@@ -236,7 +264,7 @@ type NormalisedURLConfig struct {
 	// * `/ca761232-ed42-11ce-BAcd-00aa0057b223/search`
 	// * `/ca761232-ed42-11ce-BAcd-00aa0057b223/search`
 
-	// Each UUID will be replaced with a placeholder {uuid}
+	// Each UUID will be replaced with a placeholder `{uuid}`
 	NormaliseUUIDs bool `json:"normalise_uuids"`
 
 	// Set this to true to have Tyk automatically clean up ULIDs. It will match the following style:
@@ -245,7 +273,7 @@ type NormalisedURLConfig struct {
 	// * `/posts/01g9hhnkwgbhcqx7vg3jksz055/comments`
 	// * `/posts/01g9HHNKwgbhcqx7vg3JKSZ055/comments`
 
-	// Each ULID will be replaced with a placeholder {ulid}
+	// Each ULID will be replaced with a placeholder `{ulid}`
 	NormaliseULIDs bool `json:"normalise_ulids"`
 
 	// Set this to true to have Tyk automatically match for numeric IDs, it will match with a preceding slash so as not to capture actual numbers:
@@ -277,6 +305,10 @@ type AnalyticsConfigConfig struct {
 	// Please note, this will greatly increase your analytics DB size and can cause performance degradation on analytics processing by the Dashboard.
 	// This setting can be overridden with an organization flag, enabed at an API level, or on individual Key level.
 	EnableDetailedRecording bool `json:"enable_detailed_recording"`
+
+	// AllowUnsafeDetailedLogs controls whether sensitive headers (the standard `Authorization` header and any custom auth headers defined for the API) are obfuscated when detailed recording is enabled.
+	// Setting this to true restores the legacy behavior where raw requests are captured as-is, which may expose sensitive tokens in plain text.
+	AllowUnsafeDetailedLogs bool `json:"allow_unsafe_detailed_logs"`
 
 	// Tyk can store GeoIP information based on MaxMind DB’s to enable GeoIP tracking on inbound request analytics. Set this value to `true` and assign a DB using the `geo_ip_db_path` setting.
 	EnableGeoIP bool `json:"enable_geo_ip"`
@@ -628,7 +660,7 @@ type HttpServerOptionsConfig struct {
 	SkipClientCAAnnouncement bool `json:"skip_client_ca_announcement"`
 
 	// Set this to the number of seconds that Tyk uses to flush content from the proxied upstream connection to the open downstream connection.
-	// This option needed be set for streaming protocols like Server Side Events, or gRPC streaming.
+	// This option needs to be set for streaming protocols like gRPC streaming.
 	FlushInterval int `json:"flush_interval"`
 
 	// Allow the use of a double slash in a URL path. This can be useful if you need to pass raw URLs to your API endpoints.
@@ -663,12 +695,25 @@ type HttpServerOptionsConfig struct {
 	// A value of 1 means using the last IP, 2 means second to last, and so on.
 	XFFDepth int `json:"xff_depth"`
 
+	// TrustedProxyCIDRs lists the proxy networks whose Forwarded and
+	// X-Forwarded-* headers may be used to determine the request's public
+	// origin. Requests received directly, or from any other peer, ignore those
+	// headers.
+	TrustedProxyCIDRs []string `json:"trusted_proxy_cidrs"`
+
 	// MaxResponseBodySize sets an upper limit on the response body (payload) size in bytes. It defaults to 0, which means there is no restriction on the response body size.
 	//
 	// The Gateway will return `HTTP 500 Response Body Too Large` if the response payload exceeds MaxResponseBodySize+1 bytes.
 	//
 	// **Note:** The limit is applied only when the [Response Body Transform middleware](/api-management/traffic-transformation/response-body) is enabled.
 	MaxResponseBodySize int64 `json:"max_response_body_size"`
+}
+
+// ValidateTrustedProxyCIDRs validates the networks permitted to supply public
+// request-origin headers.
+func (h HttpServerOptionsConfig) ValidateTrustedProxyCIDRs() error {
+	_, err := internalhttputil.ParseTrustedProxyCIDRs(h.TrustedProxyCIDRs)
+	return err
 }
 
 type AuthOverrideConf struct {
@@ -1102,6 +1147,13 @@ type Config struct {
 	// This can cause a file-handler limit to be exceeded. Setting to false can have performance benefits as the connection can be reused.
 	ProxyCloseConnections bool `json:"proxy_close_connections"`
 
+	// ApplyStripListenPathToURLRewrite restores the legacy behavior, where
+	// listen path stripping also applied to paths rewritten by URL Rewrite. If a rewritten path starts
+	// with the API’s listen path, Gateway strips the listen path before proxying upstream.
+	// Defaults to false, which proxies rewritten paths unchanged.
+	// Enable it only if your APIs rely on the legacy behavior.
+	ApplyStripListenPathToURLRewrite bool `json:"apply_strip_listen_path_to_url_rewrite"`
+
 	// Tyk nodes can provide uptime awareness, uptime testing and analytics for your underlying APIs uptime and availability.
 	// Tyk can also notify you when a service goes down.
 	UptimeTests UptimeTestsConfig `json:"uptime_tests"`
@@ -1263,7 +1315,7 @@ type Config struct {
 	// If not set or left empty, it will default to `info`.
 	LogLevel string `json:"log_level"`
 
-	// LogFormat configures the output format of the logs.
+	// Configures the output format used for application logs.
 	// Allowed values are `text`, `json`, or `legacy`.
 	// If not set or left empty, it defaults to `text`.
 	LogFormat logger.Format `json:"log_format"`
@@ -1344,12 +1396,14 @@ type Config struct {
 	// global session lifetime, in seconds.
 	GlobalSessionLifetime int64 `bson:"global_session_lifetime" json:"global_session_lifetime"`
 
-	// This section enables the use of the KV capabilities to substitute configuration values.
+	// Configure the Key-Value stores for secure storage of secrets and other configuration values.
+	// From Tyk 5.15.0 the dedicated Consul, Vault and File methods are deprecated in favour of the more flexible Stores approach.
 	// See more details https://tyk.io/docs/tyk-self-managed/#store-configuration-with-key-value-store
 	KV struct {
 		Consul ConsulConfig `json:"consul"`
 		Vault  VaultConfig  `json:"vault"`
 		File   FileConfig   `json:"file"`
+		Stores kv.Stores    `json:"stores" structviewer:"obfuscate"`
 	} `json:"kv"`
 
 	// Secrets configures a list of key/value pairs for the gateway.
@@ -1438,6 +1492,18 @@ type Config struct {
 	// The standard characters are alphanumeric characters plus underscore (_), hyphen (-), dot (.) and tilde (~).
 	// The use of other characters in IDs can cause unpredictable behavior and is not recommended.
 	AllowUnsafePolicyIds bool `json:"allow_unsafe_policy_ids"`
+
+	// AllowUnsafeWebhookTemplatePaths disables webhook template path validation. This is provided for compatibility with legacy webhook definitions containing potentially unsafe template paths (default: false).
+	AllowUnsafeWebhookTemplatePaths bool `json:"allow_unsafe_webhook_template_paths"`
+
+	// AllowUnsafeApiIds allows the use of non-standard characters in API identifiers (default: false).
+	// The standard characters are alphanumeric characters plus underscore (_), hyphen (-), dot (.) and tilde (~).
+	// A standard ID must also contain at least one letter or digit, so IDs made only of punctuation (e.g. "." or "..") are rejected.
+	// The use of other characters in IDs can cause unpredictable behavior and is not recommended.
+	AllowUnsafeApiIds bool `json:"allow_unsafe_api_ids"`
+
+	// AllowUnsafeBodyTransformTemplatePaths disables body transform template path validation. This is provided for compatibility with legacy API definitions containing potentially unsafe template paths (default: false).
+	AllowUnsafeBodyTransformTemplatePaths bool `json:"allow_unsafe_body_transform_template_paths"`
 }
 
 // LabsConfig include config for streaming

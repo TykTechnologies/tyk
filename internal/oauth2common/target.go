@@ -50,7 +50,8 @@ func SelectExchangeProvider(providers []oas.OAuth2TokenExchangeProvider, iss str
 }
 
 // MergeTargetForProvider merges the per-op exchange override with the provider
-// defaultTarget (most-specific wins). Returns nil when no audience can be resolved.
+// defaultTarget (most-specific wins). Returns nil when no audience resolves,
+// except under jwt-bearer — RFC 7523 has no audience wire parameter.
 func MergeTargetForProvider(ex *oas.OAuth2Exchange, provider *oas.OAuth2TokenExchangeProvider, inferredScopes []string) *Target {
 	t := &Target{}
 	if ex != nil {
@@ -68,7 +69,7 @@ func MergeTargetForProvider(ex *oas.OAuth2Exchange, provider *oas.OAuth2TokenExc
 			t.Scopes = append([]string(nil), provider.DefaultTarget.Scopes...)
 		}
 	}
-	if t.Audience == "" {
+	if t.Audience == "" && !provider.IsJWTBearer() {
 		return nil
 	}
 	return t

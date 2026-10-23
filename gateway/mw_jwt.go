@@ -20,7 +20,9 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/lonelycode/osin"
 	"github.com/ohler55/ojg/jp"
+	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
+	expmaps "golang.org/x/exp/maps"
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -833,24 +835,48 @@ func getScopeFromClaim(claims jwt.MapClaims, scopeClaimName string) []string {
 	return toScopeStringsSlice(lookedUp, nil, false)
 }
 
-func mapScopeToPolicies(mapping map[string]string, scope []string) []string {
-	polIDs := []string{}
-
+func mapScopeToPolicies(mapping map[string]string, scope []string, log *logrus.Logger) []string {
 	// add all policies matched from scope-policy mapping
-	policiesToApply := map[string]bool{}
+	var policiesToApplySet map[string]struct{}
+	var unmatchedScopes map[string]struct{}
+
 	for _, scopeItem := range scope {
 		if policyID, ok := mapping[scopeItem]; ok {
-			policiesToApply[policyID] = true
-			log.Debugf("Found a matching policy for scope item: %s", scopeItem)
+			if policiesToApplySet == nil {
+				policiesToApplySet = make(map[string]struct{}, min(len(scope), len(mapping)))
+			}
+
+			policiesToApplySet[policyID] = struct{}{}
 		} else {
-			log.Errorf("Couldn't find a matching policy for scope item: %s", scopeItem)
+			if unmatchedScopes == nil {
+				unmatchedScopes = make(map[string]struct{}, len(scope))
+			}
+
+			unmatchedScopes[scopeItem] = struct{}{}
 		}
 	}
-	for id := range policiesToApply {
-		polIDs = append(polIDs, id)
+
+	res := expmaps.Keys(policiesToApplySet)
+
+	if len(res) > 0 {
+		log.Debugf("Found a matching policy for scope item: %s", res)
 	}
 
-	return polIDs
+	// https://tyktech.atlassian.net/browse/TT-5893
+	if len(unmatchedScopes) > 0 {
+		level := logrus.DebugLevel
+		if len(policiesToApplySet) == 0 {
+			level = logrus.ErrorLevel
+		}
+
+		log.Logf(
+			level,
+			"Couldn't find a matching policy for scope item: %s",
+			expmaps.Keys(unmatchedScopes),
+		)
+	}
+
+	return res
 }
 
 func (k *JWTMiddleware) getOAuthClientIDFromClaim(claims jwt.MapClaims) string {
@@ -1044,7 +1070,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 			}
 
 			// add all policies matched from scope-policy mapping
-			mappedPolIDs := mapScopeToPolicies(scopeMap, scope)
+			mappedPolIDs := mapScopeToPolicies(scopeMap, scope, log)
 			if len(mappedPolIDs) > 0 {
 				k.Logger().Debugf("Identified policy(s) to apply to this token from scope claim: %s", scopeClaimName)
 			} else {
@@ -1263,7 +1289,21 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 
 		ctx.SetErrorClassification(r, tykerrors.ClassifyJWTError(tykerrors.ErrTypeAuthFieldMissing, k.Name()))
 		k.reportLoginFailure(tykId, r)
-		return k.prmError(w, r, errors.New("Authorization field missing"), http.StatusBadRequest)
+		// A missing credential is semantically 401, not 400. RFC 9728 / MCP
+		// clients only begin the PRM-discovery + OAuth flow on a 401 challenge,
+		// so a 400 here (even with the WWW-Authenticate resource_metadata header)
+		// leaves spec-compliant clients (e.g. VS Code) unable to authenticate.
+		//
+		// Gated on PRM being enabled for this spec so the status code changes
+		// only for APIs that opted into PRM/MCP. Every other JWT API keeps its
+		// long-standing 400 on missing auth, avoiding a global breaking change.
+		// IsPRMEnabled honours both the oauth2-scheme block (new, wins) and the
+		// deprecated top-level block.
+		missingAuthStatus := http.StatusBadRequest
+		if k.Spec.IsPRMEnabled() {
+			missingAuthStatus = http.StatusUnauthorized
+		}
+		return k.prmError(w, r, errors.New("Authorization field missing"), missingAuthStatus)
 	}
 
 	// enable bearer token format
