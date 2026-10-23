@@ -23,7 +23,8 @@ type RateLimit struct {
 	// Redis Rate Limiter, or the Sentinel Rate Limiter, as both algorithms implement a sliding log.
 	EnableRateLimitSmoothing bool `json:"enable_rate_limit_smoothing"`
 
-	// An enhancement for the Redis and Sentinel rate limiters, that offers a significant improvement in performance by not using transactions on Redis rate-limit buckets.
+	// Deprecated: ignored since v5.13.0. The Redis and Sentinel rate limiters run a single Lua script,
+	// so there is no transaction left to skip. The option is kept so existing configurations still load.
 	EnableNonTransactionalRateLimiter bool `json:"enable_non_transactional_rate_limiter"`
 
 	// How frequently a distributed rate limiter synchronises information between the Gateway nodes. Default: 2 seconds.
