@@ -27,4 +27,4 @@ jobs:
       PROBE_APP_ID: ${{ secrets.PROBE_APP_ID }}
       PROBE_APP_PRIVATE_KEY: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
     with:
-      go-version: stable
+      go-version: "1.26"
