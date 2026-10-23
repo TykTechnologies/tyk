@@ -4,6 +4,7 @@ import (
 	"context"
 	"embed"
 	"errors"
+	"fmt"
 	"io"
 	"strconv"
 	"time"
@@ -46,15 +47,11 @@ func WithLogger(logger logrus.FieldLogger) Option {
 	}
 }
 
-func discardLogger() logrus.FieldLogger {
-	logger := logrus.New()
-	logger.SetOutput(io.Discard)
-
-	return logger
-}
-
 // ErrRedisClientProvider is returned if NewSlidingLog isn't passed a valid RedisClientProvider parameter.
-var ErrRedisClientProvider = errors.New("Client doesn't implement RedisClientProvider")
+var (
+	ErrRedisClientProvider = errors.New("client doesn't implement RedisClientProvider")
+	ErrUnexpectedResponse  = errors.New("unexpected response")
+)
 
 // NewSlidingLog creates a new SlidingLog instance with a storage.Handler. In case
 // the storage is offline, it's expected to return nil and an error to handle.
@@ -112,29 +109,72 @@ func (r *SlidingLog) invokeSlidingLogAdd(ctx context.Context, key string, maxAll
 	return r.statsFromReply(res, key, maxAllowed, per)
 }
 
+// slidingLogAddReply is the result of sliding_log_add.lua.
+type slidingLogAddReply struct {
+	count        int64
+	remaining    int64
+	earliestNano int64
+	nowNano      int64
+	collisions   int64
+}
+
+func parseSlidingLogAddReply(res []any) (slidingLogAddReply, error) {
+	if len(res) != 5 {
+		return slidingLogAddReply{}, fmt.Errorf("%w: %d fields", ErrUnexpectedResponse, len(res))
+	}
+
+	var reply slidingLogAddReply
+	var errs [5]error
+
+	reply.count, errs[0] = intField(res, 0)
+	reply.remaining, errs[1] = intField(res, 1)
+	reply.earliestNano, errs[2] = nanoField(res, 2)
+	reply.nowNano, errs[3] = nanoField(res, 3)
+	reply.collisions, errs[4] = intField(res, 4)
+
+	return reply, errors.Join(errs[:]...)
+}
+
+func intField(res []any, i int) (int64, error) {
+	v, ok := res[i].(int64)
+	if !ok {
+		return 0, fmt.Errorf("%w: field %d is %T", ErrUnexpectedResponse, i, res[i])
+	}
+
+	return v, nil
+}
+
+func nanoField(res []any, i int) (int64, error) {
+	str, ok := res[i].(string)
+	if !ok {
+		return 0, fmt.Errorf("%w: field %d is %T", ErrUnexpectedResponse, i, res[i])
+	}
+
+	v, err := strconv.ParseInt(str, 10, 64)
+	if err != nil {
+		return 0, fmt.Errorf("%w: field %d: %w", ErrUnexpectedResponse, i, err)
+	}
+
+	return v, nil
+}
+
 // statsFromReply turns the result of sliding_log_add.lua into Stats.
 func (r *SlidingLog) statsFromReply(res []any, key string, maxAllowed, per int64) (Stats, error) {
-	count := res[0].(int64)      // nolint:errcheck
-	remaining := res[1].(int64)  // nolint:errcheck
-	collisions := res[4].(int64) // nolint:errcheck
-
-	earliestNano, err := strconv.ParseInt(res[2].(string), 10, 64) // nolint:errcheck
+	reply, err := parseSlidingLogAddReply(res)
 	if err != nil {
 		return NewEmptyStats(), err
 	}
 
-	nowNano, err := strconv.ParseInt(res[3].(string), 10, 64) // nolint:errcheck
-	if err != nil {
-		return NewEmptyStats(), err
-	}
-
-	if collisions > 0 {
-		r.logger.WithField("key", key).WithField("collisions", collisions).Debug("sliding log: hits in the same microsecond")
+	if reply.collisions > 0 {
+		r.logger.
+			WithField("key", key).
+			WithField("collisions", reply.collisions).
+			Debug("sliding log: hits in the same microsecond")
 	}
 
 	var reset time.Duration
-	if remaining == 0 {
-		reset = time.Duration(earliestNano + per*int64(time.Second) - nowNano)
+	if reply.remaining == 0 {
+		reset = time.Duration(reply.earliestNano + per*int64(time.Second) - reply.nowNano)
 	}
 
 	if reset < 0 {
@@ -142,9 +182,15 @@ func (r *SlidingLog) statsFromReply(res []any, key string, maxAllowed, per int64
 	}
 
 	return Stats{
-		Count:     int(count),
-		Remaining: int(remaining),
+		Count:     int(reply.count),
+		Remaining: int(reply.remaining),
 		Limit:     int(maxAllowed),
 		Reset:     reset,
 	}, nil
+}
+
+func discardLogger() logrus.FieldLogger {
+	logger := logrus.New()
+	logger.SetOutput(io.Discard)
+	return logger
 }

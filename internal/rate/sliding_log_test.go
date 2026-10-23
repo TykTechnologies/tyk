@@ -265,11 +265,53 @@ func (s *SlidingLogSuite) TestMemberCollisionJump() {
 	s.Equal(int64(9), count)
 }
 
+func (s *SlidingLogSuite) TestParseSlidingLogAddReply() {
+	good := []any{int64(2), int64(0), "1700000000000000000", "1700000000000005000", int64(1)}
+
+	reply, err := parseSlidingLogAddReply(good)
+	s.Require().NoError(err)
+	s.Equal(slidingLogAddReply{count: 2, remaining: 0, earliestNano: 1700000000000000000, nowNano: 1700000000000005000, collisions: 1}, reply)
+
+	for index := range 5 {
+		s.Run("field "+strconv.Itoa(index)+" of wrong type", func() {
+			bad := append([]any{}, good...)
+			bad[index] = 3.14
+
+			_, err := parseSlidingLogAddReply(bad)
+			s.ErrorIs(err, ErrUnexpectedResponse)
+			s.ErrorContains(err, "field "+strconv.Itoa(index))
+		})
+	}
+
+	for _, index := range []int{2, 3} {
+		s.Run("field "+strconv.Itoa(index)+" not a number", func() {
+			bad := append([]any{}, good...)
+			bad[index] = "nope"
+
+			_, err := parseSlidingLogAddReply(bad)
+			s.ErrorIs(err, ErrUnexpectedResponse)
+			s.ErrorIs(err, strconv.ErrSyntax)
+		})
+	}
+
+	s.Run("every bad field is reported", func() {
+		_, err := parseSlidingLogAddReply([]any{"a", "b", 1, 2, "c"})
+		for index := range 5 {
+			s.ErrorContains(err, "field "+strconv.Itoa(index))
+		}
+	})
+
+	s.Run("short reply", func() {
+		_, err := parseSlidingLogAddReply(good[:4])
+		s.ErrorIs(err, ErrUnexpectedResponse)
+	})
+}
+
 func (s *SlidingLogSuite) TestStatsFromReply() {
 	const sec = int64(time.Second)
 	now := int64(1700000000000005000)
-	reply := func(count, remaining, earliest, collisions int64) []interface{} {
-		return []interface{}{count, remaining, strconv.FormatInt(earliest, 10), strconv.FormatInt(now, 10), collisions}
+	reply := func(count, remaining, earliest, collisions int64) []any {
+		return []any{count, remaining, strconv.FormatInt(earliest, 10), strconv.FormatInt(now, 10), collisions}
 	}
 
 	logger, hook := logrustest.NewNullLogger()
@@ -277,8 +319,8 @@ func (s *SlidingLogSuite) TestStatsFromReply() {
 	rl := NewSlidingLogRedis(nil, nil, WithLogger(logger))
 
 	for name, tc := range map[string]struct {
-		res  []interface{}
-		want Stats
+		reply []any
+		want  Stats
 	}{
 		"slots left":      {reply(1, 1, now, 0), Stats{Count: 1, Remaining: 1, Limit: 3, Reset: 0}},
 		"last slot":       {reply(2, 0, now, 0), Stats{Count: 2, Remaining: 0, Limit: 3, Reset: 10 * time.Second}},
@@ -289,11 +331,11 @@ func (s *SlidingLogSuite) TestStatsFromReply() {
 		s.Run(name, func() {
 			hook.Reset()
 
-			got, err := rl.statsFromReply(tc.res, s.key, 3, 10)
+			got, err := rl.statsFromReply(tc.reply, s.key, 3, 10)
 			s.Require().NoError(err)
 			s.Equal(tc.want, got)
 
-			if tc.res[4].(int64) > 0 {
+			if tc.reply[4].(int64) > 0 {
 				s.Require().Len(hook.Entries, 1)
 				s.Equal(logrus.DebugLevel, hook.LastEntry().Level)
 				s.Equal(s.key, hook.LastEntry().Data["key"])
@@ -303,16 +345,11 @@ func (s *SlidingLogSuite) TestStatsFromReply() {
 		})
 	}
 
-	for name, index := range map[string]int{"earliest": 2, "now": 3} {
-		s.Run(name+" not a number", func() {
-			bad := reply(1, 1, now, 0)
-			bad[index] = "nope"
-
-			got, err := rl.statsFromReply(bad, s.key, 3, 10)
-			s.Error(err)
-			s.Equal(NewEmptyStats(), got)
-		})
-	}
+	s.Run("bad reply", func() {
+		got, err := rl.statsFromReply(reply(1, 1, now, 0)[:4], s.key, 3, 10)
+		s.ErrorIs(err, ErrUnexpectedResponse)
+		s.Equal(NewEmptyStats(), got)
+	})
 }
 
 func (s *SlidingLogSuite) TestNewSlidingLog() {
