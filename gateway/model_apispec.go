@@ -319,7 +319,11 @@ func (a *APISpec) getMatchPathAndMethod(r *http.Request, mode URLStatus) (string
 		}
 	}
 
-	if a.Proxy.ListenPath != "/" && !isJSONRPCVEMPath(r, matchPath) {
+	// For OAS APIs the listen path is stripped once, in matchesPath. Stripping
+	// it here as well eats a listen path that is also a prefix of the endpoint
+	// path, which the full URL fallback used to mask.
+	unsafeMatching := !a.IsOAS || a.GlobalConfig.AllowUnsafeListenPathMatching
+	if unsafeMatching && a.Proxy.ListenPath != "/" && !isJSONRPCVEMPath(r, matchPath) {
 		matchPath = a.StripListenPath(matchPath)
 	}
 

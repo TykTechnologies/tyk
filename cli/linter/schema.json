@@ -628,6 +628,10 @@
       "type": "boolean",
       "default": false
     },
+    "allow_unsafe_listen_path_matching": {
+      "type": "boolean",
+      "default": false
+    },
     "close_idle_connections": {
       "type": "boolean"
     },
