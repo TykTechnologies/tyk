@@ -417,3 +417,42 @@ func TestAllMetricNames_Registered(t *testing.T) {
 		assert.Contains(t, names, name)
 	}
 }
+
+// --- JWKS instruments ---
+
+func TestRecordJWKS_Noop(t *testing.T) {
+	inst := noopProvider(t)
+	require.NotPanics(t, func() {
+		inst.RecordJWKSFetch(context.Background(), "registry", "ok", 20*time.Millisecond)
+		inst.RecordJWKSKidMiss(context.Background(), "cooldown")
+	})
+}
+
+func TestRecordJWKSFetch_LabelledBySourceAndOutcome(t *testing.T) {
+	inst, tp := activeProvider(t)
+	ctx := context.Background()
+
+	inst.RecordJWKSFetch(ctx, "registry", "ok", 20*time.Millisecond)
+	inst.RecordJWKSFetch(ctx, "registry", "error", time.Second)
+
+	m := tp.FindMetric(t, jwksMetricFetches)
+	metrictest.AssertSumWithAttrs(t, m, int64(1),
+		attribute.String(jwksAttrSource, "registry"), attribute.String(jwksAttrOutcome, "ok"))
+	metrictest.AssertSumWithAttrs(t, m, int64(1),
+		attribute.String(jwksAttrSource, "registry"), attribute.String(jwksAttrOutcome, "error"))
+	metrictest.AssertDataPointCount(t, m, 2)
+	metrictest.AssertHistogramCount(t, tp.FindMetric(t, jwksMetricFetchDuration), uint64(2))
+}
+
+func TestRecordJWKSKidMiss_LabelledByResult(t *testing.T) {
+	inst, tp := activeProvider(t)
+	ctx := context.Background()
+
+	inst.RecordJWKSKidMiss(ctx, "cooldown")
+	inst.RecordJWKSKidMiss(ctx, "cooldown")
+	inst.RecordJWKSKidMiss(ctx, "refetched")
+
+	m := tp.FindMetric(t, jwksMetricKidMiss)
+	metrictest.AssertSumWithAttrs(t, m, int64(2), attribute.String(jwksAttrResult, "cooldown"))
+	metrictest.AssertSumWithAttrs(t, m, int64(1), attribute.String(jwksAttrResult, "refetched"))
+}

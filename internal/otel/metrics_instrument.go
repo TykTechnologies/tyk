@@ -38,6 +38,18 @@ const (
 	exchangeMetricCacheHit = "tyk.oauth2.exchange.cache_hit"
 )
 
+// JWKS fetch instruments. Attributes are small enums; IdP and org identifiers
+// stay out of labels so series count does not grow with tenants.
+const (
+	jwksMetricFetches       = "tyk.jwt.jwks.fetches"
+	jwksMetricFetchDuration = "tyk.jwt.jwks.fetch.duration"
+	jwksMetricKidMiss       = "tyk.jwt.jwks.kid_miss"
+
+	jwksAttrSource  = "source"
+	jwksAttrOutcome = "outcome"
+	jwksAttrResult  = "result"
+)
+
 // MetricInstruments encapsulates the OTel metrics provider and all gateway instruments.
 // All methods are safe to call even when the provider is disabled (noop).
 type MetricInstruments struct {
@@ -59,6 +71,10 @@ type MetricInstruments struct {
 	exchangeRequests *tykmetric.Counter
 	exchangeDuration *tykmetric.Histogram
 	exchangeCacheHit *tykmetric.Counter
+
+	jwksFetches       *tykmetric.Counter
+	jwksFetchDuration *tykmetric.Histogram
+	jwksKidMiss       *tykmetric.Counter
 }
 
 // NewMetricInstruments creates gateway metric instruments from an existing provider.
@@ -137,6 +153,34 @@ func NewMetricInstruments(provider tykmetric.Provider, logger *logrus.Logger) *M
 		logger.Errorf("Creating exchange cache_hit counter: %s", err)
 	}
 
+	jwksFetches, err := provider.NewCounter(
+		jwksMetricFetches,
+		"Total JWKS fetches, by source and outcome",
+		"1",
+	)
+	if err != nil {
+		logger.Errorf("Creating JWKS fetches counter: %s", err)
+	}
+
+	jwksFetchDuration, err := provider.NewHistogram(
+		jwksMetricFetchDuration,
+		"Time to fetch and parse a JWKS, by source and outcome",
+		"s",
+		exchangeDurationBuckets,
+	)
+	if err != nil {
+		logger.Errorf("Creating JWKS fetch duration histogram: %s", err)
+	}
+
+	jwksKidMiss, err := provider.NewCounter(
+		jwksMetricKidMiss,
+		"Tokens whose kid was absent from a cached JWKS, by whether a re-fetch ran",
+		"1",
+	)
+	if err != nil {
+		logger.Errorf("Creating JWKS kid miss counter: %s", err)
+	}
+
 	return &MetricInstruments{
 		provider:         provider,
 		requestCounter:   requestCounter,
@@ -147,7 +191,27 @@ func NewMetricInstruments(provider tykmetric.Provider, logger *logrus.Logger) *M
 		exchangeRequests: exchangeRequests,
 		exchangeDuration: exchangeDuration,
 		exchangeCacheHit: exchangeCacheHit,
+
+		jwksFetches:       jwksFetches,
+		jwksFetchDuration: jwksFetchDuration,
+		jwksKidMiss:       jwksKidMiss,
 	}
+}
+
+// RecordJWKSFetch records one JWKS fetch on the counter and duration histogram.
+func (i *MetricInstruments) RecordJWKSFetch(ctx context.Context, source, outcome string, duration time.Duration) {
+	attrs := []attribute.KeyValue{
+		attribute.String(jwksAttrSource, source),
+		attribute.String(jwksAttrOutcome, outcome),
+	}
+	i.jwksFetches.Add(ctx, 1, attrs...)
+	i.jwksFetchDuration.Record(ctx, duration.Seconds(), attrs...)
+}
+
+// RecordJWKSKidMiss counts a token whose kid the cached JWKS lacked; result is
+// "refetched" or "cooldown".
+func (i *MetricInstruments) RecordJWKSKidMiss(ctx context.Context, result string) {
+	i.jwksKidMiss.Add(ctx, 1, attribute.String(jwksAttrResult, result))
 }
 
 // RecordExchange records one token-exchange decision: it increments the

@@ -9,6 +9,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/rpc"
 )
@@ -30,6 +32,8 @@ type IdP struct {
 	// the conventional "scope" claim. Mirrors the dashboard's model.ClientIdP.
 	ScopeClaimName string                  `json:"scope_claim_name"`
 	APIMappings    map[string]ScopeMapping `json:"api_mappings"`
+	// Shorthand duration ("2m30s"); empty selects the gateway default.
+	JWKSCacheTimeout string `json:"jwks_cache_timeout"`
 }
 
 // ScopeMapping is the value type of IdP.APIMappings; the map key is the api_id.
@@ -45,15 +49,17 @@ type idpFeedEnvelope struct {
 	Nonce   string `json:"Nonce"`
 }
 
-// Binding is the reverse-index value: the registry maps an api_id to the set of
-// IdPs bound to it, each carrying that API's scope_to_policy overrides.
+// Binding is the reverse-index value: the registry maps an api_id to the IdPs
+// bound to it. IdP points at the snapshot's copy of the record, shared by every
+// binding of that record.
 type Binding struct {
+	IdP           *IdP
+	JWKS          *jwksEntry // nil when the record has no usable jwks_uri
 	ScopeToPolicy map[string]string
-	IdPID         string
-	// ScopeClaimName is denormalised from the bound IdP at rebuild time so the
-	// JWT hot path resolves the scope claim without a second registry lookup.
-	ScopeClaimName string
 }
+
+// client_idp_id is unique only within an org.
+type idpKey struct{ OrgID, ID string }
 
 // IdPRegistry is an in-memory, request-time join of APIs to their client IdPs.
 // It is a separate global on the Gateway struct, never merged into
@@ -63,8 +69,9 @@ type IdPRegistry struct {
 	gw *Gateway
 
 	mu            sync.RWMutex // OWN mutex — never apisMu
-	idpsByID      map[string]IdP
-	bindingsByAPI map[string][]Binding // only index the JWT path reads
+	bindingsByAPI map[string][]Binding
+	jwksByIdP     map[idpKey]*jwksEntry
+	fetcher       *jwksFetcher
 
 	debounceMu    sync.Mutex
 	debounceTimer *time.Timer
@@ -76,8 +83,9 @@ type IdPRegistry struct {
 func newIdPRegistry(gw *Gateway) *IdPRegistry {
 	return &IdPRegistry{
 		gw:            gw,
-		idpsByID:      map[string]IdP{},
 		bindingsByAPI: map[string][]Binding{},
+		jwksByIdP:     map[idpKey]*jwksEntry{},
+		fetcher:       &jwksFetcher{gw: gw},
 		rpcLoaderFn:   func() RPCDataLoader { return &RPCStorageHandler{Gw: gw} },
 	}
 }
@@ -89,53 +97,116 @@ func (r *IdPRegistry) BindingsForAPI(apiID string) []Binding {
 	return r.bindingsByAPI[apiID]
 }
 
-func (r *IdPRegistry) IdP(idpID string) (IdP, bool) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	idp, ok := r.idpsByID[idpID]
-	return idp, ok
-}
-
-// rebuild builds the reverse index, then swaps it in (build-then-swap).
-//  1. Snapshot apisByID keys under a brief apisMu RLock, then RELEASE apisMu
-//     before iterating idps — the hold time is O(len(apisByID)), not the full
-//     rebuild cost, so it never blocks a concurrent loadApps swap or reader.
-//  2. Segment-aware backstop: drop bindings whose api_id is not in the loaded
-//     set, making stale/renamed api_ids inert and keeping other segments' IdP
-//     detail out of memory (IdPs with zero surviving mappings are omitted).
-//  3. Swap both maps under r.mu.Lock() — mirrors loadApps swapping apisByID.
+// rebuild builds the reverse index, then swaps it in. A mapping binds only when
+// its API is loaded on this node (segment backstop) and belongs to the record's
+// org: the direct Dashboard feed carries every org's records. Callers hold
+// refreshMu, so rebuilds never overlap.
 func (r *IdPRegistry) rebuild(idps []IdP) {
-	r.gw.apisMu.RLock()
-	loaded := make(map[string]struct{}, len(r.gw.apisByID))
-	for id := range r.gw.apisByID {
-		loaded[id] = struct{}{}
+	b := &snapshotBuilder{
+		bindingsByAPI: map[string][]Binding{},
+		jwksByIdP:     map[idpKey]*jwksEntry{},
 	}
-	r.gw.apisMu.RUnlock()
-
-	idpsByID := make(map[string]IdP, len(idps))
-	bindingsByAPI := make(map[string][]Binding, len(loaded))
-
-	for _, idp := range idps {
-		var indexed bool
-		for apiID, sm := range idp.APIMappings {
-			if _, ok := loaded[apiID]; !ok {
-				continue
-			}
-			bindingsByAPI[apiID] = append(bindingsByAPI[apiID], Binding{
-				IdPID:          idp.ID,
-				ScopeToPolicy:  sm.ScopeToPolicy,
-				ScopeClaimName: idp.ScopeClaimName,
-			})
-			indexed = true
-		}
-		if indexed {
-			idpsByID[idp.ID] = idp
-		}
+	if len(idps) > 0 {
+		b.orgByAPI = r.gw.loadedAPIOrgs()
+		b.gwDefault = jwksDefaultTTL(r.gw.GetConfig())
+		r.mu.RLock()
+		b.prevJWKS = r.jwksByIdP
+		r.mu.RUnlock()
+	}
+	for i := range idps {
+		b.add(&idps[i])
 	}
 
 	r.mu.Lock()
-	r.idpsByID, r.bindingsByAPI = idpsByID, bindingsByAPI
+	r.bindingsByAPI, r.jwksByIdP = b.bindingsByAPI, b.jwksByIdP
 	r.mu.Unlock()
+}
+
+// snapshotBuilder is local to one rebuild call and never shared.
+type snapshotBuilder struct {
+	orgByAPI      map[string]string
+	bindingsByAPI map[string][]Binding
+
+	gwDefault time.Duration
+	prevJWKS  map[idpKey]*jwksEntry
+	jwksByIdP map[idpKey]*jwksEntry
+}
+
+func (b *snapshotBuilder) add(idp *IdP) {
+	var (
+		rec   *IdP
+		entry *jwksEntry
+	)
+	for apiID, sm := range idp.APIMappings {
+		org, loaded := b.orgByAPI[apiID]
+		if !loaded {
+			continue
+		}
+		if org != idp.OrgID {
+			idpLog(idp).WithFields(logrus.Fields{"api_id": apiID, "api_org_id": org}).
+				Warn("Ignoring client IdP mapping to an API in another org")
+			continue
+		}
+		if rec == nil { // copy on first binding, so unbound records are not retained
+			c := *idp
+			rec = &c
+			entry = b.jwksEntryFor(rec)
+		}
+		b.bindingsByAPI[apiID] = append(b.bindingsByAPI[apiID], Binding{IdP: rec, JWKS: entry, ScopeToPolicy: sm.ScopeToPolicy})
+	}
+}
+
+// Returns nil for a record without a usable HTTP(S) jwks_uri.
+func (b *snapshotBuilder) jwksEntryFor(idp *IdP) *jwksEntry {
+	// Private hosts stay allowed (an internal Keycloak is normal); other schemes do not.
+	if !httpScheme.MatchString(idp.JWKSURI) {
+		idpLog(idp).Warn("Client IdP has no usable HTTP(S) jwks_uri; its tokens cannot be verified")
+		return nil
+	}
+	ttl, source, err := idp.jwksTTL(b.gwDefault)
+	if err != nil {
+		idpLog(idp).WithError(err).Warn("Client IdP JWKS cache timeout")
+	}
+
+	key := idpKey{idp.OrgID, idp.ID}
+	entry, carried := b.prevJWKS[key]
+	if !carried || entry.url != idp.JWKSURI || entry.ttl != ttl {
+		entry = newJWKSEntry(idp.JWKSURI, ttl)
+		idpLog(idp).WithFields(logrus.Fields{"ttl": ttl, "source": source}).Debug("Client IdP JWKS entry created")
+	}
+	b.jwksByIdP[key] = entry
+	return entry
+}
+
+func idpLog(idp *IdP) *logrus.Entry {
+	return log.WithFields(logrus.Fields{"org_id": idp.OrgID, "client_idp_id": idp.ID})
+}
+
+func (gw *Gateway) loadedAPIOrgs() map[string]string {
+	gw.apisMu.RLock()
+	defer gw.apisMu.RUnlock()
+	orgs := make(map[string]string, len(gw.apisByID))
+	for id, spec := range gw.apisByID {
+		orgs[id] = spec.OrgID
+	}
+	return orgs
+}
+
+func (r *IdPRegistry) flushJWKS(key idpKey) {
+	r.mu.RLock()
+	e := r.jwksByIdP[key]
+	r.mu.RUnlock()
+	if e != nil {
+		e.flush()
+	}
+}
+
+func (r *IdPRegistry) flushAllJWKS() {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for _, e := range r.jwksByIdP {
+		e.flush()
+	}
 }
 
 // refreshIdPRegistry triggers a debounced client-IdP registry refresh, guarding

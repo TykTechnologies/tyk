@@ -1127,6 +1127,7 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	apiIDsToDeleteCache := make([]string, 0)
 	userKeyResets := make(map[string]string)
 	apiIDsToInvalidateJWKSCache := make([]string, 0)
+	var idpIDsToInvalidateJWKSCache []string
 
 	for _, key := range keys {
 		splitKeys := strings.Split(key, ":")
@@ -1155,6 +1156,11 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 				notRegularKeys[key] = true
 			case NoticeInvalidateJWKSCacheForAPI.String():
 				apiIDsToInvalidateJWKSCache = append(apiIDsToInvalidateJWKSCache, splitKeys[0])
+				notRegularKeys[key] = true
+			case NoticeInvalidateJWKSCacheForClientIdP.String():
+				// client_idp_id is caller-supplied and may itself contain ':'.
+				idpID := strings.Join(splitKeys[:len(splitKeys)-1], ":")
+				idpIDsToInvalidateJWKSCache = append(idpIDsToInvalidateJWKSCache, idpID)
 				notRegularKeys[key] = true
 			case NoticeUserKeyReset.String():
 				keyParts := strings.Split(splitKeys[0], ".")
@@ -1333,6 +1339,10 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	for _, apiID := range apiIDsToInvalidateJWKSCache {
 		log.WithField("apiID", apiID).Debug("Received request to flush JWKS cache")
 		r.Gw.invalidateJWKSCacheByAPIID(apiID)
+	}
+
+	for _, idpID := range idpIDsToInvalidateJWKSCache {
+		r.Gw.flushClientIdPJWKS(orgId, idpID)
 	}
 
 	// Notify rest of gateways in cluster to flush cache

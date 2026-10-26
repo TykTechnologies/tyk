@@ -23,7 +23,6 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 	expmaps "golang.org/x/exp/maps"
-	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -86,6 +85,7 @@ func (k *JWTMiddleware) Init() {
 			clientFactory := NewExternalHTTPClientFactory(k.Gw)
 			client, clientErr := clientFactory.CreateJWKClient()
 
+			cached := 0
 			for _, jwk := range config.JWTJwksURIs {
 				var jwkSet *jose.JSONWebKeySet
 				var err error
@@ -104,6 +104,13 @@ func (k *JWTMiddleware) Init() {
 				}
 
 				jwkCache.Set(jwk.URL, jwkSet, jwk.GetCacheTimeoutSeconds(cache.DefaultExpiration))
+				cached++
+			}
+
+			// Without the marker the first request takes the URL-change branch in
+			// getSecretFromMultipleJWKURIs, flushes this cache and fetches again.
+			if cached > 0 {
+				jwkCache.Set(k.specCacheKey(k.Spec, JWKsAPIDef), k.Spec.APIDefinition, cache.DefaultExpiration)
 			}
 		}()
 	}
@@ -192,21 +199,25 @@ func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interf
 		if val.KID != kid || strings.ToLower(val.Kty) != strings.ToLower(keyType) {
 			continue
 		}
-		if len(val.X5c) > 0 {
-			// Use the first cert only
-			decodedCert, err := base64.StdEncoding.DecodeString(val.X5c[0])
-			if !bytes.Contains(decodedCert, []byte("-----")) {
-				return nil, errors.New("No legacy public keys found")
-			}
-			if err != nil {
-				return nil, err
-			}
-			return ParseRSAPublicKey(decodedCert)
-		}
-		return nil, errors.New("no certificates in JWK")
+		return legacyKeyFromJWK(val)
 	}
 
 	return nil, errors.New("No matching KID could be found")
+}
+
+func legacyKeyFromJWK(val JWK) (any, error) {
+	if len(val.X5c) == 0 {
+		return nil, errors.New("no certificates in JWK")
+	}
+	// Use the first cert only
+	decodedCert, err := base64.StdEncoding.DecodeString(val.X5c[0])
+	if !bytes.Contains(decodedCert, []byte("-----")) {
+		return nil, errors.New("No legacy public keys found")
+	}
+	if err != nil {
+		return nil, err
+	}
+	return ParseRSAPublicKey(decodedCert)
 }
 
 func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType string) (interface{}, error) {
@@ -394,7 +405,7 @@ func (k *JWTMiddleware) secretFromIdPRegistry(r *http.Request, token *jwt.Token)
 
 	for i := range bindings {
 		b := bindings[i]
-		if key := k.keyForBinding(b, iss, kid); key != nil {
+		if key := k.keyForBinding(r, b, iss, kid); key != nil {
 			ctxSetMatchedBinding(r, &b) // request context — never k
 			return key
 		}
@@ -417,119 +428,13 @@ func unverifiedIssuerHint(token *jwt.Token) string {
 }
 
 // keyForBinding resolves the JWKS key for a single registry binding, or nil to
-// skip it: unknown IdP, iss mismatch (empty iss walks all), or no matching kid.
-func (k *JWTMiddleware) keyForBinding(b Binding, iss, kid string) interface{} {
-	idp, ok := k.Gw.idpRegistry.IdP(b.IdPID)
-	if !ok {
+// skip it: no usable jwks_uri, iss mismatch (empty iss walks all), or no
+// matching kid.
+func (k *JWTMiddleware) keyForBinding(r *http.Request, b Binding, iss, kid string) any {
+	if b.JWKS == nil || (iss != "" && b.IdP.Issuer != iss) {
 		return nil
 	}
-	if iss != "" && idp.Issuer != iss {
-		return nil
-	}
-	return k.fetchJWKSKey(idp.JWKSURI, kid)
-}
-
-// fetchJWKSKey resolves a JWKS key by kid, keyed purely on the URL. It is
-// deliberately not getSecretFromURL: that function's cache-hit path is gated on
-// decode(Spec.JWTSource) == url, which is always false for a registry URL
-// (Spec.JWTSource == ""), so it would refetch the JWKS on every request.
-//
-// Security: url is the IdP's jwks_uri from the admin-controlled client-IdP
-// registry (Dashboard/MDCB) — the same trust domain and HTTP client
-// (ExternalHTTPClientFactory) as the existing JWTSource/JWTJwksURIs fetches, so
-// it inherits their SSRF posture rather than introducing a new one. We require
-// an http(s) scheme here to reject non-HTTP vectors (file://, gopher://, ...);
-// host-level egress restrictions are intentionally NOT applied because DCR IdPs
-// (e.g. an internal Keycloak) legitimately live on private networks.
-func (k *JWTMiddleware) fetchJWKSKey(url, kid string) interface{} {
-	if url == "" || kid == "" {
-		return nil
-	}
-	if !httpScheme.MatchString(url) {
-		k.Logger().Warnf("Ignoring non-HTTP client-IdP JWKS URI")
-		return nil
-	}
-	jwkCache := k.loadOrCreateJWKCache() // per-API cache; URL-keyed inside
-
-	if key := keyFromJWKSet(cachedJWKSet(jwkCache, url), kid); key != nil {
-		return key
-	}
-
-	// Coalesce concurrent fetches for the same (API, URL) so a burst of requests
-	// on a cold/expired cache triggers a single network fetch instead of a
-	// thundering herd against the IdP's JWKS endpoint. Keyed by APIID so each
-	// API's per-API cache stays coherent.
-	res, err, _ := jwksFetchGroup.Do(k.Spec.APIID+"|"+url, func() (interface{}, error) {
-		set, fetchErr := k.fetchAndCacheJWKS(url, jwkCache)
-		return set, fetchErr
-	})
-
-	if err != nil {
-		// x5c PEM fallback (mirrors getSecretFromMultipleJWKURIs); rare error path.
-		if key, legacyErr := k.legacyGetSecretFromURL(url, kid, k.Spec.JWTSigningMethod); legacyErr == nil {
-			return key
-		}
-		k.Gw.logJWKError(k.Logger(), url, err)
-		return nil
-	}
-
-	set, ok := res.(*jose.JSONWebKeySet)
-	if !ok {
-		return nil
-	}
-	return keyFromJWKSet(set, kid)
-}
-
-// jwksFetchGroup coalesces concurrent client-IdP JWKS fetches per (API, URL).
-var jwksFetchGroup singleflight.Group
-
-// keyFromJWKSet returns the public key for kid from set, or nil if set is nil or
-// the kid is absent (e.g. JWKS cached before a key rotation).
-func keyFromJWKSet(set *jose.JSONWebKeySet, kid string) interface{} {
-	if set == nil {
-		return nil
-	}
-	if keys := set.Key(kid); len(keys) > 0 {
-		return keys[0].Key
-	}
-	return nil
-}
-
-// cachedJWKSet returns the cached JWKS for url, or nil on a miss / unexpected
-// cache value type.
-func cachedJWKSet(jwkCache cache.Repository, url string) *jose.JSONWebKeySet {
-	if raw, ok := jwkCache.Get(url); ok {
-		if set, isSet := raw.(*jose.JSONWebKeySet); isSet {
-			return set
-		}
-	}
-	return nil
-}
-
-// fetchAndCacheJWKS fetches the JWKS at url (factory client, then plain-client
-// fallback) and caches it. Runs inside the single-flight, so it re-checks the
-// cache first in case a prior in-flight fetch already populated it.
-func (k *JWTMiddleware) fetchAndCacheJWKS(url string, jwkCache cache.Repository) (*jose.JSONWebKeySet, error) {
-	if set := cachedJWKSet(jwkCache, url); set != nil {
-		return set, nil
-	}
-
-	var (
-		jwkSet *jose.JSONWebKeySet
-		err    error
-	)
-	client, clientErr := NewExternalHTTPClientFactory(k.Gw).CreateJWKClient()
-	if clientErr == nil {
-		jwkSet, err = getJWKWithClient(url, client)
-	}
-	if clientErr != nil || err != nil {
-		jwkSet, err = GetJWK(url, k.Gw.GetConfig().JWTSSLInsecureSkipVerify)
-	}
-	if err != nil {
-		return nil, err
-	}
-	jwkCache.Set(url, jwkSet, cache.DefaultExpiration)
-	return jwkSet, nil
+	return b.JWKS.key(r.Context(), k.Gw.idpRegistry.fetcher, kid)
 }
 
 var GetJWK = getJWK
@@ -1200,8 +1105,8 @@ func (k *JWTMiddleware) scopeClaimNameForRequest(claims jwt.MapClaims, binding *
 	if k.Spec.IsOAS {
 		name = k.getScopeClaimNameOAS(claims)
 	}
-	if name == "" && binding != nil {
-		name = binding.ScopeClaimName
+	if name == "" && binding != nil && binding.IdP != nil {
+		name = binding.IdP.ScopeClaimName
 	}
 	if name == "" {
 		name = "scope"
