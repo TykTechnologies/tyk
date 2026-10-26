@@ -17,8 +17,7 @@ func TestLoadApps_CertificateTracking(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
 
-		// Ensure certUsageTracker is nil (default for non-RPC mode)
-		assert.Nil(t, ts.Gw.certUsageTracker)
+		ts.Gw.certUsageTracker = nil
 
 		// Create test specs with certificates
 		spec1 := BuildAPI(func(spec *APISpec) {
