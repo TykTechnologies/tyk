@@ -119,14 +119,10 @@ func TestJSONFormatterErrorHandling(t *testing.T) {
 	})
 }
 
-func TestGetAndGetRaw(t *testing.T) {
+func TestGet(t *testing.T) {
 	logger := Get()
 	assert.NotNil(t, logger)
 	assert.Equal(t, log, logger)
-
-	rawLogger := GetRaw()
-	assert.NotNil(t, rawLogger)
-	assert.Equal(t, rawLog, rawLogger)
 }
 
 func Test_Logger_IsLegacyFormatter(t *testing.T) {

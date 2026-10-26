@@ -18,7 +18,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/ctx"
-	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -109,10 +108,6 @@ func TestJSVMLogs(t *testing.T) {
 	jsvm := JSVM{}
 	jsvm.Init(nil, logrus.NewEntry(log), ts.Gw)
 
-	jsvm.RawLog = logrus.New()
-	jsvm.RawLog.Out = &buf
-	jsvm.RawLog.Formatter = new(logger.RawFormatter)
-
 	const in = `
 log("foo")
 log('{"x": "y"}')
@@ -123,8 +118,8 @@ rawlog('{"x": "y"}')
 	want := []string{
 		`time=TIME level=info msg=foo prefix=jsvm type=log-msg`,
 		`time=TIME level=info msg="{\"x\": \"y\"}" prefix=jsvm type=log-msg`,
-		`foo`,
-		`{"x": "y"}`,
+		`time=TIME level=warning msg=foo prefix=jsvm`,
+		`time=TIME level=warning msg="{\"x\": \"y\"}" prefix=jsvm`,
 	}
 	if _, err := jsvm.VM.Run(in); err != nil {
 		t.Fatalf("failed to run js: %v", err)
@@ -139,7 +134,7 @@ rawlog('{"x": "y"}')
 			break
 		}
 		s := timeRe.ReplaceAllString(line, "time=TIME")
-		if s != line && !strings.Contains(s, "type=log-msg") {
+		if !strings.Contains(s, "prefix=jsvm") {
 			continue // log line from elsewhere (async)
 		}
 		if s != want[i] {

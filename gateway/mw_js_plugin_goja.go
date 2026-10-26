@@ -12,7 +12,6 @@ import (
 	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
 
-	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/storage"
 )
 
@@ -31,9 +30,8 @@ import (
 type GojaJSVM struct {
 	Spec    *APISpec
 	Timeout time.Duration
-	Log     *logrus.Entry  `json:"-"`
-	RawLog  *logrus.Logger `json:"-"`
-	Gw      *Gateway       `json:"-"`
+	Log     *logrus.Entry `json:"-"`
+	Gw      *Gateway      `json:"-"`
 
 	programs    []gojaProgram // compiled JS programs replayed on each new runtime
 	store       *storage.RedisCluster
@@ -261,7 +259,6 @@ func (j *GojaJSVM) Init(spec *APISpec, logger *logrus.Entry, gw *Gateway) {
 	}
 
 	j.Log = logger
-	j.RawLog = tyklog.GetRaw()
 }
 
 // TestRunnerRuntime returns a fresh runtime with all programs replayed and real
@@ -290,7 +287,6 @@ func (j *GojaJSVM) TestRunnerRuntime(logs *[]testRunnerLog) *goja.Runtime {
 func (j *GojaJSVM) DeInit() {
 	j.Spec = nil
 	j.Log = nil
-	j.RawLog = nil
 	j.Gw = nil
 	j.store = nil
 	j.initialized = false
@@ -353,7 +349,7 @@ func sanitizeJSIdent(s string) string {
 }
 
 func (j *GojaJSVM) registerAPI(vm *goja.Runtime) {
-	h := &JSVMAPIHelper{Spec: j.Spec, Gw: j.Gw, Log: j.Log, RawLog: j.RawLog, Store: j.store}
+	h := &JSVMAPIHelper{Spec: j.Spec, Gw: j.Gw, Log: j.Log, Store: j.store}
 
 	set := func(name string, fn any) {
 		if err := vm.Set(name, fn); err != nil && j.Log != nil {

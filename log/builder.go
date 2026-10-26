@@ -13,8 +13,6 @@ type Builder struct {
 	hooks                  []logrus.Hook
 	level                  *logrus.Level
 	stdLog                 *logrus.Logger
-	rawLog                 *logrus.Logger
-	withApplyHooksToRawLog bool
 	propagate              bool
 	discardOutput          bool
 	legacyLogFormatEnabled bool
@@ -52,16 +50,6 @@ func (b *Builder) WithStdLog(log *logrus.Logger) {
 	b.stdLog = log
 }
 
-// WithApplyHooksToRawLog set raw log to propagate hooks.
-func (b *Builder) WithApplyHooksToRawLog() {
-	b.withApplyHooksToRawLog = true
-}
-
-// WithRawLog set raw log to propagate hooks.
-func (b *Builder) WithRawLog(log *logrus.Logger) {
-	b.rawLog = log
-}
-
 // RedirectStdlib turns Go's standard logger output into entries of the built logger
 // at the given level, tagged prefix=system. Timestamps come from the formatter.
 func (b *Builder) RedirectStdlib(level logrus.Level) {
@@ -83,8 +71,6 @@ func (b *Builder) buildAndPropagate(dest *Logger) {
 	if b.stdLog != nil {
 		logrusStdLog = b.stdLog
 	}
-	b.applyHooksToRawLog()
-
 	dest.legacyLogFormatEnabled = b.legacyLogFormatEnabled
 	b.discardLogger(dest.innerLogger)
 	b.applyHooksAndSinks(dest.innerLogger)
@@ -140,22 +126,6 @@ func (b *Builder) applyHooksAndSinks(target *logrus.Logger) {
 		target.AddHook(&multiSinkHook{
 			sinks: b.sinkers,
 		})
-	}
-}
-
-func (b *Builder) applyHooksToRawLog() {
-	if !b.withApplyHooksToRawLog {
-		return
-	}
-
-	target := rawLog
-
-	if b.rawLog != nil {
-		target = b.rawLog
-	}
-
-	for _, hook := range b.hooks {
-		target.AddHook(hook)
 	}
 }
 

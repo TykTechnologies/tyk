@@ -20,7 +20,6 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/middleware"
-	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/user"
 
 	_ "github.com/robertkrimen/otto/underscore"
@@ -311,9 +310,8 @@ type JSVM struct {
 	Spec    *APISpec
 	VM      *otto.Otto `json:"-"`
 	Timeout time.Duration
-	Log     *logrus.Entry  `json:"-"` // logger used by the JS code
-	RawLog  *logrus.Logger `json:"-"` // logger used by `rawlog` func to avoid formatting
-	Gw      *Gateway       `json:"-"`
+	Log     *logrus.Entry `json:"-"` // logger used by the JS code
+	Gw      *Gateway      `json:"-"`
 }
 
 const defaultJSVMTimeout = 5
@@ -347,7 +345,6 @@ func (j *JSVM) Init(spec *APISpec, logger *logrus.Entry, gw *Gateway) {
 	j.VM = vm
 	j.Spec = spec
 	j.Log = logger // use the global logger by default
-	j.RawLog = tyklog.GetRaw()
 
 	// Add environment API
 	j.LoadTykJSApi()
@@ -364,7 +361,6 @@ func (j *JSVM) Init(spec *APISpec, logger *logrus.Entry, gw *Gateway) {
 func (j *JSVM) DeInit() {
 	j.Spec = nil
 	j.Log = nil
-	j.RawLog = nil
 	j.Gw = nil
 }
 
@@ -458,7 +454,7 @@ type TykJSHttpResponse struct {
 }
 
 func (j *JSVM) LoadTykJSApi() {
-	h := &JSVMAPIHelper{Spec: j.Spec, Gw: j.Gw, Log: j.Log, RawLog: j.RawLog}
+	h := &JSVMAPIHelper{Spec: j.Spec, Gw: j.Gw, Log: j.Log}
 
 	toValue := func(v interface{}) otto.Value {
 		val, err := j.VM.ToValue(v)

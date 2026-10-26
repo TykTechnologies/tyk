@@ -148,58 +148,6 @@ func TestBuilder(t *testing.T) {
 
 		assert.Empty(t, stdLogger.Hooks)
 	})
-
-	t.Run("WithApplyHooksToRawLog_Enabled", func(t *testing.T) {
-		rawLogger := logrus.New()
-		customHook := &mockHook{}
-
-		_ = Build(func(b *Builder) {
-			b.WithRawLog(rawLogger)
-			b.AddHook(customHook)
-			b.WithApplyHooksToRawLog()
-		})
-
-		assert.NotEmpty(t, rawLogger.Hooks)
-		registeredHooks := rawLogger.Hooks[logrus.InfoLevel]
-		assert.Len(t, registeredHooks, 1)
-		assert.IsType(t, &mockHook{}, registeredHooks[0])
-	})
-
-	t.Run("WithApplyHooksToRawLog_Disabled", func(t *testing.T) {
-		rawLogger := logrus.New()
-		customHook := &mockHook{}
-
-		_ = Build(func(b *Builder) {
-			b.WithRawLog(rawLogger)
-			b.AddHook(customHook)
-		})
-
-		assert.Empty(t, rawLogger.Hooks)
-	})
-
-	t.Run("WithApplyHooksToRawLog_DefaultGlobalRawLog", func(t *testing.T) {
-		originalRawLogHooks := make(logrus.LevelHooks)
-		for k, v := range rawLog.Hooks {
-			originalRawLogHooks[k] = v
-		}
-		defer func() {
-			rawLog.Hooks = originalRawLogHooks
-		}()
-
-		rawLog.Hooks = make(logrus.LevelHooks)
-
-		customHook := &mockHook{}
-
-		_ = Build(func(b *Builder) {
-			b.AddHook(customHook)
-			b.WithApplyHooksToRawLog()
-		})
-
-		assert.NotEmpty(t, rawLog.Hooks)
-		registeredHooks := rawLog.Hooks[logrus.InfoLevel]
-		assert.Len(t, registeredHooks, 1)
-		assert.IsType(t, &mockHook{}, registeredHooks[0])
-	})
 }
 
 func TestDummyFormatter(t *testing.T) {

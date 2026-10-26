@@ -52,7 +52,6 @@ func (f *Format) Valid() bool {
 
 var (
 	log               = New()
-	rawLog            = newRawLog()
 	translations      = make(map[string]string)
 	formatterRegistry = map[Format]func() logrus.Formatter{
 		FormatText:   newFormatterText,
@@ -61,22 +60,9 @@ var (
 	}
 )
 
-// RawFormatter returns the logrus entry message as bytes.
-type RawFormatter struct{}
-
-// Format returns the entry.Message as a []byte.
-func (f *RawFormatter) Format(entry *logrus.Entry) ([]byte, error) {
-	return []byte(entry.Message), nil
-}
-
 // Get returns the default configured logger.
 func Get() *Logger {
 	return log
-}
-
-// GetRaw is used internally. Should likely be removed first, do not rely on it.
-func GetRaw() *logrus.Logger {
-	return rawLog
 }
 
 // NewFormatter builds formatter
@@ -138,12 +124,6 @@ func newFormatterLegacy() logrus.Formatter {
 		FullTimestamp:   true,
 		DisableColors:   true,
 	}
-}
-
-func newRawLog() *logrus.Logger {
-	var l = logrus.New()
-	l.SetFormatter(&RawFormatter{})
-	return l
 }
 
 func defaultFieldMap() logrus.FieldMap {
