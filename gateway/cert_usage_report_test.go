@@ -110,15 +110,21 @@ func TestCertUsageReport_GatewayConfig(t *testing.T) {
 			used:    true,
 		},
 		{
-			name:    "client CA for all APIs with a client mTLS API and use_ssl on",
-			conf:    func(c *config.Config) { c.HttpServerOptions.UseSSL = true; c.Security.Certificates.API = []string{testCert} },
+			name: "client CA for all APIs with a client mTLS API and use_ssl on",
+			conf: func(c *config.Config) {
+				c.HttpServerOptions.UseSSL = true
+				c.Security.Certificates.API = []string{testCert}
+			},
 			specs:   []*APISpec{mtlsAPI("", 0)},
 			setting: certSettingAPIs,
 			used:    true,
 		},
 		{
-			name:    "client CA for all APIs with TLS but no client mTLS API",
-			conf:    func(c *config.Config) { c.HttpServerOptions.UseSSL = true; c.Security.Certificates.API = []string{testCert} },
+			name: "client CA for all APIs with TLS but no client mTLS API",
+			conf: func(c *config.Config) {
+				c.HttpServerOptions.UseSSL = true
+				c.Security.Certificates.API = []string{testCert}
+			},
 			specs:   []*APISpec{tlsAPI("", 0)},
 			setting: certSettingAPIs,
 			used:    false,
@@ -367,7 +373,7 @@ func TestCertUsageReport_APIs(t *testing.T) {
 		refs := collectCertUsage(&config.Config{}, []*APISpec{spec}).references
 		assert.Contains(t, refs, testCert)
 		assert.Contains(t, refs, testOther)
-		assert.NotContains(t, refs, testOther + "," + testCert)
+		assert.NotContains(t, refs, testOther+","+testCert)
 	})
 
 	oasSpec := func(teEnabled bool) *APISpec {

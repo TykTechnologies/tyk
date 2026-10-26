@@ -257,7 +257,7 @@ func specCertificateReferences(spec *APISpec) apidef.CertificateReferences {
 	if spec.IsOAS && spec.OAS.GetTykExtension() != nil {
 		return spec.OAS.CertificateReferences(spec.HmacAllowedAlgorithms)
 	}
-	return spec.APIDefinition.CertificateReferences()
+	return spec.CertificateReferences()
 }
 
 // specServesTLS reports whether the API's listener serves TLS. An API without a protocol takes the
@@ -291,7 +291,13 @@ func servesTLS(conf *config.Config, specs []*APISpec) bool {
 // security.certificates.dashboard_api and security.certificates.mdcb_api are never read.
 func collectCertUsage(conf *config.Config, specs []*APISpec) *certUsage {
 	u := newCertUsage()
+	collectAPICertUsage(u, conf, specs)
+	collectConfigCertUsage(u, conf, specs)
+	return u
+}
 
+// collectAPICertUsage collects the certificates named by the API specs.
+func collectAPICertUsage(u *certUsage, conf *config.Config, specs []*APISpec) {
 	for _, spec := range specs {
 		for _, ref := range specCertificateReferences(spec) {
 			u.reference(ref.CertID, spec.APIID)
@@ -303,36 +309,39 @@ func collectCertUsage(conf *config.Config, specs []*APISpec) *certUsage {
 			}
 		}
 	}
+}
 
-	addConfig := func(setting, user string, active bool, certIDs ...string) {
-		for _, id := range certIDs {
-			if id == "" {
-				continue
-			}
-			u.reference(id, user)
-			if active {
-				u.useByConfig(id, setting, setting == certSettingPinnedKeys)
-			}
+// useConfig records the certificates of a Gateway configuration setting, as used when active.
+func (u *certUsage) useConfig(setting, user string, active bool, certIDs ...string) {
+	for _, id := range certIDs {
+		if id == "" {
+			continue
+		}
+		u.reference(id, user)
+		if active {
+			u.useByConfig(id, setting, setting == certSettingPinnedKeys)
 		}
 	}
+}
 
-	tls := servesTLS(conf, specs)
+// collectConfigCertUsage collects the certificates named by the Gateway configuration.
+func collectConfigCertUsage(u *certUsage, conf *config.Config, specs []*APISpec) {
 	security := conf.Security
 
-	addConfig(certSettingServer, serverCertsUser, tls, conf.HttpServerOptions.SSLCertificates...)
+	u.useConfig(certSettingServer, serverCertsUser, servesTLS(conf, specs), conf.HttpServerOptions.SSLCertificates...)
 	for _, id := range security.Certificates.Upstream {
-		addConfig(certSettingUpstream, gatewayConfigUser, true, id)
+		u.useConfig(certSettingUpstream, gatewayConfigUser, true, id)
 	}
 	// The client CAs for all APIs are only read for APIs with client mTLS, during the TLS handshake.
 	clientMTLS := slices.ContainsFunc(specs, func(spec *APISpec) bool {
 		return spec.UseMutualTLSAuth && specServesTLS(conf, spec)
 	})
-	addConfig(certSettingAPIs, gatewayConfigUser, clientMTLS, security.Certificates.API...)
+	u.useConfig(certSettingAPIs, gatewayConfigUser, clientMTLS, security.Certificates.API...)
 	// The control API takes the Gateway's protocol, so it only serves TLS when use_ssl is on.
-	addConfig(certSettingControlAPI, gatewayConfigUser, conf.HttpServerOptions.UseSSL && security.ControlAPIUseMutualTLS, security.Certificates.ControlAPI...)
+	u.useConfig(certSettingControlAPI, gatewayConfigUser, conf.HttpServerOptions.UseSSL && security.ControlAPIUseMutualTLS, security.Certificates.ControlAPI...)
 	for _, keys := range security.PinnedPublicKeys {
 		// The Gateway splits pinned keys on "," without trimming them.
-		addConfig(certSettingPinnedKeys, gatewayConfigUser, true, strings.Split(keys, ",")...)
+		u.useConfig(certSettingPinnedKeys, gatewayConfigUser, true, strings.Split(keys, ",")...)
 	}
 
 	// Named after their keys in external_services. The storage service isn't listed: the Gateway's
@@ -348,11 +357,9 @@ func collectCertUsage(conf *config.Config, specs []*APISpec) *certUsage {
 		{"discovery", services.Discovery.MTLS},
 	} {
 		setting := externalServiceCertSetting(s.name)
-		addConfig(setting, gatewayConfigUser, s.mtls.Enabled, s.mtls.CertID)
-		addConfig(setting, gatewayConfigUser, s.mtls.Enabled, s.mtls.CACertIDs...)
+		u.useConfig(setting, gatewayConfigUser, s.mtls.Enabled, s.mtls.CertID)
+		u.useConfig(setting, gatewayConfigUser, s.mtls.Enabled, s.mtls.CACertIDs...)
 	}
-
-	return u
 }
 
 // updateCertUsage rebuilds the certificates the Gateway uses from the loaded API specs and its configuration.
