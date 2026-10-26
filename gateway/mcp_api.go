@@ -22,6 +22,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/sanitize"
 	lib "github.com/TykTechnologies/tyk/lib/apidef"
+	"github.com/TykTechnologies/tyk/pkg/identifier"
 )
 
 const errMsgDeleteFailed = "Delete failed"
@@ -321,6 +322,11 @@ func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int)
 		return errResp, errCode
 	}
 
+	if err := gw.validator.Validate(identifier.CustomApiId(newDef.APIID)); err != nil {
+		log.WithField("api_id", newDef.APIID).WithError(err).Error("Failed to validate API ID")
+		return apiError(identifier.ErrInvalidCustomApiId.Error()), http.StatusBadRequest
+	}
+
 	versioningParams := extractVersioningParams(
 		versionParams.Get(lib.BaseAPIID),
 		versionParams.Get(lib.NewVersionName),
@@ -388,6 +394,11 @@ func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (
 
 	if resp, code := validateAPIIDMatch(apiID, newDef.APIID); resp != nil {
 		return resp, code
+	}
+
+	if err := gw.validator.Validate(identifier.CustomApiId(newDef.APIID)); err != nil {
+		log.WithField("api_id", newDef.APIID).WithError(err).Error("Failed to validate API ID")
+		return apiError(identifier.ErrInvalidCustomApiId.Error()), http.StatusBadRequest
 	}
 
 	if err := gw.handleOASServersForUpdate(spec, newDef, oasObj); err != nil {

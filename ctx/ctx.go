@@ -77,6 +77,8 @@ const (
 	MCPPrimitiveName
 	// JSONRPCErrorCode stores the JSON-RPC error code for metrics dimensions.
 	JSONRPCErrorCode
+	// MCPProtocolContext stores the typed, single-parse MCP ingress context.
+	MCPProtocolContext
 	// MatchedIdPBinding holds the per-request client-IdP registry binding matched
 	// in the JWT middleware. The value (a *gateway.Binding) is type-asserted on
 	// the gateway side; only the key lives here to avoid an import cycle.
@@ -179,8 +181,9 @@ func GetOASDefinition(r *http.Request) *oas.OAS {
 	return nil
 }
 
-// GetOASConfigData returns the config data of the OAS API definition valid for the request.
-// It does not deep copy the whole API definition, making it faster than GetOASDefinition.
+// GetOASConfigData returns a deep copy of the config data of the OAS API definition valid for the request.
+// Only the config data is copied, not the whole API definition, making it faster than GetOASDefinition.
+// Modifying the returned map does not affect the loaded API definition.
 func GetOASConfigData(r *http.Request) (map[string]interface{}, error) {
 	oasDef, ok := r.Context().Value(OASDefinition).(*oas.OAS)
 	if !ok || oasDef == nil {
@@ -192,7 +195,7 @@ func GetOASConfigData(r *http.Request) (map[string]interface{}, error) {
 		return nil, errors.New("config data is nil")
 	}
 
-	return mw.Global.PluginConfig.Data.Value, nil
+	return reflect.Clone(mw.Global.PluginConfig.Data.Value), nil
 }
 
 // SetErrorClassification sets the error classification for the request context.
@@ -239,9 +242,12 @@ func GetMCPPrimitiveName(r *http.Request) string {
 }
 
 // GetJSONRPCErrorCode returns the JSON-RPC error code from the request context.
-func GetJSONRPCErrorCode(r *http.Request) int {
-	if v, ok := r.Context().Value(JSONRPCErrorCode).(int); ok {
+func GetJSONRPCErrorCode(r *http.Request) int64 {
+	switch v := r.Context().Value(JSONRPCErrorCode).(type) {
+	case int64:
 		return v
+	case int:
+		return int64(v)
 	}
 	return 0
 }

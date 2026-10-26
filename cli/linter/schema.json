@@ -624,6 +624,10 @@
     "proxy_close_connections": {
       "type": "boolean"
     },
+    "apply_strip_listen_path_to_url_rewrite": {
+      "type": "boolean",
+      "default": false
+    },
     "close_idle_connections": {
       "type": "boolean"
     },
@@ -957,6 +961,12 @@
         },
         "xff_depth": {
           "type": "integer"
+        },
+        "trusted_proxy_cidrs": {
+          "type": ["array", "null"],
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -1720,6 +1730,14 @@
       "additionalProperties": false
     },
     "allow_unsafe_webhook_template_paths": {
+      "type": ["boolean", "null"],
+      "additionalProperties": false
+    },
+    "allow_unsafe_api_ids": {
+      "type": ["boolean", "null"],
+      "additionalProperties": false
+    },
+    "allow_unsafe_body_transform_template_paths": {
       "type": ["boolean", "null"],
       "additionalProperties": false
     },

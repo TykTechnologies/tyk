@@ -2,6 +2,7 @@ package graphengine
 
 import (
 	"errors"
+	"io"
 	"net"
 	"net/http"
 
@@ -82,7 +83,13 @@ func granularAccessFailReasonAsHttpStatusCode(logger abstractlogger.Logger, resu
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	case GranularAccessFailReasonValidationError:
 		logger.Debug(restrictedFieldValidationFailedLogMsg, abstractlogger.Error(result.ValidationError))
-		return GraphQlError{graphql.RequestErrorsFromError(result.ValidationError)}, http.StatusBadRequest
+		write := result.writeErrorResponse
+		if write == nil {
+			write = func(w io.Writer, err error) (int, error) {
+				return graphql.RequestErrorsFromError(err).WriteResponse(w)
+			}
+		}
+		return GraphQlError{err: result.ValidationError, write: write}, http.StatusBadRequest
 	case GranularAccessFailReasonIntrospectionDisabled:
 		w.WriteHeader(http.StatusForbidden)
 		logger.Debug("introspection disabled")

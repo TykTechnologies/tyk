@@ -28,9 +28,11 @@ const MaxToolArgumentsBytes = 1 << 20 // 1 MiB
 // Updating the tool set mutates the server in place; list-change notifications
 // are intentionally not advertised for REST-as-MCP adapters.
 type SDKAdapter struct {
-	server   *mcpsdk.Server
-	callTool ToolCallFunc
-	handler  http.Handler
+	server                *mcpsdk.Server
+	callTool              ToolCallFunc
+	requireRequestBinding bool
+	statefulHandler       http.Handler
+	statelessHandler      http.Handler
 
 	mu    sync.RWMutex
 	tools map[string]oas.DerivedTool
@@ -51,6 +53,8 @@ type SDKServerConfig struct {
 	Tools []oas.DerivedTool
 	// CallTool executes a tools/call against the paired REST API.
 	CallTool ToolCallFunc
+	// RequireRequestBinding enforces Gateway admission and current-request identity.
+	RequireRequestBinding bool
 }
 
 // NewSDKServer builds an official Go MCP SDK server from the derived tool
@@ -75,11 +79,13 @@ func NewSDKAdapter(config SDKServerConfig) (*SDKAdapter, error) {
 	}
 
 	adapter := &SDKAdapter{
-		server:   server,
-		callTool: config.CallTool,
-		tools:    map[string]oas.DerivedTool{},
+		server:                server,
+		callTool:              config.CallTool,
+		requireRequestBinding: config.RequireRequestBinding,
+		tools:                 map[string]oas.DerivedTool{},
 	}
-	adapter.handler = adapter.newStreamableHTTPHandler(defaultSDKAdapterStreamableHTTPOptions())
+	adapter.statefulHandler = adapter.newStreamableHTTPHandler(defaultSDKAdapterStreamableHTTPOptions(false))
+	adapter.statelessHandler = adapter.newStreamableHTTPHandler(defaultSDKAdapterStreamableHTTPOptions(true))
 	if err := adapter.UpdateTools(config.Tools); err != nil {
 		return nil, err
 	}
@@ -118,20 +124,40 @@ func (a *SDKAdapter) UpdateCallTool(callTool ToolCallFunc) error {
 // requests. Non-nil options intentionally build a separate handler.
 func (a *SDKAdapter) StreamableHTTPHandler(opts *mcpsdk.StreamableHTTPOptions) http.Handler {
 	if opts == nil {
-		return a.handler
+		return a.statefulHandler
 	}
 	return a.newStreamableHTTPHandler(opts)
 }
 
-func (a *SDKAdapter) newStreamableHTTPHandler(opts *mcpsdk.StreamableHTTPOptions) http.Handler {
-	return mcpsdk.NewStreamableHTTPHandler(func(*http.Request) *mcpsdk.Server {
-		return a.Server()
-	}, opts)
+// ProtocolHTTPHandler returns one of the two adapter-owned handlers. Both
+// handlers share the same SDK server, callback, catalogue, and synchronization.
+// Selection is deliberately explicit so production routing never allocates a
+// transport handler per request.
+func (a *SDKAdapter) ProtocolHTTPHandler(stateless bool) http.Handler {
+	if a == nil {
+		return nil
+	}
+	if stateless {
+		return a.statelessHandler
+	}
+	return a.statefulHandler
 }
 
-func defaultSDKAdapterStreamableHTTPOptions() *mcpsdk.StreamableHTTPOptions {
+func (a *SDKAdapter) newStreamableHTTPHandler(opts *mcpsdk.StreamableHTTPOptions) http.Handler {
+	handler := mcpsdk.NewStreamableHTTPHandler(func(*http.Request) *mcpsdk.Server {
+		return a.Server()
+	}, opts)
+	if a.requireRequestBinding {
+		return withSDKRequestBinding(handler)
+	}
+	return handler
+}
+
+func defaultSDKAdapterStreamableHTTPOptions(stateless bool) *mcpsdk.StreamableHTTPOptions {
 	return &mcpsdk.StreamableHTTPOptions{
-		JSONResponse: true,
+		Stateless:                    stateless,
+		JSONResponse:                 true,
+		PropagateRequestCancellation: stateless,
 	}
 }
 
@@ -199,9 +225,10 @@ func newSDKServer(config SDKServerConfig, listChanged bool) (*mcpsdk.Server, err
 	)
 
 	adapter := &SDKAdapter{
-		server:   server,
-		callTool: config.CallTool,
-		tools:    map[string]oas.DerivedTool{},
+		server:                server,
+		callTool:              config.CallTool,
+		requireRequestBinding: config.RequireRequestBinding,
+		tools:                 map[string]oas.DerivedTool{},
 	}
 	for i := range config.Tools {
 		tool := config.Tools[i]
@@ -222,6 +249,13 @@ func (a *SDKAdapter) addTool(tool oas.DerivedTool) {
 		InputSchema:  toolInputSchema(tool.InputSchema),
 		OutputSchema: toolOutputSchema(tool.OutputSchema),
 	}, func(ctx context.Context, req *mcpsdk.CallToolRequest) (*mcpsdk.CallToolResult, error) {
+		if a.requireRequestBinding {
+			binding, ok := requestBindingFromExtra(req)
+			if !ok {
+				return nil, &sdkjsonrpc.Error{Code: sdkjsonrpc.CodeInternalError, Message: internalToolErrorMessage}
+			}
+			ctx = context.WithValue(ctx, requestBindingKey{}, binding)
+		}
 		args, err := unmarshalToolArgs(req)
 		if err != nil {
 			if IsInvalidParams(err) {
@@ -270,9 +304,13 @@ func NewSDKStreamableHTTPHandler(config SDKServerConfig, opts *mcpsdk.Streamable
 			JSONResponse: true,
 		}
 	}
-	return mcpsdk.NewStreamableHTTPHandler(func(*http.Request) *mcpsdk.Server {
+	handler := mcpsdk.NewStreamableHTTPHandler(func(*http.Request) *mcpsdk.Server {
 		return server
-	}, opts), nil
+	}, opts)
+	if config.RequireRequestBinding {
+		return withSDKRequestBinding(handler), nil
+	}
+	return handler, nil
 }
 
 // SDKToolResult maps a captured REST response to the SDK's CallToolResult
