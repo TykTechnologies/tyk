@@ -23,7 +23,8 @@ const (
 	msgBodyTransformed = "Body transformed"
 	// msgTemplateExecutionFailed is deliberately generic so a rejected template
 	// path gives no hint about the filesystem.
-	msgTemplateExecutionFailed = "Template execution failed"
+	msgTemplateExecutionFailed   = "Template execution failed"
+	msgTemplateCompilationFailed = "Template compilation failed"
 )
 
 var (
@@ -193,7 +194,7 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	tpl, err := tmeta.Template.Get()
 	if err != nil {
 		logger.WithError(err).Error("Body transform failure")
-		r.handleError(rw, req, http.StatusInternalServerError, msgTemplateExecutionFailed)
+		r.handleError(rw, req, http.StatusInternalServerError, msgTemplateCompilationFailed)
 		return err
 	}
 
@@ -201,7 +202,7 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	var bodyBuffer bytes.Buffer
 	if err := tpl.Execute(&bodyBuffer, bodyData); err != nil {
 		logger.WithError(err).Error("Failed to apply template to request")
-		r.handleError(rw, req, http.StatusInternalServerError, msgTemplateExecutionFailed)
+		r.handleError(rw, req, http.StatusBadRequest, msgTemplateExecutionFailed)
 		return err
 	}
 
