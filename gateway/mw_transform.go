@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	texttemplate "text/template"
 
 	"github.com/clbanning/mxj"
 	"golang.org/x/net/html/charset"
@@ -55,9 +56,15 @@ func (t *TransformMiddleware) ProcessRequest(_ http.ResponseWriter, r *http.Requ
 		return errors.New("internal server error"), http.StatusInternalServerError
 	}
 
-	if err := t.transformBody(r, tMeta); err != nil {
+	tpl, err := tMeta.Template.Get()
+	if err != nil {
 		t.Logger().WithError(err).Error("Body transform failure")
-		return errors.New(msgTemplateExecutionFailed), http.StatusInternalServerError
+		return errors.New(msgTemplateCompilationFailed), http.StatusInternalServerError
+	}
+
+	if err := t.transformBody(r, tMeta, tpl); err != nil {
+		t.Logger().WithError(err).Error("Body transform failure")
+		return errors.New(msgTemplateExecutionFailed), http.StatusBadRequest
 	}
 
 	t.Logger().Debugf("%s", msgBodyTransformed)
@@ -65,13 +72,7 @@ func (t *TransformMiddleware) ProcessRequest(_ http.ResponseWriter, r *http.Requ
 	return nil, http.StatusOK
 }
 
-func (t *TransformMiddleware) transformBody(r *http.Request, meta *TransformSpec) error {
-	tpl, err := meta.Template.Get()
-
-	if err != nil {
-		return err
-	}
-
+func (t *TransformMiddleware) transformBody(r *http.Request, meta *TransformSpec, tpl *texttemplate.Template) error {
 	body, _ := ioutil.ReadAll(r.Body)
 	defer r.Body.Close()
 

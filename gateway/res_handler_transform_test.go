@@ -242,7 +242,7 @@ func TestTransformResponseBody_UnsafeFileTemplatePath(t *testing.T) {
 
 		_, _ = ts.Run(t, test.TestCase{
 			Path: "/transform", Code: http.StatusInternalServerError,
-			BodyMatch:    `"error": "Template execution failed"`,
+			BodyMatch:    `"error": "Template compilation failed"`,
 			BodyNotMatch: "TOPSECRET",
 			HeadersMatch: map[string]string{header.ContentType: header.ApplicationJSON},
 		})
@@ -376,14 +376,14 @@ func TestResponseTransformMiddleware(t *testing.T) {
 			Path:         "/invalid-template",
 			Method:       http.MethodGet,
 			Code:         http.StatusInternalServerError,
-			BodyMatch:    msgTemplateExecutionFailed,
+			BodyMatch:    msgTemplateCompilationFailed,
 			BodyNotMatch: "unexpected",
 		})
 
 		assert.NoError(t, err)
 	})
 
-	t.Run("response transform responds 500 without partial output if template execution fails", func(t *testing.T) {
+	t.Run("response transform responds 400 without partial output if template execution fails", func(t *testing.T) {
 		ts := StartTest(nil)
 
 		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -420,7 +420,7 @@ func TestResponseTransformMiddleware(t *testing.T) {
 		resp, err := ts.Run(t, test.TestCase{
 			Path:         "/out-of-range",
 			Method:       http.MethodGet,
-			Code:         http.StatusInternalServerError,
+			Code:         http.StatusBadRequest,
 			BodyMatch:    msgTemplateExecutionFailed,
 			BodyNotMatch: `"out"`,
 		})

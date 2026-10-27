@@ -53,7 +53,7 @@ func TestTransformNonAscii(t *testing.T) {
 
 	transform := TransformMiddleware{base}
 
-	if err := transform.transformBody(r, tmeta); err != nil {
+	if err := transform.transformBody(r, tmeta, tmeta.Template.MustGet()); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
 	gotBs, err := ioutil.ReadAll(r.Body)
@@ -82,7 +82,7 @@ func BenchmarkTransformNonAscii(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		r := TestReq(b, "GET", "/", in)
 
-		if err := transform.transformBody(r, tmeta); err != nil {
+		if err := transform.transformBody(r, tmeta, tmeta.Template.MustGet()); err != nil {
 			b.Fatalf("wanted nil error, got %v", err)
 		}
 	}
@@ -106,7 +106,7 @@ func TestTransformXMLCrash(t *testing.T) {
 
 	transform := TransformMiddleware{base}
 
-	if err := transform.transformBody(r, tmeta); err == nil {
+	if err := transform.transformBody(r, tmeta, tmeta.Template.MustGet()); err == nil {
 		t.Fatalf("wanted error, got nil")
 	}
 }
@@ -161,7 +161,7 @@ func TestTransformJSONMarshalXMLInput(t *testing.T) {
 
 	transform := TransformMiddleware{base}
 
-	if err := transform.transformBody(r, tmeta); err != nil {
+	if err := transform.transformBody(r, tmeta, tmeta.Template.MustGet()); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
 	gotBs, err := ioutil.ReadAll(r.Body)
@@ -188,7 +188,7 @@ func TestTransformJSONMarshalJSONInput(t *testing.T) {
 
 	transform := TransformMiddleware{base}
 
-	if err := transform.transformBody(r, tmeta); err != nil {
+	if err := transform.transformBody(r, tmeta, tmeta.Template.MustGet()); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
 	gotBs, err := ioutil.ReadAll(r.Body)
@@ -227,7 +227,7 @@ func TestTransformJSONMarshalJSONArrayInput(t *testing.T) {
 
 	transform := TransformMiddleware{base}
 
-	if err := transform.transformBody(r, tmeta); err != nil {
+	if err := transform.transformBody(r, tmeta, tmeta.Template.MustGet()); err != nil {
 		t.Fatalf("wanted nil error, got %v", err)
 	}
 	gotBs, err := ioutil.ReadAll(r.Body)
@@ -254,7 +254,7 @@ func BenchmarkTransformJSONMarshal(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		r := TestReq(b, "GET", "/", in)
-		if err := transform.transformBody(r, tmeta); err != nil {
+		if err := transform.transformBody(r, tmeta, tmeta.Template.MustGet()); err != nil {
 			b.Fatalf("wanted nil error, got %v", err)
 		}
 	}
@@ -275,7 +275,7 @@ func TestTransformXMLMarshal(t *testing.T) {
 
 		transform := TransformMiddleware{base}
 
-		if err := transform.transformBody(r, tmeta); err != nil {
+		if err := transform.transformBody(r, tmeta, tmeta.Template.MustGet()); err != nil {
 			t.Fatalf("wanted nil error, got %v", err)
 		}
 		gotBs, err := ioutil.ReadAll(r.Body)
@@ -509,12 +509,12 @@ func TestTransformMiddleware(t *testing.T) {
 				Path:         "/bad-template",
 				Data:         `{"name":"tyk"}`,
 				Code:         http.StatusInternalServerError,
-				BodyMatch:    msgTemplateExecutionFailed,
+				BodyMatch:    msgTemplateCompilationFailed,
 				BodyNotMatch: "unclosed",
 			})
 		})
 
-		t.Run("template execution error returns StatusInternalServerError without details", func(t *testing.T) {
+		t.Run("template execution error returns StatusBadRequest without details", func(t *testing.T) {
 			api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.Proxy.ListenPath = "/"
 				spec.Proxy.TargetURL = mockEchoServer.URL
@@ -539,7 +539,7 @@ func TestTransformMiddleware(t *testing.T) {
 				Method:       http.MethodPost,
 				Path:         "/out-of-range",
 				Data:         `{"items":[1]}`,
-				Code:         http.StatusInternalServerError,
+				Code:         http.StatusBadRequest,
 				BodyMatch:    msgTemplateExecutionFailed,
 				BodyNotMatch: "index out of range",
 			})
@@ -573,7 +573,7 @@ func TestTransformMiddleware(t *testing.T) {
 			})
 		})
 
-		t.Run("malformed request body returns StatusInternalServerError", func(t *testing.T) {
+		t.Run("malformed request body returns StatusBadRequest", func(t *testing.T) {
 			api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.Proxy.ListenPath = "/"
 				spec.Proxy.TargetURL = mockEchoServer.URL
@@ -598,7 +598,7 @@ func TestTransformMiddleware(t *testing.T) {
 				Method: http.MethodPost,
 				Path:   "/transform",
 				Data:   `{malformed-json`,
-				Code:   http.StatusInternalServerError,
+				Code:   http.StatusBadRequest,
 			})
 		})
 	})
@@ -676,7 +676,7 @@ func TestTransformRequestBody_OASFileTemplatePath(t *testing.T) {
 			ts.Gw.LoadAPI(buildAPI(path))
 
 			_, _ = ts.Run(t, test.TestCase{Method: http.MethodPost, Path: "/post", Data: body,
-				BodyMatch: `"error": "Template execution failed"`, BodyNotMatch: "TOPSECRET",
+				BodyMatch: `"error": "Template compilation failed"`, BodyNotMatch: "TOPSECRET",
 				Code: http.StatusInternalServerError})
 		}
 	})
