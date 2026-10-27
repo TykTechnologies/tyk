@@ -1504,6 +1504,9 @@ type Config struct {
 
 	// AllowUnsafeBodyTransformTemplatePaths disables body transform template path validation. This is provided for compatibility with legacy API definitions containing potentially unsafe template paths (default: false).
 	AllowUnsafeBodyTransformTemplatePaths bool `json:"allow_unsafe_body_transform_template_paths"`
+
+	// AllowUnsafeVirtualEndpointPaths disables virtual endpoint script path validation, which otherwise confines file-based scripts to `middleware_path`. This is provided for compatibility with legacy API definitions containing potentially unsafe script paths (default: false).
+	AllowUnsafeVirtualEndpointPaths bool `json:"allow_unsafe_virtual_endpoint_paths"`
 }
 
 // LabsConfig include config for streaming

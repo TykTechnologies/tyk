@@ -1741,6 +1741,10 @@
       "type": ["boolean", "null"],
       "additionalProperties": false
     },
+    "allow_unsafe_virtual_endpoint_paths": {
+      "type": ["boolean", "null"],
+      "additionalProperties": false
+    },
     "error_overrides": {
       "$ref": "#/definitions/ErrorOverrides"
     }

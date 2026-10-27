@@ -54,6 +54,7 @@ import (
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/dnscache"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/assetloader"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/compression"
 	"github.com/TykTechnologies/tyk/internal/crypto"
@@ -69,7 +70,6 @@ import (
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	tyklog "github.com/TykTechnologies/tyk/log"
-	"github.com/TykTechnologies/tyk/pkg/osutil"
 	"github.com/TykTechnologies/tyk/pkg/validator"
 	"github.com/TykTechnologies/tyk/regexp"
 	"github.com/TykTechnologies/tyk/request"
@@ -283,7 +283,10 @@ type Gateway struct {
 	kvResolver resolver.Resolver
 
 	// manage safe file paths
-	OSRoot *osutil.Root
+	// TemplateLoader resolves body transform templates confined to TemplatePath.
+	TemplateLoader *assetloader.Loader
+	// JSAssetLoader resolves virtual endpoint scripts confined to MiddlewarePath.
+	JSAssetLoader *assetloader.Loader
 }
 
 func NewGateway(config config.Config, ctx context.Context) *Gateway {
@@ -355,11 +358,19 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 		log.WithError(err).Fatal("could not initialize KV registry")
 	}
 
-	// Initialize the OSRoot with your desired base path
-	if root, err := osutil.NewRoot(config.TemplatePath); err == nil {
-		gw.OSRoot = root
-	} else {
+	var err error
+	if gw.TemplateLoader, err = assetloader.New(
+		config.TemplatePath,
+		assetloader.WithAllowUnsafe(config.AllowUnsafeBodyTransformTemplatePaths),
+	); err != nil {
 		log.WithError(err).Error("Failed to initialize Gateway OSRoot")
+	}
+
+	if gw.JSAssetLoader, err = assetloader.New(
+		config.MiddlewarePath,
+		assetloader.WithAllowUnsafe(config.AllowUnsafeVirtualEndpointPaths),
+	); err != nil {
+		log.WithError(err).Warn("Failed to initialize virtual endpoint script root; file-based virtual endpoints will be rejected")
 	}
 
 	return gw
@@ -2009,6 +2020,11 @@ func (gw *Gateway) afterConfSetup() error {
 	if conf.AllowUnsafeBodyTransformTemplatePaths {
 		mainLog.Warn("allow_unsafe_body_transform_template_paths is enabled: body transform template paths are not confined to template_path. " +
 			"Risk: API definitions can read arbitrary files from the gateway filesystem.")
+	}
+
+	if conf.AllowUnsafeVirtualEndpointPaths {
+		mainLog.Warn("allow_unsafe_virtual_endpoint_paths is enabled: virtual endpoint script paths are not confined to middleware_path. " +
+			"Risk: API definitions can execute arbitrary JavaScript files from the gateway filesystem.")
 	}
 
 	if conf.HealthCheckEndpointName == "" {
