@@ -100,6 +100,7 @@ type CertificateManagerIdGetter interface {
 type certificateManager struct {
 	IdGetter
 	storage                  StorageHandler
+	localStorage             StorageHandler
 	logger                   *logrus.Entry
 	cache                    cache.Repository
 	secret                   string
@@ -235,6 +236,7 @@ func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string
 
 	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, log, callbackOnPullCertFromRPC)
 	cm.storage = mdcbStorage
+	cm.localStorage = localStorage
 	return cm
 }
 
@@ -898,31 +900,71 @@ func (c *certificateManager) ListRawPublicKey(keyID string) (out interface{}) {
 	return out
 }
 
-func (c *certificateManager) ListAllIds(prefix string) (out []string) {
+// indexStorage returns the storage that holds this gateway's certificate
+// index and migration marker.
+//
+// On an MDCB data plane that is the gateway's local Redis. The MDCB storage
+// layer cannot be used for this: its Exists only succeeds when the key exists
+// both locally and on the control plane, and the RPC layer does not implement
+// Exists, so the index would never be found. Its GetKey also falls back to the
+// control plane, which would return the control plane's migration marker
+// instead of this gateway's.
+func (c *certificateManager) indexStorage() StorageHandler {
+	if c.localStorage != nil {
+		return c.localStorage
+	}
+
+	return c.storage
+}
+
+func (c *certificateManager) ListAllIds(prefix string) []string {
+	out := make([]string, 0)
+	// The index is a Redis list, so it can hold the same certificate more than
+	// once (for example when a certificate was appended by Add and again by a
+	// migration scan). Each ID is returned only once, in first-seen order.
+	seen := make(map[string]struct{})
+	add := func(key string) {
+		id := strings.TrimPrefix(key, "raw-")
+		if _, ok := seen[id]; ok {
+			return
+		}
+		seen[id] = struct{}{}
+		out = append(out, id)
+	}
+
+	store := c.indexStorage()
 	indexKey := prefix + "-index"
-	exists, _ := c.storage.Exists(indexKey)
+	exists, _ := store.Exists(indexKey)
 	if !c.migrateCertList || (exists && prefix != "") {
-		keys, _ := c.storage.GetListRange(indexKey, 0, -1)
+		keys, _ := store.GetListRange(indexKey, 0, -1)
 		for _, key := range keys {
-			out = append(out, strings.TrimPrefix(key, "raw-"))
+			add(key)
 		}
 	} else {
-		// If list is not exists, but migrated record exists, it means it just empty
-
-		if _, err := c.storage.GetKey(indexKey + "-migrated"); err == nil {
-			return out
+		// If list is not exists, but migrated record exists, it means it just empty.
+		// Only org-scoped listings maintain an index, so the migrated marker is only
+		// meaningful for them. A listing without a prefix has no index to fall back
+		// on and must always scan, otherwise every call after the first one would
+		// return an empty list.
+		if prefix != "" {
+			if _, err := store.GetKey(indexKey + "-migrated"); err == nil {
+				return out
+			}
 		}
 
-		keys := c.storage.GetKeys("raw-" + prefix + "*")
+		keys := store.GetKeys("raw-" + prefix + "*")
 
 		for _, key := range keys {
 			if prefix != "" {
-				c.storage.AppendToSet(indexKey, key)
+				store.AppendToSet(indexKey, key)
 			}
-			out = append(out, strings.TrimPrefix(key, "raw-"))
+			add(key)
 		}
 	}
-	c.storage.SetKey(indexKey+"-migrated", "1", 0)
+
+	if prefix != "" {
+		store.SetKey(indexKey+"-migrated", "1", 0)
+	}
 
 	return out
 }
