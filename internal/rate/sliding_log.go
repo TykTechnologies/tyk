@@ -84,8 +84,8 @@ func NewSlidingLogRedis(conn redis.UniversalClient, smoothingFn SmoothingFn, opt
 	return r
 }
 
-// Do will return two values, the first indicates if a request should be blocked, and the second
-// returns an error if any occurred. In case an error occurs, the first value will be `true`.
+// Do returns two three values first is the stats, the second indicates if a request should be blocked
+// and an error if any occurred. In case an error occurs, the first value will be `true`.
 // If there are issues with storage availability for example, requests will be blocked rather
 // than let through, as no rate limit can be enforced without storage.
 func (r *SlidingLog) Do(ctx context.Context, key string, maxAllowed, per int64) (Stats, bool, error) {
