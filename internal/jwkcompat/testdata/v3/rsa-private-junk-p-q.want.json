@@ -1,0 +1,4 @@
+{
+  "note": "v3 runs rsa.PrivateKey.Validate on these primes (cubic time, CVE-2026-116587); jwkcompat rejects them first. Both reject. v3 error: input overflows the modulus size",
+  "error": "go-jose/go-jose: invalid RSA private key, p * q != n"
+}

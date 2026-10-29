@@ -1,0 +1,15 @@
+{
+  "keys": [
+    {
+      "kid": "943a3a5d7d919625a454e489b75c29adab57acba",
+      "alg": "RS256",
+      "use": "sig",
+      "type": "*rsa.PublicKey",
+      "fingerprint": "n=a48a67cc0d9ecf21044494b18aaa4b06631e22a0131fe57a8ae06d28889b5c4c98a2fba3af1f278aa4de3ba448c974fab83514bf4576909f15fe2598171cd763506a2bd21f7009a38345d40e8c93564a322ec174823dbdf4b1fecf0e6f0afcbc8e66a614864a01b29c4398691ef4a2b6d335be5fbabd52fe8b61b1c866cc03d698e87ab5e4dca54b5b7b10b4d87d08a6967bf171beff0ccd1cb92e54d527db099302a4a861d27ad295876cdb8d28c69089395dab05a86cfc46b973bb5ecd2d67c150bd5bf13e6d1f5317a047902fdfbfe13c0dc59f908ffa81e689cc184834dc417e3c7ec35f96529d89cf761815611f7908f132abbe160e9c1b1c24ed5d7ab9 e=65537",
+      "certs": 0,
+      "x5u": "",
+      "x5t": "",
+      "x5t#S256": ""
+    }
+  ]
+}
