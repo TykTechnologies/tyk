@@ -15,12 +15,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-jose/go-jose/v3"
+	"github.com/go-jose/go-jose/v4"
 	"github.com/golang-jwt/jwt/v4"
 	"github.com/lonelycode/osin"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/cache"
+	"github.com/TykTechnologies/tyk/internal/jwkcompat"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
@@ -77,13 +78,10 @@ type JWKs struct {
 	Keys []JWK `json:"keys"`
 }
 
+// parseJWK parses a JWKS the way go-jose v3 did, so key sets that loaded before
+// the move to go-jose v4 still load (for example RSA keys over 4096 bits).
 func parseJWK(buf []byte) (*jose.JSONWebKeySet, error) {
-	var j jose.JSONWebKeySet
-	err := json.Unmarshal(buf, &j)
-	if err != nil {
-		return nil, err
-	}
-	return &j, nil
+	return jwkcompat.ParseKeySet(buf)
 }
 
 func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interface{}, error) {
