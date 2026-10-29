@@ -30,8 +30,7 @@ require (
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.2
 	github.com/TykTechnologies/storage v1.5.0
-	// todo: replace after merge pump to master
-	github.com/TykTechnologies/tyk-pump v1.17.0-rc1.0.20261016095038-3b56166854c9
+	github.com/TykTechnologies/tyk-pump v1.18.0-rc1.0.20261029095747-fcfeadd159a0
 	github.com/akutz/memconn v0.1.0
 	github.com/bshuster-repo/logrus-logstash-hook v1.1.0
 	github.com/buger/jsonparser v1.1.2
@@ -659,6 +658,3 @@ replace github.com/getkin/kin-openapi => github.com/TykTechnologies/kin-openapi 
 replace github.com/hamba/avro/v2 => github.com/iskorotkov/avro/v2 v2.34.0
 
 replace github.com/modelcontextprotocol/go-sdk => github.com/andrei-tyk/go-sdk v1.7.1-0.20260912064918-3c4261d970be
-
-// todo: remove temporary pump replace after merging pump
-replace github.com/TykTechnologies/tyk-pump => github.com/TykTechnologies/tyk-pump v1.17.0-rc1.0.20261016095038-3b56166854c9
