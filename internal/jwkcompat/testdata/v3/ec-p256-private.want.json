@@ -1,0 +1,15 @@
+{
+  "keys": [
+    {
+      "kid": "a",
+      "alg": "",
+      "use": "",
+      "type": "*ecdsa.PrivateKey",
+      "fingerprint": "P-256 x=b81f2c4bd0c574366c6cb10958f74c74c55f43824d1fe8a447f38e33986a5129 y=4f29bc456ac62dbb0308c81106e8c1845ae04f72299f3b7bc9a7be3a0c9b5211 d=4ad0c1c31ee4ea9409eec14db11785363970a278f54ea66c2aa0004e68148dd7",
+      "certs": 0,
+      "x5u": "",
+      "x5t": "",
+      "x5t#S256": ""
+    }
+  ]
+}
