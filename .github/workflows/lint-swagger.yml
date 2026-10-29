@@ -7,6 +7,7 @@ on:
     types: [opened, synchronize, reopened, labeled]
     paths:
       - 'swagger.yml'
+      - 'ci/codegen/**'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -123,3 +124,35 @@ jobs:
             ${{ steps.api-check.outputs.diff-output || 'no api changes detected' }}
             ```
           edit-mode: replace
+
+  codegen_check:
+    needs: [dep-guard]
+    runs-on: ubuntu-latest
+    name: Generate and compile clients from the swagger
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff  # v5
+        with:
+          go-version: stable
+      - uses: actions/setup-java@b843ebf9b913146b38da2eaa7aeddf76074ae1ad  # v6.1.0
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4
+        with:
+          node-version: 20
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5
+        with:
+          python-version: '3.12'
+      - name: Install Maven
+        env:
+          MAVEN_VERSION: 3.9.16
+          MAVEN_SHA512: 831a8591fe20c8243b1dbe7d71e3244f31d1665b0804b2e825e38cbbe5ce0cafb8338851f90780735568773e0a6cd07bbec107cda0b896b008b861075358b6f6
+        run: |
+          curl --proto '=https' --tlsv1.2 -fsSL -o maven.tar.gz "https://downloads.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz"
+          echo "${MAVEN_SHA512}  maven.tar.gz" | sha512sum -c --quiet
+          tar -xzf maven.tar.gz -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/apache-maven-${MAVEN_VERSION}/bin" >> "$GITHUB_PATH"
+      - name: Generate and compile clients
+        run: ci/codegen/check.sh swagger.yml
