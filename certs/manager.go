@@ -99,8 +99,12 @@ type CertificateManagerIdGetter interface {
 
 type certificateManager struct {
 	IdGetter
-	storage                  StorageHandler
-	localStorage             StorageHandler
+	// storage holds the certificates. On an MDCB data plane it is the MDCB
+	// layer, which falls back to the control plane and caches pulled
+	// certificates in the gateway's local Redis.
+	storage StorageHandler
+	// index lists certificates from this gateway's own Redis (see certIndex).
+	index                    certIndex
 	logger                   *logrus.Entry
 	cache                    cache.Repository
 	secret                   string
@@ -173,11 +177,13 @@ func NewCertificateManager(storageHandler StorageHandler, secret string, logger 
 	if logger == nil {
 		logger = tyklog.Get()
 	}
+	log := logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix})
 
 	cm := &certificateManager{
 		IdGetter:                 NewIdGetter(secret),
 		storage:                  storageHandler,
-		logger:                   logger.WithFields(logrus.Fields{"prefix": CertManagerLogPrefix}),
+		index:                    certIndex{store: storageHandler, writer: storageHandler, logger: log},
+		logger:                   log,
 		cache:                    cache.New(cacheDefaultTTL, cacheCleanInterval),
 		secret:                   secret,
 		migrateCertList:          migrateCertList,
@@ -236,7 +242,7 @@ func NewSlaveCertManager(localStorage, rpcStorage storage.Handler, secret string
 
 	mdcbStorage := storage.NewMdcbStorage(localStorage, rpcStorage, log, callbackOnPullCertFromRPC)
 	cm.storage = mdcbStorage
-	cm.localStorage = localStorage
+	cm.index = certIndex{store: localStorage, writer: mdcbStorage, logger: log}
 	return cm
 }
 
@@ -900,73 +906,51 @@ func (c *certificateManager) ListRawPublicKey(keyID string) (out interface{}) {
 	return out
 }
 
-// indexStorage returns the storage that holds this gateway's certificate
-// index and migration marker.
-//
-// On an MDCB data plane that is the gateway's local Redis. The MDCB storage
-// layer cannot be used for this: its Exists only succeeds when the key exists
-// both locally and on the control plane, and the RPC layer does not implement
-// Exists, so the index would never be found. Its GetKey also falls back to the
-// control plane, which would return the control plane's migration marker
-// instead of this gateway's.
-func (c *certificateManager) indexStorage() StorageHandler {
-	if c.localStorage != nil {
-		return c.localStorage
+// ListAllIds returns the IDs of the certificates this gateway holds, limited
+// to one organisation when prefix is its ID.
+func (c *certificateManager) ListAllIds(prefix string) []string {
+	if prefix == "" {
+		return c.listAll()
 	}
 
-	return c.storage
+	return c.listOrg(prefix)
 }
 
-func (c *certificateManager) ListAllIds(prefix string) []string {
-	out := make([]string, 0)
-	// The index is a Redis list, so it can hold the same certificate more than
-	// once (for example when a certificate was appended by Add and again by a
-	// migration scan). Each ID is returned only once, in first-seen order.
-	seen := make(map[string]struct{})
-	add := func(key string) {
-		id := strings.TrimPrefix(key, "raw-")
-		if _, ok := seen[id]; ok {
-			return
+// listAll scans every stored certificate. There is no index across
+// organisations, so no migrated marker is kept either: a marker without an
+// index behind it made every call after the first return nothing (TT-14003).
+func (c *certificateManager) listAll() []string {
+	if !c.migrateCertList {
+		ids, _ := c.index.ids("") // Cloud: never scan, keep previous behaviour
+		return ids
+	}
+	return c.index.scan("")
+}
+
+// listOrg reads the organisation's index, building it first on gateways that
+// still migrate certificates stored before the index existed. Migration runs
+// once: the migrated marker tells an organisation without certificates apart
+// from one that was never scanned.
+func (c *certificateManager) listOrg(orgID string) []string {
+	ids, found := c.index.ids(orgID)
+	if c.migrateCertList && !found {
+		if c.index.migrated(orgID) {
+			return []string{} // migrated and the index is gone: no certificates
 		}
-		seen[id] = struct{}{}
-		out = append(out, id)
+		ids = c.migrateOrg(orgID)
+	}
+	c.index.markMigrated(orgID)
+	return ids
+}
+
+// migrateOrg builds the organisation's index from the stored certificates.
+func (c *certificateManager) migrateOrg(orgID string) []string {
+	ids := c.index.scan(orgID)
+	for _, id := range ids {
+		c.index.add(orgID, id)
 	}
 
-	store := c.indexStorage()
-	indexKey := prefix + "-index"
-	exists, _ := store.Exists(indexKey)
-	if !c.migrateCertList || (exists && prefix != "") {
-		keys, _ := store.GetListRange(indexKey, 0, -1)
-		for _, key := range keys {
-			add(key)
-		}
-	} else {
-		// If list is not exists, but migrated record exists, it means it just empty.
-		// Only org-scoped listings maintain an index, so the migrated marker is only
-		// meaningful for them. A listing without a prefix has no index to fall back
-		// on and must always scan, otherwise every call after the first one would
-		// return an empty list.
-		if prefix != "" {
-			if _, err := store.GetKey(indexKey + "-migrated"); err == nil {
-				return out
-			}
-		}
-
-		keys := store.GetKeys("raw-" + prefix + "*")
-
-		for _, key := range keys {
-			if prefix != "" {
-				store.AppendToSet(indexKey, key)
-			}
-			add(key)
-		}
-	}
-
-	if prefix != "" {
-		store.SetKey(indexKey+"-migrated", "1", 0)
-	}
-
-	return out
+	return ids
 }
 
 // MaskCertID truncates certificate IDs for logging to prevent information leakage.
@@ -1002,7 +986,7 @@ func (c *certificateManager) Add(certData []byte, orgID string) (string, error) 
 	}
 
 	if orgID != "" {
-		c.storage.AppendToSet(orgID+"-index", "raw-"+certID)
+		c.index.add(orgID, certID)
 	}
 
 	return certID, nil
@@ -1011,7 +995,7 @@ func (c *certificateManager) Add(certData []byte, orgID string) (string, error) 
 func (c *certificateManager) Delete(certID string, orgID string) {
 
 	if orgID != "" {
-		c.storage.RemoveFromList(orgID+"-index", "raw-"+certID)
+		c.index.remove(orgID, certID)
 	}
 
 	c.storage.DeleteKey("raw-" + certID)

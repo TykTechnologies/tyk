@@ -243,6 +243,65 @@ func (s prefixScanStorage) GetKeys(pattern string) []string {
 	return keys
 }
 
+// countingStorage counts calls to the storage methods listing relies on.
+type countingStorage struct {
+	prefixScanStorage
+	calls map[string]int
+}
+
+func newCountingStorage() countingStorage {
+	return countingStorage{prefixScanStorage{storage.NewDummyStorage()}, map[string]int{}}
+}
+
+func (s countingStorage) GetKeys(pattern string) []string {
+	s.calls["GetKeys"]++
+	return s.prefixScanStorage.GetKeys(pattern)
+}
+
+func (s countingStorage) SetKey(key, value string, ttl int64) error {
+	s.calls["SetKey "+key]++
+	return s.prefixScanStorage.SetKey(key, value, ttl)
+}
+
+func TestListAllIds_MigrationDisabled(t *testing.T) {
+	// Tyk Cloud gateways are created with migrateCertList=false and must never
+	// scan Redis.
+	store := newCountingStorage()
+	m := NewCertificateManager(store, "test", nil, false)
+
+	orgCert, _ := genCertificateFromCommonName("org-cert", false)
+	orgCertID, err := m.Add(orgCert, "orgid-1")
+	require.NoError(t, err)
+	noOrgCert, _ := genCertificateFromCommonName("no-org-cert", false)
+	_, err = m.Add(noOrgCert, "")
+	require.NoError(t, err)
+	store.Data["raw-orgid-2legacy"] = "legacy"
+
+	for i := 0; i < 3; i++ {
+		assert.Equal(t, []string{}, m.ListAllIds(""), "call %d", i+1)
+		assert.Equal(t, []string{orgCertID}, m.ListAllIds("orgid-1"), "call %d", i+1)
+		assert.Equal(t, []string{}, m.ListAllIds("orgid-2"), "legacy certificates are not migrated, call %d", i+1)
+	}
+
+	assert.Zero(t, store.calls["GetKeys"], "listing must not scan when migration is disabled")
+}
+
+func TestListAllIds_MigratedOrgWithoutCertificates(t *testing.T) {
+	store := newCountingStorage()
+	m := NewCertificateManager(store, "test", nil, true)
+
+	assert.Empty(t, m.ListAllIds("orgid-1"))
+	require.Equal(t, 1, store.calls["SetKey orgid-1-index-migrated"])
+	require.Equal(t, 1, store.calls["GetKeys"])
+
+	for i := 0; i < 3; i++ {
+		assert.Empty(t, m.ListAllIds("orgid-1"))
+	}
+
+	assert.Equal(t, 1, store.calls["GetKeys"], "an already migrated org must not be scanned again")
+	assert.Equal(t, 1, store.calls["SetKey orgid-1-index-migrated"], "an already migrated org must not rewrite its marker")
+}
+
 func TestListAllIds_MigrationMarker(t *testing.T) {
 	newMigratingManager := func() (*certificateManager, prefixScanStorage) {
 		store := prefixScanStorage{storage.NewDummyStorage()}
@@ -701,6 +760,24 @@ func TestListAllIds_MDCBDataPlane(t *testing.T) {
 
 		assert.Equal(t, before, f.controlPlane.IndexList["orgid-1-index"])
 		assert.Equal(t, dataBefore, len(f.controlPlane.Data))
+	})
+
+	t.Run("adding on the data plane writes the index through the MDCB layer", func(t *testing.T) {
+		// Unchanged behaviour: index entries are written to both the local and
+		// the control plane index, only reads are local.
+		f := newMdcbFixture(t)
+
+		cert, _ := genCertificateFromCommonName("data-plane-cert", false)
+		id, err := f.dataPlane.Add(cert, "orgid-1")
+		require.NoError(t, err)
+
+		assert.Contains(t, f.local.IndexList["orgid-1-index"], "raw-"+id)
+		assert.Contains(t, f.controlPlane.IndexList["orgid-1-index"], "raw-"+id)
+		assert.Contains(t, f.dataPlane.ListAllIds("orgid-1"), id)
+
+		f.dataPlane.Delete(id, "orgid-1")
+		assert.NotContains(t, f.local.IndexList["orgid-1-index"], "raw-"+id)
+		assert.NotContains(t, f.dataPlane.ListAllIds("orgid-1"), id)
 	})
 
 	t.Run("duplicates left in the local index by older versions are returned once", func(t *testing.T) {
