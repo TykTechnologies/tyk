@@ -21,8 +21,7 @@ import (
 
 // JWKS that go-jose v3 loaded but go-jose v4 rejects as a whole must keep
 // loading after the upgrade. Behaviour is covered in detail by
-// github.com/TykTechnologies/openid2go/jwkcompat; these tests check the
-// Gateway uses it.
+// internal/jwkcompat; these tests check the Gateway uses it.
 
 // rsaJWK returns an RSA public JWK. With padded, n uses base64url with "=" padding.
 func rsaJWK(kid string, n *big.Int, padded bool) map[string]string {

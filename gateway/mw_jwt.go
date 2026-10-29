@@ -25,12 +25,12 @@ import (
 	expmaps "golang.org/x/exp/maps"
 	"golang.org/x/sync/singleflight"
 
-	"github.com/TykTechnologies/openid2go/jwkcompat"
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/cache"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
+	"github.com/TykTechnologies/tyk/internal/jwkcompat"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/storage"

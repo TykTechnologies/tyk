@@ -187,8 +187,8 @@ github.com/TykTechnologies/kin-openapi v0.512.1-0.20260921123310-5d76ff536981 h1
 github.com/TykTechnologies/kin-openapi v0.512.1-0.20260921123310-5d76ff536981/go.mod h1:sVo98lE4i2FbZEBScpB1sGbZOPK+KLgtE/pRlzYHLkQ=
 github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632 h1:T5NWziFusj8au5nxAqMMh/bZyX9CAyYnBkaMSsfH6BA=
 github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632/go.mod h1:UsPYgOFBpNzDXLEti7MKOwHLpVSqdzuNGkVFPspQmnQ=
-github.com/TykTechnologies/openid2go v0.1.3-0.20261029135341-1d42e5bb3fd6 h1:dqcf//RnxDhz+iUyWH8CjWI/FWktmOkVYdpuBICOg+s=
-github.com/TykTechnologies/openid2go v0.1.3-0.20261029135341-1d42e5bb3fd6/go.mod h1:TFnQyRksN+E6B9bNoK0DykuqYeUPmXsmndJMCChZy98=
+github.com/TykTechnologies/openid2go v0.1.3-0.20261029125756-1b66b822f8fb h1:bQeo38QSDVsT5TjCNIbtN/ydwSD2Rp+z1zTY3v2648k=
+github.com/TykTechnologies/openid2go v0.1.3-0.20261029125756-1b66b822f8fb/go.mod h1:TFnQyRksN+E6B9bNoK0DykuqYeUPmXsmndJMCChZy98=
 github.com/TykTechnologies/opentelemetry v0.0.26 h1:UTYVheH+prYl5OkzGuKeEjrRaWpHBj8ONAE7QcC0r78=
 github.com/TykTechnologies/opentelemetry v0.0.26/go.mod h1:KgrOJOKX9HCED/Oxg68pgZ8AwMSsBjJAZasImx9luJw=
 github.com/TykTechnologies/storage v1.5.0 h1:W4ezPleAj/toq4DFT3nb7P4V92AIpE9TcMzh6hZnqx8=
