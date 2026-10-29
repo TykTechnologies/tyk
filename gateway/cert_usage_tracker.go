@@ -22,6 +22,7 @@ const (
 // Gateway configuration settings that can use a certificate, as reported to the control plane.
 const (
 	certSettingServer     = "http_server_options.ssl_certificates"
+	certSettingServerFile = "http_server_options.certificates"
 	certSettingUpstream   = "security.certificates.upstream"
 	certSettingAPIs       = "security.certificates.apis"
 	certSettingControlAPI = "security.certificates.control_api"
@@ -328,7 +329,11 @@ func (u *certUsage) useConfig(setting, user string, active bool, certIDs ...stri
 func collectConfigCertUsage(u *certUsage, conf *config.Config, specs []*APISpec) {
 	security := conf.Security
 
-	u.useConfig(certSettingServer, serverCertsUser, servesTLS(conf, specs), conf.HttpServerOptions.SSLCertificates...)
+	tls := servesTLS(conf, specs)
+	u.useConfig(certSettingServer, serverCertsUser, tls, conf.HttpServerOptions.SSLCertificates...)
+	for _, cert := range conf.HttpServerOptions.Certificates {
+		u.useConfigFiles(certSettingServerFile, tls && cert.KeyFile != "", cert.CertFile)
+	}
 	for _, id := range security.Certificates.Upstream {
 		u.useConfig(certSettingUpstream, gatewayConfigUser, true, id)
 	}
@@ -344,8 +349,25 @@ func collectConfigCertUsage(u *certUsage, conf *config.Config, specs []*APISpec)
 		u.useConfig(certSettingPinnedKeys, gatewayConfigUser, true, strings.Split(keys, ",")...)
 	}
 
-	// Named after their keys in external_services. The storage service isn't listed: the Gateway's
-	// Redis connections read only its file-based mTLS settings.
+	collectExternalServiceCertUsage(u, conf)
+}
+
+// useConfigFiles records the certificate files of a Gateway configuration setting that only takes
+// file paths. They are reported when active, but never referenced: sync only fetches store IDs.
+func (u *certUsage) useConfigFiles(setting string, active bool, paths ...string) {
+	if !active {
+		return
+	}
+	for _, path := range paths {
+		if path != "" {
+			u.useByConfig(path, setting, false)
+		}
+	}
+}
+
+// collectExternalServiceCertUsage collects the certificates used for mTLS to external services,
+// under settings named after their keys in external_services.
+func collectExternalServiceCertUsage(u *certUsage, conf *config.Config) {
 	services := conf.ExternalServices
 	for _, s := range []struct {
 		name string
@@ -359,6 +381,19 @@ func collectConfigCertUsage(u *certUsage, conf *config.Config, specs []*APISpec)
 		setting := externalServiceCertSetting(s.name)
 		u.useConfig(setting, gatewayConfigUser, s.mtls.Enabled, s.mtls.CertID)
 		u.useConfig(setting, gatewayConfigUser, s.mtls.Enabled, s.mtls.CACertIDs...)
+		// Certificate store settings take precedence over files.
+		u.useConfigFiles(setting, s.mtls.Enabled && s.mtls.CertID == "" && s.mtls.KeyFile != "", s.mtls.CertFile)
+		u.useConfigFiles(setting, s.mtls.Enabled && len(s.mtls.CACertIDs) == 0, s.mtls.CAFile)
+	}
+
+	// The storage service is only read by the rate limiter's Redis connection, over TLS, and only
+	// from files.
+	storage := services.Storage.MTLS
+	limiterStorage := conf.GetRateLimiterStorage()
+	if storage.Enabled && limiterStorage.Type == "redis" && limiterStorage.UseSSL {
+		setting := externalServiceCertSetting("storage")
+		u.useConfigFiles(setting, storage.KeyFile != "", storage.CertFile)
+		u.useConfigFiles(setting, true, storage.CAFile)
 	}
 }
 

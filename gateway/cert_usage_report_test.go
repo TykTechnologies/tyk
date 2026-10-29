@@ -462,6 +462,134 @@ func TestCertUsageReport_FileAndInline(t *testing.T) {
 	})
 }
 
+func TestCertUsageReport_FileOnlySettings(t *testing.T) {
+	_, _, combinedPEM, tlsCert := crypto.GenServerCertificate()
+	fingerprint := certs.HexSHA256(tlsCert.Certificate[0])
+	certFile := filepath.Join(t.TempDir(), "cert.pem")
+	require.NoError(t, os.WriteFile(certFile, combinedPEM, 0o600))
+
+	fileMTLS := config.MTLSConfig{Enabled: true, CertFile: certFile, KeyFile: certFile}
+	redisTLS := func(c *config.Config) {
+		c.Storage.Type = "redis"
+		c.Storage.UseSSL = true
+	}
+
+	tests := []struct {
+		name    string
+		conf    func(c *config.Config)
+		setting string
+		used    bool
+	}{
+		{
+			name: "HTTPS certificate file with use_ssl on",
+			conf: func(c *config.Config) {
+				c.HttpServerOptions.UseSSL = true
+				c.HttpServerOptions.Certificates = []config.CertData{{Name: "example.com", CertFile: certFile, KeyFile: certFile}}
+			},
+			setting: certSettingServerFile,
+			used:    true,
+		},
+		{
+			name: "HTTPS certificate file without TLS",
+			conf: func(c *config.Config) {
+				c.HttpServerOptions.Certificates = []config.CertData{{CertFile: certFile, KeyFile: certFile}}
+			},
+			used: false,
+		},
+		{
+			name: "HTTPS certificate file without a key file",
+			conf: func(c *config.Config) {
+				c.HttpServerOptions.UseSSL = true
+				c.HttpServerOptions.Certificates = []config.CertData{{CertFile: certFile}}
+			},
+			used: false,
+		},
+		{
+			name:    "external service certificate file",
+			conf:    func(c *config.Config) { c.ExternalServices.Webhooks.MTLS = fileMTLS },
+			setting: "external_services.webhooks.mtls",
+			used:    true,
+		},
+		{
+			name: "external service CA file",
+			conf: func(c *config.Config) {
+				c.ExternalServices.OAuth.MTLS = config.MTLSConfig{Enabled: true, CAFile: certFile}
+			},
+			setting: "external_services.oauth.mtls",
+			used:    true,
+		},
+		{
+			name: "external service CA file overridden by CA certificate IDs",
+			conf: func(c *config.Config) {
+				c.ExternalServices.OAuth.MTLS = config.MTLSConfig{Enabled: true, CAFile: certFile, CACertIDs: []string{testOther}}
+			},
+			used: false,
+		},
+		{
+			name: "external service mTLS switched off",
+			conf: func(c *config.Config) {
+				mtls := fileMTLS
+				mtls.Enabled = false
+				mtls.CAFile = certFile
+				c.ExternalServices.Health.MTLS = mtls
+			},
+			used: false,
+		},
+		{
+			name: "storage service files with Redis TLS",
+			conf: func(c *config.Config) {
+				redisTLS(c)
+				c.ExternalServices.Storage.MTLS = fileMTLS
+			},
+			setting: "external_services.storage.mtls",
+			used:    true,
+		},
+		{
+			name: "storage service CA file with Redis TLS",
+			conf: func(c *config.Config) {
+				redisTLS(c)
+				c.ExternalServices.Storage.MTLS = config.MTLSConfig{Enabled: true, CAFile: certFile}
+			},
+			setting: "external_services.storage.mtls",
+			used:    true,
+		},
+		{
+			name: "storage service files without Redis TLS",
+			conf: func(c *config.Config) {
+				c.Storage.Type = "redis"
+				c.ExternalServices.Storage.MTLS = fileMTLS
+			},
+			used: false,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			conf := config.Config{ListenPort: 8080}
+			tc.conf(&conf)
+
+			usage := collectCertUsage(&conf, nil)
+			assert.NotContains(t, usage.references, certFile, "file-only settings are never synced")
+
+			got := findReported(usage.buildReport(), fingerprint)
+			if !tc.used {
+				assert.Nil(t, got)
+				return
+			}
+			require.NotNil(t, got)
+			assert.Equal(t, []string{tc.setting}, got.GatewayConfig)
+		})
+	}
+
+	t.Run("a missing file isn't reported", func(t *testing.T) {
+		conf := config.Config{}
+		conf.HttpServerOptions.UseSSL = true
+		conf.HttpServerOptions.Certificates = []config.CertData{{CertFile: "/no/such/cert.pem", KeyFile: "/no/such/key.pem"}}
+
+		assert.Empty(t, reportOf(conf))
+	})
+}
+
 func TestCertUsageReport_EveryGatewayAndReload(t *testing.T) {
 	_, _, combinedPEM, _ := crypto.GenServerCertificate()
 
