@@ -28,7 +28,7 @@ require (
 	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20260928094956-ae4125cd2fb5
 	github.com/TykTechnologies/graphql-translator v0.0.0-20250602105400-41c2e7514a36
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
-	github.com/TykTechnologies/openid2go v0.1.3-0.20261029125756-1b66b822f8fb
+	github.com/TykTechnologies/openid2go v0.1.3
 	github.com/TykTechnologies/storage v1.5.0
 	github.com/TykTechnologies/tyk-pump v1.17.0-rc1.0.20261006200310-9d35063b4994
 	github.com/akutz/memconn v0.1.0
