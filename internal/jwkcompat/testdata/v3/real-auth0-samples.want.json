@@ -1,0 +1,26 @@
+{
+  "keys": [
+    {
+      "kid": "NkJCQzIyQzRBMEU4NjhGNUU4MzU4RkY0M0ZDQzkwOUQ0Q0VGNUMwQg",
+      "alg": "RS256",
+      "use": "sig",
+      "type": "*rsa.PublicKey",
+      "fingerprint": "n=a41f8085192278b379b0081cda186c316bd271cdf6f589ae2752e9b16ecb9a07b3c2959660acd422391dcc5d5355f56e85d43fb08d3ea81473a8ed33a4548db623f7dfdd7653134177e5450719646d890e0b759c7038f4de7762dac771760c4ca5dd8d0282e50a6eadac4a086f1d872080ce9a8f7379dd506c9c187f91dad44432f1d5162a0482fa16f9216ff57fbffbbd50a85933408341179ff4567b47cabd89ef5c9db0ce8f5753f5deb892224862d4eb686d203abb382c8fb828ad0466ee51ed4a34e7720aee47cd6ac5a10e497ccb1358903c707dc22e01c0e62e02e7008e2d7d6e5b789bb0fbfc3be4f3bf130cf0b27be9a57680cfb7b759ff20d72585 e=65537",
+      "certs": 1,
+      "x5u": "",
+      "x5t": "6bbc22c4a0e868f5e8358ff43fcc909d4cef5c0b",
+      "x5t#S256": ""
+    },
+    {
+      "kid": "UW65QUcG827BofOEU7QXY",
+      "alg": "RS256",
+      "use": "sig",
+      "type": "*rsa.PublicKey",
+      "fingerprint": "n=aee1ddd7c28447240dc2b76d747e0fdedaf1515aafa469adf48390793778491415849e338b216b276888e28341fd16db8449f3500bf1e7767ee39c19e53e5759d024240f97a06ae888baf1ab8d173331c241a1033c0b152ed32c6237e4730f6c21d84f06c7ebbefabbcdfc78858c69493023fe225ccca4e937d05d3c62dd058ef4f8e21471e97f168843e2fddaa48fec248712f4e71a4c5ec565b7604d7c90b7833c98872c03f7fb8acc0ef949c6d02575f50e566146240a2d5a13b2f38d4f35af04711b5f167e4e4f96e73243d83a3dfd0c49f3ddc9dc4f2ecd65185e6deae5b54c60651c287214009be582620b1e36a288411ff73318754c961f84e656a2b5 e=65537",
+      "certs": 1,
+      "x5u": "",
+      "x5t": "11110a57c468ab11351c0f629522dc7c324dc9ba",
+      "x5t#S256": ""
+    }
+  ]
+}
