@@ -3,6 +3,8 @@ package gateway
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -215,6 +217,16 @@ func TestTransformResponseBody(t *testing.T) {
 }
 
 func TestTransformResponseBody_UnsafeFileTemplatePath(t *testing.T) {
+	t.Run("load failure mapping", func(t *testing.T) {
+		code, msg := templateLoadFailure(fmt.Errorf("%w: escaped root", errUnsafeTemplatePath))
+		assert.Equal(t, http.StatusBadRequest, code)
+		assert.Equal(t, msgTemplateExecutionFailed, msg)
+
+		code, msg = templateLoadFailure(errors.New("template: unexpected EOF"))
+		assert.Equal(t, http.StatusInternalServerError, code)
+		assert.Equal(t, msgTemplateCompilationFailed, msg)
+	})
+
 	// A file outside the configured template root that the transform must never read.
 	secretPath := filepath.Join(t.TempDir(), "secret.tmpl")
 	require.NoError(t, os.WriteFile(secretPath, []byte("TOPSECRET"), 0o644))
@@ -241,8 +253,8 @@ func TestTransformResponseBody_UnsafeFileTemplatePath(t *testing.T) {
 		})
 
 		_, _ = ts.Run(t, test.TestCase{
-			Path: "/transform", Code: http.StatusInternalServerError,
-			BodyMatch:    `"error": "Template compilation failed"`,
+			Path: "/transform", Code: http.StatusBadRequest,
+			BodyMatch:    `"error": "Template execution failed"`,
 			BodyNotMatch: "TOPSECRET",
 			HeadersMatch: map[string]string{header.ContentType: header.ApplicationJSON},
 		})

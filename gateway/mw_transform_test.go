@@ -676,8 +676,8 @@ func TestTransformRequestBody_OASFileTemplatePath(t *testing.T) {
 			ts.Gw.LoadAPI(buildAPI(path))
 
 			_, _ = ts.Run(t, test.TestCase{Method: http.MethodPost, Path: "/post", Data: body,
-				BodyMatch: `"error": "Template compilation failed"`, BodyNotMatch: "TOPSECRET",
-				Code: http.StatusInternalServerError})
+				BodyMatch: `"error": "Template execution failed"`, BodyNotMatch: "TOPSECRET",
+				Code: http.StatusBadRequest})
 		}
 	})
 
