@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -35,12 +34,12 @@ func initJSVM(t *testing.T, spec *APISpec, gw *Gateway, driver apidef.Middleware
 	spec.CustomMiddleware.Driver = driver
 
 	if driver == apidef.JavaScriptDriver {
-		spec.GojaJSVM.Init(spec, logrus.NewEntry(log), gw)
+		spec.GojaJSVM.Init(spec, log.NewEntry(), gw)
 		if err := spec.GojaJSVM.LoadScript(js); err != nil {
 			t.Fatalf("failed to load JS into GojaJSVM: %v", err)
 		}
 	} else {
-		spec.JSVM.Init(spec, logrus.NewEntry(log), gw)
+		spec.JSVM.Init(spec, log.NewEntry(), gw)
 		if _, err := spec.JSVM.VM.Run(js); err != nil {
 			t.Fatalf("failed to load JS into otto JSVM: %v", err)
 		}
@@ -401,7 +400,7 @@ func TestGoja_Base64(t *testing.T) {
 	defer ts.Close()
 
 	gojaVM := GojaJSVM{}
-	gojaVM.Init(nil, logrus.NewEntry(log), ts.Gw)
+	gojaVM.Init(nil, log.NewEntry(), ts.Gw)
 
 	tests := []struct {
 		name string
@@ -538,7 +537,7 @@ func TestGoja_DeInit(t *testing.T) {
 	defer ts.Close()
 
 	vm := GojaJSVM{}
-	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	vm.Init(nil, log.NewEntry(), ts.Gw)
 	assert.True(t, vm.Initialized())
 	assert.NotNil(t, vm.VM())
 
@@ -562,7 +561,7 @@ func TestGoja_LoadScriptCompileError(t *testing.T) {
 	defer ts.Close()
 
 	vm := GojaJSVM{}
-	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	vm.Init(nil, log.NewEntry(), ts.Gw)
 
 	err := vm.LoadScript("function {{{ invalid syntax")
 	assert.Error(t, err)
@@ -583,7 +582,7 @@ func TestGoja_Init_TykJSPath_Valid(t *testing.T) {
 	defer ts.Close()
 
 	vm := GojaJSVM{}
-	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	vm.Init(nil, log.NewEntry(), ts.Gw)
 	assert.True(t, vm.Initialized())
 
 	// coreJS + userJS + TykJsResponse = 3 programs
@@ -606,7 +605,7 @@ func TestGoja_Init_TykJSPath_CompileError(t *testing.T) {
 	defer ts.Close()
 
 	vm := GojaJSVM{}
-	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	vm.Init(nil, log.NewEntry(), ts.Gw)
 	assert.True(t, vm.Initialized())
 
 	// Bad JS skipped — only coreJS + TykJsResponse remain.
@@ -620,7 +619,7 @@ func TestGoja_Init_CustomTimeout(t *testing.T) {
 	defer ts.Close()
 
 	vm := GojaJSVM{}
-	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	vm.Init(nil, log.NewEntry(), ts.Gw)
 	assert.Equal(t, 15*time.Second, vm.Timeout)
 }
 
@@ -637,7 +636,7 @@ func TestGoja_RegisterAPI_ErrorPaths(t *testing.T) {
 
 	// nil spec is safe here — all tested code paths fail before accessing Spec.
 	gojaVM := GojaJSVM{}
-	gojaVM.Init(nil, logrus.NewEntry(log), ts.Gw)
+	gojaVM.Init(nil, log.NewEntry(), ts.Gw)
 
 	tests := []struct {
 		name string
@@ -690,7 +689,7 @@ func TestGoja_TykMakeHttpRequest_Via_JS(t *testing.T) {
 
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 	gojaVM := GojaJSVM{}
-	gojaVM.Init(spec, logrus.NewEntry(log), ts.Gw)
+	gojaVM.Init(spec, log.NewEntry(), ts.Gw)
 
 	js := fmt.Sprintf(`TykMakeHttpRequest('{"Method":"GET","Domain":"%s","Resource":"/"}')`, server.URL)
 	result, err := gojaVM.Run(js)
@@ -707,7 +706,7 @@ func TestGoja_LoadJSPaths(t *testing.T) {
 	defer ts.Close()
 
 	vm := GojaJSVM{}
-	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	vm.Init(nil, log.NewEntry(), ts.Gw)
 
 	initialCount := len(vm.programs)
 
@@ -746,7 +745,7 @@ func TestGoja_StorageBindings(t *testing.T) {
 	defer ts.Close()
 
 	vm := GojaJSVM{}
-	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	vm.Init(nil, log.NewEntry(), ts.Gw)
 
 	// Unique key base so reruns against a shared Redis don't collide.
 	base := fmt.Sprintf("goja-store-%d", time.Now().UnixNano())
@@ -818,8 +817,8 @@ func TestGoja_StorageBindings(t *testing.T) {
 
 	t.Run("nil store throws instead of failing silently", func(t *testing.T) {
 		vm.DeInit()
-		defer vm.Init(nil, logrus.NewEntry(log), ts.Gw)
-		h := &JSVMAPIHelper{Log: logrus.NewEntry(log)}
+		defer vm.Init(nil, log.NewEntry(), ts.Gw)
+		h := &JSVMAPIHelper{Log: log.NewEntry()}
 		_, _, err := h.StorageGet("any")
 		assert.ErrorIs(t, err, errJSVMStoreUnavailable)
 	})
@@ -832,7 +831,7 @@ func TestGoja_StorageBindings_Contention(t *testing.T) {
 	defer ts.Close()
 
 	vm := GojaJSVM{}
-	vm.Init(nil, logrus.NewEntry(log), ts.Gw)
+	vm.Init(nil, log.NewEntry(), ts.Gw)
 
 	const n = 50
 
