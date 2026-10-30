@@ -395,7 +395,7 @@ func TestResponseTransformMiddleware(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("response transform responds 400 without partial output if template execution fails", func(t *testing.T) {
+	t.Run("response transform responds 500 without partial output if template execution fails", func(t *testing.T) {
 		ts := StartTest(nil)
 
 		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -432,7 +432,7 @@ func TestResponseTransformMiddleware(t *testing.T) {
 		resp, err := ts.Run(t, test.TestCase{
 			Path:         "/out-of-range",
 			Method:       http.MethodGet,
-			Code:         http.StatusBadRequest,
+			Code:         http.StatusInternalServerError,
 			BodyMatch:    msgTemplateExecutionFailed,
 			BodyNotMatch: `"out"`,
 		})

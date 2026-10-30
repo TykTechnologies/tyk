@@ -203,7 +203,7 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	var bodyBuffer bytes.Buffer
 	if err := tpl.Execute(&bodyBuffer, bodyData); err != nil {
 		logger.WithError(err).Error("Failed to apply template to request")
-		r.handleError(rw, req, http.StatusBadRequest, msgTemplateExecutionFailed)
+		r.handleError(rw, req, http.StatusInternalServerError, msgTemplateExecutionFailed)
 		return err
 	}
 

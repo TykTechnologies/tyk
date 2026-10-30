@@ -514,7 +514,7 @@ func TestTransformMiddleware(t *testing.T) {
 			})
 		})
 
-		t.Run("template execution error returns StatusBadRequest without details", func(t *testing.T) {
+		t.Run("template execution error returns StatusInternalServerError without details", func(t *testing.T) {
 			api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.Proxy.ListenPath = "/"
 				spec.Proxy.TargetURL = mockEchoServer.URL
@@ -539,7 +539,7 @@ func TestTransformMiddleware(t *testing.T) {
 				Method:       http.MethodPost,
 				Path:         "/out-of-range",
 				Data:         `{"items":[1]}`,
-				Code:         http.StatusBadRequest,
+				Code:         http.StatusInternalServerError,
 				BodyMatch:    msgTemplateExecutionFailed,
 				BodyNotMatch: "index out of range",
 			})
@@ -573,7 +573,7 @@ func TestTransformMiddleware(t *testing.T) {
 			})
 		})
 
-		t.Run("malformed request body returns StatusBadRequest", func(t *testing.T) {
+		t.Run("malformed request body returns StatusInternalServerError", func(t *testing.T) {
 			api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
 				spec.Proxy.ListenPath = "/"
 				spec.Proxy.TargetURL = mockEchoServer.URL
@@ -598,7 +598,7 @@ func TestTransformMiddleware(t *testing.T) {
 				Method: http.MethodPost,
 				Path:   "/transform",
 				Data:   `{malformed-json`,
-				Code:   http.StatusBadRequest,
+				Code:   http.StatusInternalServerError,
 			})
 		})
 	})
