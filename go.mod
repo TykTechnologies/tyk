@@ -646,6 +646,15 @@ replace go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 =>
 
 replace github.com/getkin/kin-openapi => github.com/TykTechnologies/kin-openapi v0.512.1-0.20260921123310-5d76ff536981
 
+// The kin-openapi fork calls yaml.UnmarshalWithOrigin, which oasdiff/yaml v0.1.x
+// removed. Plugin builds (go get tyk@sha) pull in upstream kin-openapi v0.149.0,
+// which requires oasdiff/yaml v0.1.1 and wins MVS, breaking the plugin compiler.
+// Pin both modules to the versions the fork is built against.
+replace (
+	github.com/oasdiff/yaml => github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037
+	github.com/oasdiff/yaml3 => github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90
+)
+
 // SECURITY: GO-2026-5048, CVE-2026-46384, CVE-2026-46385, GHSA-mx64-mj3q-7prj in
 // the Avro decoder. github.com/hamba/avro is archived and will not be patched, so
 // we redirect it to the maintained fork github.com/iskorotkov/avro.
