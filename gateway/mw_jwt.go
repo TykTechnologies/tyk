@@ -230,10 +230,14 @@ func (k *JWTMiddleware) getSecretFromURL(url string, kidVal interface{}, keyType
 			cacheOutdated = true
 		}
 
-		decodedURL, err := base64.StdEncoding.DecodeString(cachedAPIDef.JWTSource)
-		if err != nil {
-			k.Logger().WithError(err).Errorf("JWKS source decode failed: %s is not a base64 string", cachedAPIDef.JWTSource)
-			return nil, err
+		// JWTSource may be a plain URL or a base64 encoded one.
+		decodedURL := []byte(cachedAPIDef.JWTSource)
+		if !httpScheme.MatchString(cachedAPIDef.JWTSource) {
+			decodedURL, err = base64.StdEncoding.DecodeString(cachedAPIDef.JWTSource)
+			if err != nil {
+				k.Logger().WithError(err).Errorf("JWKS source decode failed: %s is not a base64 string", cachedAPIDef.JWTSource)
+				return nil, err
+			}
 		}
 
 		if string(decodedURL) != url {
