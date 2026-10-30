@@ -12,7 +12,7 @@ These pointers describe the source beside this file, not every released Gateway.
 | How does broker mode validate and serve its public identity? | [mcp_oauth_broker.go](../../../../gateway/mcp_oauth_broker.go), [mcp_oauth_broker_flow.go](../../../../gateway/mcp_oauth_broker_flow.go), and the configuration types in [api_definitions.go](../../../../apidef/api_definitions.go) and [server.go](../../../../apidef/oas/server.go). |
 | How is mirror versus static PRM selected? | `OAuth2PRM.IsMirrorMode` in [oauth2.go](../../../../apidef/oas/oauth2.go) and the legacy PRM type in [authentication.go](../../../../apidef/oas/authentication.go). |
 
-In this revision, the new per-scheme PRM configuration wins over the deprecated top-level block. Enabled managed-MCP PRM without static resource or authorization-server fields selects mirror behavior. Broker enablement adds a separate branch inside mirrored PRM serving; do not collapse broker, mirror, and static configuration into one set of expectations.
+In this revision, an enabled per-scheme PRM configuration wins over the deprecated top-level block, independently of the OAuth2 authentication master flag. An absent or disabled per-scheme PRM block falls back to legacy/default PRM resolution. Enabled managed-MCP PRM without static resource or authorization-server fields selects mirror behavior. Broker enablement adds a separate branch inside mirrored PRM serving; do not collapse broker, mirror, and static configuration into one set of expectations.
 
 Without the broker, `serveMirroredPRM` advertises the per-API `__tyk-as` proxy. `mcpASProxyBaseURL` selects HTTPS from `r.TLS` or `r.URL.Scheme` and otherwise uses HTTP, with `r.Host` as authority. By comparison, `gatewayResourceURL` and `prmMetadataURL` use `RequestScheme`, which checks `X-Forwarded-Proto` before TLS state. Inspect the actual ingress and header handling before attributing a deployment failure to this difference. It is a code-level explanation to investigate, not evidence that a reported SaaS request followed that path.
 
@@ -47,6 +47,7 @@ These synthetic scenarios define useful skill checks; they are not executed mode
 | Input | Expected diagnostic decision |
 | --- | --- |
 | HTTPS failure report with no response capture | Keep the root cause unconfirmed and name the first response/configuration evidence needed. |
+| Disabled per-scheme PRM with an enabled legacy block | Trace the legacy/default resolution and inspect the served legacy document; do not treat the disabled block as authoritative. |
 | Non-broker mirror failure with a suggested broker public-origin field | Check the schema and branch; do not invent an override for the selected mode. |
 | Upstream issuer retained while Gateway authorization/token endpoints are proxied | Check the specific mode contract and client error before suggesting blanket replacement. |
 | Successful metadata with no login or MCP operation | Report metadata-only evidence and the remaining interoperability gap. |
