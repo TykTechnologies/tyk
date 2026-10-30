@@ -1518,7 +1518,8 @@ func TestApply_NoAcl_UpdatesLimits(t *testing.T) {
 			},
 		}
 		store := policy.NewStoreMap(map[string]user.Policy{"pol-no-acl": pol})
-		svc := policy.New(&orgID, store, logrus.StandardLogger())
+		logger, _ := tyklog.NewNullLogger()
+		svc := policy.New(&orgID, store, logger)
 
 		sess := &user.SessionState{
 			AccessRights: map[string]user.AccessDefinition{
@@ -1549,5 +1550,84 @@ func TestApply_NoAcl_UpdatesLimits(t *testing.T) {
 		assert.Equal(t, float64(60), ar.Limit.Per)
 		assert.Equal(t, int64(5000), ar.Limit.QuotaMax)
 		assert.Equal(t, 10, ar.Limit.MaxQueryDepth)
+	})
+}
+
+// TestApply_NoAcl_EndpointsAreRateLimitData covers the scenario raised in review of
+// #8562: a rate-limit-only policy applied to a session that already carries ACL data.
+// AccessDefinition.Endpoints holds endpoint rate limits, not ACL, so it follows the
+// rate-limit partition, while ACL fields on the session are left untouched.
+func TestApply_NoAcl_EndpointsAreRateLimitData(t *testing.T) {
+	orgID := ""
+
+	newSession := func() *user.SessionState {
+		sess := &user.SessionState{
+			AccessRights: map[string]user.AccessDefinition{
+				"api1": {
+					APIID:       "api1",
+					Versions:    []string{"Default"},
+					AllowedURLs: []user.AccessSpec{{URL: "/allowed", Methods: []string{"GET"}}},
+					Limit: user.APILimit{
+						RateLimit: user.RateLimit{Rate: 5, Per: 60},
+					},
+					Endpoints: user.Endpoints{{
+						Path:    "/old",
+						Methods: user.EndpointMethods{{Name: "GET", Limit: user.RateLimit{Rate: 5, Per: 60}}},
+					}},
+				},
+			},
+		}
+		sess.SetPolicies("pol-rl")
+		return sess
+	}
+
+	rlPolicy := func(endpoints user.Endpoints) user.Policy {
+		return user.Policy{
+			ID:         "pol-rl",
+			Partitions: user.PolicyPartitions{RateLimit: true},
+			Rate:       1000,
+			Per:        60,
+			AccessRights: map[string]user.AccessDefinition{
+				"api1": {APIID: "api1", Endpoints: endpoints},
+			},
+		}
+	}
+
+	t.Run("policy endpoint limits replace session endpoint limits, ACL untouched", func(t *testing.T) {
+		logger, _ := tyklog.NewNullLogger()
+
+		newEndpoints := user.Endpoints{{
+			Path:    "/new",
+			Methods: user.EndpointMethods{{Name: "GET", Limit: user.RateLimit{Rate: 1000, Per: 60}}},
+		}}
+		store := policy.NewStoreMap(map[string]user.Policy{"pol-rl": rlPolicy(newEndpoints)})
+		svc := policy.New(&orgID, store, logger)
+
+		sess := newSession()
+		assert.NoError(t, svc.Apply(sess))
+
+		ar, ok := sess.AccessRights["api1"]
+		assert.True(t, ok)
+		assert.Equal(t, []string{"Default"}, ar.Versions)
+		assert.Equal(t, []user.AccessSpec{{URL: "/allowed", Methods: []string{"GET"}}}, ar.AllowedURLs)
+		assert.Equal(t, float64(1000), ar.Limit.Rate)
+		assert.Equal(t, newEndpoints, ar.Endpoints)
+	})
+
+	t.Run("policy without endpoint limits clears session endpoint limits, ACL untouched", func(t *testing.T) {
+		logger, _ := tyklog.NewNullLogger()
+
+		store := policy.NewStoreMap(map[string]user.Policy{"pol-rl": rlPolicy(nil)})
+		svc := policy.New(&orgID, store, logger)
+
+		sess := newSession()
+		assert.NoError(t, svc.Apply(sess))
+
+		ar, ok := sess.AccessRights["api1"]
+		assert.True(t, ok)
+		assert.Equal(t, []string{"Default"}, ar.Versions)
+		assert.Equal(t, []user.AccessSpec{{URL: "/allowed", Methods: []string{"GET"}}}, ar.AllowedURLs)
+		assert.Equal(t, float64(1000), ar.Limit.Rate)
+		assert.Empty(t, ar.Endpoints)
 	})
 }
