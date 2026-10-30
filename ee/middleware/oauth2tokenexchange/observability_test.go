@@ -58,6 +58,36 @@ func TestEventPayload_LogFields_SafeFields(t *testing.T) {
 	assertNoForbiddenKeys(t, f)
 }
 
+// TestEventPayload_DelegationFields pins the delegation signals: when an actor
+// token is attached the log line and audit meta carry oauth2_actor_source,
+// oauth2_actor_azp, and oauth2_delegation_observed — and never the actor's
+// subject identity. Impersonation (no actor source) emits none of them.
+func TestEventPayload_DelegationFields(t *testing.T) {
+	t.Parallel()
+
+	delegated := okPayload()
+	delegated.ActorSource = "client_credentials"
+	delegated.ActorAzp = "tyk-gateway-actor"
+	delegated.DelegationObserved = true
+
+	for name, m := range map[string]map[string]interface{}{
+		"log":   delegated.LogFields(),
+		"audit": delegated.AuditMeta(),
+	} {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, "client_credentials", m["oauth2_actor_source"])
+			assert.Equal(t, "tyk-gateway-actor", m["oauth2_actor_azp"])
+			assert.Equal(t, true, m["oauth2_delegation_observed"])
+			assertNoForbiddenKeys(t, m)
+		})
+	}
+
+	impersonation := okPayload().AuditMeta()
+	assert.NotContains(t, impersonation, "oauth2_actor_source")
+	assert.NotContains(t, impersonation, "oauth2_actor_azp")
+	assert.NotContains(t, impersonation, "oauth2_delegation_observed")
+}
+
 // TestEventPayload_LogFields_FailureCarriesIdPError pins TC6's failure variant.
 func TestEventPayload_LogFields_FailureCarriesIdPError(t *testing.T) {
 	t.Parallel()
@@ -137,6 +167,24 @@ func TestEventPayload_CapsAzpFields(t *testing.T) {
 		assert.LessOrEqual(t, len(subject), maxLen)
 		exchanged, _ := m["oauth2_exchanged_azp"].(string)
 		assert.LessOrEqual(t, len(exchanged), maxLen)
+	}
+}
+
+// TestEventPayload_CapsActorAzp pins that the actor authorized-party field is
+// length-capped like the other azp fields: for the header/static sources it is
+// an azp claim decoded from an unverified caller-supplied token, so its size
+// is attacker-controlled up to the request header limit.
+func TestEventPayload_CapsActorAzp(t *testing.T) {
+	t.Parallel()
+
+	p := okPayload()
+	p.ActorSource = "header"
+	p.ActorAzp = strings.Repeat("c", oauth2common.MaxIdPErrorBodyBytes+500)
+
+	maxLen := oauth2common.MaxIdPErrorBodyBytes + len(truncatedSuffix)
+	for _, m := range []map[string]interface{}{p.LogFields(), p.AuditMeta()} {
+		actor, _ := m["oauth2_actor_azp"].(string)
+		assert.LessOrEqual(t, len(actor), maxLen)
 	}
 }
 

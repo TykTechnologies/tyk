@@ -53,7 +53,7 @@ func TestExchangeAtIdP_JWTBearer_StepUpChallenge(t *testing.T) {
 	target := &oauth2common.Target{Audience: "api://orders", Scopes: []string{"Orders.Read"}}
 	ctx := httptest.NewRequest(http.MethodGet, "/", nil).Context()
 
-	_, _, err := mwWithoutTykOps().exchangeAtIdP(ctx, stepUpTestProvider(srv.URL), "user-assertion", target)
+	_, _, err := mwWithoutTykOps().exchangeAtIdP(ctx, stepUpTestProvider(srv.URL), "user-assertion", "", target)
 	require.Error(t, err)
 	var stepUp *oauth2common.StepUpRequiredError
 	require.ErrorAs(t, err, &stepUp, "interaction_required must classify as step-up")
@@ -69,7 +69,7 @@ func TestExchangeAtIdP_JWTBearer_DetectionKeysOnErrorCode(t *testing.T) {
 	target := &oauth2common.Target{Audience: "api://orders", Scopes: []string{"Orders.Read"}}
 	ctx := httptest.NewRequest(http.MethodGet, "/", nil).Context()
 
-	_, _, err := mwWithoutTykOps().exchangeAtIdP(ctx, stepUpTestProvider(srv.URL), "user-assertion", target)
+	_, _, err := mwWithoutTykOps().exchangeAtIdP(ctx, stepUpTestProvider(srv.URL), "user-assertion", "", target)
 	require.Error(t, err)
 	var stepUp *oauth2common.StepUpRequiredError
 	assert.NotErrorAs(t, err, &stepUp, "invalid_grant must not be step-up")
@@ -86,7 +86,7 @@ func TestExchangeAtIdP_TokenExchange_InteractionRequiredIsIdPError(t *testing.T)
 	ctx := httptest.NewRequest(http.MethodGet, "/", nil).Context()
 
 	provider := &oas.OAuth2TokenExchangeProvider{TokenEndpoint: srv.URL}
-	_, _, err := mwWithoutTykOps().exchangeAtIdP(ctx, provider, "subject", target)
+	_, _, err := mwWithoutTykOps().exchangeAtIdP(ctx, provider, "subject", "", target)
 	require.Error(t, err)
 	var stepUp *oauth2common.StepUpRequiredError
 	assert.NotErrorAs(t, err, &stepUp, "the relay must be scoped to the jwt-bearer grant")
