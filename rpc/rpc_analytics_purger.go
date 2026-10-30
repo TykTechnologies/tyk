@@ -97,9 +97,33 @@ func (r *Purger) PurgeCache() {
 		// Send keys to RPC
 		if _, err := FuncClientSingleton("PurgeAnalyticsData", string(data)); err != nil {
 			EmitErrorEvent(FuncClientSingletonCall, "PurgeAnalyticsData", err)
-			Log.Warn("Failed to call purge, retrying: ", err)
+			Log.Warn("Failed to call purge, restoring analytics data for next attempt: ", err)
+			r.restoreAnalyticsValues(analyticsKeyName, analyticsValues)
 		}
 
+	}
+}
+
+// restoreAnalyticsValues pushes analytics records that could not be sent over
+// RPC back into the store, so they are retried on the next purge instead of
+// being lost.
+func (r *Purger) restoreAnalyticsValues(keyName string, analyticsValues []interface{}) {
+	records := make([][]byte, 0, len(analyticsValues))
+	for _, v := range analyticsValues {
+		if s, ok := v.(string); ok {
+			records = append(records, []byte(s))
+		}
+	}
+
+	if pipelined, ok := r.Store.(interface {
+		AppendToSetPipelined(string, [][]byte)
+	}); ok {
+		pipelined.AppendToSetPipelined(keyName, records)
+		return
+	}
+
+	for _, record := range records {
+		r.Store.AppendToSet(keyName, string(record))
 	}
 }
 
