@@ -799,7 +799,9 @@ func proxyFromAPI(api *APISpec) func(*http.Request) (*url.URL, error) {
 }
 
 func tlsClientConfig(s *APISpec, gw *Gateway) *tls.Config {
-	config := &tls.Config{}
+	config := &tls.Config{
+		CurvePreferences: defaultCurvePreferences(),
+	}
 
 	if s.Protocol == "tls" || s.Protocol == "tcp" {
 		targetURL, err := url.Parse(s.Proxy.TargetURL)
@@ -863,7 +865,9 @@ func tlsClientConfig(s *APISpec, gw *Gateway) *tls.Config {
 func (p *ReverseProxy) httpTransport(dialTimeout float64, req *http.Request, outReq *http.Request) *TykRoundTripper {
 	p.logger.Debug("Creating new transport")
 	transport := p.defaultTransport(dialTimeout) // modifies a newly created transport
-	transport.TLSClientConfig = &tls.Config{}
+	transport.TLSClientConfig = &tls.Config{
+		CurvePreferences: defaultCurvePreferences(),
+	}
 	transport.Proxy = proxyFromAPI(p.TykAPISpec)
 
 	if p.Gw.GetConfig().ProxySSLInsecureSkipVerify {
