@@ -66,7 +66,7 @@ func TestOriginalRequestPath_MainHTTPSpanAttribute(t *testing.T) {
 			Endpoint: otelCollectorMock.URL,
 		},
 	}}
-	provider := otel.InitOpenTelemetry(context.Background(), tyklog.Get(), cfg, "test-gw", "v1.0.0", false, "", false, nil)
+	provider := otel.InitOpenTelemetry(context.Background(), tyklog.Get().AsLogrus(), cfg, "test-gw", "v1.0.0", false, "", false, nil)
 	defer func() {
 		_ = provider.Shutdown(context.Background())
 	}()

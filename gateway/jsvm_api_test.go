@@ -52,10 +52,9 @@ func TestJSVMAPIHelper_MakeHTTPRequest_Success(t *testing.T) {
 	defer ts.Close()
 
 	h := &JSVMAPIHelper{
-		Gw:     ts.Gw,
-		Spec:   &APISpec{APIDefinition: &apidef.APIDefinition{}},
-		Log:    logrus.NewEntry(log),
-		RawLog: rawLog,
+		Gw:   ts.Gw,
+		Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
+		Log:  log.NewEntry(),
 	}
 
 	input := fmt.Sprintf(`{"Method":"GET","Domain":"%s","Resource":"/"}`, server.URL)
@@ -77,10 +76,9 @@ func TestJSVMAPIHelper_MakeHTTPRequest_WithBody(t *testing.T) {
 	defer ts.Close()
 
 	h := &JSVMAPIHelper{
-		Gw:     ts.Gw,
-		Spec:   &APISpec{APIDefinition: &apidef.APIDefinition{}},
-		Log:    logrus.NewEntry(log),
-		RawLog: rawLog,
+		Gw:   ts.Gw,
+		Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
+		Log:  log.NewEntry(),
 	}
 
 	input := fmt.Sprintf(`{"Method":"POST","Domain":"%s","Resource":"/","Body":"test body"}`, server.URL)
@@ -105,10 +103,9 @@ func TestJSVMAPIHelper_MakeHTTPRequest_WithFormData(t *testing.T) {
 	defer ts.Close()
 
 	h := &JSVMAPIHelper{
-		Gw:     ts.Gw,
-		Spec:   &APISpec{APIDefinition: &apidef.APIDefinition{}},
-		Log:    logrus.NewEntry(log),
-		RawLog: rawLog,
+		Gw:   ts.Gw,
+		Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
+		Log:  log.NewEntry(),
 	}
 
 	input := fmt.Sprintf(`{"Method":"POST","Domain":"%s","Resource":"/","FormData":{"key":"value"}}`, server.URL)
@@ -150,7 +147,7 @@ func TestJSVMAPIHelper_LogMessage(t *testing.T) {
 }
 
 func TestJSVMAPIHelper_RawLogMessage(t *testing.T) {
-	h := &JSVMAPIHelper{RawLog: logrus.New()}
+	h := &JSVMAPIHelper{Log: logrus.NewEntry(logrus.New())}
 	assert.NotPanics(t, func() { h.RawLogMessage("test raw log message") })
 }
 
@@ -169,10 +166,9 @@ func TestJSVMAPIHelper_GetKeyData_NonExistentKey(t *testing.T) {
 	defer ts.Close()
 
 	h := &JSVMAPIHelper{
-		Spec:   &APISpec{APIDefinition: &apidef.APIDefinition{}},
-		Gw:     ts.Gw,
-		Log:    logrus.NewEntry(log),
-		RawLog: rawLog,
+		Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
+		Gw:   ts.Gw,
+		Log:  log.NewEntry(),
 	}
 
 	// Non-existent key: should return valid JSON (typically "null").
@@ -187,9 +183,8 @@ func TestJSVMAPIHelper_BatchRequest_InvalidJSON(t *testing.T) {
 	defer ts.Close()
 
 	h := &JSVMAPIHelper{
-		Gw:     ts.Gw,
-		Log:    logrus.NewEntry(log),
-		RawLog: rawLog,
+		Gw:  ts.Gw,
+		Log: log.NewEntry(),
 	}
 
 	_, err := h.BatchRequest("{invalid json}")
