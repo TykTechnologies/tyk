@@ -159,6 +159,29 @@ streams:
       add_timestamp: false
 `
 
+const bentoNatsTemplateInvalidBloblang = `
+streams:
+  test:
+    input:
+      nats:
+        auto_replay_nacks: true
+        subject: "%s"
+        urls: ["%s"]
+    output:
+      http_server:
+        path: /get
+        ws_path: /get/ws
+    pipeline:
+      processors:
+        - bloblang: |
+            root.id = "stub"
+            root.message = content().invalid()
+    logger:
+      level: DEBUG
+      format: logfmt
+      add_timestamp: false
+`
+
 const bentoNatsTemplateNoBloblang = `
 streams:
   test:
@@ -189,6 +212,54 @@ streams:
         ws_path: /subscribe
         stream_path: /get/stream
 `
+
+func TestStreamingInvalidBloblang(t *testing.T) {
+	ctx := context.Background()
+
+	natsContainer, err := natscon.Run(
+		ctx,
+		"nats:2.9",
+		testcontainers.WithWaitStrategy(wait.ForAll(
+			wait.ForLog("Server is ready"),
+			wait.ForListeningPort("4222/tcp"),
+		).WithDeadline(30*time.Second)))
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		natsContainer.Terminate(ctx)
+	})
+
+	//skip if is dynamic, does not work
+
+	configSubject := "test"
+
+	connectionStr, err := natsContainer.ConnectionString(ctx)
+	assert.NoError(t, err)
+	streamConfig := fmt.Sprintf(bentoNatsTemplateInvalidBloblang, configSubject, connectionStr)
+
+	ts := StartTest(func(globalConf *config.Config) {
+		globalConf.Streaming.Enabled = true
+	})
+	t.Cleanup(func() {
+		ts.Close()
+	})
+	//t.Cleanup(func() { ts.Close() })
+	apiName := "test-api"
+	if err = setUpStreamAPI(ts, apiName, streamConfig); err != nil {
+		t.Fatal(err)
+	}
+
+	const totalMessages = 3
+
+	dialer := websocket.Dialer{
+		HandshakeTimeout: 1 * time.Second,
+		TLSClientConfig:  &tls.Config{InsecureSkipVerify: true},
+	}
+
+	wsURL := strings.Replace(ts.URL, "http", "ws", 1) + fmt.Sprintf("/%s/get/ws", apiName)
+
+	_, _, err = dialer.Dial(wsURL, nil)
+	assert.Error(t, err)
+}
 
 func TestStreamingAPISingleClient(t *testing.T) {
 	ctx := context.Background()
