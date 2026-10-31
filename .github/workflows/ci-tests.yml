@@ -228,6 +228,9 @@ jobs:
 
       - name: Set SonarCloud parameters
         id: sonar_params
+        env:
+          PR_HEAD_REF: ${{ github.head_ref }}
+          PR_BASE_REF: ${{ github.base_ref }}
         run: |
           # Common parameters for both PR and push
           SONAR_ARGS="-Dsonar.organization=tyktechnologies \
@@ -244,8 +247,8 @@ jobs:
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
             SONAR_ARGS="$SONAR_ARGS \
             -Dsonar.pullrequest.key=${{ github.event.pull_request.number }} \
-            -Dsonar.pullrequest.branch=${{ github.head_ref }} \
-            -Dsonar.pullrequest.base=${{ github.base_ref }}"
+            -Dsonar.pullrequest.branch=$PR_HEAD_REF \
+            -Dsonar.pullrequest.base=$PR_BASE_REF"
             echo "Running SonarCloud in pull request mode"
           else
             echo "Running SonarCloud in full analysis mode"
