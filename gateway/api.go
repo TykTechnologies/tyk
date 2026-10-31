@@ -957,7 +957,33 @@ func (gw *Gateway) feedKeyListingWorkers(c context.Context, keys []string, jobs 
 	}
 }
 
-func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
+// syncedKeyLifetime returns the lifetime of a synced key, using the management layer TTL when none of its APIs are loaded.
+// It returns false if the key no longer exists in the management layer.
+func (gw *Gateway) syncedKeyLifetime(sess *user.SessionState, remoteTTL func() (int64, error)) (int64, bool) {
+	if len(sess.AccessRights) == 0 || len(gw.GetApiSpecsFromAccessRights(sess)) > 0 {
+		return gw.ApplyLifetime(sess, nil), true
+	}
+
+	conf := gw.GetConfig()
+	if !conf.ForceGlobalSessionLifetime && remoteTTL != nil {
+		ttl, err := remoteTTL()
+		switch {
+		case err != nil:
+			log.Warning("Failed to get key TTL from management layer, using local session lifetime")
+			log.WithError(err).Debug("Management layer key TTL lookup error")
+		case ttl == -2:
+			// the key was removed from the management layer
+			return 0, false
+		case ttl > 0 || ttl == -1:
+			// -1 means the key has no expiry in the management layer
+			return ttl, true
+		}
+	}
+
+	return sess.Lifetime(conf.SessionLifetimeRespectsKeyExpiration, 0, conf.ForceGlobalSessionLifetime, conf.GlobalSessionLifetime), true
+}
+
+func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string, remoteTTL func() (int64, error)) {
 	sess := &user.SessionState{}
 	err := json.Unmarshal([]byte(sessionString), sess)
 	if err != nil {
@@ -970,7 +996,11 @@ func (gw *Gateway) handleAddKey(keyName, sessionString, orgId string) {
 		return
 	}
 
-	lifetime := gw.ApplyLifetime(sess, nil)
+	lifetime, exists := gw.syncedKeyLifetime(sess, remoteTTL)
+	if !exists {
+		log.WithField("key", gw.obfuscateKey(keyName)).Debug("Key no longer exists in management layer, skipping update")
+		return
+	}
 	err = gw.GlobalSessionManager.UpdateSession(keyName, sess, lifetime, gw.GetConfig().HashKeys)
 	if err != nil {
 		log.WithFields(logrus.Fields{
