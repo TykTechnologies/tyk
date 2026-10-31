@@ -86,6 +86,8 @@ func (d *PythonDispatcher) DispatchWithContext(_ context.Context, object *coproc
 
 	python.PyTupleSetItem(args, 0, objectBytes)
 	result, err := python.PyObjectCallObject(dispatchHookFunc, args)
+	python.PyDecRef(args)
+	python.PyDecRef(dispatchHookFunc)
 	if err != nil {
 		log.WithFields(logrus.Fields{
 			"prefix": "python",
@@ -94,8 +96,6 @@ func (d *PythonDispatcher) DispatchWithContext(_ context.Context, object *coproc
 		pythonLock.Unlock()
 		return nil, err
 	}
-	python.PyDecRef(args)
-	python.PyDecRef(dispatchHookFunc)
 
 	newObjectPtr, err := python.PyTupleGetItem(result, 0)
 	if err != nil {
