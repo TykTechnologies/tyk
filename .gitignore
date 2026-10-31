@@ -95,3 +95,5 @@ ci/tests/specs/policies
 
 local-apps
 tyk-local
+# openapi-generator-cli npm wrapper state
+openapitools.json
