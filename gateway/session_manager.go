@@ -115,8 +115,6 @@ func (l *SessionLimiter) limitRedis(r *http.Request, session *user.SessionState,
 		cost = apiLimit.Rate
 	}
 
-	pipeline := l.config.EnableNonTransactionalRateLimiter
-
 	smoothingFn := func(_ context.Context, key string, currentRate, maxAllowedRate int64) bool {
 		// Subtract by 1 because of the delayed add in the window
 		var subtractor int64 = 1
@@ -153,8 +151,8 @@ func (l *SessionLimiter) limitRedis(r *http.Request, session *user.SessionState,
 		return currentRate > allowedRate-subtractor
 	}
 
-	ratelimit := rate.NewSlidingLogRedis(l.limiterStorage, pipeline, smoothingFn)
-	stats, shouldBlock, err := ratelimit.Do(ctx, time.Now(), rateLimiterKey, int64(cost), int64(per))
+	ratelimit := rate.NewSlidingLogRedis(l.limiterStorage, smoothingFn, rate.WithLogger(log))
+	stats, shouldBlock, err := ratelimit.Do(ctx, rateLimiterKey, int64(cost), int64(per))
 
 	if shouldBlock && !dryRun && (l.config.EnableSentinelRateLimiter || l.config.DRLEnableSentinelRateLimiter) {
 		l.limiterStorage.SetNX(ctx, rateLimiterSentinelKey, "1", time.Second*time.Duration(per))
