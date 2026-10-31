@@ -87,7 +87,7 @@ func (t *RequestSizeLimitMiddleware) ProcessRequest(w http.ResponseWriter, r *ht
 
 	logger.Debug("Global limit is: ", vInfo.GlobalSizeLimit)
 	// Manage global headers first
-	if vInfo.GlobalSizeLimit > 0 {
+	if !vInfo.GlobalSizeLimitDisabled && vInfo.GlobalSizeLimit > 0 {
 		logger.Debug("Checking global limit")
 		err, code := t.checkRequestLimit(r, vInfo.GlobalSizeLimit)
 		// If not OK, block
