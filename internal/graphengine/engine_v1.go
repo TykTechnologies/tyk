@@ -24,16 +24,15 @@ type EngineV1Injections struct {
 }
 
 type EngineV1 struct {
+	baseEngine
+
 	ExecutionEngine *graphql.ExecutionEngine
 	Schema          *graphql.Schema
 	ApiDefinition   *apidef.APIDefinition
 	HttpClient      *http.Client
 
-	logger                    abstractlogger.Logger
 	gqlTools                  graphqlGoToolsV1
 	graphqlRequestProcessor   GraphQLRequestProcessor
-	complexityChecker         ComplexityChecker
-	granularAccessChecker     GranularAccessChecker
 	reverseProxyPreHandler    ReverseProxyPreHandler
 	ctxStoreRequestFunc       func(r *http.Request, gqlRequest *graphql.Request)
 	ctxRetrieveRequestFunc    func(r *http.Request) *graphql.Request
@@ -102,15 +101,17 @@ func NewEngineV1(options EngineV1Options) (*EngineV1, error) {
 	}
 
 	return &EngineV1{
+		baseEngine: baseEngine{
+			logger:                logger,
+			complexityChecker:     complexityChecker,
+			granularAccessChecker: granularAccessChecker,
+		},
 		ExecutionEngine:         executionEngine,
 		Schema:                  parsedSchema,
 		ApiDefinition:           options.ApiDefinition,
 		HttpClient:              options.HttpClient,
-		logger:                  logger,
 		gqlTools:                gqlTools,
 		graphqlRequestProcessor: requestProcessor,
-		complexityChecker:       complexityChecker,
-		granularAccessChecker:   granularAccessChecker,
 		reverseProxyPreHandler:  reverseProxyPreHandler,
 		ctxStoreRequestFunc:     options.Injections.ContextStoreRequest,
 		ctxRetrieveRequestFunc:  options.Injections.ContextRetrieveRequest,
@@ -139,15 +140,6 @@ func (e *EngineV1) ProcessAndStoreGraphQLRequest(w http.ResponseWriter, r *http.
 
 	e.ctxStoreRequestFunc(r, &gqlRequest)
 	return e.graphqlRequestProcessor.ProcessRequest(r.Context(), w, r)
-}
-
-func (e *EngineV1) ProcessGraphQLComplexity(r *http.Request, accessDefinition *ComplexityAccessDefinition) (err error, statusCode int) {
-	return complexityFailReasonAsHttpStatusCode(e.complexityChecker.DepthLimitExceeded(r, accessDefinition))
-}
-
-func (e *EngineV1) ProcessGraphQLGranularAccess(w http.ResponseWriter, r *http.Request, accessDefinition *GranularAccessDefinition) (err error, statusCode int) {
-	result := e.granularAccessChecker.CheckGraphQLRequestFieldAllowance(w, r, accessDefinition)
-	return granularAccessFailReasonAsHttpStatusCode(e.logger, &result, w)
 }
 
 func (e *EngineV1) HandleReverseProxy(params ReverseProxyParams) (res *http.Response, hijacked bool, err error) {
