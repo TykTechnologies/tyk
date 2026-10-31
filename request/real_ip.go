@@ -2,66 +2,108 @@ package request
 
 import (
 	"net"
+	"net/netip"
 	"net/http"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	internalhttputil "github.com/TykTechnologies/tyk/internal/httputil"
 )
 
 var Global func() config.Config
 
 // RealIP takes a request object, and returns the real Client IP address.
+//
+// X-Real-IP and X-Forwarded-For are only honored when the immediate network
+// peer (RemoteAddr) is listed in http_server_options.trusted_proxy_cidrs.
+// Any other peer can set these headers to an arbitrary value, so trusting
+// them unconditionally lets a request forge the IP address used by the IP
+// allowlist, IP blocklist, and per-client rate limiting.
 func RealIP(r *http.Request) string {
 
 	if contextIp := r.Context().Value("remote_addr"); contextIp != nil {
 		return contextIp.(string)
 	}
 
-	if realIPVal := r.Header.Get(header.XRealIP); realIPVal != "" {
-		if realIP := net.ParseIP(realIPVal); realIP != nil {
-			return realIP.String()
-		}
+	remoteHost, _, _ := net.SplitHostPort(r.RemoteAddr)
+	if remoteHost == "" {
+		remoteHost = r.RemoteAddr
 	}
 
-	if fw := r.Header.Get(header.XForwardFor); fw != "" {
-		xffs := strings.Split(fw, ",")
-
-		// Get depth from config, default to 0 (first IP in chain)
-		var depth int
-		if Global != nil {
-			depth = Global().HttpServerOptions.XFFDepth
+	if peerIsTrustedProxy(remoteHost) {
+		if realIPVal := r.Header.Get(header.XRealIP); realIPVal != "" {
+			if realIP := net.ParseIP(realIPVal); realIP != nil {
+				return realIP.String()
+			}
 		}
 
-		// The following check for invalid depth configs.
-		// It's more secure to return empty if depth is invalid.
-		// Defaulting to an IP from the request would be
-		// burying a configuration failure.
-		if depth < 0 || depth > len(xffs) {
-			return ""
-		}
+		if fw := r.Header.Get(header.XForwardFor); fw != "" {
+			xffs := strings.Split(fw, ",")
 
-		// Choose the appropriate IP based on depth
-		// depth=0 means first IP (leftmost), depth=1 means last IP, depth=2 means second to last, etc.
-		// Negative depth is invalid and treated same as 0/unset.
-		var ip string
-		if depth == 0 {
-			ip = strings.TrimSpace(xffs[0])
-		} else {
-			ip = strings.TrimSpace(xffs[len(xffs)-depth])
-		}
+			// Get depth from config, default to 0 (first IP in chain)
+			var depth int
+			if Global != nil {
+				depth = Global().HttpServerOptions.XFFDepth
+			}
 
-		// Validate that the IP is properly formatted before returning it
-		if parsedIP := net.ParseIP(ip); parsedIP != nil {
-			return parsedIP.String()
+			// The following check for invalid depth configs.
+			// It's more secure to return empty if depth is invalid.
+			// Defaulting to an IP from the request would be
+			// burying a configuration failure.
+			if depth < 0 || depth > len(xffs) {
+				return ""
+			}
+
+			// Choose the appropriate IP based on depth
+			// depth=0 means first IP (leftmost), depth=1 means last IP, depth=2 means second to last, etc.
+			// Negative depth is invalid and treated same as 0/unset.
+			var ip string
+			if depth == 0 {
+				ip = strings.TrimSpace(xffs[0])
+			} else {
+				ip = strings.TrimSpace(xffs[len(xffs)-depth])
+			}
+
+			// Validate that the IP is properly formatted before returning it
+			if parsedIP := net.ParseIP(ip); parsedIP != nil {
+				return parsedIP.String()
+			}
+			// If IP is invalid, fall through to use RemoteAddr
 		}
-		// If IP is invalid, fall through to use RemoteAddr
 	}
 
 	// From net/http.Request.RemoteAddr:
 	//   The HTTP server in this package sets RemoteAddr to an
 	//   "IP:port" address before invoking a handler.
 	// So we can ignore the case of the port missing.
-	host, _, _ := net.SplitHostPort(r.RemoteAddr)
-	return host
+	return remoteHost
+}
+
+// peerIsTrustedProxy reports whether remoteHost is within one of the
+// configured http_server_options.trusted_proxy_cidrs networks. With no
+// trusted_proxy_cidrs configured, no peer is trusted and RealIP falls back
+// to RemoteAddr unconditionally - the secure default.
+func peerIsTrustedProxy(remoteHost string) bool {
+	if Global == nil {
+		return false
+	}
+	cidrs := Global().HttpServerOptions.TrustedProxyCIDRs
+	if len(cidrs) == 0 {
+		return false
+	}
+	prefixes, err := internalhttputil.ParseTrustedProxyCIDRs(cidrs)
+	if err != nil {
+		return false
+	}
+	addr, err := netip.ParseAddr(strings.Trim(remoteHost, "[]"))
+	if err != nil {
+		return false
+	}
+	for _, prefix := range prefixes {
+		if prefix.Contains(addr) {
+			return true
+		}
+	}
+	return false
 }
