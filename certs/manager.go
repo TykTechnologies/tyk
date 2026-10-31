@@ -844,14 +844,13 @@ func (c *certificateManager) ListPublicKeys(keyIDs []string) (out []string) {
 			}
 		}
 
-		block := decodePublicKeyBlock(rawKey)
-		if block == nil {
+		fingerprint := PublicKeyFingerprint(rawKey)
+		if fingerprint == "" {
 			c.logger.Error("Can't parse public key:", id)
 			out = append(out, "")
 			continue
 		}
 
-		fingerprint := tykcrypto.HexSHA256(block.Bytes)
 		c.cache.Set(cacheKey, fingerprint, cache.DefaultExpiration)
 		out = append(out, fingerprint)
 	}

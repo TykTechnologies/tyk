@@ -58,6 +58,28 @@ type GWStats struct {
 	PoliciesCount  int                `json:"policies_count"`
 	LoadedAPIs     []LoadedAPIInfo    `json:"loaded_apis,omitempty"`
 	LoadedPolicies []LoadedPolicyInfo `json:"loaded_policies,omitempty"`
+	// Certificates lists the certificates the Gateway uses. Unlike LoadedAPIs it is always sent,
+	// as an empty list when the Gateway uses none, so the control plane can tell such a Gateway
+	// apart from one on an older version that doesn't report certificates.
+	Certificates []CertificateUsage `json:"certificates"`
+}
+
+// CertificateUsage is one certificate a Gateway uses, as reported to the control plane.
+type CertificateUsage struct {
+	// CertID is the certificate store ID. Certificates set by file path or inline are
+	// reported by their SHA-256 fingerprint (for public keys, the public key's fingerprint),
+	// which is the certificate store ID without the org prefix.
+	CertID string `json:"cert_id"`
+	// GatewayConfig lists the Gateway configuration settings that use the certificate.
+	GatewayConfig []string `json:"gateway_config,omitempty"`
+	// APIIDs lists the loaded APIs that actively use the certificate.
+	APIIDs []string `json:"api_ids,omitempty"`
+}
+
+// CertificateReport is the list of certificates a Gateway connected directly to the Dashboard
+// sends to POST /system/node/certificates.
+type CertificateReport struct {
+	Certificates []CertificateUsage `json:"certificates"`
 }
 
 type GroupKeySpaceRequest struct {

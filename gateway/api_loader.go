@@ -1369,14 +1369,10 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 		gw.mcpPairingIndex.Set(mcpPairingSnapshot)
 	}
 
-	// Only build usage map in RPC mode (when tracker exists)
 	if gw.certUsageTracker != nil {
-		// Build the complete usage map offline (no locks held during construction)
-		newUsageMap := CollectCertUsageMap(specs, gw.GetConfig().HttpServerOptions.SSLCertificates)
-
-		// Atomically replace the old usage map with the new one
-		// This ensures no partial state is visible to concurrent readers
-		gw.certUsageTracker.ReplaceAll(newUsageMap)
+		// Build the certificate usage offline (no locks held during construction), then atomically
+		// replace the old usage, so no partial state is visible to concurrent readers.
+		gw.updateCertUsage(specs)
 
 		// Log when feature is enabled
 		if gw.GetConfig().SlaveOptions.SyncUsedCertsOnly {
