@@ -130,7 +130,7 @@ func TestRESTAsMCPAdapter_ProtocolSpecificGETAndDELETE(t *testing.T) {
 	t.Run("modern methods are rejected with POST allowance", func(t *testing.T) {
 		for _, method := range []string{http.MethodGet, http.MethodDelete} {
 			t.Run(method, func(t *testing.T) {
-				req := httptest.NewRequest(method, "/mcp", nil)
+				req := httptest.NewRequestWithContext(t.Context(), method, "/mcp", nil)
 				req.Header.Set("Accept", "application/json, text/event-stream")
 				req.Header.Set(mcp.HeaderProtocolVersion, mcp.ModernProtocolVersion)
 				rec := httptest.NewRecorder()
