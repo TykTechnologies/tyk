@@ -28,9 +28,9 @@ require (
 	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20260928094956-ae4125cd2fb5
 	github.com/TykTechnologies/graphql-translator v0.0.0-20250602105400-41c2e7514a36
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
-	github.com/TykTechnologies/openid2go v0.1.2
+	github.com/TykTechnologies/openid2go v0.1.3
 	github.com/TykTechnologies/storage v1.5.0
-	github.com/TykTechnologies/tyk-pump v1.17.0-rc1.0.20261006200310-9d35063b4994
+	github.com/TykTechnologies/tyk-pump v1.18.0-rc1.0.20261029095747-fcfeadd159a0
 	github.com/akutz/memconn v0.1.0
 	github.com/bshuster-repo/logrus-logstash-hook v1.1.0
 	github.com/buger/jsonparser v1.1.2
@@ -39,7 +39,6 @@ require (
 	github.com/clbanning/mxj v1.8.4
 	github.com/evalphobia/logrus_sentry v0.8.2
 	github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible
-	github.com/go-jose/go-jose/v3 v3.0.5
 	github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/golang-jwt/jwt/v4 v4.5.2
@@ -106,6 +105,7 @@ require (
 	github.com/eclipse/paho.mqtt.golang v1.5.1
 	github.com/felixge/httpsnoop v1.1.0
 	github.com/getkin/kin-openapi v0.149.0
+	github.com/go-jose/go-jose/v4 v4.1.6
 	github.com/go-playground/validator/v10 v10.30.1
 	github.com/go-redis/redismock/v9 v9.2.0
 	github.com/goccy/go-json v0.10.5
@@ -207,7 +207,7 @@ require (
 	github.com/PaesslerAG/jsonpath v0.1.1 // indirect
 	github.com/alecthomas/units v0.0.0-20211218093645-b94a6e3cc137 // indirect
 	github.com/alitto/pond v1.8.3 // indirect
-	github.com/andybalholm/brotli v1.2.0 // indirect
+	github.com/andybalholm/brotli v1.2.7 // indirect
 	github.com/antithesishq/antithesis-sdk-go v0.7.0 // indirect
 	github.com/apache/arrow-go/v18 v18.5.2 // indirect
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
@@ -334,7 +334,6 @@ require (
 	github.com/go-faker/faker/v4 v4.3.0 // indirect
 	github.com/go-faster/city v1.0.1 // indirect
 	github.com/go-faster/errors v0.7.1 // indirect
-	github.com/go-jose/go-jose/v4 v4.1.4 // indirect
 	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
@@ -615,8 +614,8 @@ require (
 	google.golang.org/api v0.287.1 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/genproto v0.0.0-20260319201613-d00831a3d3e7 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20260819154853-08b0e4226688 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260819154853-08b0e4226688 // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20260928230214-8a89bd6388cc // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260928230214-8a89bd6388cc // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
