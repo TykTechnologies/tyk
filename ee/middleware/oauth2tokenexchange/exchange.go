@@ -450,7 +450,7 @@ func applyClientAuth(req *http.Request, provider *oas.OAuth2TokenExchangeProvide
 		// signed private_key_jwt client_assertion).
 	case "", oas.OAuth2ClientAuthBasic:
 		if provider.ClientAuth != nil && provider.ClientAuth.ClientID != "" {
-			req.SetBasicAuth(provider.ClientAuth.ClientID, provider.ClientAuth.ClientSecret)
+			oauth2common.SetFormEncodedBasicAuth(req, provider.ClientAuth.ClientID, provider.ClientAuth.ClientSecret)
 		}
 	default:
 		return fmt.Errorf("unsupported clientAuth.method %q", method)

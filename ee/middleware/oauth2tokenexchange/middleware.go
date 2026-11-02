@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	"github.com/sirupsen/logrus"
+	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/middleware"
@@ -24,6 +25,11 @@ type Middleware struct {
 	// actorCache holds client_credentials actor tokens for their own lifetime.
 	// Distinct from Cache (exchanged-token cache); see actor.go.
 	actorCache *actorTokenCache
+	// actorSF coalesces concurrent first-misses for the same CC actor-token
+	// key. Per-middleware, never package-level: a shared group would let one
+	// API's in-flight acquisition serve another API's request, handing it a
+	// token minted with the wrong client secret.
+	actorSF singleflight.Group
 }
 
 func NewMiddleware(base BaseMiddleware, spec model.MergedAPI, cache oauth2common.ExchangeCache) *Middleware {

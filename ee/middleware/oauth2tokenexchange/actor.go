@@ -14,8 +14,6 @@ import (
 	"sync"
 	"time"
 
-	"golang.org/x/sync/singleflight"
-
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/oauth2common"
@@ -36,12 +34,10 @@ const (
 	ActorTokenTTLSafetyMargin = 30 * time.Second
 )
 
-// actorSF coalesces concurrent first-misses for the same CC actor-token key.
-var actorSF singleflight.Group
-
 // actorTokenCache is a minimal in-process TTL cache for client_credentials
-// actor tokens. Keyed by ActorCacheKey (tokenEndpoint+clientId+scopes), which
-// is non-secret operator config.
+// actor tokens. Keyed by ActorCacheKey, which binds the client secret (hashed)
+// alongside the endpoint, client id and scopes so providers sharing an
+// endpoint+clientId but holding different secrets never share an entry.
 type actorTokenCache struct {
 	mu      sync.RWMutex
 	entries map[string]actorCacheEntry
@@ -154,7 +150,7 @@ func actorHeaderSettings(h *oas.OAuth2ActorHeader) (name string, strip, required
 // flow against the configured endpoint. Concurrent first-misses for the same
 // key are coalesced via singleflight.
 func (m *Middleware) getOrAcquireActorTokenViaCC(ctx context.Context, cc *oas.OAuth2ActorClientCredentials, timeout tyktime.ReadableDuration, providerName string) (string, error) {
-	key := oauth2common.ActorCacheKey(cc.TokenEndpoint, cc.ClientID, cc.Scopes)
+	key := oauth2common.ActorCacheKey(cc.TokenEndpoint, cc.ClientID, cc.ClientSecret, cc.Scopes)
 	if m.actorCache != nil {
 		if cached, ok := m.actorCache.get(key); ok {
 			// Served from the actor-token cache: no IdP round-trip, so the
@@ -164,7 +160,7 @@ func (m *Middleware) getOrAcquireActorTokenViaCC(ctx context.Context, cc *oas.OA
 		}
 	}
 	start := time.Now()
-	v, err, _ := actorSF.Do(key, func() (interface{}, error) {
+	v, err, _ := m.actorSF.Do(key, func() (interface{}, error) {
 		if m.actorCache != nil {
 			if cached, ok := m.actorCache.get(key); ok {
 				return cached, nil
@@ -210,7 +206,7 @@ func (m *Middleware) fetchActorTokenViaCC(ctx context.Context, cc *oas.OAuth2Act
 	req.Header.Set(header.ContentType, header.ApplicationFormURLEncoded)
 	req.Header.Set(header.Accept, header.ApplicationJSON)
 	if cc.ClientID != "" {
-		req.SetBasicAuth(cc.ClientID, cc.ClientSecret)
+		oauth2common.SetFormEncodedBasicAuth(req, cc.ClientID, cc.ClientSecret)
 	}
 
 	client := oauth2common.NewIdPHTTPClient(EffectiveIdPTimeout(time.Duration(timeout)))
