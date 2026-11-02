@@ -45,9 +45,13 @@ func (m *GranularAccessMiddleware) ProcessRequest(w http.ResponseWriter, r *http
 	isSuffixMatch := gwConfig.HttpServerOptions.EnablePathSuffixMatching
 
 	if isPrefixMatch {
-		urlPaths := []string{
-			m.Spec.StripListenPath(r.URL.Path),
-			r.URL.Path,
+		// Match the path proxied upstream. With strip_listen_path on, also
+		// matching the full request path can approve /listen/foo for an allowed
+		// URL declared as /listen/foo and then proxy the undeclared /foo
+		// upstream, so it is only done with allow_unsafe_listen_path_matching.
+		urlPaths := []string{m.Spec.StripListenPath(r.URL.Path)}
+		if gwConfig.AllowUnsafeListenPathMatching || fullPathIsProxied(m.Spec) {
+			urlPaths = append(urlPaths, r.URL.Path)
 		}
 
 		logger := m.Logger().WithField("paths", urlPaths)

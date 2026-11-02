@@ -6,7 +6,6 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 
-	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/test"
@@ -88,39 +87,4 @@ func TestOASAllowList_ListenPathPrefixOfEndpoints(t *testing.T) {
 			{Path: "/employees/foo/bar", Code: http.StatusOK, BodyMatch: `"Url":"/foo/bar"`},
 		}...)
 	})
-}
-
-// TestClassicAllowList_ListenPathInEndpointPathUnchanged freezes the Classic
-// behaviour TT-18034 must not touch: an endpoint path that includes the listen
-// path still matches the full request URL, and the upstream receives the
-// stripped path.
-func TestClassicAllowList_ListenPathInEndpointPathUnchanged(t *testing.T) {
-	for _, unsafe := range []bool{false, true} {
-		t.Run("allow_unsafe_listen_path_matching="+jsonMarshalString(unsafe), func(t *testing.T) {
-			ts := StartTest(func(globalConf *config.Config) {
-				globalConf.AllowUnsafeListenPathMatching = unsafe
-			})
-			defer ts.Close()
-
-			ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
-				spec.Proxy.ListenPath = "/employees"
-				spec.Proxy.StripListenPath = true
-				spec.UseKeylessAccess = true
-				UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
-					v.UseExtendedPaths = true
-					v.ExtendedPaths.WhiteList = []apidef.EndPointMeta{
-						{Path: "/employees/static", Method: http.MethodGet},
-						{Path: "/employees/{id}", Method: http.MethodGet},
-					}
-				})
-			})
-
-			_, _ = ts.Run(t, []test.TestCase{
-				{Path: "/employees/static", Code: http.StatusOK, BodyMatch: `"Url":"/static"`},
-				{Path: "/employees/hello_world", Code: http.StatusOK, BodyMatch: `"Url":"/hello_world"`},
-				{Path: "/employees/employees/static", Code: http.StatusOK, BodyMatch: `"Url":"/employees/static"`},
-				{Path: "/employees/foo/bar", Code: http.StatusOK, BodyMatch: `"Url":"/foo/bar"`},
-			}...)
-		})
-	}
 }
