@@ -597,6 +597,9 @@ type HttpServerOptionsConfig struct {
 	// - Non-versioned full path (listen path + endpoint): `/listen-path/json`
 	// - Path without version (endpoint only): `/json`
 	//
+	// The full path variations are only checked for block lists and internal endpoints,
+	// for Tyk Classic APIs that do not strip the listen path, or when AllowUnsafeListenPathMatching is enabled.
+	//
 	// For patterns that start with `/`, the gateway prepends `^` before performing the check, ensuring a true prefix match.
 	// For patterns that start with `^`, the gateway will already perform prefix matching so EnablePathPrefixMatching will have no impact.
 	// This option allows for more specific and controlled routing of API requests, potentially reducing unintended matches. Note that you may need to adjust existing route definitions when enabling this option.
@@ -616,6 +619,9 @@ type HttpServerOptionsConfig struct {
 	// - Full path (listen path + version + endpoint): `/listen-path/v4/json`
 	// - Non-versioned full path (listen path + endpoint): `/listen-path/json`
 	// - Path without version (endpoint only): `/json`
+	//
+	// The full path variations are only checked for block lists and internal endpoints,
+	// for Tyk Classic APIs that do not strip the listen path, or when AllowUnsafeListenPathMatching is enabled.
 	//
 	// For patterns that already end with `$`, the gateway will already perform suffix matching so EnablePathSuffixMatching will have no impact. For all other patterns, the gateway appends `$` before performing the check, ensuring a true suffix match.
 	// This option allows for more specific and controlled routing of API requests, potentially reducing unintended matches. Note that you may need to adjust existing route definitions when enabling this option.
@@ -1154,12 +1160,21 @@ type Config struct {
 	// Enable it only if your APIs rely on the legacy behavior.
 	ApplyStripListenPathToURLRewrite bool `json:"apply_strip_listen_path_to_url_rewrite"`
 
-	// AllowUnsafeListenPathMatching restores the previous behavior, where endpoint
-	// matching for Tyk OAS APIs also accepted the full request URL including the
-	// listen path. With strip_listen_path enabled this could approve a request for
-	// one endpoint and proxy a different, undeclared path upstream.
-	// Defaults to false, which matches OAS endpoints only against the path that
-	// is proxied upstream. Tyk Classic APIs are not affected by this setting.
+	// AllowUnsafeListenPathMatching restores the legacy behavior, where endpoint
+	// matching also accepted the full request path including the listen path.
+	// With strip_listen_path enabled, this can approve a request for one endpoint
+	// and proxy a different, undeclared path upstream.
+	// Defaults to false, which matches endpoints only against the path proxied upstream.
+	//
+	// The setting applies to Tyk OAS and Tyk Classic APIs, to endpoint-level
+	// middleware (allow list, URL rewrite, transforms, mock responses, etc.) and,
+	// when enable_path_prefix_matching is on, to the per-key and policy
+	// path-based permissions (allowed_urls).
+	// Block lists and internal endpoints still also match the full request path,
+	// as that can only reject more requests. Tyk Classic APIs with strip_listen_path
+	// disabled also match the full request path, as that is the path proxied upstream.
+	// Enable it only if your API definitions or policies declare endpoint paths
+	// that include the listen path.
 	AllowUnsafeListenPathMatching bool `json:"allow_unsafe_listen_path_matching"`
 
 	// Tyk nodes can provide uptime awareness, uptime testing and analytics for your underlying APIs uptime and availability.

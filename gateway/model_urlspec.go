@@ -185,11 +185,21 @@ func (u *URLSpec) matchesMethod(method string) bool {
 }
 
 // matchesPath takes the input string and matches it against an internal regex.
-// it will match the regex against the clean URL with stripped listen path first,
-// then it will match against the full URL including the listen path as provided.
-// For Tyk OAS APIs the last step, matching with the listen path still in
-// place, is skipped unless allow_unsafe_listen_path_matching is enabled, so the
-// matched path is the path proxied upstream. Version stripping is unaffected.
+// It matches the regex against the URL with the listen path stripped (and the
+// version stripped, when version stripping is configured), which is the path
+// proxied upstream.
+//
+// Matching against the full URL, with the listen path still in place, is only
+// done when it cannot widen what reaches the upstream:
+//   - allow_unsafe_listen_path_matching is enabled (legacy behaviour),
+//   - the path is an internal JSON-RPC / MCP VEM path, which has no listen path,
+//   - a Tyk Classic API does not strip the listen path, so the full URL is the
+//     path proxied upstream,
+//   - the spec restricts access (block list, internal endpoint), where an extra
+//     match can only reject more requests, never let an undeclared one through.
+//
+// Without these exceptions, a request for /listen/foo would be approved by an
+// endpoint declared as /listen/foo and then proxied upstream as /foo.
 // APISpec to provide URL sanitization of the input is passed along.
 func (a *URLSpec) matchesPath(reqPath string, api *APISpec) bool {
 	clean := api.StripListenPath(reqPath)
@@ -202,14 +212,42 @@ func (a *URLSpec) matchesPath(reqPath string, api *APISpec) bool {
 	if a.spec.MatchString(clean) {
 		return true
 	}
-	// VEM paths are internal looping targets without a listen path, so the
-	// full URL is the only form they can be matched against.
-	if api.IsOAS && !api.GlobalConfig.AllowUnsafeListenPathMatching && !agentprotocol.IsProtocolVEMPath(reqPath) {
+	if !a.allowsFullPathMatch(reqPath, api) {
 		return false
 	}
 	// match /listenpath/v3/users
-	if a.spec.MatchString(reqPath) {
+	return a.spec.MatchString(reqPath)
+}
+
+// allowsFullPathMatch reports whether matchesPath may fall back to matching the
+// full request path, including the listen path. See matchesPath.
+func (a *URLSpec) allowsFullPathMatch(reqPath string, api *APISpec) bool {
+	if api.GlobalConfig.AllowUnsafeListenPathMatching {
 		return true
 	}
-	return false
+
+	// VEM paths are internal looping targets without a listen path, so the
+	// full URL is the only form they can be matched against.
+	if agentprotocol.IsProtocolVEMPath(reqPath) {
+		return true
+	}
+
+	if fullPathIsProxied(api) {
+		return true
+	}
+
+	switch a.Status {
+	case BlackList, Internal:
+		return true
+	default:
+		return false
+	}
+}
+
+// fullPathIsProxied reports whether the full request path, including the listen
+// path, is the path proxied upstream, so matching against it cannot approve one
+// endpoint and proxy another. Tyk OAS endpoint paths are relative to the listen
+// path by definition, so this only applies to Tyk Classic APIs.
+func fullPathIsProxied(api *APISpec) bool {
+	return !api.IsOAS && !api.Proxy.StripListenPath
 }
