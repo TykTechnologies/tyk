@@ -834,6 +834,13 @@ func validateOAuth2ActorToken(schemeName string, p *OAuth2TokenExchangeProvider)
 		if at.ClientCredentials == nil || at.ClientCredentials.TokenEndpoint == "" || at.ClientCredentials.ClientID == "" {
 			return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q actorToken.source=client_credentials requires clientCredentials.tokenEndpoint and clientId", schemeName, providerName)
 		}
+		// Rejected at load for the same reason as the exchange tokenEndpoint:
+		// non-HTTP schemes (file://, gopher://, …) are not valid IdP endpoints.
+		// Unlike that endpoint this one takes no $tyk_context.* template, so it
+		// is always structurally checkable here.
+		if !IsAbsoluteHTTPURL(at.ClientCredentials.TokenEndpoint) {
+			return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q actorToken.clientCredentials.tokenEndpoint must be an absolute http(s) URL", schemeName, providerName)
+		}
 	case OAuth2ActorSourceStatic:
 		if at.Static == nil || at.Static.Token == "" {
 			return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q actorToken.source=static requires static.token", schemeName, providerName)

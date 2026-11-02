@@ -87,7 +87,8 @@ func mintInboundJWTWithMayAct(t *testing.T, iss, mayActSub string) string {
 		"iss": iss, "sub": "alice", "azp": "mcp-client",
 		"may_act": map[string]string{"sub": mayActSub},
 	}
-	pj, _ := json.Marshal(payload)
+	pj, err := json.Marshal(payload)
+	require.NoError(t, err)
 	header64 := base64.RawURLEncoding.EncodeToString([]byte(`{"alg":"none","typ":"JWT"}`))
 	return header64 + "." + base64.RawURLEncoding.EncodeToString(pj) + ".sig"
 }

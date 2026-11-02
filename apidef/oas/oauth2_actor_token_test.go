@@ -163,3 +163,31 @@ func TestValidateOAuth2Schemes_ActorTokenType(t *testing.T) {
 		assert.Contains(t, err.Error(), OAuth2TokenTypeJWT)
 	})
 }
+
+func TestValidateOAuth2Schemes_ActorToken_CCTokenEndpointMustBeAbsoluteHTTP(t *testing.T) {
+	// Mirrors the exchange tokenEndpoint check: non-HTTP schemes and relative
+	// paths are not valid IdP endpoints and are rejected at config load.
+	for _, endpoint := range []string{
+		"file:///etc/passwd",
+		"gopher://internal/",
+		"/relative/token",
+		"idp.example/token",
+		"://broken",
+	} {
+		s := newOAuth2WithTokenExchange("corpOAuth", teProviderWithActor(&OAuth2ActorToken{
+			Source:            OAuth2ActorSourceClientCredentials,
+			ClientCredentials: &OAuth2ActorClientCredentials{TokenEndpoint: endpoint, ClientID: "tyk-gateway-actor"},
+		}))
+		err := s.ValidateOAuth2Schemes()
+		require.Error(t, err, "endpoint %q must be rejected", endpoint)
+		assert.Contains(t, err.Error(), "actorToken.clientCredentials.tokenEndpoint must be an absolute http(s) URL")
+	}
+
+	for _, endpoint := range []string{"https://idp.example/token", "http://idp.internal:8080/token"} {
+		s := newOAuth2WithTokenExchange("corpOAuth", teProviderWithActor(&OAuth2ActorToken{
+			Source:            OAuth2ActorSourceClientCredentials,
+			ClientCredentials: &OAuth2ActorClientCredentials{TokenEndpoint: endpoint, ClientID: "tyk-gateway-actor"},
+		}))
+		assert.NoError(t, s.ValidateOAuth2Schemes(), "endpoint %q must be accepted", endpoint)
+	}
+}
