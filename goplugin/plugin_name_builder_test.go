@@ -1,11 +1,16 @@
 package goplugin
 
 import (
+	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
 
+	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // MockStorage implements storage to simulate which file to load.
@@ -73,4 +78,89 @@ func TestGetPluginFileNameToLoad(t *testing.T) {
 			assert.Equal(t, testCase.expectedFileName, filenameToLoad)
 		})
 	}
+}
+
+// captureLogs routes the package logger through a test hook for the duration
+// of the test, restoring the original hooks afterwards.
+func captureLogs(t *testing.T) *logrustest.Hook {
+	t.Helper()
+
+	original := log.ReplaceHooks(make(logrus.LevelHooks))
+	hook := new(logrustest.Hook)
+	log.AddHook(hook)
+
+	t.Cleanup(func() { log.ReplaceHooks(original) })
+
+	return hook
+}
+
+func entriesAtOrAbove(hook *logrustest.Hook, level logrus.Level) []string {
+	var msgs []string
+	for _, entry := range hook.AllEntries() {
+		if entry.Level <= level {
+			msgs = append(msgs, entry.Level.String()+": "+entry.Message)
+		}
+	}
+	return msgs
+}
+
+func TestGetPluginFileNameToLoad_MissingCandidatesAreNotWarnings(t *testing.T) {
+	gwVersion := getPrefixedVersion()
+	osAndArch := runtime.GOOS + "_" + runtime.GOARCH
+
+	testCases := []struct {
+		name         string
+		existingFile string
+	}{
+		{
+			name:         "only the plain name exists",
+			existingFile: "myplugin.so",
+		},
+		{
+			name:         "configured path already carries version, os and arch",
+			existingFile: "myplugin_" + gwVersion + "_" + osAndArch + ".so",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			pluginPath := filepath.Join(dir, tc.existingFile)
+			require.NoError(t, os.WriteFile(pluginPath, []byte("not a real plugin"), 0o600))
+
+			hook := captureLogs(t)
+
+			got, err := GetPluginFileNameToLoad(FileSystemStorage{}, pluginPath)
+			require.NoError(t, err)
+			assert.Equal(t, pluginPath, got)
+
+			assert.Empty(t, entriesAtOrAbove(hook, logrus.WarnLevel),
+				"a plugin that is eventually found must not produce warnings for the candidates that were skipped")
+		})
+	}
+}
+
+func TestGetPluginFileNameToLoad_NotFoundReportsEveryCandidate(t *testing.T) {
+	gwVersion := getPrefixedVersion()
+	osAndArch := runtime.GOOS + "_" + runtime.GOARCH
+
+	dir := t.TempDir()
+	pluginPath := filepath.Join(dir, "myplugin.so")
+
+	hook := captureLogs(t)
+
+	got, err := GetPluginFileNameToLoad(FileSystemStorage{}, pluginPath)
+	require.Error(t, err)
+	assert.Empty(t, got)
+
+	for _, candidate := range []string{
+		filepath.Join(dir, "myplugin_"+gwVersion+"_"+osAndArch+".so"),
+		filepath.Join(dir, "myplugin_"+gwVersion[1:]+"_"+osAndArch+".so"),
+		pluginPath,
+	} {
+		assert.Contains(t, err.Error(), candidate, "the error must name every file name that was tried")
+	}
+
+	assert.Empty(t, entriesAtOrAbove(hook, logrus.WarnLevel),
+		"the loader reports the failure once through the returned error; callers decide how to log it")
 }
