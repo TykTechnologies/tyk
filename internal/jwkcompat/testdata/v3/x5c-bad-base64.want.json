@@ -1,0 +1,3 @@
+{
+  "error": "go-jose/go-jose: failed to unmarshal x5c field: illegal base64 data at input byte 0"
+}

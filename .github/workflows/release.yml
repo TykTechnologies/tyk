@@ -154,7 +154,7 @@ jobs:
               echo "::error::Go version validation failed!"
               echo "Used version: $GO_VERSION (in tykio/golang-cross:${{ matrix.golang_cross }})"
               echo "Latest patch: $LATEST_PATCH"
-              echo "Please update the buildenv Go version to the latest patch version."
+              echo "Please rebuild or update the tykio/golang-cross image so that it carries the latest patch of Go $MINOR_VERSION."
               exit 1
             else
               echo "Go version is up to date: $GO_VERSION"
