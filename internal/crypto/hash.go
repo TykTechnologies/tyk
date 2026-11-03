@@ -32,6 +32,7 @@ func hashFunction(algorithm string) (hash.Hash, error) {
 		return murmur3.New64(), fmt.Errorf("Unknown key hash function: %s. Falling back to murmur64.", algorithm)
 	}
 }
+
 func HashStr(in string, withAlg ...string) string {
 	var algo string
 	if len(withAlg) > 0 && withAlg[0] != "" {

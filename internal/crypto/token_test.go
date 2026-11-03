@@ -18,6 +18,7 @@ func TestGenerateToken(t *testing.T) {
 		hashAlgorithm string
 		expectedHash  string
 		isLegacy      bool
+		wantErr       bool
 	}{
 		{
 			name:          "Valid algorithm - sha256",
@@ -54,18 +55,21 @@ func TestGenerateToken(t *testing.T) {
 			hashAlgorithm: "invalid_algo",
 			expectedHash:  HashMurmur64,
 			isLegacy:      false,
+			wantErr:       true,
 		},
 		{
 			name:          "Invalid algorithm - case sensitive (MURMUR64)",
 			hashAlgorithm: "MURMUR64",
 			expectedHash:  HashMurmur64,
 			isLegacy:      false,
+			wantErr:       true,
 		},
 		{
 			name:          "Invalid algorithm - murmur3 (unknown)",
 			hashAlgorithm: "murmur3",
 			expectedHash:  HashMurmur64,
 			isLegacy:      false,
+			wantErr:       true,
 		},
 	}
 
@@ -73,8 +77,7 @@ func TestGenerateToken(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			token, err := GenerateToken(orgID, keyID, tt.hashAlgorithm)
 
-			if tt.hashAlgorithm != "" && tt.hashAlgorithm != HashSha256 && tt.hashAlgorithm != HashMurmur64 && tt.hashAlgorithm != HashMurmur128 && tt.hashAlgorithm != HashMurmur32 {
-				// We expect an error from hashFunction which is bubbled up by GenerateToken
+			if tt.wantErr {
 				assert.Error(t, err)
 				assert.Contains(t, err.Error(), "Unknown key hash function")
 				assert.Contains(t, err.Error(), "Falling back to murmur64")

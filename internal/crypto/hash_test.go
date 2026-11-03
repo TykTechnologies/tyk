@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"encoding/base64"
 	"testing"
 
 	"github.com/TykTechnologies/murmur3"
@@ -106,4 +107,8 @@ func TestHashStr(t *testing.T) {
 	hashWithEmpty := HashStr(input, "")
 	hashWithMurmur32 := HashStr(input, HashMurmur32)
 	assert.Equal(t, hashWithMurmur32, hashWithEmpty)
+
+	// Without an explicit algorithm, HashStr takes it from the token's "h" field.
+	tokenWithUnknownAlgo := base64.StdEncoding.EncodeToString([]byte(`{"org":"test_org","id":"test_key","h":"murmur3"}`))
+	assert.Equal(t, HashStr(tokenWithUnknownAlgo, HashMurmur64), HashStr(tokenWithUnknownAlgo))
 }
