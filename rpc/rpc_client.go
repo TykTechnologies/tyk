@@ -570,17 +570,30 @@ func handleRPCError(err error, connectionString string) bool {
 	return false
 }
 
-var rpcConnectionsPool []net.Conn
+var (
+	// rpcConnectionsPool holds every connection gorpc hands to onConnectFunc.
+	// gorpc calls OnConnect from one goroutine per pooled connection
+	// (Client.Conns), so all access must hold rpcConnectionsPoolMu.
+	rpcConnectionsPool   []net.Conn
+	rpcConnectionsPoolMu sync.Mutex
+)
 
 func onConnectFunc(conn net.Conn) (net.Conn, string, error) {
 	values.clientIsConnected.Store(true)
 	remoteAddr := conn.RemoteAddr().String()
 	Log.WithField("remoteAddr", remoteAddr).Debug("connected to RPC server")
+
+	rpcConnectionsPoolMu.Lock()
 	rpcConnectionsPool = append(rpcConnectionsPool, conn)
+	rpcConnectionsPoolMu.Unlock()
+
 	return conn, remoteAddr, nil
 }
 
 func CloseConnections() {
+	rpcConnectionsPoolMu.Lock()
+	defer rpcConnectionsPoolMu.Unlock()
+
 	for k, v := range rpcConnectionsPool {
 		err := v.Close()
 		if err != nil {
