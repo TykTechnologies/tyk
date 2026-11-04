@@ -90,7 +90,7 @@ func (r *rpcOpts) GetDNSCheckedAfterError() bool {
 	return false
 }
 
-func (r rpcOpts) ClientIsConnected() bool {
+func (r *rpcOpts) ClientIsConnected() bool {
 	if v := r.clientIsConnected.Load(); v != nil {
 		return v.(bool)
 	}
@@ -98,7 +98,7 @@ func (r rpcOpts) ClientIsConnected() bool {
 	return false
 }
 
-func (r rpcOpts) Config() Config {
+func (r *rpcOpts) Config() Config {
 	if v := r.config.Load(); v != nil {
 		return v.(Config)
 	}

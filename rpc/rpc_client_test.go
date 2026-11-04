@@ -507,3 +507,43 @@ func TestOnConnectFunc_ConcurrentConnectionsAreAllPooled(t *testing.T) {
 		}
 	}
 }
+
+// gorpc runs the dial function and OnConnect on one goroutine per pooled
+// connection, so values.Config() and values.ClientIsConnected() are read while
+// onConnectFunc stores clientIsConnected on another goroutine. The reads must
+// go through the atomics and never copy rpcOpts. Run with -race.
+func TestRPCOpts_ReadsDoNotCopyWhileStoring(t *testing.T) {
+	var r rpcOpts
+	r.config.Store(Config{ConnectionString: "127.0.0.1:9091"})
+
+	const goroutines = 8
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+
+	for i := 0; i < goroutines; i++ {
+		wg.Add(2)
+
+		go func() {
+			defer wg.Done()
+			<-start
+			for j := 0; j < 100; j++ {
+				r.clientIsConnected.Store(j%2 == 0)
+			}
+		}()
+
+		go func() {
+			defer wg.Done()
+			<-start
+			for j := 0; j < 100; j++ {
+				_ = r.ClientIsConnected()
+				if got := r.Config().ConnectionString; got != "127.0.0.1:9091" {
+					t.Errorf("Config().ConnectionString = %q, want %q", got, "127.0.0.1:9091")
+					return
+				}
+			}
+		}()
+	}
+
+	close(start)
+	wg.Wait()
+}
