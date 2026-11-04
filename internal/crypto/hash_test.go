@@ -4,8 +4,9 @@ import (
 	"encoding/base64"
 	"testing"
 
-	"github.com/TykTechnologies/murmur3"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/TykTechnologies/murmur3"
 )
 
 func TestHashFunction(t *testing.T) {

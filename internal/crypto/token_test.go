@@ -7,6 +7,7 @@ import (
 
 	"github.com/buger/jsonparser"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGenerateToken(t *testing.T) {
@@ -92,17 +93,19 @@ func TestGenerateToken(t *testing.T) {
 				assert.True(t, strings.HasPrefix(token, B64JSONPrefix))
 
 				// Decode token
-				jsonToken, decodeErr := base64.StdEncoding.DecodeString(token)
-				assert.NoError(t, decodeErr)
+				jsonToken, err := base64.StdEncoding.DecodeString(token)
+				require.NoError(t, err)
 
-				// Verify token properties
-				parsedOrg, _ := jsonparser.GetString(jsonToken, "org")
+				parsedOrg, err := jsonparser.GetString(jsonToken, "org")
+				require.NoError(t, err)
 				assert.Equal(t, orgID, parsedOrg)
 
-				parsedID, _ := jsonparser.GetString(jsonToken, "id")
+				parsedID, err := jsonparser.GetString(jsonToken, "id")
+				require.NoError(t, err)
 				assert.Equal(t, keyID, parsedID)
 
-				parsedHash, _ := jsonparser.GetString(jsonToken, "h")
+				parsedHash, err := jsonparser.GetString(jsonToken, "h")
+				require.NoError(t, err)
 				assert.Equal(t, tt.expectedHash, parsedHash)
 			}
 		})
