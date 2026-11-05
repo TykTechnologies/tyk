@@ -75,7 +75,9 @@ type GraphqlGranularAccessResult struct {
 type GraphqlGranularAccessChecker struct{}
 
 func (g *GraphqlGranularAccessChecker) validateFieldRestrictions(gqlRequest *graphql.Request, fieldRestrictionList graphql.FieldRestrictionList, schema *graphql.Schema) GraphqlGranularAccessResult {
-	result, err := gqlRequest.ValidateFieldRestrictions(schema, fieldRestrictionList, graphql.DefaultFieldsValidator{})
+	result, err := gqlRequest.ValidateFieldRestrictions(schema, fieldRestrictionList, &graphengine.TykFieldsValidatorV1{
+		Variables: gqlRequest.Variables,
+	})
 	if err != nil {
 		return GraphqlGranularAccessResult{failReason: GranularAccessFailReasonInternalError, internalErr: err}
 	}
