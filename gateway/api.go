@@ -1910,7 +1910,7 @@ func (gw *Gateway) keyHandler(w http.ResponseWriter, r *http.Request) {
 			if gwConfig.HashKeys {
 				// get all keys is disabled by default
 				if !gwConfig.EnableHashedKeysListing {
-					doJSONWrite(w, http.StatusNotFound, apiError("Hashed key listing is disabled in config (enable_hashed_keys_listing)"))
+					doJSONWrite(w, http.StatusNotFound, apiError("Hashed key listing is disabled in the Gateway config: set enable_hashed_keys_listing to true in tyk.conf (or TYK_GW_ENABLEHASHEDKEYSLISTING)"))
 					return
 				}
 				obj, code = gw.handleGetAllKeys(r.Context(), "", apiID, true)
