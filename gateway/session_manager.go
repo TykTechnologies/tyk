@@ -250,7 +250,7 @@ func (l *SessionLimiter) RateLimitInfo(r *http.Request, api *APISpec, endpoints 
 		for _, urlPath := range urlPaths {
 			match := asRegex.MatchString(urlPath)
 			if !match {
-				break
+				continue
 			}
 
 			for _, endpointMethod := range endpoint.Methods {
