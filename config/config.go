@@ -986,7 +986,9 @@ type Config struct {
 	// If you are using the Tyk Dashboard, you must configure this setting with the same value in both Gateway and Dashboard
 	DisableKeyActionsByUsername bool `json:"disable_key_actions_by_username"`
 
-	// Specify the Key hashing algorithm. Possible values: murmur64, murmur128, sha256.
+	// Specify the Key hashing algorithm. Possible values: murmur32, murmur64, murmur128, sha256.
+	// Values are case-sensitive. An unknown value is logged and falls back to murmur64.
+	// If not set, keys are generated in the legacy format and hashed with murmur32.
 	HashKeyFunction string `json:"hash_key_function"`
 
 	// Specify the Key hashing algorithm for "basic auth". Possible values: murmur64, murmur128, sha256, bcrypt.

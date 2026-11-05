@@ -1,7 +1,7 @@
 package goplugin
 
 import (
-	"errors"
+	"fmt"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -9,32 +9,33 @@ import (
 	"github.com/TykTechnologies/tyk/internal/build"
 )
 
-// GetPluginFileNameToLoad check which file to load based on name, tyk version, os and architecture
-// but it also takes care of returning the name of the file that exists
+// GetPluginFileNameToLoad returns the plugin file to load for pluginPath.
+// The candidates are tried in order and the first one that exists wins:
+//
+//  1. {plugin-dir}/{plugin-name}_v{GW-version}_{OS}_{arch}.so
+//  2. {plugin-dir}/{plugin-name}_{GW-version}_{OS}_{arch}.so
+//  3. pluginPath exactly as given
+//
+// Candidates that do not exist are only reported at debug level, since missing
+// them is the expected outcome of the search. When none exists the returned
+// error names every file that was tried.
 func GetPluginFileNameToLoad(pluginStorage storage, pluginPath string) (string, error) {
-	var (
-		versionPrefixed = getPrefixedVersion()
-		version         = versionPrefixed[1:]
-	)
+	versionPrefixed := getPrefixedVersion()
 
-	// 1. attempt to load a plugin that follow the new standard
-	newNamingFormat := getPluginNameFromTykVersion(versionPrefixed, pluginPath)
-	if pluginStorage.fileExist(newNamingFormat) {
-		return newNamingFormat, nil
+	candidates := []string{
+		getPluginNameFromTykVersion(versionPrefixed, pluginPath),
+		getPluginNameFromTykVersion(versionPrefixed[1:], pluginPath),
+		pluginPath,
 	}
 
-	// 2. attempt to load a plugin that follows the new standard but gw version is not prefixed
-	newNamingFormat = getPluginNameFromTykVersion(version, pluginPath)
-	if pluginStorage.fileExist(newNamingFormat) {
-		return newNamingFormat, nil
+	for _, candidate := range candidates {
+		if pluginStorage.fileExist(candidate) {
+			return candidate, nil
+		}
+		log.Debugf("plugin file %v doesn't exist", candidate)
 	}
 
-	// 3. attempt to load the exact name provided
-	if !pluginStorage.fileExist(pluginPath) {
-		return "", errors.New("plugin file not found")
-	}
-
-	return pluginPath, nil
+	return "", fmt.Errorf("plugin file not found, tried: %s", strings.Join(candidates, ", "))
 }
 
 // getPluginNameFromTykVersion builds a name of plugin based on tyk version,
