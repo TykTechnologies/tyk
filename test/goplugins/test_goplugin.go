@@ -33,10 +33,21 @@ func MyPluginPre(rw http.ResponseWriter, r *http.Request) {
 func MyPluginAuthCheck(rw http.ResponseWriter, r *http.Request) {
 	// perform auth (only one token "abc" is allowed)
 	token := r.Header.Get(header.Authorization)
-	if token != "abc" {
-		rw.Header().Add(header.XAuthResult, "failed")
-		rw.WriteHeader(http.StatusForbidden)
+
+	authFailed := func(status int) {
+		rw.Header().Set(header.XAuthResult, "failed")
+		rw.WriteHeader(status)
 		_, _ = rw.Write([]byte("auth failed"))
+	}
+
+	switch token {
+	case "unauthorized_token":
+		authFailed(http.StatusUnauthorized)
+		return
+	case "abc":
+		// Valid token.
+	default:
+		authFailed(http.StatusForbidden)
 		return
 	}
 
@@ -271,7 +282,8 @@ func MyAnalyticsPluginAddTag(record *analytics.AnalyticsRecord) {
 }
 
 // MyPluginAccessingOASConfigData reads the API's config_data from the OAS
-// definition using ctx.GetOASConfigData (no deep copy of the whole OAS doc,
+// definition using ctx.GetOASConfigData (deep copies only the config data,
+// not the whole OAS doc).
 func MyPluginAccessingOASConfigData(rw http.ResponseWriter, r *http.Request) {
 	configData, err := ctx.GetOASConfigData(r)
 	if err != nil {

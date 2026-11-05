@@ -1,0 +1,15 @@
+{
+  "keys": [
+    {
+      "kid": "a",
+      "alg": "",
+      "use": "",
+      "type": "ed25519.PublicKey",
+      "fingerprint": "ed25519 00e805ecf9ed05deab2b6fc8da60e4e569a16ccccbbe51e9c86cbbbb2e07f0ae",
+      "certs": 0,
+      "x5u": "",
+      "x5t": "",
+      "x5t#S256": ""
+    }
+  ]
+}

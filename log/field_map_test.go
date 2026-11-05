@@ -1,63 +1,114 @@
-package log_test
+package log
 
 import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/require"
-
-	"github.com/TykTechnologies/tyk/log"
+	"github.com/stretchr/testify/assert"
 )
 
-func TestFieldMap_Resolve(t *testing.T) {
-	tests := []struct {
-		name       string
-		fieldMap   log.FieldMap
-		inputField string
-		want       string
-	}{
-		{
-			name:       "Uninitialized map",
-			fieldMap:   log.NewFieldMap(logrus.FieldMap{}),
-			inputField: "msg",
-			want:       "msg",
-		},
-		{
-			name:       "Empty initialized map",
-			fieldMap:   log.NewFieldMap(logrus.FieldMap{}),
-			inputField: "msg",
-			want:       "msg",
-		},
-		{
-			name: "Existing mapping resolved",
-			fieldMap: log.NewFieldMap(logrus.FieldMap{
-				logrus.FieldKeyMsg: "message",
-			}),
-			inputField: "msg",
-			want:       "message",
-		},
-		{
-			name: "Missing mapping returns original field",
-			fieldMap: log.NewFieldMap(logrus.FieldMap{
-				logrus.FieldKeyMsg: "message",
-			}),
-			inputField: "time",
-			want:       "time",
-		},
-		{
-			name: "Empty string field resolved",
-			fieldMap: log.NewFieldMap(logrus.FieldMap{
-				"": "empty_key",
-			}),
-			inputField: "",
-			want:       "empty_key",
-		},
+func TestNewFieldMap(t *testing.T) {
+	logrusMap := logrus.FieldMap{
+		logrus.FieldKeyMsg:   "message",
+		logrus.FieldKeyLevel: "severity",
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := tt.fieldMap.Resolve(tt.inputField)
-			require.Equal(t, tt.want, got)
-		})
-	}
+	fm := NewFieldMap(logrusMap)
+	assert.Equal(t, "message", fm.fields[string(logrus.FieldKeyMsg)])
+	assert.Equal(t, "severity", fm.fields[string(logrus.FieldKeyLevel)])
+
+	fmNil := NewFieldMap(nil)
+	assert.NotNil(t, fmNil.fields)
+	assert.Empty(t, fmNil.fields)
+}
+
+func TestFieldMap_Resolve(t *testing.T) {
+	fm := FieldMap{fields: map[string]string{
+		"original_key": "mapped_key",
+	}}
+
+	assert.Equal(t, "mapped_key", fm.Resolve("original_key"))
+	assert.Equal(t, "unknown_key", fm.Resolve("unknown_key"))
+
+	fmEmpty := FieldMap{}
+	assert.Equal(t, "any_key", fmEmpty.Resolve("any_key"))
+}
+
+func TestFieldMap_UnmarshalJSON(t *testing.T) {
+	t.Run("base cases", func(t *testing.T) {
+		tests := []struct {
+			name        string
+			input       string
+			expectError bool
+			expectedMap map[string]string
+		}{
+			{"valid_json", `{"time":"@timestamp"}`, false, map[string]string{"time": "@timestamp"}},
+			{"null_string", `null`, false, nil},
+			{"invalid_json", `{"broken": json}`, true, nil},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				var fm FieldMap
+				err := fm.UnmarshalJSON([]byte(tt.input))
+
+				if tt.expectError {
+					assert.Error(t, err)
+				} else {
+					assert.NoError(t, err)
+					assert.Equal(t, tt.expectedMap, fm.fields)
+				}
+			})
+		}
+	})
+
+	t.Run("merges into existing fields", func(t *testing.T) {
+		tests := []struct {
+			name        string
+			input       string
+			expectedMap map[string]string
+		}{
+			{"adds_new_key", `{"time":"@timestamp"}`, map[string]string{"msg": "message", "time": "@timestamp"}},
+			{"overrides_existing_key", `{"msg":"text"}`, map[string]string{"msg": "text"}},
+			{"empty_object_keeps_defaults", `{}`, map[string]string{"msg": "message"}},
+			{"null_keeps_defaults", `null`, map[string]string{"msg": "message"}},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				fm := NewFieldMap(defaultFieldMap())
+				assert.NoError(t, fm.UnmarshalJSON([]byte(tt.input)))
+				assert.Equal(t, tt.expectedMap, fm.fields)
+			})
+		}
+	})
+
+	t.Run("does not mutate existing fields on error", func(t *testing.T) {
+		fm := NewFieldMap(defaultFieldMap())
+		assert.Error(t, fm.UnmarshalJSON([]byte(`{"broken": json}`)))
+		assert.Equal(t, map[string]string{"msg": "message"}, fm.fields)
+	})
+}
+
+func TestFieldMap_MarshalJSON(t *testing.T) {
+	t.Run("nil_map", func(t *testing.T) {
+		fm := FieldMap{}
+		data, err := fm.MarshalJSON()
+		assert.NoError(t, err)
+		assert.Equal(t, []byte("null"), data)
+	})
+
+	t.Run("empty_map_from_constructor", func(t *testing.T) {
+		fm := NewFieldMap(nil)
+		data, err := fm.MarshalJSON()
+		assert.NoError(t, err)
+		assert.JSONEq(t, `null`, string(data))
+	})
+
+	t.Run("populated_map", func(t *testing.T) {
+		fm := FieldMap{fields: map[string]string{"key": "value"}}
+		data, err := fm.MarshalJSON()
+		assert.NoError(t, err)
+		assert.JSONEq(t, `{"key":"value"}`, string(data))
+	})
 }
