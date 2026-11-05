@@ -1,0 +1,41 @@
+version: api.keploy.io/v1beta1
+kind: Http
+name: test-3
+spec:
+    metadata: {}
+    req:
+        method: GET
+        proto_major: 1
+        proto_minor: 1
+        url: http://localhost:8080/tyk/reload/group
+        header:
+            Accept: '*/*'
+            Host: localhost:8080
+            User-Agent: curl/7.81.0
+            X-Tyk-Authorization: 352d20ee67be67f6340b4c0605b044b7
+        body: ""
+        timestamp: 2024-04-01T06:21:52.035612565Z
+    resp:
+        status_code: 200
+        header:
+            Content-Length: "29"
+            Content-Type: application/json
+            Date: Mon, 01 Apr 2024 06:21:52 GMT
+        body: |
+            {"status":"ok","message":""}
+        status_message: OK
+        proto_major: 0
+        proto_minor: 0
+        timestamp: 2024-04-01T06:21:54.057423423Z
+    objects: []
+    assertions:
+        noise:
+            header.Date: []
+    created: 1711952514
+curl: |
+    curl --request GET \
+      --url http://localhost:8080/tyk/reload/group \
+      --header 'User-Agent: curl/7.81.0' \
+      --header 'Accept: */*' \
+      --header 'X-Tyk-Authorization: 352d20ee67be67f6340b4c0605b044b7' \
+      --header 'Host: localhost:8080' \
