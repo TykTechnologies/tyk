@@ -3,6 +3,7 @@ package httputil
 import (
 	"mime"
 	"net/http"
+	"net/textproto"
 	"strings"
 )
 
@@ -38,8 +39,7 @@ func IsSSEStreamingResponse(r *http.Response) bool {
 
 // IsUpgrade checks if the request is an upgrade request and returns the upgrade type.
 func IsUpgrade(req *http.Request) (string, bool) {
-	connection := strings.ToLower(strings.TrimSpace(req.Header.Get(headerConnection)))
-	if connection != "upgrade" {
+	if !headerContainsTokenIgnoreCase(req.Header, headerConnection, "Upgrade") {
 		return "", false
 	}
 
@@ -49,6 +49,28 @@ func IsUpgrade(req *http.Request) (string, bool) {
 	}
 
 	return "", false
+}
+
+func headerContainsTokenIgnoreCase(h http.Header, key, token string) bool {
+	for _, t := range headerTokens(h, key) {
+		if strings.EqualFold(t, token) {
+			return true
+		}
+	}
+	return false
+}
+
+func headerTokens(h http.Header, key string) []string {
+	key = textproto.CanonicalMIMEHeaderKey(key)
+	var tokens []string
+	for _, v := range h[key] {
+		v = strings.TrimSpace(v)
+		for _, t := range strings.Split(v, ",") {
+			t = strings.TrimSpace(t)
+			tokens = append(tokens, t)
+		}
+	}
+	return tokens
 }
 
 // IsStreamingRequest returns true if the request designates streaming (gRPC or WebSocket).
