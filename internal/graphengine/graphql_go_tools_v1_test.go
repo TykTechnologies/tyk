@@ -45,12 +45,9 @@ func TestGraphqlRequestProcessorV1_ProcessRequest(t *testing.T) {
 		recorder := httptest.NewRecorder()
 
 		err, statusCode := processor.ProcessRequest(context.Background(), recorder, request)
-		body := bytes.Buffer{}
-		_, _ = body.ReadFrom(recorder.Body)
-
 		assert.Error(t, err)
 		assert.Equal(t, 400, statusCode)
-		assert.Equal(t, `{"errors":[{"message":"field: goodBye not defined on type: Query","path":["query","goodBye"]}]}`, body.String())
+		assert.Equal(t, `{"errors":[{"message":"field: goodBye not defined on type: Query","path":["query","goodBye"]}]}`, renderGraphQLError(t, err, statusCode, recorder))
 	})
 
 	t.Run("should return error and 400 when input validation fails", func(t *testing.T) {
@@ -68,12 +65,9 @@ func TestGraphqlRequestProcessorV1_ProcessRequest(t *testing.T) {
 		recorder := httptest.NewRecorder()
 
 		err, statusCode := processor.ProcessRequest(context.Background(), recorder, request)
-		body := bytes.Buffer{}
-		_, _ = body.ReadFrom(recorder.Body)
-
 		assert.Error(t, err)
 		assert.Equal(t, 400, statusCode)
-		assert.Equal(t, `{"errors":[{"message":"Validation for variable \"name\" failed: expected string, but got number","locations":[{"line":1,"column":7}],"path":["query"]}]}`, body.String())
+		assert.Equal(t, `{"errors":[{"message":"Validation for variable \"name\" failed: expected string, but got number","locations":[{"line":1,"column":7}],"path":["query"]}]}`, renderGraphQLError(t, err, statusCode, recorder))
 	})
 
 	t.Run("should return no error and 200 when everything passes", func(t *testing.T) {
@@ -119,12 +113,9 @@ func TestGraphqlRequestProcessorWithOtelV1_ProcessRequest(t *testing.T) {
 		recorder := httptest.NewRecorder()
 
 		err, statusCode := processor.ProcessRequest(context.Background(), recorder, request)
-		body := bytes.Buffer{}
-		_, _ = body.ReadFrom(recorder.Body)
-
 		assert.Error(t, err)
 		assert.Equal(t, 400, statusCode)
-		assert.Equal(t, `{"errors":[{"message":"field: goodBye not defined on type: Query","path":["query","goodBye"]}]}`, body.String())
+		assert.Equal(t, `{"errors":[{"message":"field: goodBye not defined on type: Query","path":["query","goodBye"]}]}`, renderGraphQLError(t, err, statusCode, recorder))
 	})
 
 	t.Run("should return error and 400 when input validation fails", func(t *testing.T) {
@@ -142,12 +133,9 @@ func TestGraphqlRequestProcessorWithOtelV1_ProcessRequest(t *testing.T) {
 		recorder := httptest.NewRecorder()
 
 		err, statusCode := processor.ProcessRequest(context.Background(), recorder, request)
-		body := bytes.Buffer{}
-		_, _ = body.ReadFrom(recorder.Body)
-
 		assert.Error(t, err)
 		assert.Equal(t, 400, statusCode)
-		assert.Equal(t, `{"errors":[{"message":"Validation for variable \"name\" failed: expected string, but got number","locations":[{"line":1,"column":7}],"path":["query"]}]}`, body.String())
+		assert.Equal(t, `{"errors":[{"message":"Validation for variable \"name\" failed: expected string, but got number","locations":[{"line":1,"column":7}],"path":["query"]}]}`, renderGraphQLError(t, err, statusCode, recorder))
 	})
 
 	t.Run("should return no error and 200 when everything passes", func(t *testing.T) {
