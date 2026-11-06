@@ -57,7 +57,7 @@ func TestFetchExchangedToken_EndpointVariables(t *testing.T) {
 		for _, tid := range []string{"aaa-111", "bbb-222"} {
 			st := &oauth2common.State{ReplaceVariables: replaceVarsWith(tid), RawToken: "inbound"}
 			r := httptest.NewRequest(http.MethodGet, "/", nil)
-			_, _, err := mwWithoutTykOps().fetchExchangedToken(r, st, provider, target)
+			_, _, err := mwWithoutTykOps().fetchExchangedToken(r, st, provider, target, "", "")
 			require.NoError(t, err)
 		}
 		assert.Equal(t, []string{"/aaa-111/token", "/bbb-222/token"}, *paths)
@@ -69,7 +69,7 @@ func TestFetchExchangedToken_EndpointVariables(t *testing.T) {
 
 		st := &oauth2common.State{RawToken: "inbound"}
 		r := httptest.NewRequest(http.MethodGet, "/", nil)
-		_, _, err := mwWithoutTykOps().fetchExchangedToken(r, st, provider, target)
+		_, _, err := mwWithoutTykOps().fetchExchangedToken(r, st, provider, target, "", "")
 		require.NoError(t, err)
 		assert.Equal(t, []string{"/$tyk_context.jwt_claims_tid/token"}, *paths,
 			"without a hook the variable text goes out literally — resolution is the gateway's job")
@@ -99,7 +99,7 @@ func TestFetchExchangedToken_ResolvedEndpointValidated(t *testing.T) {
 				RawToken:         "inbound",
 			}
 			r := httptest.NewRequest(http.MethodGet, "/", nil)
-			_, _, err := mwWithoutTykOps().fetchExchangedToken(r, st, provider, target)
+			_, _, err := mwWithoutTykOps().fetchExchangedToken(r, st, provider, target, "", "")
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "not an absolute http(s) URL")
 		})
@@ -138,7 +138,7 @@ func TestFetchExchangedToken_EndpointVariables_CacheIsPerTenant(t *testing.T) {
 			RawToken:         "inbound",
 		}
 		r := httptest.NewRequest(http.MethodGet, "/", nil)
-		_, _, err := m.fetchExchangedToken(r, st, provider, target)
+		_, _, err := m.fetchExchangedToken(r, st, provider, target, "", "")
 		require.NoError(t, err)
 	}
 
