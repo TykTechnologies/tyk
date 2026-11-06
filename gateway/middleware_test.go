@@ -1559,3 +1559,30 @@ func TestCheckSessionAndIdentityForValidKey_AuthStorePath_MarksSessionAsNew(t *t
 	updated := baseMid.UpdateRequestSession(req)
 	assert.True(t, updated, "Should update session if session is touched")
 }
+
+type succeedMiddleware struct {
+	*BaseMiddleware
+}
+
+func (m *succeedMiddleware) Name() string { return "succeedMiddleware" }
+func (m *succeedMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, conf interface{}) (error, int) {
+	return ErrResponseSucceed, http.StatusOK
+}
+
+func TestTraceMiddleware_ErrResponseSucceed_DoesNotSetSpanError(t *testing.T) {
+	conf := config.Config{}
+	conf.OpenTelemetry.Traces.Enabled = true
+	gw := NewGateway(conf, context.Background())
+	baseMid := NewBaseMiddleware(gw, &APISpec{}, nil, nil)
+
+	succeed := &succeedMiddleware{BaseMiddleware: baseMid}
+	tr := TraceMiddleware{TykMiddleware: succeed}
+
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
+	w := httptest.NewRecorder()
+
+	err, code := tr.ProcessRequest(w, req, nil)
+	assert.Equal(t, ErrResponseSucceed, err)
+	assert.Equal(t, http.StatusOK, code)
+}
+
