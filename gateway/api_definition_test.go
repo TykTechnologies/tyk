@@ -2167,6 +2167,65 @@ func TestFromDashboardServiceServerError(t *testing.T) {
 	assert.Equal(t, 1, requestCount, "Should make only one request, no retry for server errors")
 }
 
+// TestFromDashboardServiceNullBody tests that a 200 response whose body is the
+// JSON literal null is rejected as an invalid API definition list instead of
+// panicking, and that the current nonce is kept.
+func TestFromDashboardServiceNullBody(t *testing.T) {
+	conf := func(globalConf *config.Config) {
+		globalConf.UseDBAppConfigs = false // Disable to prevent registration during startup
+		globalConf.DBAppConfOptions.ConnectionTimeout = 2
+		globalConf.DisableDashboardZeroConf = true
+		globalConf.NodeSecret = "test-secret"
+	}
+	g := StartTest(conf)
+	defer g.Close()
+
+	g.Gw.DashService = &HTTPDashboardHandler{
+		Gw:     g.Gw,
+		Secret: "test-secret",
+	}
+
+	// dashClient is a package-level singleton; start from a fresh one.
+	g.Gw.resetDashboardClient()
+	t.Cleanup(g.Gw.resetDashboardClient)
+
+	for _, body := range []string{"null", "  null\n"} {
+		t.Run(fmt.Sprintf("%q", body), func(t *testing.T) {
+			var requestCount int
+			ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				requestCount++
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusOK)
+				_, _ = w.Write([]byte(body))
+			}))
+			defer ts.Close()
+
+			g.Gw.ServiceNonceMutex.Lock()
+			g.Gw.ServiceNonce = "current-nonce"
+			g.Gw.ServiceNonceMutex.Unlock()
+
+			loader := APIDefinitionLoader{Gw: g.Gw}
+
+			var (
+				specs []*APISpec
+				err   error
+			)
+			require.NotPanics(t, func() {
+				specs, err = loader.FromDashboardService(ts.URL)
+			})
+
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "null api definition list")
+			assert.Nil(t, specs)
+			assert.Equal(t, 1, requestCount, "Should make only one request, no retry for an invalid body")
+
+			g.Gw.ServiceNonceMutex.RLock()
+			defer g.Gw.ServiceNonceMutex.RUnlock()
+			assert.Equal(t, "current-nonce", g.Gw.ServiceNonce, "nonce must not change on an invalid body")
+		})
+	}
+}
+
 // TestFromDashboardServiceNoDashServiceFallback tests graceful fallback for API definitions
 func TestFromDashboardServiceNoDashServiceFallback(t *testing.T) {
 	// Mock dashboard that returns nonce error

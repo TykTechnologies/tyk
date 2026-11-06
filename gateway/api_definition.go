@@ -455,6 +455,9 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 	return spec, nil
 }
 
+// errDashboardNullAPIList is returned when the dashboard answers 200 with a JSON null body.
+var errDashboardNullAPIList = errors.New("dashboard returned a null api definition list")
+
 // FromDashboardService will connect and download ApiDefintions from a Tyk Dashboard instance.
 func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, error) {
 	// Get the definitions
@@ -525,6 +528,12 @@ func (a APIDefinitionLoader) FromDashboardService(endpoint string) ([]*APISpec, 
 		log.Error("Couldn't unmarshal api definition list")
 		// JSON unmarshal errors are not network errors, so don't retry
 		return nil, err
+	}
+
+	// A JSON null body unmarshals without error but sets list to nil.
+	if list == nil {
+		log.Error("Couldn't unmarshal api definition list: dashboard returned null")
+		return nil, errDashboardNullAPIList
 	}
 
 	// Extract tagged entries only
