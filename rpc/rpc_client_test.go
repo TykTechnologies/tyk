@@ -3,6 +3,7 @@ package rpc
 import (
 	"errors"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -440,4 +441,109 @@ func TestRPCErrorRetryBehavior_Integration(t *testing.T) {
 		}
 		t.Logf("Scenario 3: DNS changed, succeeded after %d call(s) and %d reconnect(s)", callCount, reconnectCount)
 	})
+}
+
+type pooledTestConn struct {
+	net.Conn
+}
+
+func (*pooledTestConn) RemoteAddr() net.Addr {
+	return &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 9091}
+}
+
+// gorpc calls OnConnect from one goroutine per pooled connection, so
+// onConnectFunc must record every connection it is handed even when those
+// calls run at the same time. A lost entry is a connection CloseConnections
+// can never close.
+func TestOnConnectFunc_ConcurrentConnectionsAreAllPooled(t *testing.T) {
+	savedPool := rpcConnectionsPool
+	savedConnected := values.ClientIsConnected()
+	t.Cleanup(func() {
+		rpcConnectionsPool = savedPool
+		values.clientIsConnected.Store(savedConnected)
+	})
+
+	const (
+		rounds = 100
+		conns  = 32
+	)
+
+	for round := 0; round < rounds; round++ {
+		// Pre-size the pool so that, without locking, concurrent appends
+		// lose entries instead of corrupting memory and killing the test
+		// binary.
+		rpcConnectionsPool = make([]net.Conn, 0, conns)
+
+		want := make(map[net.Conn]bool, conns)
+		start := make(chan struct{})
+		var wg sync.WaitGroup
+
+		for i := 0; i < conns; i++ {
+			conn := &pooledTestConn{}
+			want[conn] = true
+
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				<-start
+				if _, _, err := onConnectFunc(conn); err != nil {
+					t.Error(err)
+				}
+			}()
+		}
+
+		close(start)
+		wg.Wait()
+
+		if got := len(rpcConnectionsPool); got != conns {
+			t.Fatalf("round %d: %d connections established concurrently, %d recorded in the pool", round, conns, got)
+		}
+
+		for _, conn := range rpcConnectionsPool {
+			if !want[conn] {
+				t.Fatalf("round %d: pool holds an unexpected or duplicate connection", round)
+			}
+			delete(want, conn)
+		}
+	}
+}
+
+// gorpc runs the dial function and OnConnect on one goroutine per pooled
+// connection, so values.Config() and values.ClientIsConnected() are read while
+// onConnectFunc stores clientIsConnected on another goroutine. The reads must
+// go through the atomics and never copy rpcOpts. Run with -race.
+func TestRPCOpts_ReadsDoNotCopyWhileStoring(t *testing.T) {
+	var r rpcOpts
+	r.config.Store(Config{ConnectionString: "127.0.0.1:9091"})
+
+	const goroutines = 8
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+
+	for i := 0; i < goroutines; i++ {
+		wg.Add(2)
+
+		go func() {
+			defer wg.Done()
+			<-start
+			for j := 0; j < 100; j++ {
+				r.clientIsConnected.Store(j%2 == 0)
+			}
+		}()
+
+		go func() {
+			defer wg.Done()
+			<-start
+			for j := 0; j < 100; j++ {
+				_ = r.ClientIsConnected()
+				if got := r.Config().ConnectionString; got != "127.0.0.1:9091" {
+					t.Errorf("Config().ConnectionString = %q, want %q", got, "127.0.0.1:9091")
+					return
+				}
+			}
+		}()
+	}
+
+	close(start)
+	wg.Wait()
 }
