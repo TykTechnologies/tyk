@@ -2307,6 +2307,21 @@ func TestJWTSessionRSAWithJWK(t *testing.T) {
 	})
 }
 
+// Regression test for https://github.com/TykTechnologies/tyk/issues/7461:
+// requests served from the JWKS cache must not fail when JWTSource is a plain URL.
+func TestJWTSessionRSAWithJWK_CachedPlainURLSource(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	jwtToken := ts.prepareJWTSessionRSAWithJWK()
+	authHeaders := map[string]string{"authorization": jwtToken}
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{Headers: authHeaders, Code: http.StatusOK},
+		{Headers: authHeaders, Code: http.StatusOK},
+	}...)
+}
+
 func BenchmarkJWTSessionRSAWithJWK(b *testing.B) {
 	b.ReportAllocs()
 
