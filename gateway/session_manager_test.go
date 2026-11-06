@@ -483,6 +483,31 @@ func TestSessionLimiter_RateLimitInfo(t *testing.T) {
 	}
 }
 
+func TestSessionLimiter_RateLimitInfo_ListenPath(t *testing.T) {
+	limiter := &SessionLimiter{config: &config.Default}
+	spec := BuildAPI(func(a *APISpec) {
+		a.Proxy.ListenPath = "/api/"
+	})[0]
+
+	for _, rulePath := range []string{"/users", "/api/users"} {
+		t.Run("rule "+rulePath, func(t *testing.T) {
+			endpoints := user.Endpoints{{
+				Path:    rulePath,
+				Methods: []user.EndpointMethod{{Name: "GET", Limit: user.RateLimit{Rate: 1, Per: 60}}},
+			}}
+			req := httptest.NewRequest(http.MethodGet, "/api/users", nil)
+
+			result, found := limiter.RateLimitInfo(req, spec, endpoints)
+			assert.True(t, found)
+			assert.Equal(t, &user.EndpointRateLimitInfo{
+				KeySuffix: storage.HashStr("GET:" + rulePath),
+				Rate:      1,
+				Per:       60,
+			}, result)
+		})
+	}
+}
+
 func TestSessionLimiter(t *testing.T) {
 	newSessionLimiter := func(t *testing.T) SessionLimiter {
 		t.Helper()
