@@ -8,7 +8,7 @@ on:
       - ".github/actions/**"
   push:
     branches:
-      - master
+      - release-5.16
     paths:
       - ".github/workflows/**"
       - ".github/actions/**"
