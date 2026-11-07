@@ -996,6 +996,10 @@ func (r *RedisOsinStorageInterface) SaveAccess(accessData *osin.AccessData) erro
 	// Override timeouts so that we can be in sync with Osin
 	newSession.Expires = time.Now().Unix() + int64(accessData.ExpiresIn)
 
+	// Record the creation time, matching the normal key creation flow;
+	// otherwise date_created serialises as Go's zero time (0001-01-01T00:00:00Z).
+	newSession.DateCreated = time.Now()
+
 	c, ok := accessData.Client.(*OAuthClient)
 	if ok && c.MetaData != nil {
 		if newSession.MetaData == nil {
