@@ -63,14 +63,15 @@ func TestMCPOriginValidationMiddleware(t *testing.T) {
 			rec := httptest.NewRecorder()
 
 			err, status := mw.ProcessRequest(rec, req, nil)
-			require.NoError(t, err)
 			if test.wantStatus == http.StatusForbidden {
-				assert.Equal(t, middleware.StatusRespond, status)
+				require.ErrorIs(t, err, middleware.ErrResponseRendered)
+				assert.Equal(t, http.StatusForbidden, status)
 				assert.Equal(t, http.StatusForbidden, rec.Code)
 				assert.Equal(t, "Forbidden\n", rec.Body.String())
 				assert.Equal(t, "text/plain; charset=utf-8", rec.Header().Get("Content-Type"))
 				return
 			}
+			require.NoError(t, err)
 			assert.Equal(t, http.StatusOK, status)
 			assert.Empty(t, rec.Body.String())
 		})
@@ -136,10 +137,11 @@ func TestMCPOriginCORSFallbackAndExplicitPrecedence(t *testing.T) {
 			req.Header.Set("Origin", tc.origin)
 			rec := httptest.NewRecorder()
 			err, status := mw.ProcessRequest(rec, req, nil)
-			require.NoError(t, err)
 			if tc.allowed {
+				require.NoError(t, err)
 				require.Equal(t, http.StatusOK, status)
 			} else {
+				require.ErrorIs(t, err, middleware.ErrResponseRendered)
 				require.Equal(t, http.StatusForbidden, rec.Code)
 			}
 		})
