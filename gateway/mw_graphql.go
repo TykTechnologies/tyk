@@ -68,7 +68,7 @@ func (m *GraphQLMiddleware) Init() {
 
 		log.Info("GraphQL Config Version 1 is deprecated - Please consider migrating to version 2 or higher")
 		m.Spec.GraphEngine, err = graphengine.NewEngineV1(graphengine.EngineV1Options{
-			Logger:        log,
+			Logger:        log.AsLogrus(),
 			ApiDefinition: m.Spec.APIDefinition,
 			Schema:        schema,
 			HttpClient: &http.Client{
@@ -87,7 +87,7 @@ func (m *GraphQLMiddleware) Init() {
 			Transport: &http.Transport{TLSClientConfig: tlsClientConfig(m.Spec, nil)},
 		}
 		m.Spec.GraphEngine, err = graphengine.NewEngineV2(graphengine.EngineV2Options{
-			Logger:          log,
+			Logger:          log.AsLogrus(),
 			Schema:          schema,
 			ApiDefinition:   m.Spec.APIDefinition,
 			HttpClient:      httpClient,
@@ -124,7 +124,7 @@ func (m *GraphQLMiddleware) Init() {
 			return
 		}
 		engine, err := graphengine.NewEngineV3(graphengine.EngineV3Options{
-			Logger:        log,
+			Logger:        log.AsLogrus(),
 			Schema:        v2Schema,
 			ApiDefinition: m.Spec.APIDefinition,
 			OpenTelemetry: graphengine.EngineV2OTelConfig{
