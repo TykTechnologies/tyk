@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 )
 
 // Helper function to create test API spec
@@ -22,17 +23,25 @@ func createTestAPISpec(apiID string, certs, clientCerts []string, upstreamCerts,
 	}
 }
 
+// collectCertReferences returns the references that drive selective certificate sync.
+func collectCertReferences(specs []*APISpec, serverCerts []string) map[string]map[string]struct{} {
+	conf := config.Config{}
+	conf.HttpServerOptions.SSLCertificates = serverCerts
+	return collectCertUsage(&conf, specs).references
+}
+
 func TestNewUsageTracker(t *testing.T) {
 	cr := newUsageTracker()
 
 	assert.NotNil(t, cr)
 	assert.NotNil(t, cr.apis)
 	assert.Equal(t, 0, cr.Len())
+	assert.NotNil(t, cr.Report(), "an empty report must be sent as an empty list")
 }
 
-func TestCollectCertUsageMap(t *testing.T) {
+func TestCollectCertReferences(t *testing.T) {
 	t.Run("empty specs and no server certs", func(t *testing.T) {
-		usageMap := CollectCertUsageMap(nil, nil)
+		usageMap := collectCertReferences(nil, nil)
 
 		assert.NotNil(t, usageMap)
 		assert.Empty(t, usageMap)
@@ -40,7 +49,7 @@ func TestCollectCertUsageMap(t *testing.T) {
 
 	t.Run("only server certs, no API specs", func(t *testing.T) {
 		serverCerts := []string{"server-cert1", "server-cert2"}
-		usageMap := CollectCertUsageMap(nil, serverCerts)
+		usageMap := collectCertReferences(nil, serverCerts)
 
 		assert.Len(t, usageMap, 2)
 		assert.Contains(t, usageMap, "server-cert1")
@@ -56,7 +65,7 @@ func TestCollectCertUsageMap(t *testing.T) {
 			createTestAPISpec("api1", []string{"cert1", "cert2"}, nil, nil, nil),
 			createTestAPISpec("api2", []string{"cert3"}, nil, nil, nil),
 		}
-		usageMap := CollectCertUsageMap(specs, nil)
+		usageMap := collectCertReferences(specs, nil)
 
 		assert.Len(t, usageMap, 3)
 		assert.Contains(t, usageMap, "cert1")
@@ -74,7 +83,7 @@ func TestCollectCertUsageMap(t *testing.T) {
 			createTestAPISpec("api1", []string{"cert1"}, nil, nil, nil),
 		}
 		serverCerts := []string{"server-cert1"}
-		usageMap := CollectCertUsageMap(specs, serverCerts)
+		usageMap := collectCertReferences(specs, serverCerts)
 
 		assert.Len(t, usageMap, 2)
 		assert.Contains(t, usageMap, "cert1")
@@ -90,7 +99,7 @@ func TestCollectCertUsageMap(t *testing.T) {
 			createTestAPISpec("api2", []string{"shared-cert"}, nil, nil, nil),
 			createTestAPISpec("api3", []string{"shared-cert", "cert3"}, nil, nil, nil),
 		}
-		usageMap := CollectCertUsageMap(specs, nil)
+		usageMap := collectCertReferences(specs, nil)
 
 		assert.Len(t, usageMap, 2)
 		assert.Contains(t, usageMap, "shared-cert")
@@ -115,7 +124,7 @@ func TestCollectCertUsageMap(t *testing.T) {
 				map[string]string{"upstream": "cert3"},
 				map[string]string{"pinned": "cert4"}),
 		}
-		usageMap := CollectCertUsageMap(specs, nil)
+		usageMap := collectCertReferences(specs, nil)
 
 		assert.Len(t, usageMap, 4)
 		assert.Contains(t, usageMap, "cert1")
@@ -135,7 +144,7 @@ func TestCollectCertUsageMap(t *testing.T) {
 			createTestAPISpec("api1", []string{"cert1", "", "cert2"}, nil, nil, nil),
 		}
 		serverCerts := []string{"server-cert1", "", "server-cert2"}
-		usageMap := CollectCertUsageMap(specs, serverCerts)
+		usageMap := collectCertReferences(specs, serverCerts)
 
 		assert.Len(t, usageMap, 4)
 		assert.Contains(t, usageMap, "cert1")
@@ -152,7 +161,7 @@ func TestCollectCertUsageMap(t *testing.T) {
 				map[string]string{"upstream": "cert2"},
 				nil),
 		}
-		usageMap := CollectCertUsageMap(specs, nil)
+		usageMap := collectCertReferences(specs, nil)
 
 		assert.Len(t, usageMap, 2)
 		assert.Contains(t, usageMap, "cert1")
@@ -168,7 +177,7 @@ func TestCollectCertUsageMap(t *testing.T) {
 			createTestAPISpec("api1", []string{"shared-cert"}, nil, nil, nil),
 		}
 		serverCerts := []string{"shared-cert"}
-		usageMap := CollectCertUsageMap(specs, serverCerts)
+		usageMap := collectCertReferences(specs, serverCerts)
 
 		assert.Len(t, usageMap, 1)
 		assert.Contains(t, usageMap, "shared-cert")
@@ -273,11 +282,11 @@ func TestUsageTracker_ReplaceAll(t *testing.T) {
 
 }
 
-// TestExtractCertificatesFromSpec_SkipsEmbeddedPEM verifies that inline PEM
+// TestCollectCertReferences_SkipsEmbeddedPEM verifies that inline PEM
 // values in spec.Certificates / ClientCertificates / UpstreamCertificates /
-// PinnedPublicKeys are NOT added to the usage map. They are inline content
+// PinnedPublicKeys are NOT added to the sync references. They are inline content
 // and have no corresponding MDCB sync target.
-func TestExtractCertificatesFromSpec_SkipsEmbeddedPEM(t *testing.T) {
+func TestCollectCertReferences_SkipsEmbeddedPEM(t *testing.T) {
 	embeddedPEM := "-----BEGIN CERTIFICATE-----\nMIIBkTCB+wIJANRA...\n-----END CERTIFICATE-----"
 
 	spec := createTestAPISpec(
@@ -288,7 +297,7 @@ func TestExtractCertificatesFromSpec_SkipsEmbeddedPEM(t *testing.T) {
 		map[string]string{"pinned-a": "real-key-id-1", "pinned-b": embeddedPEM},
 	)
 
-	got := extractCertificatesFromSpec(spec)
+	got := collectCertReferences([]*APISpec{spec}, nil)
 
 	assert.Equal(t, 4, len(got), "embedded PEMs must be excluded from the usage set")
 	assert.Contains(t, got, "real-cert-id-1")

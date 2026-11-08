@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/certs"
 
 	"github.com/TykTechnologies/tyk/internal/crypto"
@@ -27,8 +28,6 @@ func (s *RequestSigning) Name() string {
 func (s *RequestSigning) EnabledForSpec() bool {
 	return s.Spec.RequestSigning.IsEnabled
 }
-
-var supportedAlgorithms = []string{"hmac-sha1", "hmac-sha256", "hmac-sha384", "hmac-sha512", "rsa-sha256"}
 
 func generateHeaderList(r *http.Request, headerList []string) []string {
 	var result []string
@@ -100,7 +99,7 @@ func (s *RequestSigning) ProcessRequest(w http.ResponseWriter, r *http.Request, 
 	if len(s.Spec.HmacAllowedAlgorithms) > 0 {
 		algoList = s.Spec.HmacAllowedAlgorithms
 	} else {
-		algoList = supportedAlgorithms
+		algoList = apidef.RequestSigningAlgorithms
 	}
 
 	algorithmAllowed := false

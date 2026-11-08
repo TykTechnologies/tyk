@@ -8,10 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/model"
 )
 
 var dashLog = log.WithField("prefix", "dashboard")
@@ -49,10 +51,23 @@ type HTTPDashboardHandler struct {
 	DeRegistrationEndpoint  string
 	HeartBeatEndpoint       string
 	KeyQuotaTriggerEndpoint string
+	CertificatesEndpoint    string
 
 	Secret string
 
 	heartBeatStopSentinel int32
+
+	// certReportMu serialises certificate reports, so an older report never arrives last.
+	certReportMu sync.Mutex
+	// certReportQueued is set while a report waits for the one in flight, so reloads during a
+	// slow request queue a single report instead of one each.
+	certReportQueued atomic.Bool
+	// certReportFailed is set when a report couldn't be delivered. The next successful heartbeat
+	// sends it again, so the Dashboard doesn't count a working Gateway as not reporting.
+	certReportFailed atomic.Bool
+	// certReportUnsupported is set when the Dashboard is too old to accept certificate reports,
+	// and cleared when the Gateway registers again.
+	certReportUnsupported atomic.Bool
 
 	Gw *Gateway `json:"-"`
 }
@@ -127,6 +142,7 @@ func (h *HTTPDashboardHandler) Init() error {
 	h.DeRegistrationEndpoint = h.Gw.buildDashboardConnStr("/system/node")
 	h.HeartBeatEndpoint = h.Gw.buildDashboardConnStr("/register/ping")
 	h.KeyQuotaTriggerEndpoint = h.Gw.buildDashboardConnStr("/system/key/quota_trigger")
+	h.CertificatesEndpoint = h.Gw.buildDashboardConnStr("/system/node/certificates")
 
 	if h.Secret = h.Gw.GetConfig().NodeSecret; h.Secret == "" {
 		dashLog.Fatal("Node secret is not set, required for dashboard connection")
@@ -268,7 +284,112 @@ func (h *HTTPDashboardHandler) attemptRegistration(ctx context.Context) (registe
 	h.Gw.ServiceNonceMutex.Unlock()
 	dashLog.Debug("Registration Finished: Nonce Set: ", val.Nonce)
 
+	// The Dashboard drops the report of a node ID it gives to a newly registering Gateway,
+	// and it may have been upgraded since the last registration.
+	h.certReportUnsupported.Store(false)
+	h.queueCertificateReport()
+
 	return true, nil
+}
+
+// reportCertificatesToDashboard sends the certificates the Gateway uses to the Dashboard,
+// when the Gateway is connected directly to it. Data Plane Gateways report through MDCB instead.
+func (gw *Gateway) reportCertificatesToDashboard() {
+	conf := gw.GetConfig()
+	if !conf.UseDBAppConfigs || conf.SlaveOptions.UseRPC {
+		return
+	}
+
+	if h, ok := gw.DashService.(*HTTPDashboardHandler); ok {
+		h.queueCertificateReport()
+	}
+}
+
+// queueCertificateReport sends a report in the background. The report is built when it's sent, so
+// a report already waiting will carry the latest list, and another one isn't needed.
+func (h *HTTPDashboardHandler) queueCertificateReport() {
+	if !h.certReportQueued.CompareAndSwap(false, true) {
+		return
+	}
+
+	go func() {
+		h.certReportMu.Lock()
+		defer h.certReportMu.Unlock()
+		h.certReportQueued.Store(false)
+
+		if err := h.sendCertificateReport(); err != nil {
+			dashLog.WithError(err).Warning("Could not report the certificates in use to the Dashboard, will retry after the next heartbeat")
+		}
+	}()
+}
+
+// ReportCertificates sends the certificates the Gateway uses to POST /system/node/certificates.
+// An older Dashboard answers 404, and the Gateway doesn't try again until it next registers.
+func (h *HTTPDashboardHandler) ReportCertificates() error {
+	h.certReportMu.Lock()
+	defer h.certReportMu.Unlock()
+	return h.sendCertificateReport()
+}
+
+func (h *HTTPDashboardHandler) sendCertificateReport() error {
+	err := h.doSendCertificateReport()
+	h.certReportFailed.Store(err != nil)
+	return err
+}
+
+func (h *HTTPDashboardHandler) doSendCertificateReport() error {
+	if h.certReportUnsupported.Load() || h.CertificatesEndpoint == "" {
+		return nil
+	}
+
+	body, err := json.Marshal(model.CertificateReport{Certificates: h.Gw.certificateReport()})
+	if err != nil {
+		return err
+	}
+
+	ctx := h.Gw.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, h.CertificatesEndpoint, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	h.addHeaderToRequest(req)
+	req.Header.Set(header.ContentType, header.ApplicationJSON)
+	req.Header.Set(header.XTykNodeID, h.Gw.GetNodeID())
+	h.Gw.ServiceNonceMutex.RLock()
+	req.Header.Set(header.XTykNonce, h.Gw.ServiceNonce)
+	h.Gw.ServiceNonceMutex.RUnlock()
+
+	resp, err := h.Gw.initialiseClient().Do(req)
+	if err != nil {
+		return fmt.Errorf("certificate report request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	switch resp.StatusCode {
+	case http.StatusOK:
+	case http.StatusNotFound:
+		h.certReportUnsupported.Store(true)
+		dashLog.Info("The Dashboard doesn't accept reports of the certificates in use. Upgrade it to see which Gateways use each certificate.")
+		return nil
+	default:
+		return fmt.Errorf("certificate report failed with status %d", resp.StatusCode)
+	}
+
+	val := NodeResponse{}
+	if err := json.NewDecoder(resp.Body).Decode(&val); err != nil {
+		return err
+	}
+	if val.Nonce != "" {
+		h.Gw.ServiceNonceMutex.Lock()
+		h.Gw.ServiceNonce = val.Nonce
+		h.Gw.ServiceNonceMutex.Unlock()
+	}
+
+	dashLog.Debug("Reported the certificates in use to the Dashboard")
+	return nil
 }
 
 // Ping is the dashboard liveness probe behind /hello and /ready. It must
@@ -391,6 +512,10 @@ func (h *HTTPDashboardHandler) doHeartBeat(req *http.Request, client *http.Clien
 	h.Gw.ServiceNonce = val.Nonce
 	h.Gw.ServiceNonceMutex.Unlock()
 	//log.Debug("Heartbeat Finished: Nonce Set: ", h.Gw.ServiceNonce)
+
+	if h.certReportFailed.CompareAndSwap(true, false) {
+		h.queueCertificateReport()
+	}
 
 	return nil
 }

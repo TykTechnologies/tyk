@@ -26,6 +26,9 @@ type (
 	// Loaded resource info types
 	LoadedAPIInfo    = apidef.LoadedAPIInfo
 	LoadedPolicyInfo = apidef.LoadedPolicyInfo
+
+	CertificateUsage  = apidef.CertificateUsage
+	CertificateReport = apidef.CertificateReport
 )
 
 // Other.

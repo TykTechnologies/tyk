@@ -98,7 +98,7 @@ type CertificateExpiryCheckBatcher struct {
 	flushTicker           *time.Ticker
 	fireEvent             FireEventFunc
 	certificateRole       string            // Role of certificate: "client" or "upstream"
-	certUsage             certusage.Tracker // can be nil in non-RPC mode
+	certUsage             certusage.Tracker // only consulted in RPC mode with sync_used_certs_only
 	gwConfig              *config.Config    // can be nil
 }
 

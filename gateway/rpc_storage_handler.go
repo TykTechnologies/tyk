@@ -194,6 +194,7 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 			PoliciesCount:  meta.PoliciesCount,
 			LoadedAPIs:     r.Gw.GetLoadedAPIIDs(),
 			LoadedPolicies: r.Gw.GetLoadedPolicyIDs(),
+			Certificates:   r.Gw.certificateReport(),
 		},
 		HostDetails: meta.HostDetails,
 	}

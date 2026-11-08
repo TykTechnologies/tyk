@@ -44,6 +44,9 @@ func TestGWStats_WithLoadedResources_JSONSerialization(t *testing.T) {
 		LoadedPolicies: []LoadedPolicyInfo{
 			{PolicyID: "pol-1"},
 		},
+		Certificates: []CertificateUsage{
+			{CertID: "org1cert", GatewayConfig: []string{"security.certificates.upstream"}, APIIDs: []string{"api-1"}},
+		},
 	}
 
 	data, err := json.Marshal(stats)
@@ -53,9 +56,20 @@ func TestGWStats_WithLoadedResources_JSONSerialization(t *testing.T) {
 		"apis_count": 2,
 		"policies_count": 1,
 		"loaded_apis": [{"api_id": "api-1"}, {"api_id": "api-2"}],
-		"loaded_policies": [{"policy_id": "pol-1"}]
+		"loaded_policies": [{"policy_id": "pol-1"}],
+		"certificates": [{"cert_id": "org1cert", "gateway_config": ["security.certificates.upstream"], "api_ids": ["api-1"]}]
 	}`
 	assert.JSONEq(t, expected, string(data))
+}
+
+func TestGWStats_Certificates_AlwaysSent(t *testing.T) {
+	data, err := json.Marshal(GWStats{Certificates: []CertificateUsage{}})
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"apis_count": 0, "policies_count": 0, "certificates": []}`, string(data))
+
+	data, err = json.Marshal(CertificateUsage{CertID: "org1cert"})
+	assert.NoError(t, err)
+	assert.JSONEq(t, `{"cert_id": "org1cert"}`, string(data), "unused fields are omitted")
 }
 
 func TestGWStats_EmptyLoadedResources_OmitsFields(t *testing.T) {

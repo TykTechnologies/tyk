@@ -436,6 +436,7 @@ func TestGetGroupLoginCallback(t *testing.T) {
 				Stats: model.GWStats{
 					APIsCount:     0,
 					PoliciesCount: 0,
+					Certificates:  []model.CertificateUsage{},
 				},
 				HostDetails: model.HostDetails{
 					Hostname: ts.Gw.hostDetails.Hostname,
@@ -480,6 +481,7 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				Stats: model.GWStats{
 					APIsCount:     0,
 					PoliciesCount: 0,
+					Certificates:  []model.CertificateUsage{},
 				},
 			},
 		},
@@ -504,6 +506,7 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				Stats: model.GWStats{
 					APIsCount:     0,
 					PoliciesCount: 0,
+					Certificates:  []model.CertificateUsage{},
 				},
 			},
 		},
@@ -540,6 +543,7 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				Stats: model.GWStats{
 					APIsCount:     1,
 					PoliciesCount: 1,
+					Certificates:  []model.CertificateUsage{},
 				},
 			},
 		},
@@ -564,6 +568,7 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				Stats: model.GWStats{
 					APIsCount:     0,
 					PoliciesCount: 0,
+					Certificates:  []model.CertificateUsage{},
 				},
 			},
 		},
@@ -590,6 +595,7 @@ func TestRPCStorageHandler_BuildNodeInfo(t *testing.T) {
 				Stats: model.GWStats{
 					APIsCount:     0,
 					PoliciesCount: 0,
+					Certificates:  []model.CertificateUsage{},
 				},
 			},
 		},
@@ -1170,13 +1176,13 @@ func TestSelectiveCertificateSync_Config(t *testing.T) {
 		assert.True(t, globalConf.SlaveOptions.SyncUsedCertsOnly)
 	})
 
-	t.Run("certUsageTracker initialized only in RPC mode", func(t *testing.T) {
+	t.Run("certUsageTracker initialized in every mode", func(t *testing.T) {
 		// Non-RPC mode
 		conf1 := config.Config{}
 		conf1.SlaveOptions.UseRPC = false
 		ctx := context.Background()
 		gw1 := NewGateway(conf1, ctx)
-		assert.Nil(t, gw1.certUsageTracker, "certUsageTracker should be nil in non-RPC mode")
+		assert.NotNil(t, gw1.certUsageTracker, "certUsageTracker should be initialized in non-RPC mode")
 
 		// RPC mode
 		conf2 := config.Config{}
@@ -1434,6 +1440,8 @@ func TestRPCStorageHandler_BuildNodeInfo_GoldenWireShape(t *testing.T) {
 		"node_is_segmented", "tags", "health", "stats", "host_details",
 	}, keysOf(got))
 	// loaded_apis / loaded_policies are omitempty and the fixture loads none.
-	assert.ElementsMatch(t, []string{"apis_count", "policies_count"}, keysOf(got["stats"]))
+	// certificates is always sent, as an empty list when the Gateway uses none.
+	assert.ElementsMatch(t, []string{"apis_count", "policies_count", "certificates"}, keysOf(got["stats"]))
+	assert.Equal(t, []any{}, got["stats"].(map[string]any)["certificates"])
 	assert.ElementsMatch(t, []string{"Hostname", "PID", "Address"}, keysOf(got["host_details"]))
 }
