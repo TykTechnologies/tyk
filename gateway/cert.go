@@ -442,6 +442,10 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		baseConfig.NameToCertificate[name] = cert
 	}
 
+	if len(baseConfig.CurvePreferences) == 0 {
+		baseConfig.CurvePreferences = defaultCurvePreferences()
+	}
+
 	listenPortStr := strconv.Itoa(listenPort)
 
 	return func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
@@ -450,6 +454,9 @@ func (gw *Gateway) getTLSConfigForClient(baseConfig *tls.Config, listenPort int)
 		}
 
 		newConfig := baseConfig.Clone()
+		if len(newConfig.CurvePreferences) == 0 {
+			newConfig.CurvePreferences = defaultCurvePreferences()
+		}
 
 		// Avoiding Race
 		newConfig.Certificates = []tls.Certificate{}
