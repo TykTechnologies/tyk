@@ -58,6 +58,20 @@ func TestEventPayload_LogFields_SafeFields(t *testing.T) {
 	assertNoForbiddenKeys(t, f)
 }
 
+func TestEventPayload_ResourceOnlyWhenSent(t *testing.T) {
+	t.Parallel()
+
+	p := okPayload()
+	p.Resources = []string{"https://api.internal"}
+	assert.Equal(t, []string{"https://api.internal"}, p.LogFields()["oauth2_resource"])
+	assert.Equal(t, []string{"https://api.internal"}, p.AuditMeta()["oauth2_resource"])
+
+	p.Audience = "abc123"
+	p.Resources = nil
+	assert.NotContains(t, p.LogFields(), "oauth2_resource")
+	assert.NotContains(t, p.AuditMeta(), "oauth2_resource")
+}
+
 // TestEventPayload_LogFields_FailureCarriesIdPError pins TC6's failure variant.
 func TestEventPayload_LogFields_FailureCarriesIdPError(t *testing.T) {
 	t.Parallel()

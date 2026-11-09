@@ -48,6 +48,9 @@ func (m *Middleware) runExchange(r *http.Request, st *oauth2common.State) (oauth
 	}
 	out.Audience = target.Audience
 	out.Scopes = target.Scopes
+	if !provider.IsJWTBearer() {
+		out.Resources = exchangeResources(target)
+	}
 
 	start := time.Now()
 	exchanged, cacheHit, err := m.fetchExchangedToken(r, st, provider, target)

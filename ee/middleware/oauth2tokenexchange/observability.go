@@ -25,6 +25,7 @@ const (
 	fieldExchangedAzp    = "oauth2_exchanged_azp"
 	fieldAudience        = "oauth2_audience"
 	fieldScopesRequested = "oauth2_scopes_requested"
+	fieldResources       = "oauth2_resource"
 
 	truncatedSuffix = "...(truncated)"
 )
@@ -56,6 +57,9 @@ type EventPayload struct {
 	// Audience and ScopesRequested are the resolved exchange target.
 	Audience        string
 	ScopesRequested []string
+	// Resources are the RFC 8707 resource values requested for the target, if
+	// any; logged on cache hits too, like Audience.
+	Resources []string
 }
 
 // LogFields returns the structured log line for one exchange: the same bounded
@@ -96,6 +100,9 @@ func (p EventPayload) addOptional(m map[string]interface{}) {
 	}
 	if len(p.ScopesRequested) > 0 {
 		m[fieldScopesRequested] = p.ScopesRequested
+	}
+	if len(p.Resources) > 0 {
+		m[fieldResources] = p.Resources
 	}
 	if p.Outcome == oauth2common.OutcomeIdPError {
 		if p.IdpError != "" {

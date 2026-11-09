@@ -77,6 +77,7 @@ func (m *Middleware) emitObservability(ctx context.Context, st *oauth2common.Sta
 		ExchangedAzp:    exchangedAzp(out.ExchangedToken),
 		Audience:        out.Audience,
 		ScopesRequested: out.Scopes,
+		Resources:       out.Resources,
 	}
 
 	m.Logger().WithFields(payload.LogFields()).Info("oauth2 token exchange")
