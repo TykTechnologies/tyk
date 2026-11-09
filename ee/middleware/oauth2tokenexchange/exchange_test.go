@@ -186,3 +186,44 @@ func TestRunExchange_StrictResourceIdP(t *testing.T) {
 		})
 	}
 }
+
+func TestRunExchange_CacheSeparatesExplicitResources(t *testing.T) {
+	idp, forms := strictResourceIdP(t)
+	m := newMiddleware(newFakeBase(), &fakeCache{items: map[string]string{}})
+
+	stateFor := func(resources ...string) *oauth2common.State {
+		return &oauth2common.State{
+			Claims:   jwt.MapClaims{oas.OAuth2ClaimIss: "https://idp.example.com", oas.OAuth2ClaimSub: "user"},
+			RawToken: "inbound",
+			APIID:    "api-1",
+			OASConfig: &oas.OAuth2{TokenExchange: &oas.OAuth2TokenExchange{
+				Providers: []oas.OAuth2TokenExchangeProvider{{
+					Name:          "example",
+					Issuers:       []string{"https://idp.example.com"},
+					TokenEndpoint: idp.URL,
+					Cache:         &oas.OAuth2ExchangeCache{Enabled: true},
+					DefaultTarget: &oas.OAuth2DefaultTarget{Audience: "abc123", Resources: resources},
+				}},
+			}},
+		}
+	}
+	run := func(st *oauth2common.State) oauth2common.Outcome {
+		out, err := m.runExchange(httptest.NewRequest(http.MethodGet, "/orders", nil), st)
+		require.NoError(t, err)
+		return out
+	}
+
+	first := run(stateFor("https://r1.example.com"))
+	second := run(stateFor("https://r2.example.com"))
+	repeat := run(stateFor("https://r1.example.com"))
+
+	assert.False(t, first.CacheHit)
+	assert.False(t, second.CacheHit, "a different resource must not reuse the cached token")
+	assert.True(t, repeat.CacheHit)
+	assert.Equal(t, []string{"https://r2.example.com"}, second.Resources)
+
+	got := forms()
+	require.Len(t, got, 2)
+	assert.Equal(t, []string{"https://r1.example.com"}, got[0][oas.OAuth2FormResource])
+	assert.Equal(t, []string{"https://r2.example.com"}, got[1][oas.OAuth2FormResource])
+}

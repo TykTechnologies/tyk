@@ -139,6 +139,7 @@ func (m *Middleware) fetchExchangedToken(r *http.Request, st *oauth2common.State
 		APIID:          st.APIID,
 		Audience:       target.Audience,
 		Scopes:         target.Scopes,
+		Resources:      target.Resources,
 		ProviderName:   provider.Name,
 		TenantEndpoint: tenantEndpoint,
 	}.Build()
@@ -347,10 +348,13 @@ func buildExchangeForm(provider *oas.OAuth2TokenExchangeProvider, subjectToken s
 }
 
 // exchangeResources returns the RFC 8707 resource values for an RFC 8693
-// exchange. The audience doubles as the resource only when it is itself a valid
-// resource indicator; a logical audience such as a client id is never sent as
-// resource, which strict IdPs reject with invalid_target.
+// exchange: the explicit resources when configured, otherwise the audience when
+// it is itself a valid resource indicator. A logical audience such as a client
+// id is never sent as resource, which strict IdPs reject with invalid_target.
 func exchangeResources(target *oauth2common.Target) []string {
+	if len(target.Resources) > 0 {
+		return target.Resources
+	}
 	if oas.IsResourceIndicator(target.Audience) {
 		return []string{target.Audience}
 	}

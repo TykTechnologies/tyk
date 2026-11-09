@@ -96,6 +96,25 @@ func TestBuildExchangeForm(t *testing.T) {
 		}
 	})
 
+	t.Run("explicit resources replace the derived one", func(t *testing.T) {
+		tests := []struct {
+			name      string
+			audience  string
+			resources []string
+		}{
+			{name: "with a client id audience", audience: "abc123", resources: []string{"https://orders.example.com"}},
+			{name: "with a URL audience", audience: "https://upstream", resources: []string{"api://orders"}},
+			{name: "several values are repeated", audience: "abc123", resources: []string{"https://a.example.com", "https://b.example.com"}},
+		}
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				form := buildExchangeForm(provider, "s", &oauth2common.Target{Audience: tc.audience, Resources: tc.resources}, oas.OAuth2ClientAuthBasic)
+				assert.Equal(t, tc.audience, form.Get(oas.OAuth2FormAudience))
+				assert.Equal(t, tc.resources, form[oas.OAuth2FormResource])
+			})
+		}
+	})
+
 	t.Run("scopes are space-joined and customParams included", func(t *testing.T) {
 		form := buildExchangeForm(provider, "s", target, oas.OAuth2ClientAuthBasic)
 		assert.Equal(t, "read write", form.Get(oas.OAuth2FormScope))

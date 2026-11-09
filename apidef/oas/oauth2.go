@@ -282,6 +282,11 @@ type OAuth2DefaultTarget struct {
 	Audience string `bson:"audience,omitempty" json:"audience,omitempty"`
 	// Scopes is the default set of scopes requested for the exchanged token.
 	Scopes []string `bson:"scopes,omitempty" json:"scopes,omitempty"`
+	// Resources are the RFC 8707 resource indicators sent as repeated `resource`
+	// parameters. Each must be an absolute URI without a fragment. When empty,
+	// the audience is sent as the resource only if it is itself such a URI.
+	// Not allowed on a jwt-bearer provider, whose grant has no resource parameter.
+	Resources []string `bson:"resources,omitempty" json:"resources,omitempty"`
 }
 
 // OAuth2Exchange is the per-operation audience/scopes override for token exchange.
@@ -299,6 +304,11 @@ type OAuth2Exchange struct {
 	// Scopes is the explicit scope list for this operation; when empty the scopes
 	// are inferred from the operation's security: requirement (RFC 8693 §4.5.5).
 	Scopes []string `bson:"scopes,omitempty" json:"scopes,omitempty"`
+	// Resources are the RFC 8707 resource indicators for this operation; when
+	// non-empty they replace the provider's defaultTarget.resources. Each must be
+	// an absolute URI without a fragment. Ignored when the request is served by a
+	// jwt-bearer provider.
+	Resources []string `bson:"resources,omitempty" json:"resources,omitempty"`
 }
 
 // IsActive reports whether this per-op exchange block is active (requires explicit Enabled=true).
@@ -469,8 +479,9 @@ func (s *OAS) ValidateOAuth2Schemes() error {
 // exchangeOverride is an enabled per-operation or per-primitive exchange block,
 // labelled by the operationID or primitive name that owns it.
 type exchangeOverride struct {
-	label    string
-	audience string
+	label     string
+	audience  string
+	resources []string
 }
 
 // activeExchangeOverrides collects every enabled exchange override in the
@@ -483,7 +494,7 @@ func (s *OAS) activeExchangeOverrides() []exchangeOverride {
 	var out []exchangeOverride
 	add := func(label string, ex *OAuth2Exchange) {
 		if ex.IsActive() {
-			out = append(out, exchangeOverride{label: label, audience: ex.Audience})
+			out = append(out, exchangeOverride{label: label, audience: ex.Audience, resources: ex.Resources})
 		}
 	}
 	for label, op := range mw.Operations {
@@ -533,7 +544,42 @@ func validateOAuth2TokenExchange(schemeName string, te *OAuth2TokenExchange, ove
 			return err
 		}
 	}
+	if err := validateExchangeResources(schemeName, te.Providers, overrides); err != nil {
+		return err
+	}
 	return validateExchangeAudience(schemeName, te.Providers, overrides)
+}
+
+// validateExchangeResources requires every configured resource to be an RFC
+// 8707 resource indicator, and rejects resources on a jwt-bearer provider's
+// defaultTarget, whose grant has no resource parameter. Overrides are not
+// tied to a provider, so a jwt-bearer provider simply ignores theirs.
+func validateExchangeResources(schemeName string, providers []OAuth2TokenExchangeProvider, overrides []exchangeOverride) error {
+	for i := range providers {
+		p := &providers[i]
+		if p.DefaultTarget == nil || len(p.DefaultTarget.Resources) == 0 {
+			continue
+		}
+		if p.IsJWTBearer() {
+			return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q uses the %q grant, which sends no resource; remove defaultTarget.resources",
+				schemeName, p.Name, OAuth2ProviderGrantJWTBearer)
+		}
+		for _, r := range p.DefaultTarget.Resources {
+			if !IsResourceIndicator(r) {
+				return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q defaultTarget.resources entry %q is not an absolute URI without a fragment",
+					schemeName, p.Name, r)
+			}
+		}
+	}
+	for _, o := range overrides {
+		for _, r := range o.resources {
+			if !IsResourceIndicator(r) {
+				return fmt.Errorf("oauth2 scheme %q: exchange on %q resources entry %q is not an absolute URI without a fragment",
+					schemeName, o.label, r)
+			}
+		}
+	}
+	return nil
 }
 
 // validateExchangeAudience rejects a config that cannot resolve an audience
