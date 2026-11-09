@@ -147,3 +147,33 @@ func TestValidateOAuth2Schemes_Audience_AcceptedConfigurations(t *testing.T) {
 		assert.NoError(t, s.ValidateOAuth2Schemes())
 	})
 }
+
+func TestIsResourceIndicator(t *testing.T) {
+	tests := []struct {
+		in   string
+		want bool
+	}{
+		{"https://orders.example.com", true},
+		{"https://orders.example.com/v1?x=1", true},
+		{"api://orders", true},
+		{"urn:example:orders", true},
+		{"abc123", false},
+		{"/relative/path", false},
+		{"https://orders.example.com#frag", false},
+		{"https://orders.example.com#", false},
+		{"HTTPS://orders.example.com", true},
+		{"https:", false},
+		{"https://", false},
+		{"https:///path", false},
+		{"x:", false},
+		{"urn:a urn:b", false},
+		{"https://x/a b", false},
+		{"https://x/\ta", false},
+		{"", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.in, func(t *testing.T) {
+			assert.Equal(t, tc.want, IsResourceIndicator(tc.in))
+		})
+	}
+}

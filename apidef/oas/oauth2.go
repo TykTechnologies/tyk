@@ -628,6 +628,26 @@ func IsAbsoluteHTTPURL(s string) bool {
 	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
 }
 
+// IsResourceIndicator reports whether s is a valid RFC 8707 resource indicator:
+// an absolute URI without a fragment. Any scheme is accepted, so api:// and urn:
+// values qualify alongside http(s) URLs. A URI with nothing after the scheme,
+// an http(s) URL without a host, and whitespace or control characters are
+// rejected.
+func IsResourceIndicator(s string) bool {
+	if strings.Contains(s, "#") || strings.IndexFunc(s, func(r rune) bool { return r <= ' ' || r == 0x7f }) >= 0 {
+		return false
+	}
+	u, err := url.Parse(s)
+	if err != nil || !u.IsAbs() {
+		return false
+	}
+	switch strings.ToLower(u.Scheme) {
+	case "http", "https":
+		return u.Host != ""
+	}
+	return u.Host != "" || u.Opaque != "" || u.Path != ""
+}
+
 // validateExchangeClientAuth validates the client-authentication method.
 // Secret methods (basic/post, and the empty default) are accepted as-is;
 // private_key_jwt additionally requires a certId to sign the client assertion;

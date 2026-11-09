@@ -331,7 +331,9 @@ func buildExchangeForm(provider *oas.OAuth2TokenExchangeProvider, subjectToken s
 	form.Set(oas.OAuth2FormSubjectTokenType, oas.OAuth2TokenTypeAccessToken)
 	if target.Audience != "" {
 		form.Set(oas.OAuth2FormAudience, target.Audience)
-		form.Set(oas.OAuth2FormResource, target.Audience)
+	}
+	for _, resource := range exchangeResources(target) {
+		form.Add(oas.OAuth2FormResource, resource)
 	}
 	if len(target.Scopes) > 0 {
 		form.Set(oas.OAuth2FormScope, strings.Join(target.Scopes, " "))
@@ -339,6 +341,17 @@ func buildExchangeForm(provider *oas.OAuth2TokenExchangeProvider, subjectToken s
 	addCustomParams(form, provider)
 	addPostClientCredentials(form, provider, method)
 	return form
+}
+
+// exchangeResources returns the RFC 8707 resource values for an RFC 8693
+// exchange. The audience doubles as the resource only when it is itself a valid
+// resource indicator; a logical audience such as a client id is never sent as
+// resource, which strict IdPs reject with invalid_target.
+func exchangeResources(target *oauth2common.Target) []string {
+	if oas.IsResourceIndicator(target.Audience) {
+		return []string{target.Audience}
+	}
+	return nil
 }
 
 // buildJWTBearerForm builds the RFC 7523 jwt-bearer request: the inbound token
