@@ -75,10 +75,25 @@ func TestBuildExchangeForm(t *testing.T) {
 		assert.Equal(t, oas.OAuth2TokenTypeAccessToken, form.Get(oas.OAuth2FormSubjectTokenType))
 	})
 
-	t.Run("audience populates both audience and resource", func(t *testing.T) {
-		form := buildExchangeForm(provider, "s", target, oas.OAuth2ClientAuthBasic)
-		assert.Equal(t, "https://upstream", form.Get(oas.OAuth2FormAudience))
-		assert.Equal(t, "https://upstream", form.Get(oas.OAuth2FormResource))
+	t.Run("resource is derived from the audience only when it is an absolute URI without a fragment", func(t *testing.T) {
+		tests := []struct {
+			name         string
+			audience     string
+			wantResource []string
+		}{
+			{name: "client id is sent as audience only", audience: "abc123"},
+			{name: "https URL is sent as both", audience: "https://upstream", wantResource: []string{"https://upstream"}},
+			{name: "URI with a fragment is not a resource", audience: "https://x#frag"},
+			{name: "api scheme URI is sent as both", audience: "api://orders", wantResource: []string{"api://orders"}},
+			{name: "URN is sent as both", audience: "urn:x:y", wantResource: []string{"urn:x:y"}},
+		}
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				form := buildExchangeForm(provider, "s", &oauth2common.Target{Audience: tc.audience}, oas.OAuth2ClientAuthBasic)
+				assert.Equal(t, tc.audience, form.Get(oas.OAuth2FormAudience))
+				assert.Equal(t, tc.wantResource, form[oas.OAuth2FormResource])
+			})
+		}
 	})
 
 	t.Run("scopes are space-joined and customParams included", func(t *testing.T) {
