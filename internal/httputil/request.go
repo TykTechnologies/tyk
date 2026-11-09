@@ -2,6 +2,7 @@ package httputil
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/TykTechnologies/tyk/header"
 )
@@ -38,4 +39,23 @@ func RequestScheme(r *http.Request) string {
 // and not empty, which are the conditions for a standard preflight request. Otherwise, it returns false.
 func IsCORSPreflightRequest(r *http.Request) bool {
 	return r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != ""
+}
+
+// ForwardedScheme returns the scheme the client used to reach the Gateway.
+// Behind a TLS-terminating proxy the connection is plain HTTP, so the last
+// X-Forwarded-Proto hop is used when it is "http" or "https". Any other value
+// is ignored and the TLS state of the connection decides.
+func ForwardedScheme(r *http.Request) string {
+	values := r.Header.Values(header.XForwardProto)
+	if len(values) > 0 {
+		hops := strings.Split(values[len(values)-1], ",")
+		switch scheme := strings.ToLower(strings.TrimSpace(hops[len(hops)-1])); scheme {
+		case "http", "https":
+			return scheme
+		}
+	}
+	if r.TLS != nil {
+		return "https"
+	}
+	return "http"
 }

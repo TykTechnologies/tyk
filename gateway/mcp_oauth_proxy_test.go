@@ -483,3 +483,54 @@ func TestReplaceOrAppendResourceMetadata(t *testing.T) {
 		})
 	}
 }
+
+// TestMCPMirror_AdvertisesForwardedScheme covers a Gateway behind a TLS
+// terminator: the connection is plain HTTP and only X-Forwarded-Proto says
+// the client used HTTPS. Every URL in the mirrored PRM and AS metadata must
+// carry that scheme, because MCP clients refuse a non-HTTPS token endpoint.
+func TestMCPMirror_AdvertisesForwardedScheme(t *testing.T) {
+	var (
+		authorizeHits, tokenHits int
+		lastResource             string
+	)
+	ts, _ := newMCPMirrorTest(t, stockUpstreamHandler(&authorizeHits, &tokenHits, &lastResource))
+	host := strings.TrimPrefix(ts.URL, "http://")
+
+	tests := []struct {
+		name   string
+		proto  string
+		scheme string
+	}{
+		{name: "TLS terminated upstream", proto: "https", scheme: "https"},
+		{name: "plain HTTP", scheme: "http"},
+		{name: "unknown forwarded value falls back", proto: "javascript", scheme: "http"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			headers := map[string]string{}
+			if tc.proto != "" {
+				headers["X-Forwarded-Proto"] = tc.proto
+			}
+			base := tc.scheme + "://" + host
+
+			resp, _ := ts.Run(t, test.TestCase{
+				Method: http.MethodGet, Path: "/mcp-test/.well-known/oauth-protected-resource",
+				Headers: headers, Code: http.StatusOK,
+			})
+			var prm map[string]any
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&prm))
+			assert.Equal(t, base+"/mcp-test/", prm["resource"])
+			assert.Equal(t, []any{base + "/__tyk-as/test"}, prm["authorization_servers"])
+
+			resp, _ = ts.Run(t, test.TestCase{
+				Method: http.MethodGet, Path: "/.well-known/oauth-authorization-server/__tyk-as/test",
+				Headers: headers, Code: http.StatusOK,
+			})
+			var meta map[string]any
+			require.NoError(t, json.NewDecoder(resp.Body).Decode(&meta))
+			assert.Equal(t, base+"/__tyk-as/test/authorize", meta["authorization_endpoint"])
+			assert.Equal(t, base+"/__tyk-as/test/token", meta["token_endpoint"])
+		})
+	}
+}
