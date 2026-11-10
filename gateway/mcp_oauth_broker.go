@@ -775,10 +775,14 @@ func (b *mcpOAuthBroker) validPublicRequest(r *http.Request) bool {
 	// TLS often ends at a proxy the Gateway is not configured to trust (Tyk
 	// Cloud, most load balancers). Accept the HTTPS origin it reports only when
 	// the Host matches publicOrigin exactly.
-	if terminated, ok := internalhttputil.TLSTerminatedOrigin(r, b.spec.mcpTrustedProxyPrefixes); ok && terminated == b.config.PublicOrigin {
+	terminated, ok := internalhttputil.TLSTerminatedOrigin(r, b.spec.mcpTrustedProxyPrefixes)
+	if ok && terminated == b.config.PublicOrigin {
 		return true
 	}
 	fields := logrus.Fields{"api_id": b.spec.APIID, "request_origin": origin, "public_origin": b.config.PublicOrigin}
+	if ok {
+		fields["tls_terminated_origin"] = terminated
+	}
 	if err != nil {
 		fields["error"] = err.Error()
 	}

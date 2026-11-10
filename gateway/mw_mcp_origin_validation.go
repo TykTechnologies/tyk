@@ -68,7 +68,12 @@ func (m *MCPOriginValidationMiddleware) ProcessRequest(w http.ResponseWriter, r 
 		}
 	}
 
-	log.WithFields(logrus.Fields{"origin": origin, "gateway_origin": external}).
+	// The rejected Origin value is client-controlled, so it is not logged.
+	fields := logrus.Fields{"gateway_origin": external}
+	if m.Spec != nil {
+		fields["api_id"] = m.Spec.APIID
+	}
+	log.WithFields(fields).
 		Debug("MCP Origin validation rejected an origin that is neither the Gateway's own nor trusted")
 	return rejectMCPOrigin(w)
 }
