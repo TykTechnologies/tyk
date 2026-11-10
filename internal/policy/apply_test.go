@@ -1652,3 +1652,44 @@ func TestApply_NoAcl_EmptiedPolicyRevokesAccess(t *testing.T) {
 
 	assert.EqualError(t, svc.Apply(sess), "key has no valid policies to be applied")
 }
+
+// TestApply_NoAcl_RateOnlyPolicyKeepsSessionQuota covers B3 from the MDCB verification of
+// #8562: a rate-limit-only policy merged into a key whose per-API limit was empty must
+// carry the session quota along, otherwise the now non-empty per-API limit has no quota.
+func TestApply_NoAcl_RateOnlyPolicyKeepsSessionQuota(t *testing.T) {
+	orgID := ""
+	logger, _ := tyklog.NewNullLogger()
+
+	rl := user.Policy{
+		ID:         "pol-rl",
+		Partitions: user.PolicyPartitions{RateLimit: true},
+		Rate:       1000,
+		Per:        60,
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {APIID: "api1"},
+		},
+	}
+	store := policy.NewStoreMap(map[string]user.Policy{"pol-rl": rl})
+	svc := policy.New(&orgID, store, logger)
+
+	sess := &user.SessionState{
+		QuotaMax:         2,
+		QuotaRenewalRate: 3600,
+		QuotaRenews:      1,
+		MaxQueryDepth:    3,
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {APIID: "api1", Versions: []string{"Default"}},
+		},
+	}
+	sess.SetPolicies("pol-rl")
+
+	assert.NoError(t, svc.Apply(sess))
+
+	ar := sess.AccessRights["api1"]
+	assert.Equal(t, float64(1000), ar.Limit.Rate)
+	assert.Equal(t, float64(60), ar.Limit.Per)
+	assert.Equal(t, int64(2), ar.Limit.QuotaMax)
+	assert.Equal(t, int64(3600), ar.Limit.QuotaRenewalRate)
+	assert.Equal(t, int64(1), ar.Limit.QuotaRenews)
+	assert.Equal(t, 3, ar.Limit.MaxQueryDepth)
+}
