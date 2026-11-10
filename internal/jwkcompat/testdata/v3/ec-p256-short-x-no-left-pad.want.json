@@ -1,0 +1,3 @@
+{
+  "error": "go-jose/go-jose: invalid EC public key, wrong length for x"
+}

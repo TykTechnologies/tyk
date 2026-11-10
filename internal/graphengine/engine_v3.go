@@ -14,9 +14,10 @@ import (
 )
 
 type EngineV3 struct {
+	baseEngine
+
 	engine        *graphqlv2.ExecutionEngineV2
 	schema        *graphqlv2.Schema
-	logger        abstractlogger.Logger
 	openTelemetry *EngineV2OTelConfig
 	apiDefinition *apidef.APIDefinition
 
@@ -25,8 +26,6 @@ type EngineV3 struct {
 
 	gqlTools                  graphqlGoToolsV2
 	graphqlRequestProcessor   GraphQLRequestProcessor
-	complexityChecker         ComplexityChecker
-	granularAccessChecker     GranularAccessChecker
 	reverseProxyPreHandler    ReverseProxyPreHandler
 	specCtx                   context.Context
 	contextCancel             context.CancelFunc
@@ -119,7 +118,11 @@ func NewEngineV3(options EngineV3Options) (*EngineV3, error) {
 	}
 
 	engine := EngineV3{
-		logger:                 logger,
+		baseEngine: baseEngine{
+			logger:                logger,
+			complexityChecker:     complexityChecker,
+			granularAccessChecker: granularAccessChecker,
+		},
 		schema:                 options.Schema,
 		engine:                 executionEngine,
 		ctxRetrieveRequestFunc: options.Injections.ContextRetrieveRequest,
@@ -132,8 +135,6 @@ func NewEngineV3(options EngineV3Options) (*EngineV3, error) {
 		seekReadCloser:         options.Injections.SeekReadCloser,
 		specCtx:                specCtx,
 		contextCancel:          cancel,
-		complexityChecker:      complexityChecker,
-		granularAccessChecker:  granularAccessChecker,
 	}
 
 	if engine.openTelemetry == nil {
@@ -216,7 +217,7 @@ func (e *EngineV3) ProcessRequest(ctx context.Context, w http.ResponseWriter, r 
 	}
 
 	if normalizationResult.Errors != nil && normalizationResult.Errors.Count() > 0 {
-		return writeGraphQLError(e.logger, w, normalizationResult.Errors)
+		return wrapGraphQLErrorAndLog(e.logger, normalizationResult.Errors)
 	}
 
 	validationResult, err := gqlRequest.ValidateForSchema(e.schema)
@@ -226,7 +227,7 @@ func (e *EngineV3) ProcessRequest(ctx context.Context, w http.ResponseWriter, r 
 	}
 
 	if validationResult.Errors != nil && validationResult.Errors.Count() > 0 {
-		return writeGraphQLError(e.logger, w, validationResult.Errors)
+		return wrapGraphQLErrorAndLog(e.logger, validationResult.Errors)
 	}
 
 	inputValidationResult, err := gqlRequest.ValidateInput(e.schema)
@@ -235,7 +236,7 @@ func (e *EngineV3) ProcessRequest(ctx context.Context, w http.ResponseWriter, r 
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	}
 	if inputValidationResult.Errors != nil && inputValidationResult.Errors.Count() > 0 {
-		return writeGraphQLError(e.logger, w, inputValidationResult.Errors)
+		return wrapGraphQLErrorAndLog(e.logger, inputValidationResult.Errors)
 	}
 	return nil, http.StatusOK
 }

@@ -6,14 +6,14 @@ import (
 	"testing"
 	"time"
 
-	logrus "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/internal/scheduler"
+	tyklog "github.com/TykTechnologies/tyk/log"
 )
 
 func TestScheduler_Break(t *testing.T) {
-	logger, _ := logrus.NewNullLogger()
+	logger, _ := tyklog.NewNullLogger()
 
 	s := scheduler.NewScheduler(logger)
 
@@ -29,7 +29,7 @@ func TestScheduler_Break(t *testing.T) {
 }
 
 func TestScheduler_Close(t *testing.T) {
-	logger, _ := logrus.NewNullLogger()
+	logger, _ := tyklog.NewNullLogger()
 
 	s := scheduler.NewScheduler(logger)
 	defer s.Close()
@@ -44,7 +44,7 @@ func TestScheduler_Close(t *testing.T) {
 }
 
 func TestScheduler_Job_Errors(t *testing.T) {
-	logger, _ := logrus.NewNullLogger()
+	logger, _ := tyklog.NewNullLogger()
 
 	testcases := []struct {
 		name string

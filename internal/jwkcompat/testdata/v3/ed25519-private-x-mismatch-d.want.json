@@ -1,0 +1,15 @@
+{
+  "keys": [
+    {
+      "kid": "a",
+      "alg": "",
+      "use": "",
+      "type": "ed25519.PrivateKey",
+      "fingerprint": "ed25519-private 2df891a5fcbace769bd67e7f414bad55eeb0f3458ac15b4b7e587f8cc4bbfa9e5fecfc7c0210d7b1c5ea762c5699eb8dc6a0f1bba61950c83d19ec13fec92b20",
+      "certs": 0,
+      "x5u": "",
+      "x5t": "",
+      "x5t#S256": ""
+    }
+  ]
+}

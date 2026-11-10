@@ -33,7 +33,7 @@ func (gw *Gateway) obfuscateKey(keyName string) string {
 
 func (gw *Gateway) getLogEntryForRequest(logger *logrus.Entry, r *http.Request, key string, data map[string]interface{}) *logrus.Entry {
 	if logger == nil {
-		logger = logrus.NewEntry(log)
+		logger = log.NewEntry()
 	}
 
 	// populate http request fields

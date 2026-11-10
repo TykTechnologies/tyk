@@ -228,7 +228,7 @@ func (g *graphqlRequestProcessorV1) ProcessRequest(ctx context.Context, w http.R
 	}
 
 	if normalizationResult.Errors != nil && normalizationResult.Errors.Count() > 0 {
-		return writeGraphQLError(g.logger, w, normalizationResult.Errors)
+		return wrapGraphQLErrorAndLog(g.logger, normalizationResult.Errors)
 	}
 
 	validationResult, err := gqlRequest.ValidateForSchema(g.schema)
@@ -238,7 +238,7 @@ func (g *graphqlRequestProcessorV1) ProcessRequest(ctx context.Context, w http.R
 	}
 
 	if validationResult.Errors != nil && validationResult.Errors.Count() > 0 {
-		return writeGraphQLError(g.logger, w, validationResult.Errors)
+		return wrapGraphQLErrorAndLog(g.logger, validationResult.Errors)
 	}
 
 	inputValidationResult, err := gqlRequest.ValidateInput(g.schema)
@@ -247,7 +247,7 @@ func (g *graphqlRequestProcessorV1) ProcessRequest(ctx context.Context, w http.R
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	}
 	if inputValidationResult.Errors != nil && inputValidationResult.Errors.Count() > 0 {
-		return writeGraphQLError(g.logger, w, inputValidationResult.Errors)
+		return wrapGraphQLErrorAndLog(g.logger, inputValidationResult.Errors)
 	}
 	return nil, http.StatusOK
 }
@@ -274,7 +274,7 @@ func (g *graphqlRequestProcessorWithOTelV1) ProcessRequest(ctx context.Context, 
 		g.logger.Error("error while normalizing GraphqlRequest", abstractlogger.Error(err))
 		var reqErr graphql.RequestErrors
 		if errors.As(err, &reqErr) {
-			return writeGraphQLError(g.logger, w, reqErr)
+			return wrapGraphQLErrorAndLog(g.logger, reqErr)
 		}
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	}
@@ -285,7 +285,7 @@ func (g *graphqlRequestProcessorWithOTelV1) ProcessRequest(ctx context.Context, 
 		g.logger.Error("error while validating GraphQL request", abstractlogger.Error(err))
 		var reqErr graphql.RequestErrors
 		if errors.As(err, &reqErr) {
-			return writeGraphQLError(g.logger, w, reqErr)
+			return wrapGraphQLErrorAndLog(g.logger, reqErr)
 		}
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	}
@@ -296,7 +296,7 @@ func (g *graphqlRequestProcessorWithOTelV1) ProcessRequest(ctx context.Context, 
 		g.logger.Error("error while validating variables for request", abstractlogger.Error(err))
 		var reqErr graphql.RequestErrors
 		if errors.As(err, &reqErr) {
-			return writeGraphQLError(g.logger, w, reqErr)
+			return wrapGraphQLErrorAndLog(g.logger, reqErr)
 		}
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	}
@@ -473,7 +473,7 @@ func (g *granularAccessCheckerV1) validateFieldRestrictions(gqlRequest *graphql.
 	}
 
 	if !result.Valid || (result.Errors != nil && result.Errors.Count() > 0) {
-		return GraphQLGranularAccessResult{FailReason: GranularAccessFailReasonValidationError, ValidationError: result.Errors, writeErrorResponse: g.writeErrorResponse}
+		return GraphQLGranularAccessResult{FailReason: GranularAccessFailReasonValidationError, ValidationError: result.Errors}
 	}
 	return GraphQLGranularAccessResult{FailReason: GranularAccessFailReasonNone}
 }
@@ -487,10 +487,6 @@ func (g *granularAccessCheckerV1) convertGranularAccessTypeToGraphQLType(accessT
 		})
 	}
 	return types
-}
-
-func (g *granularAccessCheckerV1) writeErrorResponse(w io.Writer, providedErr error) (n int, err error) {
-	return graphql.RequestErrorsFromError(providedErr).WriteResponse(w)
 }
 
 type reverseProxyPreHandlerV1 struct {

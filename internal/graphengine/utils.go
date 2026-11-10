@@ -2,7 +2,6 @@ package graphengine
 
 import (
 	"errors"
-	"io"
 	"net"
 	"net/http"
 
@@ -53,15 +52,33 @@ func absLoggerLevel(level logrus.Level) abstractlogger.Level {
 	return abstractlogger.InfoLevel
 }
 
-func writeGraphQLError(logger abstractlogger.Logger, w http.ResponseWriter, errors graphql.Errors) (error, int) {
-	w.Header().Set(header.ContentType, header.ApplicationJSON)
-	w.WriteHeader(http.StatusBadRequest)
-	_, _ = errors.WriteResponse(w)
-	logger.Error("error while validating GraphQL request", abstractlogger.Error(errors))
-	return errCustomBodyResponse, http.StatusBadRequest
+//nolint:staticcheck // ST1008: engine ProcessRequest convention returns (error, int)
+func wrapGraphQLErrorAndLog(logger abstractlogger.Logger, gqlErrors graphql.Errors) (error, int) {
+	logger.Error("error while validating GraphQL request", abstractlogger.Error(gqlErrors))
+	return GraphQlError{err: gqlErrors}, http.StatusBadRequest
 }
 
-func complexityFailReasonAsHttpStatusCode(failReason ComplexityFailReason) (error, int) {
+// baseEngine holds what every engine version shares: the logger, the access checkers
+// and the Engine methods built on them.
+type baseEngine struct {
+	logger                abstractlogger.Logger
+	complexityChecker     ComplexityChecker
+	granularAccessChecker GranularAccessChecker
+}
+
+//nolint:staticcheck // ST1008: Engine interface convention returns (error, int)
+func (e *baseEngine) ProcessGraphQLComplexity(r *http.Request, accessDefinition *ComplexityAccessDefinition) (err error, statusCode int) {
+	return e.complexityFailReasonAsHttpStatusCode(e.complexityChecker.DepthLimitExceeded(r, accessDefinition))
+}
+
+//nolint:staticcheck // ST1008: Engine interface convention returns (error, int)
+func (e *baseEngine) ProcessGraphQLGranularAccess(w http.ResponseWriter, r *http.Request, accessDefinition *GranularAccessDefinition) (err error, statusCode int) {
+	result := e.granularAccessChecker.CheckGraphQLRequestFieldAllowance(w, r, accessDefinition)
+	return e.granularAccessFailReasonAsHttpStatusCode(&result)
+}
+
+//nolint:staticcheck // ST1008: Engine interface convention returns (error, int)
+func (e *baseEngine) complexityFailReasonAsHttpStatusCode(failReason ComplexityFailReason) (err error, statusCode int) {
 	switch failReason {
 	case ComplexityFailReasonInternalError:
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
@@ -72,27 +89,21 @@ func complexityFailReasonAsHttpStatusCode(failReason ComplexityFailReason) (erro
 	return nil, http.StatusOK
 }
 
-func granularAccessFailReasonAsHttpStatusCode(logger abstractlogger.Logger, result *GraphQLGranularAccessResult, w http.ResponseWriter) (error, int) {
+//nolint:staticcheck // ST1008: Engine interface convention returns (error, int)
+func (e *baseEngine) granularAccessFailReasonAsHttpStatusCode(result *GraphQLGranularAccessResult) (err error, statusCode int) {
 	const restrictedFieldValidationFailedLogMsg = "error during GraphQL request restricted fields validation"
 
 	switch result.FailReason {
 	case GranularAccessFailReasonNone:
 		return nil, http.StatusOK
 	case GranularAccessFailReasonInternalError:
-		logger.Error(restrictedFieldValidationFailedLogMsg, abstractlogger.Error(result.InternalErr))
+		e.logger.Error(restrictedFieldValidationFailedLogMsg, abstractlogger.Error(result.InternalErr))
 		return ProxyingRequestFailedErr, http.StatusInternalServerError
 	case GranularAccessFailReasonValidationError:
-		logger.Debug(restrictedFieldValidationFailedLogMsg, abstractlogger.Error(result.ValidationError))
-		write := result.writeErrorResponse
-		if write == nil {
-			write = func(w io.Writer, err error) (int, error) {
-				return graphql.RequestErrorsFromError(err).WriteResponse(w)
-			}
-		}
-		return GraphQlError{err: result.ValidationError, write: write}, http.StatusBadRequest
+		e.logger.Debug(restrictedFieldValidationFailedLogMsg, abstractlogger.Error(result.ValidationError))
+		return GraphQlError{err: result.ValidationError}, http.StatusBadRequest
 	case GranularAccessFailReasonIntrospectionDisabled:
-		w.WriteHeader(http.StatusForbidden)
-		logger.Debug("introspection disabled")
+		e.logger.Debug("introspection disabled")
 		return ErrIntrospectionDisabled, http.StatusForbidden
 	}
 
