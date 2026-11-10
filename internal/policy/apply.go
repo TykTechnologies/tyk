@@ -209,9 +209,11 @@ func (t *Service) Apply(session *user.SessionState) error {
 	}
 
 	// If some APIs had only ACL partitions, inherit rest from session level
+	updatedExistingRights := false
 	for k, v := range rights {
 		if !applyState.didAcl[k] {
 			if existingAR, ok := session.AccessRights[k]; ok {
+				updatedExistingRights = true
 				if applyState.didRateLimit[k] {
 					existingAR.Limit.Rate = v.Limit.Rate
 					existingAR.Limit.Per = v.Limit.Per
@@ -273,7 +275,9 @@ func (t *Service) Apply(session *user.SessionState) error {
 		session.AccessRights = rights
 	}
 
-	if appliedPoliciesCount == 0 && policyIDs != nil {
+	// A key needs either ACL from a policy or limits merged into rights it already
+	// holds; a found policy that grants neither leaves it with no valid policies (TT-12710).
+	if policyIDs != nil && (appliedPoliciesCount == 0 || (len(rights) == 0 && !updatedExistingRights)) {
 		return errors.New("key has no valid policies to be applied")
 	}
 

@@ -1631,3 +1631,24 @@ func TestApply_NoAcl_EndpointsAreRateLimitData(t *testing.T) {
 		assert.Empty(t, ar.Endpoints)
 	})
 }
+
+// TestApply_NoAcl_EmptiedPolicyRevokesAccess covers B2 from the MDCB verification of #8562:
+// a policy whose access rights were emptied must not leave the session with the ACL it
+// granted earlier; the key is rejected as on master (TT-12710).
+func TestApply_NoAcl_EmptiedPolicyRevokesAccess(t *testing.T) {
+	orgID := ""
+	logger, _ := tyklog.NewNullLogger()
+
+	emptied := user.Policy{ID: "pol-emptied", AccessRights: map[string]user.AccessDefinition{}}
+	store := policy.NewStoreMap(map[string]user.Policy{"pol-emptied": emptied})
+	svc := policy.New(&orgID, store, logger)
+
+	sess := &user.SessionState{
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {APIID: "api1", Versions: []string{"Default"}},
+		},
+	}
+	sess.SetPolicies("pol-emptied")
+
+	assert.EqualError(t, svc.Apply(sess), "key has no valid policies to be applied")
+}
