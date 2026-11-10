@@ -1,0 +1,3 @@
+{
+  "error": "go-jose/go-jose: invalid JWK, x5u header is invalid URL: parse \"http://[::1\": missing ']' in host"
+}

@@ -40,7 +40,7 @@ func NewLocalKVRegistry(ctx context.Context, conf *Config) (*registry.Registry, 
 		ctx,
 		nil,
 		registry.WithDefaultStores(local),
-		registry.WithInitLogger(kvLogger{l: log}),
+		registry.WithInitLogger(kvLogger{l: log.AsLogrus()}),
 	)
 }
 
@@ -70,7 +70,7 @@ func LoadAndInitKVRegistry(
 		marshaledBytes,
 		registry.WithDefaultStores(buildKVConfig(conf)),
 		registry.WithFactories(factories),
-		registry.WithInitLogger(kvLogger{l: log}),
+		registry.WithInitLogger(kvLogger{l: log.AsLogrus()}),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("initialize KV registry: %w", err)

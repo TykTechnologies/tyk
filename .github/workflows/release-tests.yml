@@ -18,6 +18,7 @@ jobs:
         uses: arduino/setup-task@e26d8975574116b0097a1161e0fe16ba75d84c1c  # v1
         with:
           version: 3
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - id: ecr-login
         uses: ./.github/actions/ecr-login
@@ -44,6 +45,7 @@ jobs:
         uses: arduino/setup-task@e26d8975574116b0097a1161e0fe16ba75d84c1c  # v1
         with:
           version: 3
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
 
       - id: ecr-login
         uses: ./.github/actions/ecr-login

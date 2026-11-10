@@ -17,15 +17,16 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	"github.com/TykTechnologies/gorpc"
-	"github.com/TykTechnologies/tyk-pump/serializer"
 
+	"github.com/TykTechnologies/tyk-pump/serializer"
 	"github.com/TykTechnologies/tyk/internal/uuid"
+	tyklog "github.com/TykTechnologies/tyk/log"
 )
 
 var (
 	GlobalRPCCallTimeout = 30 * time.Second
 	GlobalRPCPingTimeout = 60 * time.Second
-	Log                  = &logrus.Logger{}
+	Log                  = tyklog.Get()
 	Instrument           *health.Stream
 
 	clientSingleton     *gorpc.Client
@@ -308,7 +309,7 @@ func initializeClient() {
 		clientSingleton = gorpc.NewTCPClient(values.Config().ConnectionString)
 	}
 
-	if Log.Level != logrus.DebugLevel {
+	if Log.GetLevel() != logrus.DebugLevel {
 		clientSingleton.LogError = gorpc.NilErrorLogger
 	}
 

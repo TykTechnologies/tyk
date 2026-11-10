@@ -1,17 +1,26 @@
 package log
 
 import (
-	"os"
+	"encoding/json"
+	"fmt"
+	"reflect"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
 )
 
-var (
-	log          = logrus.New()
-	rawLog       = logrus.New()
-	translations = make(map[string]string)
+const (
+	EnvTykLogformat   = "TYK_LOGFORMAT"
+	EnvTykGwLogformat = "TYK_GW_LOGFORMAT"
+	EnvTykLoglevel    = "TYK_LOGLEVEL"
+	EnvTykGwLoglevel  = "TYK_GW_LOGLEVEL"
+)
+
+const (
+	LegacyTimestampFormat = "Jan 02 15:04:05"
 )
 
 type Format string
@@ -22,73 +31,41 @@ const (
 	FormatLegacy Format = "legacy"
 )
 
-const (
-	LegacyTimestampFormat = "Jan 02 15:04:05"
+func (f *Format) Parse(str string) bool {
+	s := Format(strings.ToLower(str))
+
+	if s.Valid() {
+		*f = s
+		return true
+	}
+
+	return false
+}
+
+func (f *Format) Valid() bool {
+	switch *f {
+	case FormatText, FormatJson, FormatLegacy:
+		return true
+	}
+	return false
+}
+
+var (
+	log               = New()
+	translations      = make(map[string]string)
+	formatterRegistry = map[Format]func() logrus.Formatter{
+		FormatText:   newFormatterText,
+		FormatJson:   newFormatterJson,
+		FormatLegacy: newFormatterLegacy,
+	}
 )
 
-// RawFormatter returns the logrus entry message as bytes.
-type RawFormatter struct{}
-
-// Format returns the entry.Message as a []byte.
-func (f *RawFormatter) Format(entry *logrus.Entry) ([]byte, error) {
-	return []byte(entry.Message), nil
-}
-
-//nolint:gochecknoinits
-func init() {
-	setupGlobals()
-}
-
-func getenv(names ...string) string {
-	for _, name := range names {
-		val := os.Getenv(name)
-		if val == "" {
-			continue
-		}
-		return strings.ToLower(val)
-	}
-	return ""
-}
-
-var logLevels = map[string]logrus.Level{
-	"error": logrus.ErrorLevel,
-	"warn":  logrus.WarnLevel,
-	"debug": logrus.DebugLevel,
-	"info":  logrus.InfoLevel,
-}
-
-func setupGlobals() {
-	format := Format(getenv("TYK_LOGFORMAT", "TYK_GW_LOGFORMAT"))
-	SetupFormatter(format)
-
-	logLevel := getenv("TYK_LOGLEVEL", "TYK_GW_LOGLEVEL")
-
-	if level, ok := logLevels[logLevel]; ok {
-		log.Level = level
-	}
-
-	rawLog.Formatter = new(RawFormatter)
-}
-
-func SetupFormatter(format Format) {
-	log.Formatter = NewFormatter(format)
-
-	// non legacy formatter does not set up global logrus formatter
-	if format != FormatLegacy {
-		logrus.StandardLogger().Formatter = log.Formatter
-	}
-}
-
 // Get returns the default configured logger.
-func Get() *logrus.Logger {
+func Get() *Logger {
 	return log
 }
 
-// GetRaw is used internally. Should likely be removed first, do not rely on it.
-func GetRaw() *logrus.Logger {
-	return rawLog
-}
-
+// NewFormatter builds formatter
 func NewFormatter(format Format) logrus.Formatter {
 	switch format {
 	case FormatLegacy:
@@ -100,6 +77,21 @@ func NewFormatter(format Format) logrus.Formatter {
 	default:
 		return newFormatterText()
 	}
+}
+
+func MakeFormatter(format Format, opts json.RawMessage) (logrus.Formatter, error) {
+	formatterFactory, ok := formatterRegistry[format]
+	if !ok {
+		return nil, fmt.Errorf("unknown formatter %q", format)
+	}
+
+	formatter := formatterFactory()
+
+	if err := applySnakeCaseOptions(opts, formatter); err != nil {
+		return nil, fmt.Errorf("failed to apply options to %s formatter: %w", format, err)
+	}
+
+	return formatter, nil
 }
 
 func newFormatterText() logrus.Formatter {
@@ -134,20 +126,80 @@ func newFormatterLegacy() logrus.Formatter {
 	}
 }
 
-func IsLegacyFormatter(formatter logrus.Formatter) bool {
-	textFormatter, ok := formatter.(*logrus.TextFormatter)
-
-	return ok && textFormatter.TimestampFormat == LegacyTimestampFormat
-}
-
 func defaultFieldMap() logrus.FieldMap {
 	return logrus.FieldMap{
 		logrus.FieldKeyMsg: "message",
 	}
 }
 
-type InjectTestHookOptions struct {
-	Logger *logrus.Logger
+// applySnakeCaseOptions maps snake_case JSON keys onto the target's CamelCase fields.
+// Keys that match no field are reported as given.
+func applySnakeCaseOptions(data json.RawMessage, target any) error {
+	if len(data) == 0 || string(data) == "null" {
+		return nil
+	}
+
+	var rawMap map[string]json.RawMessage
+	if err := json.Unmarshal(data, &rawMap); err != nil {
+		return err
+	}
+
+	known := optionFieldNames(target)
+	normalizedMap := make(map[string]json.RawMessage, len(rawMap))
+	var unknown []string
+
+	for key, val := range rawMap {
+		normalizedKey := normalizeOptionKey(key)
+		if _, ok := known[normalizedKey]; !ok {
+			unknown = append(unknown, strconv.Quote(key))
+			continue
+		}
+		normalizedMap[normalizedKey] = val
+	}
+
+	if len(unknown) > 0 {
+		sort.Strings(unknown)
+		return fmt.Errorf("unknown option(s): %s", strings.Join(unknown, ", "))
+	}
+
+	transformedData, err := json.Marshal(normalizedMap)
+	if err != nil {
+		return err
+	}
+
+	return json.Unmarshal(transformedData, target)
 }
 
-type InjectTestHookOpt func(*InjectTestHookOptions)
+func normalizeOptionKey(key string) string {
+	return strings.ToLower(strings.ReplaceAll(key, "_", ""))
+}
+
+// optionFieldNames lists the target struct's settable fields, normalized like the option keys.
+func optionFieldNames(target any) map[string]struct{} {
+	names := make(map[string]struct{})
+
+	t := reflect.TypeOf(target)
+	for t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	if t.Kind() != reflect.Struct {
+		return names
+	}
+
+	for field := range t.Fields() {
+		if !field.IsExported() {
+			continue
+		}
+
+		name := field.Name
+		if tag, _, _ := strings.Cut(field.Tag.Get("json"), ","); tag == "-" {
+			continue
+		} else if tag != "" {
+			name = tag
+		}
+
+		names[normalizeOptionKey(name)] = struct{}{}
+	}
+
+	return names
+}
