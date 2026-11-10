@@ -398,7 +398,6 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 		if v.UseExtendedPaths {
 			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(v, spec, a.Gw.GetConfig())
 		} else {
-			logger.Warning("Legacy path detected! Upgrade to extended.")
 			pathSpecs, whiteListSpecs = a.getPathSpecs(v, a.Gw.GetConfig())
 		}
 		spec.RxPaths[v.Name] = pathSpecs

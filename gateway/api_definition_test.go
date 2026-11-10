@@ -22,6 +22,8 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	vaultapi "github.com/hashicorp/vault/api"
+	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -3377,5 +3379,61 @@ func TestAPIDefinitionLoader_resolveTemplatePath(t *testing.T) {
 		tmpl, err := allowed.loadFileTemplate(filepath.Join(outside, "secret.tmpl"))
 		assert.NoError(t, err)
 		assert.NotNil(t, tmpl)
+	})
+}
+
+// TestMakeSpec_NoLegacyPathWarning covers TT-14976: loading an API must not log the
+// obsolete legacy path warning, while legacy path lists keep working.
+func TestMakeSpec_NoLegacyPathWarning(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const legacyWarning = "Legacy path detected"
+
+	makeSpec := func(t *testing.T, verGen func(v *apidef.VersionInfo)) (*APISpec, *logrustest.Hook) {
+		t.Helper()
+
+		spec := BuildAPI(func(spec *APISpec) {
+			UpdateAPIVersion(spec, "v1", verGen)
+		})[0]
+
+		logger, hook := logrustest.NewNullLogger()
+		loader := APIDefinitionLoader{Gw: ts.Gw}
+		loaded, err := loader.MakeSpec(&model.MergedAPI{APIDefinition: spec.APIDefinition}, logrus.NewEntry(logger))
+		require.NoError(t, err)
+
+		return loaded, hook
+	}
+
+	assertNoLegacyWarning := func(t *testing.T, hook *logrustest.Hook) {
+		t.Helper()
+		for _, entry := range hook.AllEntries() {
+			assert.NotContains(t, entry.Message, legacyWarning)
+		}
+	}
+
+	t.Run("legacy paths without extended_paths", func(t *testing.T) {
+		_, hook := makeSpec(t, func(v *apidef.VersionInfo) {
+			v.UseExtendedPaths = false
+		})
+		assertNoLegacyWarning(t, hook)
+	})
+
+	t.Run("empty extended_paths", func(t *testing.T) {
+		_, hook := makeSpec(t, func(v *apidef.VersionInfo) {
+			v.UseExtendedPaths = true
+			v.ExtendedPaths = apidef.ExtendedPathsSet{}
+		})
+		assertNoLegacyWarning(t, hook)
+	})
+
+	t.Run("legacy white_list is still enforced", func(t *testing.T) {
+		spec, hook := makeSpec(t, func(v *apidef.VersionInfo) {
+			v.UseExtendedPaths = false
+			v.Paths.WhiteList = []string{"/allowed"}
+		})
+		assertNoLegacyWarning(t, hook)
+		assert.True(t, spec.WhiteListEnabled["v1"])
+		assert.NotEmpty(t, spec.RxPaths["v1"])
 	})
 }
