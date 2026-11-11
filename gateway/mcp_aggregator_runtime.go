@@ -137,7 +137,12 @@ func (d mcpAggregatorDispatcher) toolsCatalogue(parent *http.Request) mcpAggrega
 		go func(i int) {
 			defer wg.Done()
 			tools, err := d.listUpstreamTools(parent, upstream)
-			if err != nil {
+			var mismatch *mcpAggregatorVersionMismatchError
+			switch {
+			case errors.As(err, &mismatch):
+				logMCPAggregatorVersionMismatch(d.aggregator.APIID, upstream.APIID, upstream.Alias, mismatch)
+				return
+			case err != nil:
 				logMCPAggregatorUpstreamOmitted(d.aggregator.APIID, upstream.APIID, upstream.Alias, mcpAggregatorFailureReason(err))
 				return
 			}
@@ -151,6 +156,18 @@ func (d mcpAggregatorDispatcher) toolsCatalogue(parent *http.Request) mcpAggrega
 		catalogue.Tools = append(catalogue.Tools, tools...)
 	}
 	return catalogue
+}
+
+// logMCPAggregatorVersionMismatch warns that an aggregated MCP proxy is left
+// out because it no longer serves 2026-07-28.
+func logMCPAggregatorVersionMismatch(aggregatorAPIID, upstreamAPIID, alias string, mismatch *mcpAggregatorVersionMismatchError) {
+	log.WithFields(logrus.Fields{
+		"aggregator_api_id":    aggregatorAPIID,
+		"upstream_api_id":      upstreamAPIID,
+		"alias":                alias,
+		"mcp_protocol_version": mcp.ModernProtocolVersion,
+		"reason":               fmt.Sprintf("version mismatch: does not support MCP version %s: %s", mcp.ModernProtocolVersion, mismatch.Detail),
+	}).Warn(mcpAggregatorUpstreamOmittedMsg)
 }
 
 func mcpAggregatorFailureReason(err error) string {
