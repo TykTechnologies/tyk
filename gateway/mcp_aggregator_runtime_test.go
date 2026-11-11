@@ -34,6 +34,7 @@ const mcpAggregatorRuntimeOrg = "acme"
 // records the protocol headers of the last request it served.
 type mockRemoteMCPServer struct {
 	*httptest.Server
+	t            *testing.T
 	mu           sync.Mutex
 	tools        []string
 	sse          bool
@@ -49,7 +50,7 @@ type mockRemoteMCPServer struct {
 
 func newMockRemoteMCPServer(t *testing.T, tools ...string) *mockRemoteMCPServer {
 	t.Helper()
-	m := &mockRemoteMCPServer{tools: tools}
+	m := &mockRemoteMCPServer{t: t, tools: tools}
 	m.Server = httptest.NewServer(http.HandlerFunc(m.serve))
 	t.Cleanup(m.Close)
 	return m
@@ -63,7 +64,10 @@ func (m *mockRemoteMCPServer) serve(w http.ResponseWriter, r *http.Request) {
 			Cursor string `json:"cursor"`
 		} `json:"params"`
 	}
-	_ = json.NewDecoder(r.Body).Decode(&req)
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid JSON-RPC request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	m.mu.Lock()
 	m.lastProtocol = r.Header.Get(mcp.HeaderProtocolVersion)
@@ -85,7 +89,9 @@ func (m *mockRemoteMCPServer) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.Method != mcp.MethodToolsList {
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": req.ID, "error": map[string]any{"code": mcp.JSONRPCMethodNotFound, "message": "not found"}})
+		if err := json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": req.ID, "error": map[string]any{"code": mcp.JSONRPCMethodNotFound, "message": "not found"}}); err != nil {
+			m.t.Errorf("encode error response: %v", err)
+		}
 		return
 	}
 
@@ -97,14 +103,21 @@ func (m *mockRemoteMCPServer) serve(w http.ResponseWriter, r *http.Request) {
 	if next != "" {
 		result["nextCursor"] = next
 	}
-	body, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": result})
+	body, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": result})
+	if err != nil {
+		m.t.Errorf("marshal tools/list result: %v", err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	if sse {
 		w.Header().Set("Content-Type", "text/event-stream")
 		_, _ = fmt.Fprintf(w, "event: message\ndata: %s\n\n", body)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write(body)
+	if _, err := w.Write(body); err != nil {
+		m.t.Errorf("write tools/list result: %v", err)
+	}
 }
 
 func (m *mockRemoteMCPServer) observed() (protocol, method, auth string) {
@@ -260,7 +273,9 @@ func startMCPAggregatorRuntimeTest(t *testing.T) (*Test, *mockRemoteMCPServer, *
 	github := newMockRemoteMCPServer(t, "search_repos", "create_issue")
 	ordersBackend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`[]`))
+		if _, err := w.Write([]byte(`[]`)); err != nil {
+			t.Errorf("w.Write: %v", err)
+		}
 	}))
 	t.Cleanup(ordersBackend.Close)
 	return ts, github, ordersBackend
@@ -439,7 +454,8 @@ func TestMCPAggregatorRejectsUnsupportedMethods(t *testing.T) {
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()
-	raw, _ := io.ReadAll(resp.Body)
+	raw, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
 
 	assert.Equal(t, http.StatusNotFound, resp.StatusCode, string(raw))
 	assert.Contains(t, string(raw), `"code":-32601`)
@@ -460,7 +476,8 @@ func TestMCPAggregatorLoopTrustRejectsUpstreamNotAdmitted(t *testing.T) {
 		mw := &MCPAggregatorLoopAuthBypassMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: gw}}
 		req := httptest.NewRequest(http.MethodPost, "/", nil)
 		ctxSetMCPAggregatorLoopTrust(req, trust)
-		_, code := mw.ProcessRequest(httptest.NewRecorder(), req, nil)
+		err, code := mw.ProcessRequest(httptest.NewRecorder(), req, nil)
+		assert.Equal(t, code == http.StatusOK, err == nil, "an error is returned exactly when the request is rejected")
 		return code, req
 	}
 
@@ -518,8 +535,9 @@ func TestMCPAggregatorLoopSessionIsScopedToTheAdmittedProxy(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/", nil)
 	ctxSetMCPAggregatorLoopTrust(req, &mcpAggregatorLoopTrust{OrgID: mcpAggregatorRuntimeOrg, AggregatorAPIID: "company-tools", UpstreamAPIID: "github-mcp"})
 
-	_, code := mw.ProcessRequest(httptest.NewRecorder(), req, nil)
+	err, code := mw.ProcessRequest(httptest.NewRecorder(), req, nil)
 
+	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, code)
 	session := ctxGetSession(req)
 	require.NotNil(t, session)

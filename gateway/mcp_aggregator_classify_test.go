@@ -28,7 +28,9 @@ func TestClassicAPILoopingToAPINamedMCPAggregatorStillProxies(t *testing.T) {
 	t.Cleanup(ts.Close)
 
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = w.Write([]byte("reached-target"))
+		if _, err := w.Write([]byte("reached-target")); err != nil {
+			t.Errorf("w.Write: %v", err)
+		}
 	}))
 	t.Cleanup(upstream.Close)
 
