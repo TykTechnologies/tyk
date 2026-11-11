@@ -422,3 +422,14 @@ func TestModernPingIsKeptOnlyWhereTheEndpointServesIt(t *testing.T) {
 	_, err = ValidateProtocolDeclarations(modernIngressContext(t, MethodInitialize, `{"protocolVersion":"2026-07-28"}`), modernPingEndpoint{})
 	require.NotNil(t, err, "the ping opt-in does not keep initialize")
 }
+
+func TestEncodeMirroredHeaderRoundTrips(t *testing.T) {
+	t.Parallel()
+
+	for _, name := range []string{"list_issues", "get__order", "naïve tool", "line\nbreak", ""} {
+		decoded, ok := DecodeMirroredHeader(EncodeMirroredHeader(name))
+		assert.True(t, ok, name)
+		assert.Equal(t, name, decoded)
+	}
+	assert.Equal(t, "list_issues", EncodeMirroredHeader("list_issues"), "plain ASCII stays readable")
+}

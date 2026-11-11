@@ -223,6 +223,24 @@ func ValidateModernMirroredHeaders(header http.Header, envelope *RequestEnvelope
 	return nil
 }
 
+// EncodeMirroredHeader encodes a value for a mirrored MCP header: printable
+// ASCII is sent as is, anything else in the SEP-2243 Base64 wrapper.
+func EncodeMirroredHeader(value string) string {
+	const prefix = "=?base64?"
+	const suffix = "?="
+	plain := !strings.HasPrefix(value, prefix) && !strings.HasSuffix(value, suffix)
+	for _, char := range value {
+		if char < 0x20 || char > 0x7e {
+			plain = false
+			break
+		}
+	}
+	if plain {
+		return value
+	}
+	return prefix + base64.StdEncoding.EncodeToString([]byte(value)) + suffix
+}
+
 // DecodeMirroredHeader decodes the SEP-2243 Base64 wrapper. Partial wrappers
 // and invalid payloads are rejected rather than compared as literal text.
 func DecodeMirroredHeader(value string) (string, bool) {

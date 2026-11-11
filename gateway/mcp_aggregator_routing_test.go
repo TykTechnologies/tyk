@@ -15,6 +15,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
@@ -104,6 +105,11 @@ func (u *mcpRoutingUpstream) serve(w http.ResponseWriter, r *http.Request) {
 	case mcp.MethodServerDiscover:
 		result = `{"supportedVersions":["2026-07-28"],"capabilities":{"tools":{}}}`
 	case mcp.MethodToolsCall:
+		if !mcpRoutingUpstreamHasTool(descriptors, req.Params["name"]) {
+			// The go-sdk's answer to a tool it does not have.
+			writeMCPTestJSONRPCError(w, req.ID, mcp.JSONRPCInvalidParams, "unknown tool "+string(req.Params["name"]))
+			return
+		}
 		if call == nil {
 			writeMCPTestJSONRPCError(w, req.ID, mcp.JSONRPCMethodNotFound, "Method not found")
 			return
@@ -123,6 +129,18 @@ func (u *mcpRoutingUpstream) serve(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/json")
 	_, _ = io.WriteString(w, `{"jsonrpc":"2.0","id":`+string(req.ID)+`,"result":`+result+`}`)
+}
+
+func mcpRoutingUpstreamHasTool(descriptors []string, name json.RawMessage) bool {
+	for _, descriptor := range descriptors {
+		var tool struct {
+			Name string `json:"name"`
+		}
+		if json.Unmarshal([]byte(descriptor), &tool) == nil && `"`+tool.Name+`"` == string(name) {
+			return true
+		}
+	}
+	return false
 }
 
 func (u *mcpRoutingUpstream) observed(method string) []mcpRoutingRequest {
@@ -425,4 +443,389 @@ func TestMCPAggregatorSkipsTheResponseCacheLookup(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, code)
 	assert.Nil(t, ctxGetCacheOptions(req), "no cache key is armed for an aggregator response")
+}
+
+// postMCPToolsCall sends a 2026-07-28 tools/call with raw params, mirroring the
+// tool name in Mcp-Name, and any extra headers.
+func postMCPToolsCall(t *testing.T, ts *Test, key, params string, extra ...string) mcpTestResponse {
+	t.Helper()
+	return postMCPToolsCallTo(t, ts, "/company-tools/", key, params, extra...)
+}
+
+func postMCPToolsCallTo(t *testing.T, ts *Test, listenPath, key, params string, extra ...string) mcpTestResponse {
+	t.Helper()
+	var decoded struct {
+		Name string `json:"name"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(params), &decoded))
+	body := `{"jsonrpc":"2.0","id":"call-1","method":"tools/call","params":` + params + `}`
+	req, err := http.NewRequest(http.MethodPost, ts.URL+listenPath, strings.NewReader(body))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	req.Header.Set(mcp.HeaderProtocolVersion, mcp.ModernProtocolVersion)
+	req.Header.Set(mcp.HeaderMethod, mcp.MethodToolsCall)
+	req.Header.Set(mcp.HeaderName, decoded.Name)
+	req.Header.Set("Authorization", key)
+	for i := 0; i+1 < len(extra); i += 2 {
+		req.Header.Set(extra[i], extra[i+1])
+	}
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	raw, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	out := mcpTestResponse{status: resp.StatusCode, body: string(raw), header: resp.Header}
+	_ = json.Unmarshal(raw, &out.rpc)
+	return out
+}
+
+// toolCallParams builds tools/call params whose arguments and extra _meta
+// entries are kept byte for byte.
+func toolCallParams(name, arguments, extraMeta string) string {
+	meta := `"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}`
+	if extraMeta != "" {
+		meta += "," + extraMeta
+	}
+	params := `{"name":"` + name + `"`
+	if arguments != "" {
+		params += `,"arguments":` + arguments
+	}
+	return params + `,"_meta":{` + meta + `}}`
+}
+
+func answering(result string) func(*http.Request, map[string]json.RawMessage) (string, int, string) {
+	return func(*http.Request, map[string]json.RawMessage) (string, int, string) { return result, 0, "" }
+}
+
+func TestMCPAggregatorRoutesToolCallToTheOwningProxy(t *testing.T) {
+	orders := newMCPRoutingUpstream(t, namedTools("list_orders", "create_order")...)
+	github := newMCPRoutingUpstream(t, namedTools("list_orders")...)
+	orders.call = answering(`{"content":[{"type":"text","text":"2 open orders"}]}`)
+	ts, key := startMCPAggregatorRoutingTest(t, orders, github)
+
+	res := postMCPToolsCall(t, ts, key, toolCallParams("orders__list_orders", `{"status": "open"}`, ""))
+
+	require.Equal(t, http.StatusOK, res.status, res.body)
+	assert.JSONEq(t, `{"jsonrpc":"2.0","id":"call-1","result":{"content":[{"type":"text","text":"2 open orders"}]}}`, res.body)
+	calls := orders.observed(mcp.MethodToolsCall)
+	require.Len(t, calls, 1)
+	assert.JSONEq(t, `"list_orders"`, string(calls[0].Params["name"]))
+	assert.Equal(t, "list_orders", calls[0].HeaderName, "Mcp-Name mirrors the forwarded name")
+	assert.Equal(t, mcp.MethodToolsCall, calls[0].Header.Get(mcp.HeaderMethod))
+	assert.Equal(t, `{"status": "open"}`, string(calls[0].Params["arguments"]))
+	assert.Empty(t, github.observed(mcp.MethodToolsCall), "only the owning proxy is called")
+}
+
+func TestMCPAggregatorSplitsTheAliasAtTheFirstSeparator(t *testing.T) {
+	orders := newMCPRoutingUpstream(t, namedTools("get__order", "get")...)
+	orders.call = answering(`{"content":[{"type":"text","text":"order o-1"}]}`)
+	ts, key := startMCPAggregatorRoutingTest(t, orders, newMCPRoutingUpstream(t, namedTools("list_issues")...))
+
+	res := postMCPToolsCall(t, ts, key, toolCallParams("orders__get__order", `{"id":"o-1"}`, ""))
+
+	require.Equal(t, http.StatusOK, res.status, res.body)
+	calls := orders.observed(mcp.MethodToolsCall)
+	require.Len(t, calls, 1)
+	assert.JSONEq(t, `"get__order"`, string(calls[0].Params["name"]))
+	assert.Equal(t, "get__order", calls[0].HeaderName)
+}
+
+func TestMCPAggregatorRejectsUnknownTools(t *testing.T) {
+	orders := newMCPRoutingUpstream(t, namedTools("list_orders")...)
+	orders.call = answering(`{"content":[]}`)
+	ts, key := startMCPAggregatorRoutingTest(t, orders, newMCPRoutingUpstream(t, namedTools("list_issues")...))
+
+	for _, name := range []string{"billing__list_invoices", "orders__cancel_order", "list_orders", "__list_orders", "orders__", "orders_list_orders", "ORDERS__list_orders"} {
+		t.Run(name, func(t *testing.T) {
+			res := postMCPToolsCall(t, ts, key, toolCallParams(name, `{}`, ""))
+
+			assert.Equal(t, http.StatusBadRequest, res.status, res.body)
+			require.NotNil(t, res.rpc.Error, res.body)
+			assert.Equal(t, mcp.JSONRPCInvalidParams, res.rpc.Error.Code)
+			assert.Equal(t, `unknown tool "`+name+`"`, res.rpc.Error.Message)
+			assert.Contains(t, res.body, `"id":"call-1"`)
+		})
+	}
+	calls := orders.observed(mcp.MethodToolsCall)
+	require.Len(t, calls, 1, "only a configured alias is forwarded; the proxy rejects a tool it does not have")
+	assert.JSONEq(t, `"cancel_order"`, string(calls[0].Params["name"]))
+	assert.Empty(t, orders.observed(mcp.MethodToolsList), "names are resolved without listing the proxy")
+}
+
+func TestMCPAggregatorReportsUnknownToolsOfAnAPIToMCPProxy(t *testing.T) {
+	ts, key := startMCPAggregatorProtocolTest(t, newDualMCPUpstream(t, "list_issues"))
+
+	res := postMCPToolsCall(t, ts, key, toolCallParams("orders__cancel_order", `{}`, ""))
+
+	assert.Equal(t, http.StatusBadRequest, res.status, res.body)
+	require.NotNil(t, res.rpc.Error, res.body)
+	assert.Equal(t, mcp.JSONRPCInvalidParams, res.rpc.Error.Code)
+	assert.Equal(t, `unknown tool "orders__cancel_order"`, res.rpc.Error.Message, "the adapter's own unknown-tool error names the aggregated tool")
+}
+
+func TestMCPAggregatorSendsEachToolCallToTheProxyExactlyOnce(t *testing.T) {
+	orders := newMCPRoutingUpstream(t, namedTools("list_orders")...)
+	orders.call = answering(`{"content":[]}`)
+	ts, key := startMCPAggregatorRoutingTest(t, orders, newMCPRoutingUpstream(t, namedTools("list_issues")...))
+
+	const calls = 5
+	for i := 0; i < calls; i++ {
+		res := postMCPToolsCall(t, ts, key, toolCallParams("orders__list_orders", `{}`, ""))
+		require.Equal(t, http.StatusOK, res.status, res.body)
+	}
+
+	assert.Len(t, orders.observed(mcp.MethodToolsCall), calls)
+	assert.Empty(t, orders.observed(mcp.MethodToolsList))
+}
+
+// TestMCPAggregatorToolCallsCountOnceAgainstTheProxysRateLimit checks that
+// an aggregated call spends the proxy's API-level rate limit exactly as a
+// direct call to the proxy does: the aggregator adds no request of its own.
+// Both are refused at the same call. That call is not the 11th of a 10 per
+// minute limit, because the proxy's JSON-RPC routing checks the API-level
+// limit again on each VEM hop of a tools/call (listen path, tools/call VEM,
+// tool VEM), on direct calls as well.
+func TestMCPAggregatorToolCallsCountOnceAgainstTheProxysRateLimit(t *testing.T) {
+	orders := newMCPRoutingUpstream(t, namedTools("list_orders")...)
+	orders.call = answering(`{"content":[]}`)
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+	limited := func(apiID string) *APISpec {
+		spec := remoteMCPProxyRuntimeSpec(apiID, orders.URL)
+		spec.GlobalRateLimit = apidef.GlobalRateLimit{Rate: 10, Per: 60}
+		return spec
+	}
+	ts.Gw.LoadAPI(
+		limited("orders-mcp"),
+		limited("orders-direct"),
+		remoteMCPProxyRuntimeSpec("github-mcp", newMCPRoutingUpstream(t, namedTools("list_issues")...).URL),
+		companyToolsRuntimeSpec(aggregated("orders-mcp", "orders"), aggregated("github-mcp", "github")),
+	)
+	key := companyToolsKey(t, ts)
+	_, directKey := ts.CreateSession(func(s *user.SessionState) {
+		s.OrgID = mcpAggregatorRuntimeOrg
+		s.AccessRights = map[string]user.AccessDefinition{"orders-direct": {APIID: "orders-direct", APIName: "orders-direct"}}
+	})
+
+	firstRefused := func(call func() mcpTestResponse) (int, mcpTestResponse) {
+		for i := 1; i <= 11; i++ {
+			if res := call(); res.rpc.Error != nil {
+				return i, res
+			}
+		}
+		return 0, mcpTestResponse{}
+	}
+	direct, _ := firstRefused(func() mcpTestResponse {
+		return postMCPToolsCallTo(t, ts, "/orders-direct/", directKey, toolCallParams("list_orders", `{}`, ""))
+	})
+	viaAggregator, refused := firstRefused(func() mcpTestResponse {
+		return postMCPToolsCall(t, ts, key, toolCallParams("orders__list_orders", `{}`, ""))
+	})
+
+	require.NotZero(t, direct, "the direct calls were never rate-limited")
+	assert.Equal(t, direct, viaAggregator, "the aggregator adds no request against the proxy's limit")
+	require.NotNil(t, refused.rpc.Error)
+	assert.Equal(t, jsonrpcerrors.CodeModernRateLimitExceeded, refused.rpc.Error.Code, "the orders chain refuses the call")
+	assert.Equal(t, http.StatusOK, refused.status, "the proxy's 429 stays on the aggregator's hop")
+	assert.Empty(t, orders.observed(mcp.MethodToolsList), "no tools/list is spent on resolving the calls")
+}
+
+func TestMCPAggregatorAnswersProxyJSONRPCErrorsWithHTTP200(t *testing.T) {
+	for _, status := range []int{http.StatusUnauthorized, http.StatusForbidden, http.StatusTooManyRequests, http.StatusBadRequest} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			proxyError := `{"code":-33001,"message":"<b>authentication required</b>","data":{"http_code":401}}`
+			orders := newMCPRoutingUpstream(t, namedTools("create_order")...)
+			orders.call = func(*http.Request, map[string]json.RawMessage) (string, int, string) {
+				return "", status, `{"jsonrpc":"2.0","id":1,"error":` + proxyError + `}`
+			}
+			ts, key := startMCPAggregatorRoutingTest(t, orders, newMCPRoutingUpstream(t, namedTools("list_issues")...))
+
+			res := postMCPToolsCall(t, ts, key, toolCallParams("orders__create_order", `{}`, ""))
+
+			assert.Equal(t, http.StatusOK, res.status, res.body)
+			assert.Empty(t, res.header.Get("WWW-Authenticate"))
+			assert.Equal(t, `{"jsonrpc":"2.0","id":"call-1","error":`+proxyError+"}\n", res.body, "the error is kept byte for byte")
+		})
+	}
+}
+
+func TestMCPAggregatorRejectsAmbiguousToolNames(t *testing.T) {
+	orders := newMCPRoutingUpstream(t, namedTools("list_orders", "delete_all")...)
+	orders.call = answering(`{"content":[]}`)
+	ts, key := startMCPAggregatorRoutingTest(t, orders, newMCPRoutingUpstream(t, namedTools("list_issues")...))
+	meta := `"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}`
+
+	for name, params := range map[string]string{
+		"duplicate name":     `{"name":"orders__delete_all","name":"orders__list_orders","arguments":{},` + meta + `}`,
+		"case variant":       `{"name":"orders__list_orders","NAME":"delete_all","arguments":{},` + meta + `}`,
+		"mixed-case variant": `{"Name":"delete_all","name":"orders__list_orders","arguments":{},` + meta + `}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			res := postMCPToolsCall(t, ts, key, params)
+
+			assert.Equal(t, http.StatusBadRequest, res.status, res.body)
+			require.NotNil(t, res.rpc.Error, res.body)
+			assert.Equal(t, mcp.JSONRPCParseError, res.rpc.Error.Code, "ingress refuses it before the aggregator")
+		})
+	}
+	assert.Empty(t, orders.observed(mcp.MethodToolsCall), "an ambiguous name is never forwarded")
+
+	nested := postMCPToolsCall(t, ts, key, `{"name":"orders__list_orders","arguments":{"name":"orders__delete_all"},`+meta+`}`)
+	require.Equal(t, http.StatusOK, nested.status, nested.body)
+	calls := orders.observed(mcp.MethodToolsCall)
+	require.Len(t, calls, 1)
+	assert.JSONEq(t, `"list_orders"`, string(calls[0].Params["name"]))
+	assert.JSONEq(t, `{"name":"orders__delete_all"}`, string(calls[0].Params["arguments"]), "only the top-level name is replaced")
+}
+
+func TestReplaceJSONObjectFieldFailsClosed(t *testing.T) {
+	out, err := replaceJSONObjectField(json.RawMessage(`{ "a" : 1, "name" :  "x__y" ,"b":{"name":"z"}}`), "name", []byte(`"y"`))
+	require.NoError(t, err)
+	assert.Equal(t, `{ "a" : 1, "name" :  "y" ,"b":{"name":"z"}}`, string(out))
+
+	for _, object := range []string{
+		`{"name":"a","name":"b"}`,
+		`{"name":"a","NAME":"b"}`,
+		`{"Name":"a"}`,
+		`{"arguments":{}}`,
+		`["name"]`,
+		`{"name":`,
+	} {
+		_, err := replaceJSONObjectField(json.RawMessage(object), "name", []byte(`"y"`))
+		assert.Error(t, err, object)
+	}
+}
+
+func TestMCPAggregatorPassesToolResultsThroughUnchanged(t *testing.T) {
+	for name, result := range map[string]string{
+		"tool error":         `{"content":[{"type":"text","text":"customer_id is required"}],"isError":true}`,
+		"structured content": `{"content":[{"type":"text","text":"{\"orders\": []}"}],"structuredContent":{"orders":[]},"_meta":{"com.acme/page":1},"x-extension":{"kept":true}}`,
+		"html-like text":     `{"content":[{"type":"text","text":"<b>a & b</b>"}]}`,
+	} {
+		t.Run(name, func(t *testing.T) {
+			orders := newMCPRoutingUpstream(t, namedTools("create_order", "list_orders")...)
+			orders.call = answering(result)
+			ts, key := startMCPAggregatorRoutingTest(t, orders, newMCPRoutingUpstream(t, namedTools("list_issues")...))
+
+			res := postMCPToolsCall(t, ts, key, toolCallParams("orders__create_order", `{}`, ""))
+
+			require.Equal(t, http.StatusOK, res.status, res.body)
+			assert.Equal(t, result, string(res.rpc.Result), "the result is returned byte for byte")
+		})
+	}
+}
+
+func TestMCPAggregatorPassesArgumentsAndMetadataThroughExactly(t *testing.T) {
+	orders := newMCPRoutingUpstream(t, namedTools("create_order")...)
+	orders.call = answering(`{"content":[]}`)
+	ts, key := startMCPAggregatorRoutingTest(t, orders, newMCPRoutingUpstream(t, namedTools("list_issues")...))
+	arguments := `{"customer_id": "c-123", "items": [{"sku": "A1", "qty": 2}], "note": "<rush> & gift", "ratio": 1.50}`
+	extraMeta := `"io.modelcontextprotocol/clientInfo":{"name":"acme-agent","version":"1.2.0"},"com.acme/trace-id":"t-789"`
+	params := toolCallParams("orders__create_order", arguments, extraMeta)
+	params = strings.Replace(params, `{"name"`, `{"com.acme/unknown":{"a":[1, 2]},"name"`, 1)
+
+	res := postMCPToolsCall(t, ts, key, params, "Mcp-Param-Region", "eu-west")
+
+	require.Equal(t, http.StatusOK, res.status, res.body)
+	calls := orders.observed(mcp.MethodToolsCall)
+	require.Len(t, calls, 1)
+	assert.Equal(t, arguments, string(calls[0].Params["arguments"]), "arguments arrive byte for byte")
+	var clientParams map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal([]byte(params), &clientParams))
+	assert.Equal(t, string(clientParams["_meta"]), string(calls[0].Params["_meta"]), "_meta arrives byte for byte")
+	assert.Equal(t, `{"a":[1, 2]}`, string(calls[0].Params["com.acme/unknown"]), "unknown params are kept")
+	assert.Equal(t, strings.Replace(params, `"orders__create_order"`, `"create_order"`, 1), extractParams(t, calls[0].Body), "only the name changes")
+	assert.Equal(t, "eu-west", calls[0].Header.Get("Mcp-Param-Region"), "custom Mcp-Param headers are forwarded")
+}
+
+func extractParams(t *testing.T, body string) string {
+	t.Helper()
+	var envelope struct {
+		Params json.RawMessage `json:"params"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(body), &envelope))
+	return string(envelope.Params)
+}
+
+func TestMCPAggregatorPassesToolCallErrorsOfTheProxyThrough(t *testing.T) {
+	orders := newMCPRoutingUpstream(t, namedTools("create_order")...)
+	orders.call = func(*http.Request, map[string]json.RawMessage) (string, int, string) {
+		return "", http.StatusOK, `{"jsonrpc":"2.0","id":1,"error":{"code":-32602,"message":"invalid arguments","data":{"field":"customer_id"}}}`
+	}
+	ts, key := startMCPAggregatorRoutingTest(t, orders, newMCPRoutingUpstream(t, namedTools("list_issues")...))
+
+	res := postMCPToolsCall(t, ts, key, toolCallParams("orders__create_order", `{}`, ""))
+
+	assert.Equal(t, http.StatusOK, res.status, res.body)
+	assert.JSONEq(t, `{"jsonrpc":"2.0","id":"call-1","error":{"code":-32602,"message":"invalid arguments","data":{"field":"customer_id"}}}`, res.body)
+}
+
+func TestMCPAggregatorReportsAnUnavailableProxyOnlyForItsOwnTools(t *testing.T) {
+	orders := newMCPRoutingUpstream(t, namedTools("list_orders")...)
+	orders.call = answering(`{"content":[{"type":"text","text":"0 orders"}]}`)
+	github := newMCPRoutingUpstream(t, namedTools("list_issues")...)
+	ts, key := startMCPAggregatorRoutingTest(t, orders, github)
+	github.Close()
+	hook := log.GetTestHook(t)
+
+	res := postMCPToolsCall(t, ts, key, toolCallParams("github__list_issues", `{}`, ""))
+
+	assert.Equal(t, http.StatusServiceUnavailable, res.status, res.body)
+	require.NotNil(t, res.rpc.Error, res.body)
+	assert.Equal(t, mcpAggregatorUpstreamErrorCode, res.rpc.Error.Code)
+	assert.Equal(t, `upstream unavailable: aggregated MCP proxy "github"`, res.rpc.Error.Message)
+	assert.Contains(t, res.body, `"id":"call-1"`)
+	var warned bool
+	for _, entry := range hook.AllEntries() {
+		if entry.Message == mcpAggregatorToolCallFailedMsg && entry.Data["alias"] == "github" {
+			warned = true
+			assert.Equal(t, "github-mcp", entry.Data["upstream_api_id"])
+			assert.Equal(t, "github__list_issues", entry.Data["tool"])
+		}
+	}
+	assert.True(t, warned, "the failure is logged naming github")
+
+	ok := postMCPToolsCall(t, ts, key, toolCallParams("orders__list_orders", `{}`, ""))
+	require.Equal(t, http.StatusOK, ok.status, ok.body)
+	assert.JSONEq(t, `{"content":[{"type":"text","text":"0 orders"}]}`, string(ok.rpc.Result))
+}
+
+func TestMCPAggregatorReportsAnUnloadedProxyAsUnavailable(t *testing.T) {
+	orders := newMCPRoutingUpstream(t, namedTools("list_orders")...)
+	ts, key := startMCPAggregatorRoutingTest(t, orders, newMCPRoutingUpstream(t, namedTools("list_issues")...))
+	ts.Gw.LoadAPI(
+		remoteMCPProxyRuntimeSpec("orders-mcp", orders.URL),
+		companyToolsRuntimeSpec(aggregated("orders-mcp", "orders"), aggregated("github-mcp", "github")),
+	)
+
+	res := postMCPToolsCall(t, ts, key, toolCallParams("github__list_issues", `{}`, ""))
+
+	assert.Equal(t, http.StatusServiceUnavailable, res.status, res.body)
+	require.NotNil(t, res.rpc.Error, res.body)
+	assert.Equal(t, `upstream unavailable: aggregated MCP proxy "github"`, res.rpc.Error.Message)
+}
+
+func TestMCPAggregatorToolCallsAreBlockedByTheConsumersToolRules(t *testing.T) {
+	github := newMCPRoutingUpstream(t, namedTools("list_issues", "create_issue")...)
+	github.call = answering(`{"content":[]}`)
+	ts, _ := startMCPAggregatorRoutingTest(t, newMCPRoutingUpstream(t, namedTools("list_orders")...), github)
+	key := companyToolsKeyWithTools(t, ts, user.AccessControlRules{Blocked: []string{"github__create_issue"}})
+
+	blocked := postMCPToolsCall(t, ts, key, toolCallParams("github__create_issue", `{}`, ""))
+	allowed := postMCPToolsCall(t, ts, key, toolCallParams("github__list_issues", `{}`, ""))
+
+	assert.Equal(t, http.StatusForbidden, blocked.status, blocked.body)
+	assert.Equal(t, http.StatusOK, allowed.status, allowed.body)
+	require.Len(t, github.observed(mcp.MethodToolsCall), 1, "the blocked call never reaches the proxy")
+}
+
+func TestMCPAggregatorCallsToolsOnTheLatestVersion(t *testing.T) {
+	github := newDualMCPUpstream(t, "list_issues")
+	ts, key := startMCPAggregatorProtocolTest(t, github)
+
+	res := postMCPToolsCall(t, ts, key, toolCallParams("github__list_issues", `{}`, ""))
+
+	require.Equal(t, http.StatusOK, res.status, res.body)
+	assertMCPAggregatorCalledOnLatest(t, github, mcp.MethodToolsCall)
 }

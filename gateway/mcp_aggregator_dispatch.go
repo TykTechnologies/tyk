@@ -32,21 +32,56 @@ type mcpAggregatorDispatcher struct {
 // call sends one modern-protocol JSON-RPC request to an aggregated MCP proxy
 // and returns the raw JSON-RPC result.
 func (d mcpAggregatorDispatcher) call(parent *http.Request, upstream mcpaggregator.Upstream, method string, params map[string]any) (json.RawMessage, error) {
-	spec := d.gw.getApiSpec(upstream.APIID)
-	if spec == nil || !d.gw.mcpAggregatorIndex.Allows(d.aggregator.APIID, upstream.APIID) {
+	spec, err := d.upstreamSpec(upstream.APIID)
+	if err != nil {
+		return nil, err
+	}
+	return d.send(parent, spec, method, params, d.loopTrust(spec))
+}
+
+// upstreamSpec returns the loaded spec of an aggregated MCP proxy this
+// aggregator admits.
+func (d mcpAggregatorDispatcher) upstreamSpec(apiID string) (*APISpec, error) {
+	spec := d.gw.getApiSpec(apiID)
+	if spec == nil || !d.gw.mcpAggregatorIndex.Allows(d.aggregator.APIID, apiID) {
 		return nil, errMCPAggregatorUpstreamNotLoaded
 	}
-	return d.send(parent, spec, method, params, &mcpAggregatorLoopTrust{
+	return spec, nil
+}
+
+func (d mcpAggregatorDispatcher) loopTrust(spec *APISpec) *mcpAggregatorLoopTrust {
+	return &mcpAggregatorLoopTrust{
 		OrgID:           d.aggregator.OrgID,
 		AggregatorAPIID: d.aggregator.APIID,
 		UpstreamAPIID:   spec.APIID,
-	})
+	}
 }
 
 // send runs one JSON-RPC request through an aggregated MCP proxy's chain under
 // the given loop trust. A response showing that the proxy does not serve
 // 2026-07-28 is reported as an *mcpAggregatorVersionMismatchError.
 func (d mcpAggregatorDispatcher) send(parent *http.Request, spec *APISpec, method string, params map[string]any, trust *mcpAggregatorLoopTrust) (json.RawMessage, error) {
+	body, err := mcpAggregatorRequestBody(method, params)
+	if err != nil {
+		return nil, err
+	}
+	rec, err := d.exchange(parent, spec, method, body, nil, trust)
+	if err != nil {
+		return nil, err
+	}
+	if detail := mcpAggregatorVersionMismatch(method, rec.statusCode, rec.header, rec.body.Bytes()); detail != "" {
+		return nil, &mcpAggregatorVersionMismatchError{Method: method, Detail: detail}
+	}
+	if rec.statusCode >= http.StatusBadRequest {
+		return nil, fmt.Errorf("%s failed with HTTP %d", method, rec.statusCode)
+	}
+	return parseMCPAggregatorResult(method, rec.header.Get(headerContentType), rec.body.Bytes())
+}
+
+// exchange runs one JSON-RPC request body through an aggregated MCP proxy's
+// chain under the given loop trust, with the MCP headers for method and any
+// extra headers, and returns the buffered response.
+func (d mcpAggregatorDispatcher) exchange(parent *http.Request, spec *APISpec, method string, body []byte, extra http.Header, trust *mcpAggregatorLoopTrust) (*mcpAggregatorResponseRecorder, error) {
 	if d.gw.apisHandlesByID == nil {
 		return nil, errMCPAggregatorUpstreamNotLoaded
 	}
@@ -59,16 +94,15 @@ func (d mcpAggregatorDispatcher) send(parent *http.Request, spec *APISpec, metho
 		return nil, errMCPAggregatorUpstreamNotLoaded
 	}
 
-	body, err := mcpAggregatorRequestBody(method, params)
-	if err != nil {
-		return nil, err
-	}
 	req, err := http.NewRequestWithContext(mcpAggregatorUpstreamRequestContext(parent.Context()), http.MethodPost, spec.Proxy.ListenPath, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
 	req.Host = parent.Host
 	req.RemoteAddr = parent.RemoteAddr
+	for name, values := range extra {
+		req.Header[name] = append([]string(nil), values...)
+	}
 	req.Header.Set(headerContentType, contentTypeJSON)
 	req.Header.Set("Accept", "application/json, text/event-stream")
 	req.Header.Set(mcp.HeaderProtocolVersion, mcp.ModernProtocolVersion)
@@ -80,13 +114,7 @@ func (d mcpAggregatorDispatcher) send(parent *http.Request, spec *APISpec, metho
 	if rec.exceeded {
 		return nil, fmt.Errorf("response exceeds %d bytes", rec.limit)
 	}
-	if detail := mcpAggregatorVersionMismatch(method, rec.statusCode, rec.header, rec.body.Bytes()); detail != "" {
-		return nil, &mcpAggregatorVersionMismatchError{Method: method, Detail: detail}
-	}
-	if rec.statusCode >= http.StatusBadRequest {
-		return nil, fmt.Errorf("%s failed with HTTP %d", method, rec.statusCode)
-	}
-	return parseMCPAggregatorResult(method, rec.header.Get(headerContentType), rec.body.Bytes())
+	return rec, nil
 }
 
 func (d mcpAggregatorDispatcher) maxResponseBytes() int {
