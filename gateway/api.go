@@ -1582,6 +1582,9 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 			return apiError("API is referenced by paired MCP proxies: " + strings.Join(pairedProxyIDs, ", ")), http.StatusConflict
 		}
 	}
+	if resp, code := gw.mcpAggregatorDeleteConflict(apiID); resp != nil {
+		return resp, code
+	}
 
 	fs := afero.NewOsFs()
 

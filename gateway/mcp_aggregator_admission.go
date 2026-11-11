@@ -3,6 +3,7 @@ package gateway
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
@@ -105,4 +106,14 @@ func (gw *Gateway) validateMCPProxyReferences(r *http.Request, mcpObj *oas.OAS) 
 		return msg, code
 	}
 	return gw.validateMCPAggregatorUpstreams(mcpObj)
+}
+
+// mcpAggregatorDeleteConflict rejects deleting an MCP proxy that loaded
+// aggregators still reference, which would silently drop their tools.
+func (gw *Gateway) mcpAggregatorDeleteConflict(apiID string) (interface{}, int) {
+	aggregatorIDs := gw.mcpAggregatorIndex.AggregatorsReferencing(apiID)
+	if len(aggregatorIDs) == 0 {
+		return nil, 0
+	}
+	return apiError(fmt.Sprintf("API %q is referenced by MCP aggregators: %s", apiID, strings.Join(aggregatorIDs, ", "))), http.StatusConflict
 }
