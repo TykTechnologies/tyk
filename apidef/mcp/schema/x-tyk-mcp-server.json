@@ -18,12 +18,25 @@
               },
               "method": {
                 "type": "string"
+              },
+              "toolName": {
+                "type": "string",
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9_.-]{1,128}$"
               }
+            },
+            "not": {
+              "anyOf": [
+                {"required": ["toolName", "operationId"]},
+                {"required": ["toolName", "path"]},
+                {"required": ["toolName", "method"]}
+              ]
             },
             "additionalProperties": false
           },
           "name": {
             "type": "string",
+            "maxLength": 128,
             "pattern": "^[A-Za-z0-9_.-]{1,128}$"
           },
           "description": {
