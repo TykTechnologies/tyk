@@ -18,6 +18,13 @@ func (s *APISpec) SupportedProtocolVersions() []string {
 	return mcp.ServedProtocolVersions()
 }
 
+// ServesModernInitialize reports whether this endpoint answers a modern
+// initialize itself: the MCP aggregator negotiates 2026-07-28 for clients
+// that still open with initialize.
+func (s *APISpec) ServesModernInitialize() bool {
+	return s.IsMCPAggregator()
+}
+
 func (m *JSONRPCMiddleware) validateMCPIngress(w http.ResponseWriter, r *http.Request) bool {
 	ingress := httpctx.GetMCPProtocolContext(r)
 	if err := mcp.ValidateProtocolHeader(r.Header); err != nil {

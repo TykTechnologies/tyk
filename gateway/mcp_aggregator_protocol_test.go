@@ -158,6 +158,11 @@ type mcpTestCall struct {
 	initializeVersion string
 	key               string
 	sessionID         string
+	// noMethodHeader leaves out Mcp-Method on a 2026-07-28 request, as
+	// initialize-first clients do.
+	noMethodHeader bool
+	// notification sends the request without an id.
+	notification bool
 }
 
 func (c mcpTestCall) body() string {
@@ -173,7 +178,11 @@ func (c mcpTestCall) body() string {
 		params["capabilities"] = map[string]any{}
 		params["clientInfo"] = map[string]any{"name": "test", "version": "1"}
 	}
-	body, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": 9, "method": c.method, "params": params})
+	envelope := map[string]any{"jsonrpc": "2.0", "id": 9, "method": c.method, "params": params}
+	if c.notification {
+		delete(envelope, "id")
+	}
+	body, _ := json.Marshal(envelope)
 	return string(body)
 }
 
@@ -207,7 +216,7 @@ func postMCPTestCall(t *testing.T, ts *Test, listenPath string, call mcpTestCall
 	req.Header.Set("Accept", "application/json, text/event-stream")
 	if call.version != "" {
 		req.Header.Set(mcp.HeaderProtocolVersion, call.version)
-		if call.version == mcp.ModernProtocolVersion {
+		if call.version == mcp.ModernProtocolVersion && !call.noMethodHeader {
 			req.Header.Set(mcp.HeaderMethod, call.method)
 		}
 	}
@@ -350,4 +359,135 @@ func mcpTestResultField(t *testing.T, res mcpTestResponse, field string) json.Ra
 func TestMCPAggregatorAdvertisesOnlyTheLatestSupportedVersion(t *testing.T) {
 	assert.Equal(t, []string{mcp.ModernProtocolVersion}, companyToolsRuntimeSpec(aggregated("github-mcp", "github")).SupportedProtocolVersions())
 	assert.Equal(t, mcp.ServedProtocolVersions(), githubMCPProxyRuntimeSpec("http://github.invalid").SupportedProtocolVersions())
+}
+
+func mcpTestResultObject(t *testing.T, res mcpTestResponse) map[string]json.RawMessage {
+	t.Helper()
+	require.Equal(t, http.StatusOK, res.status, res.body)
+	require.Nil(t, res.rpc.Error, res.body)
+	var result map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(res.rpc.Result, &result), res.body)
+	return result
+}
+
+func TestMCPAggregatorDiscoveryAdvertisesOnlyTheLatestVersion(t *testing.T) {
+	ts, key := startMCPAggregatorProtocolTest(t, newDualMCPUpstream(t, "list_issues"))
+
+	res := postMCPTestCall(t, ts, "/company-tools/", modernCall(mcp.MethodServerDiscover, key))
+
+	result := mcpTestResultObject(t, res)
+	assert.JSONEq(t, `["2026-07-28"]`, string(result["supportedVersions"]))
+	assert.JSONEq(t, `{"tools":{}}`, string(result["capabilities"]))
+	assert.NotContains(t, result, "serverInfo", "serverInfo travels in _meta, as in the SDK's DiscoverResult")
+	var meta struct {
+		ServerInfo struct {
+			Name string `json:"name"`
+		} `json:"io.modelcontextprotocol/serverInfo"`
+	}
+	require.NoError(t, json.Unmarshal(result["_meta"], &meta))
+	assert.Equal(t, "company-tools", meta.ServerInfo.Name)
+	assert.Contains(t, res.body, `"id":9`)
+
+	unauthenticated := postMCPTestCall(t, ts, "/company-tools/", modernCall(mcp.MethodServerDiscover, ""))
+	assert.Equal(t, http.StatusUnauthorized, unauthenticated.status, unauthenticated.body)
+}
+
+func TestMCPAggregatorInitializeNegotiatesOnlyTheLatestVersion(t *testing.T) {
+	ts, key := startMCPAggregatorProtocolTest(t, newDualMCPUpstream(t, "list_issues"))
+
+	call := modernCall(mcp.MethodInitialize, key)
+	call.initializeVersion = mcp.ModernProtocolVersion
+	res := postMCPTestCall(t, ts, "/company-tools/", call)
+
+	result := mcpTestResultObject(t, res)
+	assert.JSONEq(t, `"2026-07-28"`, string(result["protocolVersion"]))
+	assert.JSONEq(t, `{"tools":{}}`, string(result["capabilities"]))
+	assert.Contains(t, string(result["serverInfo"]), `"company-tools"`)
+	assert.Empty(t, res.header.Get(mcp.HeaderSessionID), "the aggregator is stateless")
+
+	older := postMCPTestCall(t, ts, "/company-tools/", mcpTestCall{method: mcp.MethodInitialize, initializeVersion: "2025-11-25", key: key})
+	assertUnsupportedMCPVersion(t, older, "2025-11-25")
+}
+
+func TestMCPAggregatorStillRejectsMethodsItDoesNotServe(t *testing.T) {
+	ts, key := startMCPAggregatorProtocolTest(t, newDualMCPUpstream(t, "list_issues"))
+
+	res := postMCPTestCall(t, ts, "/company-tools/", modernCall("prompts/list", key))
+
+	assert.Equal(t, http.StatusNotFound, res.status, res.body)
+	require.NotNil(t, res.rpc.Error, res.body)
+	assert.Equal(t, mcp.JSONRPCMethodNotFound, res.rpc.Error.Code)
+}
+
+func TestMCPAggregatorServesInitializeFirstClientsOnTheLatestVersion(t *testing.T) {
+	ts, key := startMCPAggregatorProtocolTest(t, newDualMCPUpstream(t, "list_issues"))
+
+	initialize := postMCPTestCall(t, ts, "/company-tools/", mcpTestCall{
+		method: mcp.MethodInitialize, version: mcp.ModernProtocolVersion, initializeVersion: mcp.ModernProtocolVersion,
+		key: key, noMethodHeader: true,
+	})
+	result := mcpTestResultObject(t, initialize)
+	assert.JSONEq(t, `"2026-07-28"`, string(result["protocolVersion"]))
+	assert.JSONEq(t, `{"tools":{}}`, string(result["capabilities"]))
+
+	for name, call := range map[string]mcpTestCall{
+		"header only":      {method: mcp.MethodNotificationsInitialized, version: mcp.ModernProtocolVersion, key: key, noMethodHeader: true, notification: true},
+		"header and _meta": {method: mcp.MethodNotificationsInitialized, version: mcp.ModernProtocolVersion, metaVersion: mcp.ModernProtocolVersion, key: key, notification: true},
+	} {
+		t.Run("notifications/initialized "+name, func(t *testing.T) {
+			res := postMCPTestCall(t, ts, "/company-tools/", call)
+			assert.Equal(t, http.StatusAccepted, res.status, res.body)
+			assert.Empty(t, res.body)
+		})
+	}
+
+	t.Run("notifications/initialized carrying an id", func(t *testing.T) {
+		res := postMCPTestCall(t, ts, "/company-tools/", mcpTestCall{method: mcp.MethodNotificationsInitialized, version: mcp.ModernProtocolVersion, key: key, noMethodHeader: true})
+		assert.Equal(t, http.StatusBadRequest, res.status, res.body)
+		require.NotNil(t, res.rpc.Error, res.body)
+		assert.Equal(t, mcp.JSONRPCInvalidRequest, res.rpc.Error.Code)
+		assert.Equal(t, "notifications must not carry an id", res.rpc.Error.Message)
+		assert.Contains(t, res.body, `"id":9`)
+	})
+
+	// Conflicting declarations fall through to the existing rules: without
+	// _meta the modern _meta requirement answers, with it the conflict does.
+	t.Run("conflicting declarations without _meta", func(t *testing.T) {
+		res := postMCPTestCall(t, ts, "/company-tools/", mcpTestCall{
+			method: mcp.MethodInitialize, version: mcp.ModernProtocolVersion, initializeVersion: "2025-11-25", key: key, noMethodHeader: true,
+		})
+		assert.Equal(t, http.StatusBadRequest, res.status, res.body)
+		require.NotNil(t, res.rpc.Error, res.body)
+		assert.Equal(t, mcp.JSONRPCInvalidParams, res.rpc.Error.Code)
+	})
+	t.Run("conflicting declarations with _meta", func(t *testing.T) {
+		res := postMCPTestCall(t, ts, "/company-tools/", mcpTestCall{
+			method: mcp.MethodInitialize, version: mcp.ModernProtocolVersion, metaVersion: mcp.ModernProtocolVersion, initializeVersion: "2025-11-25", key: key,
+		})
+		assert.Equal(t, http.StatusBadRequest, res.status, res.body)
+		require.NotNil(t, res.rpc.Error, res.body)
+		assert.Equal(t, mcp.CodeHeaderMismatch, res.rpc.Error.Code)
+	})
+	t.Run("without credential", func(t *testing.T) {
+		res := postMCPTestCall(t, ts, "/company-tools/", mcpTestCall{
+			method: mcp.MethodInitialize, version: mcp.ModernProtocolVersion, initializeVersion: mcp.ModernProtocolVersion, noMethodHeader: true,
+		})
+		assert.Equal(t, http.StatusUnauthorized, res.status, res.body)
+	})
+}
+
+func TestInitializeFirstHandshakeIsOnlyRelaxedOnTheAggregator(t *testing.T) {
+	ts, _ := startMCPAggregatorProtocolTest(t, newDualMCPUpstream(t, "list_issues"))
+	_, key := ts.CreateSession(func(s *user.SessionState) {
+		s.OrgID = mcpAggregatorRuntimeOrg
+		s.AccessRights = map[string]user.AccessDefinition{"github-mcp": {APIID: "github-mcp", APIName: "github-mcp"}}
+	})
+
+	res := postMCPTestCall(t, ts, "/github-mcp/", mcpTestCall{
+		method: mcp.MethodInitialize, version: mcp.ModernProtocolVersion, initializeVersion: mcp.ModernProtocolVersion, key: key, noMethodHeader: true,
+	})
+
+	assert.Equal(t, http.StatusBadRequest, res.status, res.body)
+	require.NotNil(t, res.rpc.Error, res.body)
+	assert.Equal(t, mcp.JSONRPCInvalidParams, res.rpc.Error.Code, "other MCP proxies keep requiring _meta on 2026-07-28")
 }

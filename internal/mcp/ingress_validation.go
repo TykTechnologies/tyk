@@ -50,6 +50,9 @@ func ValidateProtocolDeclarations(protocolContext *ProtocolContext, endpoints ..
 	if modernRequested && !slices.Contains(versions, ModernProtocolVersion) {
 		return true, unsupportedProtocol(ModernProtocolVersion, versions)
 	}
+	if modernInitializeHandshake(protocolContext, endpoints) {
+		return false, nil
+	}
 	if modernRequested && (!protocolContext.MetadataProtocolPresent || !protocolContext.MetadataProtocolValid) {
 		return true, &IngressError{Code: JSONRPCInvalidParams, Message: fmt.Sprintf("missing or invalid _meta field %q", MetaKeyProtocolVersion)}
 	}
@@ -100,12 +103,40 @@ func ValidateProtocolDeclarations(protocolContext *ProtocolContext, endpoints ..
 	// Gateway owns no sampling, roots, or elicitation callbacks on native
 	// proxy endpoints. Requirements for upstream-owned features stay upstream.
 	if protocolContext.Envelope != nil {
-		switch protocolContext.Envelope.Method {
+		method := protocolContext.Envelope.Method
+		if isInitializeHandshakeMethod(method) && len(endpoints) > 0 && servesModernInitialize(endpoints[0]) {
+			return true, nil
+		}
+		switch method {
 		case "initialize", "ping", "notifications/initialized", "notifications/roots/list_changed", "logging/setLevel", "resources/subscribe", "resources/unsubscribe":
 			return true, &IngressError{Code: JSONRPCMethodNotFound, Message: "method removed in the modern protocol"}
 		}
 	}
 	return true, nil
+}
+
+// modernInitializeHandshake reports an initialize-first client opening a
+// 2026-07-28 exchange on an endpoint that answers the handshake: initialize
+// declaring 2026-07-28 in both the header and params.protocolVersion, or the
+// following notifications/initialized carrying the header, with no _meta.
+// Such requests skip the modern _meta and mirrored-header requirements.
+func modernInitializeHandshake(c *ProtocolContext, endpoints []ProtocolSupport) bool {
+	if c.Envelope == nil || !isInitializeHandshakeMethod(c.Envelope.Method) || len(endpoints) == 0 || !servesModernInitialize(endpoints[0]) {
+		return false
+	}
+	if c.HeaderProtocolVersion != ModernProtocolVersion || c.MetadataProtocolPresent || c.DeclarationMismatch {
+		return false
+	}
+	return c.Envelope.Method != MethodInitialize || c.InitializeProtocolVersion == ModernProtocolVersion
+}
+
+func isInitializeHandshakeMethod(method string) bool {
+	return method == MethodInitialize || method == MethodNotificationsInitialized
+}
+
+func servesModernInitialize(endpoint ProtocolSupport) bool {
+	support, ok := endpoint.(ModernInitializeSupport)
+	return ok && support.ServesModernInitialize()
 }
 
 func unsupportedProtocol(version string, supported []string) *IngressError {

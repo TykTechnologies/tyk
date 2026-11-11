@@ -3,6 +3,7 @@ package mcp
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"testing"
 
@@ -285,4 +286,116 @@ func TestModernOnlyEndpointHasNoLegacyFallback(t *testing.T) {
 	modern, err := ValidateProtocolDeclarations(modernIngressContext(t, MethodToolsList, `{}`), modernOnlyEndpoint{})
 	assert.True(t, modern)
 	assert.Nil(t, err)
+}
+
+type modernInitializeEndpoint struct{ modernOnlyEndpoint }
+
+func (modernInitializeEndpoint) ServesModernInitialize() bool { return true }
+
+func TestModernInitializeIsKeptOnlyWhereTheEndpointServesIt(t *testing.T) {
+	t.Parallel()
+
+	ctx := modernIngressContext(t, MethodInitialize, `{"protocolVersion":"2026-07-28"}`)
+	_, err := ValidateProtocolDeclarations(ctx, modernInitializeEndpoint{})
+	assert.Nil(t, err)
+
+	_, err = ValidateProtocolDeclarations(modernIngressContext(t, MethodInitialize, `{"protocolVersion":"2026-07-28"}`), modernOnlyEndpoint{})
+	require.NotNil(t, err)
+	assert.Equal(t, JSONRPCMethodNotFound, err.Code)
+
+	_, err = ValidateProtocolDeclarations(modernIngressContext(t, "ping", `{}`), modernInitializeEndpoint{})
+	require.NotNil(t, err, "only initialize is kept")
+}
+
+func TestInitializeFirstHandshakeOnTheOptInEndpoint(t *testing.T) {
+	t.Parallel()
+
+	initialize := func(header string, params string) *ProtocolContext {
+		return NewProtocolContext(header, "", &RequestEnvelope{Method: MethodInitialize, Params: json.RawMessage(params)}, nil)
+	}
+	modern, err := ValidateProtocolDeclarations(initialize(ModernProtocolVersion, `{"protocolVersion":"2026-07-28"}`), modernInitializeEndpoint{})
+	assert.Nil(t, err)
+	assert.False(t, modern, "the handshake skips the modern mirrored-header checks")
+
+	modern, err = ValidateProtocolDeclarations(NewProtocolContext(ModernProtocolVersion, "", &RequestEnvelope{Method: MethodNotificationsInitialized}, nil), modernInitializeEndpoint{})
+	assert.Nil(t, err)
+	assert.False(t, modern)
+
+	for name, tc := range map[string]struct {
+		ctx      *ProtocolContext
+		endpoint ProtocolSupport
+		code     int
+	}{
+		"endpoint without the opt-in":   {initialize(ModernProtocolVersion, `{"protocolVersion":"2026-07-28"}`), modernOnlyEndpoint{}, JSONRPCInvalidParams},
+		"body-only offer":               {initialize("", `{"protocolVersion":"2026-07-28"}`), modernInitializeEndpoint{}, JSONRPCInvalidParams},
+		"conflicting declarations":      {initialize(ModernProtocolVersion, `{"protocolVersion":"2025-11-25"}`), modernInitializeEndpoint{}, JSONRPCInvalidParams},
+		"older header":                  {initialize("2025-11-25", `{"protocolVersion":"2025-11-25"}`), modernInitializeEndpoint{}, CodeUnsupportedProtocolVersion},
+		"other method with header only": {NewProtocolContext(ModernProtocolVersion, "", &RequestEnvelope{Method: MethodToolsList}, nil), modernInitializeEndpoint{}, JSONRPCInvalidParams},
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := ValidateProtocolDeclarations(tc.ctx, tc.endpoint)
+			require.NotNil(t, err)
+			assert.Equal(t, tc.code, err.Code)
+		})
+	}
+}
+
+type fullEndpoint struct{}
+
+func (fullEndpoint) SupportedProtocolVersions() []string { return ServedProtocolVersions() }
+
+type fullHandshakeEndpoint struct{ fullEndpoint }
+
+func (fullHandshakeEndpoint) ServesModernInitialize() bool { return true }
+
+// TestHandshakeOptInOnlyRelaxesTheHandshake walks a matrix of declarations
+// and shows the opt-in changes no outcome except accepting handshake methods.
+func TestHandshakeOptInOnlyRelaxesTheHandshake(t *testing.T) {
+	t.Parallel()
+
+	versions := []string{"", "2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25", "2026-07-28", "2099-01-01"}
+	methods := []string{MethodInitialize, MethodToolsList, MethodToolsCall, "ping", MethodServerDiscover, MethodNotificationsInitialized, "resources/subscribe"}
+	pairs := []struct{ plain, optIn ProtocolSupport }{
+		{fullEndpoint{}, fullHandshakeEndpoint{}},
+		{modernOnlyEndpoint{}, modernInitializeEndpoint{}},
+	}
+	var cases, relaxed int
+	for _, pair := range pairs {
+		for _, header := range versions {
+			for _, metaVersion := range versions {
+				for _, initVersion := range versions {
+					for _, method := range methods {
+						if initVersion != "" && method != MethodInitialize {
+							continue
+						}
+						for _, session := range []string{"", "s1"} {
+							params := map[string]any{}
+							if metaVersion != "" {
+								params["_meta"] = map[string]any{MetaKeyProtocolVersion: metaVersion, MetaKeyClientCapabilities: map[string]any{}}
+							}
+							if initVersion != "" {
+								params["protocolVersion"] = initVersion
+							}
+							raw, _ := json.Marshal(params)
+							build := func() *ProtocolContext {
+								return NewProtocolContext(header, session, &RequestEnvelope{JSONRPC: "2.0", Method: method, Params: raw, ID: 1}, nil)
+							}
+							plainModern, plainErr := ValidateProtocolDeclarations(build(), pair.plain)
+							optModern, optErr := ValidateProtocolDeclarations(build(), pair.optIn)
+							cases++
+							if plainModern == optModern && assert.ObjectsAreEqual(plainErr, optErr) {
+								continue
+							}
+							relaxed++
+							label := fmt.Sprintf("h=%s m=%s i=%s %s sess=%s", header, metaVersion, initVersion, method, session)
+							assert.True(t, isInitializeHandshakeMethod(method), "opt-in changed a non-handshake request: %s", label)
+							assert.Nil(t, optErr, "opt-in may only accept, never reject: %s", label)
+						}
+					}
+				}
+			}
+		}
+	}
+	t.Logf("%d cases, %d accepted only through the opt-in", cases, relaxed)
+	assert.NotZero(t, relaxed)
 }
