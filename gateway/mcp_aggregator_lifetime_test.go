@@ -88,8 +88,9 @@ func TestMCPAggregatorSendsNoResultForACancelledCall(t *testing.T) {
 	time.AfterFunc(200*time.Millisecond, cancel)
 	rec := httptest.NewRecorder()
 
-	_, code := mw.ProcessRequest(rec, req, nil)
+	err, code := mw.ProcessRequest(rec, req, nil)
 
+	assert.NoError(t, err)
 	assert.Equal(t, middleware.StatusRespond, code)
 	assert.False(t, rec.Flushed)
 	assert.Empty(t, rec.Body.String(), "nothing is written for a cancelled call")

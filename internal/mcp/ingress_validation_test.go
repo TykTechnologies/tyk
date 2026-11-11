@@ -376,7 +376,8 @@ func TestHandshakeOptInOnlyRelaxesTheHandshake(t *testing.T) {
 							if initVersion != "" {
 								params["protocolVersion"] = initVersion
 							}
-							raw, _ := json.Marshal(params)
+							raw, err := json.Marshal(params)
+							require.NoError(t, err)
 							build := func() *ProtocolContext {
 								return NewProtocolContext(header, session, &RequestEnvelope{JSONRPC: "2.0", Method: method, Params: raw, ID: 1}, nil)
 							}

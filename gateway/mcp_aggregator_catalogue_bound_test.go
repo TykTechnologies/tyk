@@ -27,7 +27,9 @@ func pageToolNames(names []string, size int) func(cursor string) ([]string, stri
 	return func(cursor string) ([]string, string) {
 		start := 0
 		if cursor != "" {
-			_, _ = fmt.Sscanf(cursor, "page-%d", &start)
+			if _, err := fmt.Sscanf(cursor, "page-%d", &start); err != nil {
+				panic(fmt.Sprintf("unexpected tools/list cursor %q: %v", cursor, err))
+			}
 		}
 		end := min(start+size, len(names))
 		if end == len(names) {
@@ -200,12 +202,14 @@ func TestMCPAggregatorResponseRecorderStaysWithinTheBudget(t *testing.T) {
 
 	first := d.newResponseRecorder()
 	assert.Equal(t, 10, first.limit)
-	_, _ = first.Write([]byte("123456"))
+	_, err := first.Write([]byte("123456"))
+	require.NoError(t, err)
 	require.NoError(t, d.recorded(first))
 
 	second := d.newResponseRecorder()
 	assert.Equal(t, 4, second.limit, "a response is limited to what is left of the budget")
-	_, _ = second.Write([]byte("12345"))
+	_, err = second.Write([]byte("12345"))
+	require.NoError(t, err, "a write past the budget is dropped, not failed")
 	assert.Equal(t, 0, second.body.Len(), "nothing past the budget is buffered")
 	assert.EqualError(t, d.recorded(second), "responses exceed the 10 byte share of the catalogue byte budget")
 

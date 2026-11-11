@@ -148,7 +148,8 @@ func TestMCPAggregatorProbeTrustIsLimitedToReadOnlyDiscovery(t *testing.T) {
 		req := httptest.NewRequest(http.MethodPost, "/", nil)
 		ctxSetMCPMethod(req, method)
 		ctxSetMCPAggregatorLoopTrust(req, trust)
-		_, code := mw.ProcessRequest(httptest.NewRecorder(), req, nil)
+		err, code := mw.ProcessRequest(httptest.NewRecorder(), req, nil)
+		assert.Equal(t, code == http.StatusOK, err == nil, "an error is returned exactly when the request is rejected")
 		return code
 	}
 	probe := func(org, upstream string) *mcpAggregatorLoopTrust {
@@ -279,15 +280,19 @@ func sessionFirstLegacyMCPUpstream(t *testing.T) *httptest.Server {
 			ID     any    `json:"id"`
 			Method string `json:"method"`
 		}
-		_ = json.NewDecoder(r.Body).Decode(&req)
+		if !decodeMCPTestRequest(w, r, &req) {
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		if req.Method != mcp.MethodInitialize && r.Header.Get(mcp.HeaderSessionID) == "" {
 			w.WriteHeader(http.StatusBadRequest)
-			_, _ = w.Write([]byte(`{"jsonrpc":"2.0","error":{"code":-32000,"message":"Bad Request: Mcp-Session-Id header is required"},"id":null}`))
+			if _, err := w.Write([]byte(`{"jsonrpc":"2.0","error":{"code":-32000,"message":"Bad Request: Mcp-Session-Id header is required"},"id":null}`)); err != nil {
+				t.Errorf("w.Write: %v", err)
+			}
 			return
 		}
 		w.Header().Set(mcp.HeaderSessionID, "legacy-session")
-		_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": map[string]any{
+		writeMCPTestJSON(t, w, map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": map[string]any{
 			"protocolVersion": mcp.LegacyFallbackProtocolVersion,
 			"capabilities":    map[string]any{"tools": map[string]any{}},
 		}})
@@ -305,15 +310,16 @@ func headerUnawareLegacyMCPUpstream(t *testing.T) *httptest.Server {
 			ID     any    `json:"id"`
 			Method string `json:"method"`
 		}
-		_ = json.NewDecoder(r.Body).Decode(&req)
+		if !decodeMCPTestRequest(w, r, &req) {
+			return
+		}
 		if req.Method == mcp.MethodToolsList {
-			w.Header().Set("Content-Type", "application/json")
-			_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": map[string]any{
+			writeMCPTestJSON(t, w, map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": map[string]any{
 				"tools": []any{map[string]any{"name": "list_issues", "inputSchema": map[string]any{"type": "object"}}},
 			}})
 			return
 		}
-		writeMCPTestJSONRPCError(w, req.ID, mcp.JSONRPCMethodNotFound, "Method not found")
+		writeMCPTestJSONRPCError(t, w, req.ID, mcp.JSONRPCMethodNotFound, "Method not found")
 	}))
 	t.Cleanup(s.Close)
 	return s
