@@ -13,6 +13,7 @@ import (
 	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/TykTechnologies/tyk/internal/mcp"
+	"github.com/TykTechnologies/tyk/request"
 )
 
 var errMCPAggregatorUpstreamNotLoaded = errors.New("not loaded on this gateway")
@@ -26,6 +27,43 @@ const mcpAggregatorMaxUpstreamResponseBytes = 10 << 20
 type mcpAggregatorDispatcher struct {
 	gw         *Gateway
 	aggregator *APISpec
+	// budget, when set, bounds the bytes buffered from one aggregated proxy's
+	// responses. It is used by one goroutine at a time.
+	budget *mcpAggregatorByteBudget
+}
+
+// mcpAggregatorByteBudget is one aggregated MCP proxy's share of the
+// catalogue byte budget for one tools/list.
+type mcpAggregatorByteBudget struct {
+	share int
+	used  int
+}
+
+// newResponseRecorder buffers one response up to the gateway's response size
+// limit, or up to what is left of the budget when that is less, so the
+// response being read and those already read together stay within the share.
+func (d mcpAggregatorDispatcher) newResponseRecorder() *mcpAggregatorResponseRecorder {
+	rec := &mcpAggregatorResponseRecorder{bufferedResponseWriter: newBufferedResponseWriter(), limit: d.maxResponseBytes()}
+	if d.budget != nil && d.budget.share-d.budget.used < rec.limit {
+		rec.limit = d.budget.share - d.budget.used
+		rec.budgeted = true
+	}
+	return rec
+}
+
+// recorded reports a response that went past its limit, and otherwise
+// charges the response to the budget.
+func (d mcpAggregatorDispatcher) recorded(rec *mcpAggregatorResponseRecorder) error {
+	if rec.exceeded {
+		if rec.budgeted {
+			return fmt.Errorf("responses exceed the %d byte share of the catalogue byte budget", d.budget.share)
+		}
+		return fmt.Errorf("response exceeds %d bytes", rec.limit)
+	}
+	if d.budget != nil {
+		d.budget.used += rec.body.Len()
+	}
+	return nil
 }
 
 // upstreamSpec returns the loaded spec of an aggregated MCP proxy this
@@ -83,7 +121,7 @@ func (d mcpAggregatorDispatcher) exchange(parent *http.Request, spec *APISpec, m
 		return nil, errMCPAggregatorUpstreamNotLoaded
 	}
 
-	req, err := http.NewRequestWithContext(mcpAggregatorUpstreamRequestContext(parent.Context()), http.MethodPost, spec.Proxy.ListenPath, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(mcpAggregatorUpstreamRequestContext(parent.Context(), request.RealIP(parent)), http.MethodPost, spec.Proxy.ListenPath, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +136,7 @@ func (d mcpAggregatorDispatcher) exchange(parent *http.Request, spec *APISpec, m
 	req.Header.Set(mcp.HeaderMethod, method)
 	ctxSetMCPAggregatorLoopTrust(req, trust)
 
-	rec := &mcpAggregatorResponseRecorder{bufferedResponseWriter: newBufferedResponseWriter(), limit: d.maxResponseBytes()}
+	rec := d.newResponseRecorder()
 	// The chain runs apart from this goroutine so that the caller's
 	// cancellation and the aggregator's timeout bound the exchange even when
 	// the chain does not stop on its context. An abandoned chain still writes
@@ -121,8 +159,8 @@ func (d mcpAggregatorDispatcher) exchange(parent *http.Request, spec *APISpec, m
 	if panicked != nil {
 		return nil, fmt.Errorf("%s aborted: %v", method, panicked)
 	}
-	if rec.exceeded {
-		return nil, fmt.Errorf("response exceeds %d bytes", rec.limit)
+	if err := d.recorded(rec); err != nil {
+		return nil, err
 	}
 	return rec, nil
 }
@@ -140,6 +178,8 @@ type mcpAggregatorResponseRecorder struct {
 	*bufferedResponseWriter
 	limit    int
 	exceeded bool
+	// budgeted is set when the limit is what is left of a byte budget.
+	budgeted bool
 }
 
 func (w *mcpAggregatorResponseRecorder) Write(data []byte) (int, error) {
@@ -150,18 +190,32 @@ func (w *mcpAggregatorResponseRecorder) Write(data []byte) (int, error) {
 	return w.bufferedResponseWriter.Write(data)
 }
 
-// mcpAggregatorUpstreamContext keeps the caller's cancellation but none of its
-// request-scoped values, so the aggregated proxy's chain starts clean.
+// mcpAggregatorClientIPContextKey is the context key request.RealIP reads
+// before any header or the remote address.
+const mcpAggregatorClientIPContextKey = "remote_addr"
+
+// mcpAggregatorUpstreamContext keeps the caller's cancellation and client IP
+// but none of its other request-scoped values, so the aggregated proxy's chain
+// starts clean.
 type mcpAggregatorUpstreamContext struct {
 	context.Context
+	clientIP string
 }
 
-func (mcpAggregatorUpstreamContext) Value(any) any { return nil }
+func (c mcpAggregatorUpstreamContext) Value(key any) any {
+	if key == mcpAggregatorClientIPContextKey {
+		return c.clientIP
+	}
+	return nil
+}
 
-// mcpAggregatorUpstreamRequestContext keeps only the caller's cancellation and
-// trace span, so upstream spans join the aggregator's trace.
-func mcpAggregatorUpstreamRequestContext(parent context.Context) context.Context {
-	return oteltrace.ContextWithSpan(mcpAggregatorUpstreamContext{parent}, oteltrace.SpanFromContext(parent))
+// mcpAggregatorUpstreamRequestContext keeps only the caller's cancellation,
+// trace span and client IP. Upstream spans join the aggregator's trace, and
+// request.RealIP in the aggregated proxy's chain returns clientIP, the address
+// the aggregator resolved for its caller, so the proxy's IP access control
+// sees the agent's address and not the load balancer's in front of it.
+func mcpAggregatorUpstreamRequestContext(parent context.Context, clientIP string) context.Context {
+	return oteltrace.ContextWithSpan(mcpAggregatorUpstreamContext{Context: parent, clientIP: clientIP}, oteltrace.SpanFromContext(parent))
 }
 
 func mcpAggregatorRequestBody(method string, params map[string]any) ([]byte, error) {

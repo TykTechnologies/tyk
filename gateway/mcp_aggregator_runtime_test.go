@@ -24,6 +24,7 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/mcp"
+	"github.com/TykTechnologies/tyk/request"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -42,6 +43,8 @@ type mockRemoteMCPServer struct {
 	lastAuth     string
 	// pager, when set, serves tools/list pages by cursor.
 	pager func(cursor string) (tools []string, next string)
+	// descriptionPadding lengthens every tool description by this many bytes.
+	descriptionPadding int
 }
 
 func newMockRemoteMCPServer(t *testing.T, tools ...string) *mockRemoteMCPServer {
@@ -69,6 +72,7 @@ func (m *mockRemoteMCPServer) serve(w http.ResponseWriter, r *http.Request) {
 	tools := append([]string(nil), m.tools...)
 	sse := m.sse
 	pager := m.pager
+	padding := strings.Repeat("x", m.descriptionPadding)
 	m.mu.Unlock()
 	next := ""
 	if pager != nil {
@@ -87,7 +91,7 @@ func (m *mockRemoteMCPServer) serve(w http.ResponseWriter, r *http.Request) {
 
 	list := make([]map[string]any, 0, len(tools))
 	for _, name := range tools {
-		list = append(list, map[string]any{"name": name, "description": name + " tool", "inputSchema": map[string]any{"type": "object"}})
+		list = append(list, map[string]any{"name": name, "description": name + " tool" + padding, "inputSchema": map[string]any{"type": "object"}})
 	}
 	result := map[string]any{"tools": list}
 	if next != "" {
@@ -203,6 +207,12 @@ type mcpToolsListResult struct {
 
 func postModernToolsList(t *testing.T, ts *Test, listenPath, key string) mcpToolsListResult {
 	t.Helper()
+	return postModernToolsListWithHeader(t, ts, listenPath, key, nil)
+}
+
+// postModernToolsListWithHeader posts tools/list with extra request headers.
+func postModernToolsListWithHeader(t *testing.T, ts *Test, listenPath, key string, header http.Header) mcpToolsListResult {
+	t.Helper()
 
 	body := `{"jsonrpc":"2.0","id":7,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}}`
 	req, err := http.NewRequest(http.MethodPost, ts.URL+listenPath, strings.NewReader(body))
@@ -213,6 +223,9 @@ func postModernToolsList(t *testing.T, ts *Test, listenPath, key string) mcpTool
 	req.Header.Set(mcp.HeaderMethod, mcp.MethodToolsList)
 	if key != "" {
 		req.Header.Set("Authorization", key)
+	}
+	for name, values := range header {
+		req.Header[name] = values
 	}
 
 	resp, err := http.DefaultClient.Do(req)
@@ -631,7 +644,7 @@ func TestMCPAggregatorWarnsAboutAggregatedToolsWithoutName(t *testing.T) {
 	assert.True(t, found)
 }
 
-func TestMCPAggregatorUpstreamContextKeepsOnlyCancellationAndTraceSpan(t *testing.T) {
+func TestMCPAggregatorUpstreamContextKeepsOnlyCancellationTraceSpanAndClientIP(t *testing.T) {
 	type otherKey struct{}
 	spanContext := oteltrace.NewSpanContext(oteltrace.SpanContextConfig{
 		TraceID:    oteltrace.TraceID{1},
@@ -640,10 +653,11 @@ func TestMCPAggregatorUpstreamContextKeepsOnlyCancellationAndTraceSpan(t *testin
 	})
 	parent, cancel := context.WithCancel(context.WithValue(oteltrace.ContextWithSpanContext(context.Background(), spanContext), otherKey{}, "leak"))
 
-	upstream := mcpAggregatorUpstreamRequestContext(parent)
+	upstream := mcpAggregatorUpstreamRequestContext(parent, "203.0.113.7")
 
 	assert.Equal(t, spanContext, oteltrace.SpanContextFromContext(upstream))
 	assert.Nil(t, upstream.Value(otherKey{}))
+	assert.Equal(t, "203.0.113.7", request.RealIP((&http.Request{RemoteAddr: "10.0.0.1:1234"}).WithContext(upstream)))
 	cancel()
 	assert.ErrorIs(t, upstream.Err(), context.Canceled)
 }

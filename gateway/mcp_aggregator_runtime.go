@@ -28,6 +28,18 @@ const (
 	// one aggregated MCP proxy; a proxy that needs more is omitted.
 	mcpAggregatorMaxListPages = 100
 
+	// mcpAggregatorMaxCatalogueTools bounds the tools in one aggregator's
+	// merged tools/list. It is far above what an agent can use (clients and
+	// models degrade well before a few hundred tools) while still capping the
+	// work and memory of one tools/list at 50 aggregated proxies.
+	mcpAggregatorMaxCatalogueTools = 10000
+
+	// mcpAggregatorMaxCatalogueBytes bounds the JSON size of the tool
+	// definitions in one aggregator's merged tools/list: 10000 tools at about
+	// 3 KiB each. It is also the budget for the tools/list responses buffered
+	// for one tools/list, shared equally between the aggregated proxies.
+	mcpAggregatorMaxCatalogueBytes = 32 << 20
+
 	mcpAggregatorUnnamedToolMsg = "MCP aggregator skips aggregated tool without a name"
 
 	mcpAggregatorSelectedToolMissingMsg = "MCP aggregator omits selected tool the aggregated MCP proxy does not expose"
@@ -184,6 +196,10 @@ func (d mcpAggregatorDispatcher) toolsCatalogue(parent *http.Request) mcpAggrega
 	}
 
 	results := make([][]mcpAggregatorTool, len(ext.Upstreams))
+	// Every configured proxy gets the same share of the byte budget, so the
+	// responses buffered at once stay within it however the reads interleave,
+	// and whether a proxy fits never depends on the others.
+	share := mcpAggregatorMaxCatalogueBytes / max(len(ext.Upstreams), 1)
 	var wg sync.WaitGroup
 	for i, ref := range ext.Upstreams {
 		upstream := mcpaggregator.Upstream{APIID: ref.APIID, Alias: ref.Alias, Tools: ref.Tools}
@@ -194,7 +210,9 @@ func (d mcpAggregatorDispatcher) toolsCatalogue(parent *http.Request) mcpAggrega
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			tools, err := d.listUpstreamTools(parent, upstream)
+			budgeted := d
+			budgeted.budget = &mcpAggregatorByteBudget{share: share}
+			tools, err := budgeted.listUpstreamTools(parent, upstream)
 			var mismatch *mcpAggregatorVersionMismatchError
 			switch {
 			case errors.As(err, &mismatch):
@@ -210,8 +228,16 @@ func (d mcpAggregatorDispatcher) toolsCatalogue(parent *http.Request) mcpAggrega
 	wg.Wait()
 
 	var catalogue mcpAggregatorCatalogue
-	for _, tools := range results {
+	var catalogueBytes int
+	for i, tools := range results {
+		size := mcpAggregatorToolsSize(tools)
+		if reason := mcpAggregatorCatalogueOverflow(len(catalogue.Tools)+len(tools), catalogueBytes+size); reason != "" {
+			ref := ext.Upstreams[i]
+			logMCPAggregatorUpstreamOmitted(d.aggregator.APIID, ref.APIID, ref.Alias, reason)
+			continue
+		}
 		catalogue.Tools = append(catalogue.Tools, tools...)
+		catalogueBytes += size
 	}
 	sort.SliceStable(catalogue.Tools, func(i, j int) bool { return catalogue.Tools[i].Name < catalogue.Tools[j].Name })
 	return catalogue
@@ -227,6 +253,30 @@ func logMCPAggregatorVersionMismatch(aggregatorAPIID, upstreamAPIID, alias strin
 		"mcp_protocol_version": mcp.ModernProtocolVersion,
 		"reason":               fmt.Sprintf("version mismatch: does not support MCP version %s: %s", mcp.ModernProtocolVersion, mismatch.Detail),
 	}).Warn(mcpAggregatorUpstreamOmittedMsg)
+}
+
+// mcpAggregatorCatalogueOverflow says why a catalogue of the given tool count
+// and definition size is over the aggregator's bounds, or returns "".
+func mcpAggregatorCatalogueOverflow(tools, bytes int) string {
+	switch {
+	case tools > mcpAggregatorMaxCatalogueTools:
+		return fmt.Sprintf("catalogue limit: the aggregator serves at most %d tools", mcpAggregatorMaxCatalogueTools)
+	case bytes > mcpAggregatorMaxCatalogueBytes:
+		return fmt.Sprintf("catalogue limit: the aggregator serves at most %d bytes of tool definitions", mcpAggregatorMaxCatalogueBytes)
+	}
+	return ""
+}
+
+// mcpAggregatorToolsSize approximates the JSON size of tool definitions as the
+// size of their field names and raw values.
+func mcpAggregatorToolsSize(tools []mcpAggregatorTool) int {
+	var size int
+	for _, tool := range tools {
+		for key, value := range tool.Definition {
+			size += len(key) + len(value)
+		}
+	}
+	return size
 }
 
 func mcpAggregatorFailureReason(err error) string {
@@ -250,9 +300,10 @@ func (d mcpAggregatorDispatcher) listUpstreamTools(parent *http.Request, upstrea
 	}
 	var tools []mcpAggregatorTool
 	names := make(map[string]struct{}, len(exposed))
+	selection := newMCPAggregatorToolSelection(upstream)
 	for _, tool := range exposed {
 		names[tool.Name] = struct{}{}
-		if !mcpAggregatorSelects(upstream, tool.Name) {
+		if !selection.selects(tool.Name) {
 			continue
 		}
 		aggregatedName := mcpaggregator.ToolName(upstream.Alias, tool.Name)
@@ -298,6 +349,7 @@ func (d mcpAggregatorDispatcher) exposedTools(parent *http.Request, spec *APISpe
 	var tools []mcpAggregatorExposedTool
 	params := map[string]any{}
 	seenCursors := map[string]struct{}{}
+	var listedBytes int
 	for page := 0; ; page++ {
 		if page == mcpAggregatorMaxListPages {
 			return nil, fmt.Errorf("returned more than %d pages", mcpAggregatorMaxListPages)
@@ -305,6 +357,13 @@ func (d mcpAggregatorDispatcher) exposedTools(parent *http.Request, spec *APISpe
 		raw, err := d.send(parent, spec, mcp.MethodToolsList, params, trust)
 		if err != nil {
 			return nil, err
+		}
+		// Reading stops once a proxy lists more than the whole catalogue may
+		// hold, so one proxy cannot make the aggregator buffer more than that.
+		// Such a proxy is left out even when only some of its tools are
+		// selected.
+		if listedBytes += len(raw); listedBytes > mcpAggregatorMaxCatalogueBytes {
+			return nil, fmt.Errorf("returned more than %d bytes of tools", mcpAggregatorMaxCatalogueBytes)
 		}
 		var result struct {
 			Tools      []map[string]json.RawMessage `json:"tools"`
@@ -324,6 +383,9 @@ func (d mcpAggregatorDispatcher) exposedTools(parent *http.Request, spec *APISpe
 				continue
 			}
 			tools = append(tools, mcpAggregatorExposedTool{Name: name, Definition: definition})
+		}
+		if len(tools) > mcpAggregatorMaxCatalogueTools {
+			return nil, fmt.Errorf("returned more than %d tools", mcpAggregatorMaxCatalogueTools)
 		}
 		if result.NextCursor == "" {
 			return tools, nil

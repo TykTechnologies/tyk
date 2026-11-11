@@ -153,10 +153,35 @@ func (d mcpAggregatorDispatcher) resolveTool(name string) (mcpaggregator.Upstrea
 // mcpAggregatorSelects reports whether the aggregator exposes tool of an
 // aggregated MCP proxy: every tool when the proxy has no selection, otherwise
 // only the selected names, matched exactly against the names the proxy
-// exposes. tools/list and tools/call both apply it, so a deselected tool is
-// neither listed nor callable.
+// exposes. tools/call applies it to one name, and tools/list applies the same
+// rule through mcpAggregatorToolSelection, so a deselected tool is neither
+// listed nor callable.
 func mcpAggregatorSelects(upstream mcpaggregator.Upstream, tool string) bool {
 	return upstream.Tools == nil || slices.Contains(upstream.Tools, tool)
+}
+
+// mcpAggregatorToolSelection is an aggregated MCP proxy's tool selection as a
+// set, for checking every tool of a tools/list in constant time. It is nil
+// when the proxy has no selection.
+type mcpAggregatorToolSelection map[string]struct{}
+
+func newMCPAggregatorToolSelection(upstream mcpaggregator.Upstream) mcpAggregatorToolSelection {
+	if upstream.Tools == nil {
+		return nil
+	}
+	selection := make(mcpAggregatorToolSelection, len(upstream.Tools))
+	for _, tool := range upstream.Tools {
+		selection[tool] = struct{}{}
+	}
+	return selection
+}
+
+func (s mcpAggregatorToolSelection) selects(tool string) bool {
+	if s == nil {
+		return true
+	}
+	_, ok := s[tool]
+	return ok
 }
 
 // mcpAggregatorNameFits reports whether an aggregated tool name is within

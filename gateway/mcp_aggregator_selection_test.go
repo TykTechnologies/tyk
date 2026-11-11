@@ -66,13 +66,28 @@ func mcpAggregatorMissingToolWarnings(hook interface{ AllEntries() []*logrus.Ent
 func TestMCPAggregatorSelects(t *testing.T) {
 	all := mcpaggregator.Upstream{APIID: "github-mcp", Alias: "github"}
 	some := mcpaggregator.Upstream{APIID: "github-mcp", Alias: "github", Tools: []string{"list_issues", "search"}}
+	none := mcpaggregator.Upstream{APIID: "github-mcp", Alias: "github", Tools: []string{}}
 
-	assert.True(t, mcpAggregatorSelects(all, "create_issue"), "no selection includes every tool")
-	assert.True(t, mcpAggregatorSelects(some, "list_issues"))
-	assert.True(t, mcpAggregatorSelects(some, "search"))
-	assert.False(t, mcpAggregatorSelects(some, "create_issue"))
-	assert.False(t, mcpAggregatorSelects(some, "List_Issues"), "names match case-sensitively")
-	assert.False(t, mcpAggregatorSelects(some, "list_issues "), "names match exactly")
+	tests := []struct {
+		name     string
+		upstream mcpaggregator.Upstream
+		tool     string
+		selected bool
+	}{
+		{name: "no selection includes every tool", upstream: all, tool: "create_issue", selected: true},
+		{name: "selected tool", upstream: some, tool: "list_issues", selected: true},
+		{name: "other selected tool", upstream: some, tool: "search", selected: true},
+		{name: "tool outside the selection", upstream: some, tool: "create_issue"},
+		{name: "names match case-sensitively", upstream: some, tool: "List_Issues"},
+		{name: "names match exactly", upstream: some, tool: "list_issues "},
+		{name: "empty selection includes no tool", upstream: none, tool: "list_issues"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.selected, mcpAggregatorSelects(tc.upstream, tc.tool))
+			assert.Equal(t, tc.selected, newMCPAggregatorToolSelection(tc.upstream).selects(tc.tool), "tools/list applies the same selection as tools/call")
+		})
+	}
 }
 
 func TestMCPAggregatorListsEveryToolWithoutASelection(t *testing.T) {

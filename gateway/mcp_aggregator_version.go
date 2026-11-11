@@ -306,8 +306,12 @@ func (gw *Gateway) validateMCPAggregatorUpstreamViews(r *http.Request, aggregato
 // name, of the selected tools or of all exposed tools without a selection,
 // must fit MCP's tool name limit.
 func mcpAggregatorSelectionError(ref oas.TykMCPAggregatorUpstream, exposed []string) string {
+	exposedSet := make(map[string]struct{}, len(exposed))
+	for _, tool := range exposed {
+		exposedSet[tool] = struct{}{}
+	}
 	for _, tool := range ref.Tools {
-		if !slices.Contains(exposed, tool) {
+		if _, ok := exposedSet[tool]; !ok {
 			return fmt.Sprintf("tool %q not found in aggregated MCP proxy %q", tool, ref.Alias)
 		}
 	}
