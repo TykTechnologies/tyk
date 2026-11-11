@@ -104,3 +104,35 @@ func TestMCPAggregatorForwardsNoHeadersWithoutATransform(t *testing.T) {
 	require.Len(t, calls, 1)
 	assert.Empty(t, calls[0].Header.Get("X-Acme-Tenant"))
 }
+
+// TestMCPAggregatorForwardsTransformHeadersAlongsideTheClientIP checks that
+// the transform's headers and the caller's client IP both reach an aggregated
+// proxy: the proxy's IP allow list sees the agent's address while its
+// upstream receives the transform's header.
+func TestMCPAggregatorForwardsTransformHeadersAlongsideTheClientIP(t *testing.T) {
+	const clientIP, otherIP = "203.0.113.7", "198.51.100.9"
+	for name, forwarded := range map[string]string{"allowed client": clientIP, "refused client": otherIP} {
+		t.Run(name, func(t *testing.T) {
+			github := newMCPRoutingUpstream(t, namedTools("list_issues")...)
+			github.call = answering(`{"content":[]}`)
+			doc := mcpRuntimeDoc("company-tools", oas.MCPAggregatorTargetURL)
+			doc.SetTykMCPAggregatorExtension(&oas.TykMCPAggregator{Upstreams: []oas.TykMCPAggregatorUpstream{aggregated("github-mcp", "github")}})
+			doc.GetTykExtension().Middleware = &oas.Middleware{Global: &oas.Global{TransformRequestHeaders: &oas.TransformHeaders{
+				Enabled: true, Add: oas.Headers{{Name: "X-Acme-Tenant", Value: "acme"}},
+			}}}
+			ts := StartTest(nil)
+			t.Cleanup(ts.Close)
+			ts.Gw.LoadAPI(githubMCPProxyWithIPAccessControl(github.URL, []string{clientIP}, nil), requireToken(mcpRuntimeOASSpec(doc, true)))
+
+			res := postMCPToolsCall(t, ts, companyToolsKey(t, ts), toolCallParams("github__list_issues", `{}`, ""), "X-Forwarded-For", forwarded)
+
+			calls := github.observed(mcp.MethodToolsCall)
+			if forwarded == otherIP {
+				assert.Empty(t, calls, "the proxy's allow list sees the agent's address: %s", res.body)
+				return
+			}
+			require.Len(t, calls, 1, res.body)
+			assert.Equal(t, "acme", calls[0].Header.Get("X-Acme-Tenant"))
+		})
+	}
+}
