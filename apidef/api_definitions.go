@@ -146,6 +146,11 @@ const (
 
 	// Application protocols
 	AppProtocolMCP = "mcp"
+
+	// MCPAggregatorTargetURL is the reserved upstream URL of an MCP aggregator.
+	// An aggregator serves its catalogue from aggregated MCP proxies on the same
+	// gateway and never proxies to this URL.
+	MCPAggregatorTargetURL = "tyk://mcp-aggregator"
 )
 
 var (
@@ -1633,6 +1638,17 @@ func (a *APIDefinition) IsPairedMCPAdapterProxy() bool {
 		return path == "" || path == "/"
 	}
 	return mcpadapter.IsLoopPath(path)
+}
+
+// IsMCPAggregator returns true if this MCP API uses the reserved MCP aggregator
+// upstream. A non-MCP API with that target is an ordinary loop to an API named
+// "mcp-aggregator". The gateway's APISpec additionally requires the
+// x-tyk-mcp-aggregator extension.
+func (a *APIDefinition) IsMCPAggregator() bool {
+	if a == nil {
+		return false
+	}
+	return a.IsMCP() && strings.TrimSpace(a.Proxy.TargetURL) == MCPAggregatorTargetURL
 }
 
 // IsMCPManaged reports whether this API belongs to the MCP management surface.
