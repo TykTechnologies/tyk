@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"sync"
@@ -13,7 +14,9 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/mcp/catalogue"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/mcp/tooloverride"
 )
 
@@ -201,4 +204,52 @@ func (gw *Gateway) remoteMCPCatalogueClient(spec *APISpec) *http.Client {
 		Timeout:       remoteMCPCatalogueTimeout,
 		CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },
 	}
+}
+
+// remoteMCPToolsListView returns the admitted tool view when the request is a
+// tools/list on a remote MCP proxy that has one.
+func remoteMCPToolsListView(spec *APISpec, state *httpctx.JSONRPCRoutingState) *tooloverride.View {
+	if spec == nil || state == nil || state.Method != mcp.MethodToolsList {
+		return nil
+	}
+	return spec.MCPToolView()
+}
+
+// rewriteRemoteMCPToolsList applies view to a tools/list response body. A
+// body that cannot be rewritten is passed through unchanged.
+func rewriteRemoteMCPToolsList(spec *APISpec, view *tooloverride.View, state *httpctx.JSONRPCRoutingState, body []byte, logger *logrus.Entry) ([]byte, bool) {
+	logger = logger.WithFields(logrus.Fields{"api_id": spec.APIID, "api_name": spec.Name})
+	out, changed, missing, err := view.RewriteToolsList(body, isFirstToolsListPage(state))
+	if err != nil {
+		logger.WithError(err).Debug("Upstream tools/list response was not rewritten with MCP tool overrides")
+		return body, false
+	}
+	now := time.Now()
+	for _, source := range missing {
+		if view.ShouldWarnMissing(source, now) {
+			logger.WithField("source_tool", source).Warning("MCP tool override source tool is not in the upstream tool list; it is not exposed")
+		}
+	}
+	return out, changed
+}
+
+func isFirstToolsListPage(state *httpctx.JSONRPCRoutingState) bool {
+	var params struct {
+		Cursor *string `json:"cursor"`
+	}
+	if len(state.Params) > 0 && json.Unmarshal(state.Params, &params) != nil {
+		return false
+	}
+	return params.Cursor == nil
+}
+
+// remoteMCPToolViewBypassesCache keeps the response cache away from
+// tools/list and tools/call while a tool view is active, so entries stored
+// before the view changed are never replayed.
+func remoteMCPToolViewBypassesCache(spec *APISpec, r *http.Request) bool {
+	if spec == nil || r == nil || spec.MCPToolView() == nil {
+		return false
+	}
+	state := httpctx.GetJSONRPCRoutingState(r)
+	return state != nil && (state.Method == mcp.MethodToolsList || state.Method == mcp.MethodToolsCall)
 }

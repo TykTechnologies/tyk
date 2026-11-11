@@ -51,16 +51,23 @@ func (h *MCPListFilterResponseHandler) HandleResponse(_ http.ResponseWriter, res
 
 	listCfg := h.listConfig(state.Method)
 	discovery := state.Method == mcp.MethodServerDiscover
+	toolView := remoteMCPToolsListView(h.Spec, state)
 	var filter func([]byte) ([]byte, bool, error)
 	switch {
 	case listCfg != nil:
 		ruleSets := effectiveMCPListRuleSets(h.Spec, ses, listCfg)
-		if len(ruleSets) == 0 {
+		if len(ruleSets) == 0 && toolView == nil {
 			return nil
 		}
 		filter = func(body []byte) ([]byte, bool, error) {
-			filtered, changed := mcp.FilterJSONRPCBodyWithRuleSets(body, listCfg, ruleSets)
-			return filtered, changed, nil
+			edited := false
+			if toolView != nil {
+				body, edited = rewriteRemoteMCPToolsList(h.Spec, toolView, state, body, h.logger())
+			}
+			if filtered, changed := mcp.FilterJSONRPCBodyWithRuleSets(body, listCfg, ruleSets); changed {
+				return filtered, true, nil
+			}
+			return body, edited, nil
 		}
 	case state.Method == mcp.MethodInitialize:
 		ruleSets := effectiveJSONRPCMethodRuleSets(h.Spec, ses)
@@ -117,6 +124,11 @@ func (h *MCPListFilterResponseHandler) HandleResponse(_ http.ResponseWriter, res
 	res.Body = io.NopCloser(bytes.NewReader(newBody))
 	res.ContentLength = int64(len(newBody))
 	res.Header.Set("Content-Length", strconv.Itoa(len(newBody)))
+	if toolView != nil {
+		// The upstream validators describe the unmodified catalogue.
+		res.Header.Del("ETag")
+		res.Header.Del("Last-Modified")
+	}
 	if state.Method != mcp.MethodServerDiscover {
 		markMCPResponseEdited(req)
 	}
