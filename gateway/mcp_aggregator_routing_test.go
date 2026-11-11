@@ -581,11 +581,8 @@ func TestMCPAggregatorSendsEachToolCallToTheProxyExactlyOnce(t *testing.T) {
 
 // TestMCPAggregatorToolCallsCountOnceAgainstTheProxysRateLimit checks that
 // an aggregated call spends the proxy's API-level rate limit exactly as a
-// direct call to the proxy does: the aggregator adds no request of its own.
-// Both are refused at the same call. That call is not the 11th of a 10 per
-// minute limit, because the proxy's JSON-RPC routing checks the API-level
-// limit again on each VEM hop of a tools/call (listen path, tools/call VEM,
-// tool VEM), on direct calls as well.
+// direct call to the proxy does: the aggregator adds no request of its own,
+// so both are refused at the 11th call of a 10 per minute limit.
 func TestMCPAggregatorToolCallsCountOnceAgainstTheProxysRateLimit(t *testing.T) {
 	orders := newMCPRoutingUpstream(t, namedTools("list_orders")...)
 	orders.call = answering(`{"content":[]}`)
@@ -609,7 +606,7 @@ func TestMCPAggregatorToolCallsCountOnceAgainstTheProxysRateLimit(t *testing.T) 
 	})
 
 	firstRefused := func(call func() mcpTestResponse) (int, mcpTestResponse) {
-		for i := 1; i <= 11; i++ {
+		for i := 1; i <= 12; i++ {
 			if res := call(); res.rpc.Error != nil {
 				return i, res
 			}
@@ -623,8 +620,9 @@ func TestMCPAggregatorToolCallsCountOnceAgainstTheProxysRateLimit(t *testing.T) 
 		return postMCPToolsCall(t, ts, key, toolCallParams("orders__list_orders", `{}`, ""))
 	})
 
-	require.NotZero(t, direct, "the direct calls were never rate-limited")
-	assert.Equal(t, direct, viaAggregator, "the aggregator adds no request against the proxy's limit")
+	assert.Equal(t, 11, direct, "a direct call counts once against the proxy's limit")
+	assert.Equal(t, 11, viaAggregator, "the aggregator adds no request against the proxy's limit")
+	assert.Equal(t, 20, len(orders.observed(mcp.MethodToolsCall)), "each admitted call reaches the upstream once")
 	require.NotNil(t, refused.rpc.Error)
 	assert.Equal(t, jsonrpcerrors.CodeModernRateLimitExceeded, refused.rpc.Error.Code, "the orders chain refuses the call")
 	assert.Equal(t, http.StatusOK, refused.status, "the proxy's 429 stays on the aggregator's hop")

@@ -60,7 +60,7 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 	}
 
 	session := ctxGetSession(r)
-	mcpVirtualEndpoint := isMCPJSONRPCVirtualEndpointLoop(k.Spec, r)
+	mcpVirtualEndpoint := isOwnMCPJSONRPCVirtualEndpointHop(k.Spec, r)
 	if mcpVirtualEndpoint {
 		// Public ingress already consumed the credential's global rate and
 		// quota. VEM hops must still enforce matching credential endpoint limits;
@@ -177,4 +177,11 @@ func (k *RateLimitAndQuotaCheck) ProcessRequest(w http.ResponseWriter, r *http.R
 
 func isMCPJSONRPCVirtualEndpointLoop(spec *APISpec, r *http.Request) bool {
 	return spec != nil && spec.IsMCP() && httpctx.IsSelfLooping(r) && httpctx.GetJSONRPCRoutingState(r) != nil
+}
+
+// isOwnMCPJSONRPCVirtualEndpointHop reports whether r is a JSON-RPC VEM hop
+// of spec's own routing, not a request another MCP API looped into spec while
+// carrying its routing state.
+func isOwnMCPJSONRPCVirtualEndpointHop(spec *APISpec, r *http.Request) bool {
+	return isMCPJSONRPCVirtualEndpointLoop(spec, r) && httpctx.GetJSONRPCRoutingState(r).APIID == spec.APIID
 }
