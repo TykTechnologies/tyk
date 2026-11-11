@@ -554,16 +554,16 @@ func TestRemoteMCPToolView_ToolsListAnnotations(t *testing.T) {
 			tools, names, result := listedTools(t, body)
 
 			assert.Equal(t, []string{"delete_repo", "create_issue", "merge_branch", "list_repos"}, names)
-			t.Run("A1 delete_repo without upstream annotations marked destructive", func(t *testing.T) {
+			t.Run("delete_repo without upstream annotations marked destructive", func(t *testing.T) {
 				assert.JSONEq(t, `{"name":"delete_repo","description":"Delete a repository","inputSchema":{"type":"object","properties":{"repo":{"type":"string"}}},"annotations":{"destructiveHint":true}}`, string(tools["delete_repo"]))
 			})
-			t.Run("A2 A3 idempotentHint and openWorldHint true overridden with false", func(t *testing.T) {
+			t.Run("idempotentHint and openWorldHint true overridden with false", func(t *testing.T) {
 				assert.JSONEq(t, `{"name":"merge_branch","inputSchema":{"type":"object"},"annotations":{"idempotentHint":false,"openWorldHint":false}}`, string(tools["merge_branch"]))
 			})
-			t.Run("A4 only annotations.title changes; upstream hints and top-level title kept", func(t *testing.T) {
+			t.Run("only annotations.title changes; upstream hints and top-level title kept", func(t *testing.T) {
 				assert.JSONEq(t, `{"name":"create_issue","title":"Create issue","description":"Open an issue","inputSchema":{"type":"object"},"annotations":{"title":"Create GitHub issue","idempotentHint":false,"destructiveHint":false,"x-vendor":"kept"},"_meta":{"io.example/x":1},"vendorField":[1,2]}`, string(tools["create_issue"]))
 			})
-			t.Run("A6 tool without override unchanged and result fields kept", func(t *testing.T) {
+			t.Run("tool without override unchanged and result fields kept", func(t *testing.T) {
 				assert.JSONEq(t, upstreamListRepos, string(tools["list_repos"]))
 				assert.JSONEq(t, `{"upstream":"kept"}`, string(result["_meta"]))
 			})
