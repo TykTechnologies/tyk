@@ -7,13 +7,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	tykctx "github.com/TykTechnologies/tyk/ctx"
-	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"net/http"
 	"strings"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
 
+	tykctx "github.com/TykTechnologies/tyk/ctx"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/request"
 )
@@ -137,6 +137,8 @@ func (d mcpAggregatorDispatcher) exchange(parent *http.Request, spec *APISpec, m
 	req.Header.Set(mcp.HeaderProtocolVersion, mcp.ModernProtocolVersion)
 	req.Header.Set(mcp.HeaderMethod, method)
 	ctxSetMCPAggregatorLoopTrust(req, trust)
+	sink := &mcpAggregatorErrorSink{}
+	setCtxValue(req, mcpAggregatorErrorSinkKey, sink)
 
 	rec := d.newResponseRecorder()
 	// The chain runs apart from this goroutine so that the caller's
@@ -161,8 +163,9 @@ func (d mcpAggregatorDispatcher) exchange(parent *http.Request, spec *APISpec, m
 	if panicked != nil {
 		return nil, fmt.Errorf("%s aborted: %v", method, panicked)
 	}
-	// The chain has finished with req, so its error classification can be read.
-	rec.classification = tykctx.GetErrorClassification(req)
+	// The chain has finished, so the classification its error handler
+	// recorded can be read.
+	rec.classification = sink.classification
 	if err := d.recorded(rec); err != nil {
 		return nil, err
 	}
@@ -311,4 +314,24 @@ func mcpAggregatorEventStreamResponse(body []byte) ([]byte, error) {
 		return event, nil
 	}
 	return nil, errors.New("event stream has no JSON-RPC response")
+}
+
+const mcpAggregatorErrorSinkKey mcpContextKey = "mcp_aggregator_error_sink"
+
+// mcpAggregatorErrorSink receives the error classification of an aggregated
+// proxy's refusal. It travels in the internal request's context, so the
+// error handler reaches it even when tracing runs the chain on a copy of the
+// request, which keeps the classification on that copy.
+type mcpAggregatorErrorSink struct {
+	classification *tykerrors.ErrorClassification
+}
+
+// recordMCPAggregatorErrorClassification hands the classification of an error
+// handled for an aggregator's internal request to the waiting dispatcher.
+func recordMCPAggregatorErrorClassification(r *http.Request) {
+	if sink, ok := r.Context().Value(mcpAggregatorErrorSinkKey).(*mcpAggregatorErrorSink); ok {
+		if classification := tykctx.GetErrorClassification(r); classification != nil {
+			sink.classification = classification
+		}
+	}
 }

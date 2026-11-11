@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,9 +12,12 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
 	"github.com/TykTechnologies/tyk/internal/mcp"
+	"github.com/TykTechnologies/tyk/internal/rate"
+	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -54,8 +58,7 @@ func TestMCPProxyAPIRateLimitCountsEachRequestOnce(t *testing.T) {
 		t.Run(method, func(t *testing.T) {
 			orders := newMCPRoutingUpstream(t, namedTools("list_orders")...)
 			orders.call = answering(`{"content":[]}`)
-			ts := StartTest(nil)
-			t.Cleanup(ts.Close)
+			ts := startExactRateLimitTest(t)
 			ts.Gw.LoadAPI(withAPIRateLimit(remoteMCPProxyRuntimeSpec("orders-mcp", orders.URL), 10, 60))
 			key := mcpProxyKey(t, ts, "orders-mcp")
 
@@ -74,7 +77,7 @@ func TestMCPProxyAPIRateLimitCountsEachRequestOnce(t *testing.T) {
 // never take JSON-RPC VEM hops and its rate-limit error is the gateway's
 // generic one.
 func TestAPIToMCPProxyAPIRateLimitCountsEachRequestOnce(t *testing.T) {
-	ts, _, ordersBackend := startMCPAggregatorRuntimeTest(t)
+	ts, _, ordersBackend := startMCPAggregatorRuntimeTestWith(t)
 	proxy := withAPIRateLimit(ordersMCPProxyRuntimeSpec(), 10, 60)
 	require.False(t, proxy.IsMCP())
 	ts.Gw.LoadAPI(ordersRESTSourceSpec(ordersBackend.URL, false), proxy)
@@ -93,6 +96,8 @@ func TestAPIToMCPProxyAPIRateLimitCountsEachRequestOnce(t *testing.T) {
 // check_limits, on an MCP API or not, still spends it, and so does a loop
 // carrying another API's routing state.
 func TestAPIRateLimitStillCountsLoopsOutsideMCPRouting(t *testing.T) {
+	// The default limiter keys each limiter's bucket by its load time, so the
+	// unloaded limiters below start empty on every run.
 	ts := StartTest(nil)
 	t.Cleanup(ts.Close)
 
@@ -163,8 +168,7 @@ func TestChainedMCPProxyStillSpendsTheNextProxysAPILimit(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			back := newMCPRoutingUpstream(t, namedTools("list_orders")...)
 			back.call = answering(`{"content":[]}`)
-			ts := StartTest(nil)
-			t.Cleanup(ts.Close)
+			ts := startExactRateLimitTest(t)
 			ts.Gw.LoadAPI(
 				remoteMCPProxyRuntimeSpec("front-mcp", target),
 				withAPIRateLimit(remoteMCPProxyRuntimeSpec("back-mcp", back.URL), 3, 60),
@@ -198,8 +202,7 @@ func TestChainedMCPProxyStillSpendsTheNextProxysAPILimit(t *testing.T) {
 func TestChainedMCPProxyStillSpendsTheKeysLimitOnTheNextProxy(t *testing.T) {
 	back := newMCPRoutingUpstream(t, namedTools("list_orders")...)
 	back.call = answering(`{"content":[]}`)
-	ts := StartTest(nil)
-	t.Cleanup(ts.Close)
+	ts := startExactRateLimitTest(t)
 	ts.Gw.LoadAPI(
 		remoteMCPProxyRuntimeSpec("front-mcp", "tyk://back-mcp"),
 		remoteMCPProxyRuntimeSpec("back-mcp", back.URL),
@@ -256,8 +259,7 @@ func TestVersionedMCPProxyCountsEachRequestOnce(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			upstream := newMCPRoutingUpstream(t, namedTools("list_orders")...)
 			upstream.call = answering(`{"content":[]}`)
-			ts := StartTest(nil)
-			t.Cleanup(ts.Close)
+			ts := startExactRateLimitTest(t)
 			base, child := versionedMCPProxy(upstream.URL)
 			if tc.apiLimit {
 				child = withAPIRateLimit(child, 3, 60)
@@ -283,4 +285,52 @@ func TestVersionedMCPProxyCountsEachRequestOnce(t *testing.T) {
 			assert.Equal(t, 3, len(upstream.observed(mcp.MethodToolsCall)), "each admitted call reaches the child's upstream once")
 		})
 	}
+}
+
+// startExactRateLimitTest starts a gateway with the Redis rolling limiter,
+// which counts every request exactly, so tests can assert the call a limit
+// refuses; the default limiter is approximate. Its API-level windows live in
+// Redis under the API's ID, so they are removed when the test ends, before
+// another test or run loads an API with the same ID.
+func startExactRateLimitTest(t *testing.T, conf ...func(*config.Config)) *Test {
+	t.Helper()
+	ts := StartTest(func(c *config.Config) {
+		c.EnableRedisRollingLimiter = true
+		for _, f := range conf {
+			f(c)
+		}
+	})
+	t.Cleanup(ts.Close)
+	t.Cleanup(func() { clearAPIRateLimitWindows(t, ts) })
+	return ts
+}
+
+// clearAPIRateLimitWindows deletes the Redis rolling windows of the loaded
+// APIs' API-level rate limits.
+func clearAPIRateLimitWindows(t *testing.T, ts *Test) {
+	t.Helper()
+	ts.Gw.apisMu.RLock()
+	keys := make([]string, 0, len(ts.Gw.apisByID))
+	for _, spec := range ts.Gw.apisByID {
+		hash := storage.HashKey("apilimiter-"+spec.OrgID+spec.APIID, ts.Gw.GetConfig().HashKeys)
+		keys = append(keys, rate.Prefix(rate.LimiterKeyPrefix, hash))
+	}
+	ts.Gw.apisMu.RUnlock()
+	if len(keys) > 0 && ts.Gw.SessionLimiter.limiterStorage != nil {
+		require.NoError(t, ts.Gw.SessionLimiter.limiterStorage.Del(context.Background(), keys...).Err())
+	}
+}
+
+// startMCPAggregatorRuntimeTestWith is startMCPAggregatorRuntimeTest on a
+// gateway from startExactRateLimitTest.
+func startMCPAggregatorRuntimeTestWith(t *testing.T, conf ...func(*config.Config)) (*Test, *mockRemoteMCPServer, *httptest.Server) {
+	t.Helper()
+	ts := startExactRateLimitTest(t, conf...)
+	github := newMockRemoteMCPServer(t, "search_repos", "create_issue")
+	ordersBackend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`[]`))
+	}))
+	t.Cleanup(ordersBackend.Close)
+	return ts, github, ordersBackend
 }

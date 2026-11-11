@@ -586,8 +586,7 @@ func TestMCPAggregatorSendsEachToolCallToTheProxyExactlyOnce(t *testing.T) {
 func TestMCPAggregatorToolCallsCountOnceAgainstTheProxysRateLimit(t *testing.T) {
 	orders := newMCPRoutingUpstream(t, namedTools("list_orders")...)
 	orders.call = answering(`{"content":[]}`)
-	ts := StartTest(nil)
-	t.Cleanup(ts.Close)
+	ts := startExactRateLimitTest(t)
 	limited := func(apiID string) *APISpec {
 		spec := remoteMCPProxyRuntimeSpec(apiID, orders.URL)
 		spec.GlobalRateLimit = apidef.GlobalRateLimit{Rate: 10, Per: 60}

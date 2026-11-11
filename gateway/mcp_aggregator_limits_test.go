@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/config"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
@@ -44,8 +45,7 @@ func TestMCPAggregatorRateLimitsStackAcrossChains(t *testing.T) {
 		t.Helper()
 		orders := newMCPRoutingUpstream(t, namedTools("list_orders")...)
 		orders.call = answering(`{"content":[]}`)
-		ts := StartTest(nil)
-		t.Cleanup(ts.Close)
+		ts := startExactRateLimitTest(t)
 		ts.Gw.LoadAPI(
 			withAPIRateLimit(remoteMCPProxyRuntimeSpec("orders-mcp", orders.URL), ordersRate, 60),
 			remoteMCPProxyRuntimeSpec("github-mcp", newMCPRoutingUpstream(t, namedTools("list_issues")...).URL),
@@ -119,7 +119,7 @@ func TestMCPAggregatorIgnoresConsumerQuotasOfTheAggregatedProxy(t *testing.T) {
 // gateway's generic {"error":"..."} body rather than JSON-RPC: the agent still
 // gets a JSON-RPC error object.
 func TestMCPAggregatorAnswersAnAPIToMCPProxysRateLimitAsAJSONRPCError(t *testing.T) {
-	ts, _, ordersBackend := startMCPAggregatorRuntimeTest(t)
+	ts, _, ordersBackend := startMCPAggregatorRuntimeTestWith(t)
 	ts.Gw.LoadAPI(
 		ordersRESTSourceSpec(ordersBackend.URL, false),
 		withAPIRateLimit(ordersMCPProxyRuntimeSpec(), 10, 60),
@@ -159,6 +159,40 @@ func TestMCPAggregatorMapsAProxysGenericRefusalToTheGatewaysCode(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.JSONEq(t, tc.want, string(reply.Error))
+		})
+	}
+}
+
+// TestMCPAggregatorKeepsTheProxyChainsErrorClassificationWithTracing checks
+// that the code for an API-to-MCP proxy's generic refusal comes from its
+// chain's classification whether or not traces wrap the chain, which then
+// runs on a copy of the dispatcher's request: an IP block is -33005, not the
+// -33002 a bare 403 would give.
+func TestMCPAggregatorKeepsTheProxyChainsErrorClassificationWithTracing(t *testing.T) {
+	const blockedIP = "203.0.113.9"
+	for _, traces := range []bool{false, true} {
+		t.Run(map[bool]string{false: "traces off", true: "traces on"}[traces], func(t *testing.T) {
+			collector := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }))
+			t.Cleanup(collector.Close)
+			ts, _, ordersBackend := startMCPAggregatorRuntimeTestWith(t, func(c *config.Config) {
+				if traces {
+					c.OpenTelemetry.Enabled = true
+					c.OpenTelemetry.Exporter = "http"
+					c.OpenTelemetry.Endpoint = collector.URL
+					c.OpenTelemetry.SpanProcessorType = "simple"
+				}
+			})
+			orders := ordersMCPProxyRuntimeSpec()
+			orders.EnableIpBlacklisting = true
+			orders.BlacklistedIPs = []string{blockedIP}
+			ts.Gw.LoadAPI(ordersRESTSourceSpec(ordersBackend.URL, false), orders, companyToolsRuntimeSpec(aggregated("orders-mcp", "orders")))
+			require.Equal(t, traces, ts.Gw.GetConfig().OpenTelemetry.TracesEnabled())
+
+			res := postMCPToolsCall(t, ts, companyToolsKey(t, ts), toolCallParams("orders__list_orders", `{}`, ""), "X-Real-IP", blockedIP)
+
+			assert.Equal(t, http.StatusOK, res.status, res.body)
+			require.NotNil(t, res.rpc.Error, res.body)
+			assert.Equal(t, jsonrpcerrors.CodeModernIPBlocked, res.rpc.Error.Code, res.body)
 		})
 	}
 }

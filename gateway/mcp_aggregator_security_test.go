@@ -21,7 +21,12 @@ func startMCPAggregatorSecurityTest(t *testing.T) (ts *Test, orders, github *mcp
 	orders.call = answering(`{"content":[]}`)
 	github = newMCPRoutingUpstream(t, namedTools("list_issues", "create_issue")...)
 	github.call = answering(`{"content":[]}`)
-	ts, _ = startMCPAggregatorRoutingTest(t, orders, github)
+	ts = startExactRateLimitTest(t)
+	ts.Gw.LoadAPI(
+		remoteMCPProxyRuntimeSpec("orders-mcp", orders.URL),
+		remoteMCPProxyRuntimeSpec("github-mcp", github.URL),
+		companyToolsRuntimeSpec(aggregated("orders-mcp", "orders"), aggregated("github-mcp", "github")),
+	)
 	return ts, orders, github
 }
 
