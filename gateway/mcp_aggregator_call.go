@@ -263,7 +263,7 @@ func (d mcpAggregatorDispatcher) callTool(parent *http.Request, upstream mcpaggr
 	case len(resp.Error) > 0 && string(resp.Error) != "null" && isMCPUnknownToolError(resp.Error):
 		return nil, errMCPAggregatorUnknownTool
 	case len(resp.Error) > 0 && string(resp.Error) != "null" && !isJSONObject(resp.Error):
-		return mcpAggregatorGatewayErrorReply(parent, rec.statusCode, resp.Error)
+		return mcpAggregatorGatewayErrorReply(parent, rec.statusCode, rec.classification, resp.Error)
 	case len(resp.Error) > 0 && string(resp.Error) != "null":
 		return &mcpAggregatorToolReply{Error: resp.Error}, nil
 	case rec.statusCode >= http.StatusBadRequest || len(resp.Result) == 0:
@@ -281,19 +281,15 @@ func isJSONObject(raw json.RawMessage) bool {
 // the gateway's generic {"error":"..."} form, as an API-to-MCP proxy does
 // before it reaches JSON-RPC routing, into the JSON-RPC error object the proxy
 // would have written as an MCP API: the code the gateway selects for the HTTP
-// status on 2026-07-28, the message, and data.http_code.
-func mcpAggregatorGatewayErrorReply(parent *http.Request, status int, raw json.RawMessage) (*mcpAggregatorToolReply, error) {
+// status and the proxy chain's error classification on 2026-07-28, the
+// message, and data.http_code.
+func mcpAggregatorGatewayErrorReply(parent *http.Request, status int, classification *tykerrors.ErrorClassification, raw json.RawMessage) (*mcpAggregatorToolReply, error) {
 	if status < http.StatusBadRequest {
 		return nil, mcpAggregatorUnavailable("tools/call failed with HTTP %d: invalid JSON-RPC response", status)
 	}
 	var message string
 	if json.Unmarshal(raw, &message) != nil || message == "" {
 		message = http.StatusText(status)
-	}
-	// A 403 is an access denial unless the gateway's message says quota.
-	var classification *tykerrors.ErrorClassification
-	if status == http.StatusForbidden && strings.Contains(strings.ToLower(message), "quota") {
-		classification = tykerrors.NewErrorClassification(tykerrors.QEX, "quota_exceeded")
 	}
 	encoded, err := json.Marshal(jsonrpcerrors.JSONRPCError{
 		Code:    jsonrpcerrors.SelectJSONRPCCode(status, classification, httpctx.GetMCPProtocolContext(parent)),

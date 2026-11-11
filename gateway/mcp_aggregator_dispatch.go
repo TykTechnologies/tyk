@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	tykctx "github.com/TykTechnologies/tyk/ctx"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"net/http"
 	"strings"
 
@@ -159,6 +161,8 @@ func (d mcpAggregatorDispatcher) exchange(parent *http.Request, spec *APISpec, m
 	if panicked != nil {
 		return nil, fmt.Errorf("%s aborted: %v", method, panicked)
 	}
+	// The chain has finished with req, so its error classification can be read.
+	rec.classification = tykctx.GetErrorClassification(req)
 	if err := d.recorded(rec); err != nil {
 		return nil, err
 	}
@@ -180,6 +184,8 @@ type mcpAggregatorResponseRecorder struct {
 	exceeded bool
 	// budgeted is set when the limit is what is left of a byte budget.
 	budgeted bool
+	// classification is how the proxy's chain classified its refusal, if any.
+	classification *tykerrors.ErrorClassification
 }
 
 func (w *mcpAggregatorResponseRecorder) Write(data []byte) (int, error) {

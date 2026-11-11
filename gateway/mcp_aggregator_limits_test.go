@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
 	"github.com/TykTechnologies/tyk/internal/mcp"
@@ -142,17 +143,19 @@ func TestMCPAggregatorMapsAProxysGenericRefusalToTheGatewaysCode(t *testing.T) {
 	parent := httptest.NewRequest(http.MethodPost, "/company-tools/", nil)
 	httpctx.SetMCPProtocolContext(parent, &mcp.ProtocolContext{EffectiveProtocolVersion: mcp.ModernProtocolVersion})
 	for name, tc := range map[string]struct {
-		status int
-		body   string
-		want   string
+		status         int
+		classification *tykerrors.ErrorClassification
+		body           string
+		want           string
 	}{
-		"rate limit":    {http.StatusTooManyRequests, `"API Rate Limit Exceeded"`, `{"code":-33004,"message":"API Rate Limit Exceeded","data":{"http_code":429}}`},
-		"quota":         {http.StatusForbidden, `"Quota exceeded"`, `{"code":-33003,"message":"Quota exceeded","data":{"http_code":403}}`},
-		"access denied": {http.StatusForbidden, `"Access to this API has been disallowed"`, `{"code":-33002,"message":"Access to this API has been disallowed","data":{"http_code":403}}`},
-		"not a string":  {http.StatusUnauthorized, `42`, `{"code":-33001,"message":"Unauthorized","data":{"http_code":401}}`},
+		"rate limit":                             {http.StatusTooManyRequests, tykerrors.ClassifyRateLimitError(tykerrors.ErrTypeAPIRateLimit, "RateLimitForAPI"), `"API Rate Limit Exceeded"`, `{"code":-33004,"message":"API Rate Limit Exceeded","data":{"http_code":429}}`},
+		"quota":                                  {http.StatusForbidden, tykerrors.ClassifyQuotaExceededError("RateLimitAndQuotaCheck"), `"Quota exceeded"`, `{"code":-33003,"message":"Quota exceeded","data":{"http_code":403}}`},
+		"access denied":                          {http.StatusForbidden, nil, `"Access to this API has been disallowed"`, `{"code":-33002,"message":"Access to this API has been disallowed","data":{"http_code":403}}`},
+		"quota wording without a classification": {http.StatusForbidden, nil, `"Quota exceeded"`, `{"code":-33002,"message":"Quota exceeded","data":{"http_code":403}}`},
+		"not a string":                           {http.StatusUnauthorized, nil, `42`, `{"code":-33001,"message":"Unauthorized","data":{"http_code":401}}`},
 	} {
 		t.Run(name, func(t *testing.T) {
-			reply, err := mcpAggregatorGatewayErrorReply(parent, tc.status, json.RawMessage(tc.body))
+			reply, err := mcpAggregatorGatewayErrorReply(parent, tc.status, tc.classification, json.RawMessage(tc.body))
 
 			require.NoError(t, err)
 			assert.JSONEq(t, tc.want, string(reply.Error))
