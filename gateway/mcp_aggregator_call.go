@@ -181,7 +181,8 @@ func isMCPUnknownToolError(raw json.RawMessage) bool {
 // callTool forwards a tools/call to an aggregated MCP proxy. Only the name in
 // params changes, to the proxy's own tool name; arguments, _meta and every
 // other field keep their bytes. Mcp-Name mirrors the new name, and the
-// agent's Mcp-Param-* headers travel with the call.
+// agent's Mcp-Param-* headers and the headers the aggregator's request header
+// transform set travel with the call.
 func (d mcpAggregatorDispatcher) callTool(parent *http.Request, upstream mcpaggregator.Upstream, tool string, params json.RawMessage) (*mcpAggregatorToolReply, error) {
 	spec, err := d.upstreamSpec(upstream.APIID)
 	if err != nil {
@@ -200,7 +201,7 @@ func (d mcpAggregatorDispatcher) callTool(parent *http.Request, upstream mcpaggr
 	body = append(body, forwarded...)
 	body = append(body, '}')
 
-	extra := http.Header{}
+	extra := mcpAggregatorTransformedHeaders(parent)
 	for name, values := range parent.Header {
 		if strings.HasPrefix(http.CanonicalHeaderKey(name), mcp.HeaderParamPrefix) {
 			extra[name] = values
@@ -302,4 +303,65 @@ func writeMCPAggregatorRaw(w http.ResponseWriter, status int, id any, member str
 	_, _ = fmt.Fprintf(w, `{"jsonrpc":%q,"id":%s,%q:`, apidef.JsonRPC20, encodedID, member)
 	_, _ = w.Write(raw)
 	_, _ = w.Write([]byte("}\n"))
+}
+
+const mcpAggregatorTransformedHeadersKey mcpContextKey = "mcp_aggregator_transformed_headers"
+
+// ctxAddMCPAggregatorTransformedHeaders records the names of the request
+// headers an aggregator's header transform set on this request.
+func ctxAddMCPAggregatorTransformedHeaders(r *http.Request, names []string) {
+	if len(names) == 0 {
+		return
+	}
+	previous, _ := r.Context().Value(mcpAggregatorTransformedHeadersKey).([]string)
+	setCtxValue(r, mcpAggregatorTransformedHeadersKey, append(slices.Clone(previous), names...))
+}
+
+// mcpAggregatorTransformedHeaders returns the headers the aggregator's
+// request header transform set, with their current values, for the internal
+// call to an aggregated MCP proxy. Agent headers are never forwarded this
+// way, and neither are the headers mcpAggregatorForwardsTransformedHeader
+// refuses.
+func mcpAggregatorTransformedHeaders(r *http.Request) http.Header {
+	names, _ := r.Context().Value(mcpAggregatorTransformedHeadersKey).([]string)
+	out := http.Header{}
+	for _, name := range names {
+		if !mcpAggregatorForwardsTransformedHeader(name) {
+			continue
+		}
+		values := r.Header[name]
+		if len(values) == 0 {
+			values = r.Header.Values(name)
+		}
+		if len(values) > 0 {
+			out[name] = slices.Clone(values)
+		}
+	}
+	return out
+}
+
+// Headers a transform may set that never travel to the proxy hop: credentials,
+// client-address and gateway-internal headers (the client address travels in
+// the request context), and headers that frame the internal request.
+var (
+	mcpAggregatorUnforwardedHeaders = []string{
+		"Authorization", "Cookie", "Forwarded", "X-Real-Ip",
+		"Accept", "Content-Type", "Content-Length", "Content-Encoding", "Host",
+	}
+	mcpAggregatorUnforwardedHeaderPrefixes = []string{"Mcp-", "Proxy-", "X-Forwarded-", "X-Tyk-"}
+)
+
+func mcpAggregatorForwardsTransformedHeader(name string) bool {
+	canonical := http.CanonicalHeaderKey(name)
+	for _, prefix := range mcpAggregatorUnforwardedHeaderPrefixes {
+		if strings.HasPrefix(canonical, prefix) {
+			return false
+		}
+	}
+	for _, blocked := range slices.Concat(mcpAggregatorUnforwardedHeaders, hopHeaders) {
+		if strings.EqualFold(canonical, blocked) {
+			return false
+		}
+	}
+	return true
 }
