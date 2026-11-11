@@ -293,7 +293,10 @@ func replaceJSONObjectField(object json.RawMessage, key string, value []byte) ([
 		if err := dec.Decode(&raw); err != nil {
 			return nil, err
 		}
-		field, _ := tok.(string)
+		field, ok := tok.(string)
+		if !ok {
+			return nil, errors.New("params must be a JSON object")
+		}
 		if !strings.EqualFold(field, key) {
 			continue
 		}
@@ -324,7 +327,13 @@ func writeMCPAggregatorRaw(w http.ResponseWriter, status int, id any, member str
 	}
 	w.Header().Set(headerContentType, contentTypeJSON)
 	w.WriteHeader(status)
-	_, _ = fmt.Fprintf(w, `{"jsonrpc":%q,"id":%s,%q:`, apidef.JsonRPC20, encodedID, member)
-	_, _ = w.Write(raw)
-	_, _ = w.Write([]byte("}\n"))
+	prefix := fmt.Appendf(nil, `{"jsonrpc":%q,"id":%s,%q:`, apidef.JsonRPC20, encodedID, member)
+	for _, part := range [][]byte{prefix, raw, []byte("}\n")} {
+		if _, err := w.Write(part); err != nil {
+			// The status line is already sent, so a failed write, usually a
+			// client that went away, can only be logged.
+			log.WithError(err).Warn("MCP aggregator could not write the JSON-RPC response")
+			return
+		}
+	}
 }

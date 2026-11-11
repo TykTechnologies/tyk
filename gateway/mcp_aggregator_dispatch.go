@@ -121,6 +121,7 @@ func (d mcpAggregatorDispatcher) exchange(parent *http.Request, spec *APISpec, m
 		return nil, errMCPAggregatorUpstreamNotLoaded
 	}
 
+	//nolint:gosec // G704: served in-process by the proxy's own chain below, never sent over the network.
 	req, err := http.NewRequestWithContext(mcpAggregatorUpstreamRequestContext(parent.Context(), request.RealIP(parent)), http.MethodPost, spec.Proxy.ListenPath, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
