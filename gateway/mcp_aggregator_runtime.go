@@ -293,9 +293,10 @@ func (d mcpAggregatorDispatcher) listUpstreamTools(parent *http.Request, upstrea
 	}
 	var tools []mcpAggregatorTool
 	names := make(map[string]struct{}, len(exposed))
+	selection := newMCPAggregatorToolSelection(upstream)
 	for _, tool := range exposed {
 		names[tool.Name] = struct{}{}
-		if !mcpAggregatorSelects(upstream, tool.Name) {
+		if !selection.selects(tool.Name) {
 			continue
 		}
 		aggregatedName := mcpaggregator.ToolName(upstream.Alias, tool.Name)
