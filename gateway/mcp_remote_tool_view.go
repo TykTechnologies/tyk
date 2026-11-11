@@ -219,15 +219,20 @@ func remoteMCPToolsListView(spec *APISpec, state *httpctx.JSONRPCRoutingState) *
 // body that cannot be rewritten is passed through unchanged.
 func rewriteRemoteMCPToolsList(spec *APISpec, view *tooloverride.View, state *httpctx.JSONRPCRoutingState, body []byte, logger *logrus.Entry) ([]byte, bool) {
 	logger = logger.WithFields(logrus.Fields{"api_id": spec.APIID, "api_name": spec.Name})
-	out, changed, missing, err := view.RewriteToolsList(body, isFirstToolsListPage(state))
+	out, changed, drift, err := view.RewriteToolsList(body, isFirstToolsListPage(state))
 	if err != nil {
 		logger.WithError(err).Debug("Upstream tools/list response was not rewritten with MCP tool overrides")
 		return body, false
 	}
 	now := time.Now()
-	for _, source := range missing {
+	for _, source := range drift.Missing {
 		if view.ShouldWarnMissing(source, now) {
 			logger.WithField("source_tool", source).Warning("MCP tool override source tool is not in the upstream tool list; it is not exposed")
+		}
+	}
+	for _, name := range drift.Hidden {
+		if view.ShouldWarnHidden(name, now) {
+			logger.WithField("upstream_tool", name).Warning("Upstream MCP tool has the name of a tool override and is hidden; the override is exposed under that name")
 		}
 	}
 	return out, changed

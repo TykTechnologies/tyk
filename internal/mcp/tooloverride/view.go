@@ -15,30 +15,50 @@ import (
 	"github.com/TykTechnologies/tyk/internal/mcp"
 )
 
-// MissingSourceWarningInterval is how often ShouldWarnMissing lets a warning
-// about the same missing source tool through.
+// MissingSourceWarningInterval is how often ShouldWarnMissing and
+// ShouldWarnHidden let a warning about the same tool through.
 const MissingSourceWarningInterval = 10 * time.Minute
 
 // View is the compiled set of tool overrides for one remote MCP proxy, keyed
-// by upstream tool name. The overrides are immutable; only the
-// missing-source warning state changes.
+// by upstream tool name. The overrides are immutable; only the warning state
+// changes.
 type View struct {
 	bySource map[string]*Override
-	// quotedSources are the source names as JSON strings, used to skip
-	// decoding tools that cannot have an override.
-	quotedSources [][]byte
+	// exposed maps every name the view exposes to its upstream source tool.
+	exposed map[string]string
+	// quotedNames are the source and exposed names as JSON strings, used to
+	// skip decoding tools that the view cannot affect.
+	quotedNames [][]byte
 
 	warnMu      sync.Mutex
-	lastWarning map[string]time.Time
+	lastWarning map[warning]time.Time
+}
+
+type warning struct {
+	hidden bool
+	tool   string
+}
+
+// Drift reports where an upstream tools/list response no longer matches the
+// overrides. Missing lists override sources that the complete list lacks.
+// Hidden lists upstream tools that were dropped because their own name is
+// bound to an override of another tool.
+type Drift struct {
+	Missing []string
+	Hidden  []string
 }
 
 // Override holds what a View changes on one upstream tool.
 type Override struct {
-	source      string
-	annotations []annotationField
+	source string
+	// name is the exposed name; it equals source when the tool is not renamed.
+	name string
+	// fields are the top-level tool fields that replace the upstream values.
+	fields      []jsonField
+	annotations []jsonField
 }
 
-type annotationField struct {
+type jsonField struct {
 	key   string
 	value json.RawMessage
 }
@@ -53,15 +73,31 @@ func Compile(ext *oas.TykMCPServer) (*View, error) {
 		return nil, err
 	}
 
-	view := &View{bySource: make(map[string]*Override, len(ext.Primitives))}
+	view := &View{
+		bySource: make(map[string]*Override, len(ext.Primitives)),
+		exposed:  make(map[string]string, len(ext.Primitives)),
+	}
 	for _, primitive := range ext.Primitives {
-		override := &Override{source: primitive.Source.ToolName}
+		override := &Override{source: primitive.Source.ToolName, name: primitive.Source.ToolName}
+		if primitive.Name != "" && primitive.Name != override.source {
+			override.name = primitive.Name
+			override.fields = append(override.fields, jsonField{key: "name", value: jsonString(primitive.Name)})
+			view.quotedNames = append(view.quotedNames, jsonString(primitive.Name))
+		}
+		if primitive.Description != "" {
+			override.fields = append(override.fields, jsonField{key: "description", value: jsonString(primitive.Description)})
+		}
 		override.annotations = compileAnnotations(primitive.Annotations)
 		view.bySource[override.source] = override
-		quoted, _ := json.Marshal(override.source) //nolint:errchkjson // a string always marshals
-		view.quotedSources = append(view.quotedSources, quoted)
+		view.exposed[override.name] = override.source
+		view.quotedNames = append(view.quotedNames, jsonString(override.source))
 	}
 	return view, nil
+}
+
+func jsonString(s string) json.RawMessage {
+	quoted, _ := json.Marshal(s) //nolint:errchkjson // a string always marshals
+	return quoted
 }
 
 // Override returns the override configured for an upstream tool.
@@ -76,26 +112,36 @@ func (v *View) Override(source string) (*Override, bool) {
 // ShouldWarnMissing reports whether a warning that source is missing from the
 // upstream tool list is due, so that per-request warnings are rate limited.
 func (v *View) ShouldWarnMissing(source string, now time.Time) bool {
+	return v.shouldWarn(warning{tool: source}, now)
+}
+
+// ShouldWarnHidden reports whether a warning that the upstream's own tool
+// called name is hidden behind an override is due. It is rate limited like
+// ShouldWarnMissing.
+func (v *View) ShouldWarnHidden(name string, now time.Time) bool {
+	return v.shouldWarn(warning{hidden: true, tool: name}, now)
+}
+
+func (v *View) shouldWarn(key warning, now time.Time) bool {
 	v.warnMu.Lock()
 	defer v.warnMu.Unlock()
-	if last, ok := v.lastWarning[source]; ok && now.Sub(last) < MissingSourceWarningInterval {
+	if last, ok := v.lastWarning[key]; ok && now.Sub(last) < MissingSourceWarningInterval {
 		return false
 	}
 	if v.lastWarning == nil {
-		v.lastWarning = map[string]time.Time{}
+		v.lastWarning = map[warning]time.Time{}
 	}
-	v.lastWarning[source] = now
+	v.lastWarning[key] = now
 	return true
 }
 
-func compileAnnotations(a *oas.DerivedToolAnnotations) []annotationField {
+func compileAnnotations(a *oas.DerivedToolAnnotations) []jsonField {
 	if a == nil {
 		return nil
 	}
-	var fields []annotationField
+	var fields []jsonField
 	if a.Title != "" {
-		title, _ := json.Marshal(a.Title) //nolint:errchkjson // a string always marshals
-		fields = append(fields, annotationField{key: "title", value: title})
+		fields = append(fields, jsonField{key: "title", value: jsonString(a.Title)})
 	}
 	for _, hint := range []struct {
 		key   string
@@ -107,7 +153,7 @@ func compileAnnotations(a *oas.DerivedToolAnnotations) []annotationField {
 		{"openWorldHint", a.OpenWorldHint},
 	} {
 		if hint.value != nil {
-			fields = append(fields, annotationField{key: hint.key, value: json.RawMessage(strconv.FormatBool(*hint.value))})
+			fields = append(fields, jsonField{key: hint.key, value: json.RawMessage(strconv.FormatBool(*hint.value))})
 		}
 	}
 	return fields
@@ -115,35 +161,38 @@ func compileAnnotations(a *oas.DerivedToolAnnotations) []annotationField {
 
 // RewriteToolsList applies the view to a JSON-RPC tools/list response body.
 //
-// Each tool is merged field by field: a configured annotation replaces the
-// upstream value (an explicit false included), and every other annotation
-// and tool field is kept, including unknown ones. Tools without an override
-// and responses that need no change are returned untouched, with changed
-// false. Error responses and server messages pass through.
+// Each overridden tool is merged field by field: a configured name or
+// description replaces the upstream value, a configured annotation replaces
+// the upstream annotation (an explicit false included), and every other
+// field is kept, including unknown ones. An upstream tool whose own name is
+// bound to an override of another tool is dropped and reported as hidden, so
+// the explicit override wins. Tools without an override and responses that
+// need no change are returned untouched, with changed false. Error responses
+// and server messages pass through.
 //
 // complete reports that the request asked for the first page; when the
 // response also has no nextCursor the list is the whole catalogue, and
-// sources of overrides that it does not contain are returned as missing.
-func (v *View) RewriteToolsList(body []byte, complete bool) (out []byte, changed bool, missing []string, err error) {
+// sources of overrides that it does not contain are reported as missing.
+func (v *View) RewriteToolsList(body []byte, complete bool) (out []byte, changed bool, drift Drift, err error) {
 	var envelope mcp.JSONRPCResponse
 	if err := json.Unmarshal(body, &envelope); err != nil {
-		return nil, false, nil, err
+		return nil, false, Drift{}, err
 	}
 	if envelope.Result == nil {
-		return body, false, nil, nil
+		return body, false, Drift{}, nil
 	}
 
 	var result map[string]json.RawMessage
 	if err := json.Unmarshal(envelope.Result, &result); err != nil {
-		return nil, false, nil, fmt.Errorf("invalid tools/list result: %w", err)
+		return nil, false, Drift{}, fmt.Errorf("invalid tools/list result: %w", err)
 	}
 	rawTools, ok := result["tools"]
 	if !ok {
-		return body, false, nil, nil
+		return body, false, Drift{}, nil
 	}
 	var tools []json.RawMessage
 	if err := json.Unmarshal(rawTools, &tools); err != nil {
-		return nil, false, nil, fmt.Errorf("invalid tools/list tools: %w", err)
+		return nil, false, Drift{}, fmt.Errorf("invalid tools/list tools: %w", err)
 	}
 
 	_, hasNextCursor := result["nextCursor"]
@@ -152,57 +201,67 @@ func (v *View) RewriteToolsList(body []byte, complete bool) (out []byte, changed
 		seen = make(map[string]struct{}, len(v.bySource))
 	}
 
-	for i, tool := range tools {
-		if !v.mayHaveOverride(tool) {
+	// Hidden tools are dropped in place; kept never overtakes the loop index.
+	kept := tools[:0]
+	for _, tool := range tools {
+		if !v.mayAffect(tool) {
+			kept = append(kept, tool)
 			continue
 		}
 		var named struct {
 			Name string `json:"name"`
 		}
 		if json.Unmarshal(tool, &named) != nil {
+			kept = append(kept, tool)
 			continue
 		}
-		override, ok := v.bySource[named.Name]
-		if !ok {
+		if override, ok := v.bySource[named.Name]; ok {
+			if seen != nil {
+				seen[named.Name] = struct{}{}
+			}
+			rewritten, toolChanged, err := override.apply(tool)
+			if err != nil {
+				return nil, false, Drift{}, fmt.Errorf("tool %q: %w", named.Name, err)
+			}
+			if toolChanged {
+				tool = rewritten
+				changed = true
+			}
+			kept = append(kept, tool)
 			continue
 		}
-		if seen != nil {
-			seen[named.Name] = struct{}{}
-		}
-		rewritten, toolChanged, err := override.apply(tool)
-		if err != nil {
-			return nil, false, nil, fmt.Errorf("tool %q: %w", named.Name, err)
-		}
-		if toolChanged {
-			tools[i] = rewritten
+		if _, bound := v.exposed[named.Name]; bound {
+			drift.Hidden = append(drift.Hidden, named.Name)
 			changed = true
+			continue
 		}
+		kept = append(kept, tool)
 	}
 
 	if seen != nil {
 		for source := range v.bySource {
 			if _, ok := seen[source]; !ok {
-				missing = append(missing, source)
+				drift.Missing = append(drift.Missing, source)
 			}
 		}
-		sort.Strings(missing)
+		sort.Strings(drift.Missing)
 	}
 
 	if !changed {
-		return body, false, missing, nil
+		return body, false, drift, nil
 	}
-	out, err = mcp.ReencodeEnvelope(&envelope, result, "tools", tools)
+	out, err = mcp.ReencodeEnvelope(&envelope, result, "tools", kept)
 	if err != nil {
-		return nil, false, nil, err
+		return nil, false, Drift{}, err
 	}
-	return out, true, missing, nil
+	return out, true, drift, nil
 }
 
-// mayHaveOverride reports whether a raw tool mentions any source name.
-// Source names are restricted to characters JSON never escapes, so a tool
-// whose bytes lack every quoted source name cannot be one of them.
-func (v *View) mayHaveOverride(tool json.RawMessage) bool {
-	for _, quoted := range v.quotedSources {
+// mayAffect reports whether a raw tool mentions any source or exposed name.
+// Tool names are restricted to characters JSON never escapes, so a tool
+// whose bytes lack every quoted name cannot be one of them.
+func (v *View) mayAffect(tool json.RawMessage) bool {
+	for _, quoted := range v.quotedNames {
 		if bytes.Contains(tool, quoted) {
 			return true
 		}
@@ -211,7 +270,7 @@ func (v *View) mayHaveOverride(tool json.RawMessage) bool {
 }
 
 func (o *Override) apply(tool json.RawMessage) (json.RawMessage, bool, error) {
-	if len(o.annotations) == 0 {
+	if len(o.fields) == 0 && len(o.annotations) == 0 {
 		return tool, false, nil
 	}
 
@@ -220,35 +279,46 @@ func (o *Override) apply(tool json.RawMessage) (json.RawMessage, bool, error) {
 		return nil, false, err
 	}
 
-	var annotations map[string]json.RawMessage
-	if raw := fields["annotations"]; len(raw) > 0 && !bytes.Equal(raw, []byte("null")) {
-		if err := json.Unmarshal(raw, &annotations); err != nil {
-			return nil, false, fmt.Errorf("invalid annotations: %w", err)
+	changed := mergeFields(fields, o.fields)
+	if len(o.annotations) > 0 {
+		var annotations map[string]json.RawMessage
+		if raw := fields["annotations"]; len(raw) > 0 && !bytes.Equal(raw, []byte("null")) {
+			if err := json.Unmarshal(raw, &annotations); err != nil {
+				return nil, false, fmt.Errorf("invalid annotations: %w", err)
+			}
 		}
-	}
-	if annotations == nil {
-		annotations = make(map[string]json.RawMessage, len(o.annotations))
-	}
-
-	changed := false
-	for _, field := range o.annotations {
-		if current, ok := annotations[field.key]; ok && jsonEqual(current, field.value) {
-			continue
+		if annotations == nil {
+			annotations = make(map[string]json.RawMessage, len(o.annotations))
 		}
-		annotations[field.key] = field.value
-		changed = true
+		if mergeFields(annotations, o.annotations) {
+			raw, err := json.Marshal(annotations)
+			if err != nil {
+				return nil, false, err
+			}
+			fields["annotations"] = raw
+			changed = true
+		}
 	}
 	if !changed {
 		return tool, false, nil
 	}
 
-	raw, err := json.Marshal(annotations)
-	if err != nil {
-		return nil, false, err
-	}
-	fields["annotations"] = raw
 	out, err := json.Marshal(fields)
 	return out, err == nil, err
+}
+
+// mergeFields sets each override in target and reports whether any value
+// changed.
+func mergeFields(target map[string]json.RawMessage, overrides []jsonField) bool {
+	changed := false
+	for _, field := range overrides {
+		if current, ok := target[field.key]; ok && jsonEqual(current, field.value) {
+			continue
+		}
+		target[field.key] = field.value
+		changed = true
+	}
+	return changed
 }
 
 func jsonEqual(a, b json.RawMessage) bool {
