@@ -2300,7 +2300,7 @@ paths:
       description: |-
         Tyk will generate the access token based on the OrgID specified in the API Definition and a random UUID. This ensures that keys can be owned by different API Owners should segmentation be needed at an organisational level.
          <br/><br/>
-          API keys without `access_rights` data are master keys. A master key can access all APIs on the system. Tyk Gateway creates master keys only if `allow_master_keys` is set to `true`. Always set `access_rights` data on a key, or apply a Policy, to limit the key to the APIs that it needs.
+          API keys that have no `access_rights` data after Tyk Gateway applies their Policies are master keys. A master key can access all APIs on the system. Tyk Gateway creates master keys only if `allow_master_keys` is set to `true`. Always set `access_rights` data on a key, or apply a Policy, to limit the key to the APIs that it needs.
       operationId: addKey
       parameters:
       - description: When set to true the key_hash returned will be similar to the
