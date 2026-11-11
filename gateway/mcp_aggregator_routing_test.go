@@ -26,6 +26,7 @@ import (
 // request, and answers tools/call through an optional handler.
 type mcpRoutingUpstream struct {
 	*httptest.Server
+	t           *testing.T
 	mu          sync.Mutex
 	descriptors []string
 	// listExtra is merged verbatim into the tools/list result.
@@ -49,7 +50,7 @@ type mcpRoutingRequest struct {
 
 func newMCPRoutingUpstream(t *testing.T, descriptors ...string) *mcpRoutingUpstream {
 	t.Helper()
-	u := &mcpRoutingUpstream{descriptors: descriptors}
+	u := &mcpRoutingUpstream{t: t, descriptors: descriptors}
 	u.Server = httptest.NewServer(http.HandlerFunc(u.serve))
 	t.Cleanup(u.Close)
 	return u
@@ -107,11 +108,11 @@ func (u *mcpRoutingUpstream) serve(w http.ResponseWriter, r *http.Request) {
 	case mcp.MethodToolsCall:
 		if !mcpRoutingUpstreamHasTool(descriptors, req.Params["name"]) {
 			// The go-sdk's answer to a tool it does not have.
-			writeMCPTestJSONRPCError(w, req.ID, mcp.JSONRPCInvalidParams, "unknown tool "+string(req.Params["name"]))
+			writeMCPTestJSONRPCError(u.t, w, req.ID, mcp.JSONRPCInvalidParams, "unknown tool "+string(req.Params["name"]))
 			return
 		}
 		if call == nil {
-			writeMCPTestJSONRPCError(w, req.ID, mcp.JSONRPCMethodNotFound, "Method not found")
+			writeMCPTestJSONRPCError(u.t, w, req.ID, mcp.JSONRPCMethodNotFound, "Method not found")
 			return
 		}
 		var status int
@@ -124,7 +125,7 @@ func (u *mcpRoutingUpstream) serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	default:
-		writeMCPTestJSONRPCError(w, req.ID, mcp.JSONRPCMethodNotFound, "Method not found")
+		writeMCPTestJSONRPCError(u.t, w, req.ID, mcp.JSONRPCMethodNotFound, "Method not found")
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
