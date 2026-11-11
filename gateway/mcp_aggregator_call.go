@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/sirupsen/logrus"
 
@@ -138,7 +140,7 @@ func (d mcpAggregatorDispatcher) resolveTool(name string) (mcpaggregator.Upstrea
 		return mcpaggregator.Upstream{}, "", errMCPAggregatorUnknownTool
 	}
 
-	if !mcpAggregatorSelects(upstream, tool) {
+	if !mcpAggregatorSelects(upstream, tool) || !mcpAggregatorNameFits(name) {
 		return upstream, "", errMCPAggregatorUnknownTool
 	}
 	if status := classifyMCPAggregatorUpstream(d.aggregator.OrgID, d.gw.getApiSpec(upstream.APIID)); status != mcpAggregatorUpstreamAdmitted {
@@ -148,11 +150,20 @@ func (d mcpAggregatorDispatcher) resolveTool(name string) (mcpaggregator.Upstrea
 }
 
 // mcpAggregatorSelects reports whether the aggregator exposes tool of an
-// aggregated MCP proxy. Every tool is exposed until tool selection (TT-18770)
-// applies upstream.Tools here, rejecting deselected tools without an upstream
-// call, and in listUpstreamTools.
-func mcpAggregatorSelects(_ mcpaggregator.Upstream, _ string) bool {
-	return true
+// aggregated MCP proxy: every tool when the proxy has no selection, otherwise
+// only the selected names, matched exactly against the names the proxy
+// exposes. tools/list and tools/call both apply it, so a deselected tool is
+// neither listed nor callable.
+func mcpAggregatorSelects(upstream mcpaggregator.Upstream, tool string) bool {
+	return upstream.Tools == nil || slices.Contains(upstream.Tools, tool)
+}
+
+// mcpAggregatorNameFits reports whether an aggregated tool name is within
+// MCP's tool name limit. Admission rejects a configuration that would
+// aggregate a longer name; the runtime also omits and refuses one, for a
+// proxy that gains such a tool after the aggregator was admitted.
+func mcpAggregatorNameFits(aggregatedName string) bool {
+	return utf8.RuneCountInString(aggregatedName) <= mcpaggregator.MaxToolNameLength
 }
 
 // isMCPUnknownToolError reports a proxy's unknown-tool rejection: -32602 with

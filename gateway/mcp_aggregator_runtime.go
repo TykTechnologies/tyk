@@ -10,6 +10,7 @@ import (
 	"sort"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/sirupsen/logrus"
@@ -28,6 +29,9 @@ const (
 	mcpAggregatorMaxListPages = 100
 
 	mcpAggregatorUnnamedToolMsg = "MCP aggregator skips aggregated tool without a name"
+
+	mcpAggregatorSelectedToolMissingMsg = "MCP aggregator omits selected tool the aggregated MCP proxy does not expose"
+	mcpAggregatorToolNameTooLongMsg     = "MCP aggregator omits aggregated tool whose name exceeds the MCP tool name limit"
 )
 
 // MCPAggregatorMiddleware serves an MCP aggregator's JSON-RPC methods after the
@@ -232,8 +236,12 @@ func mcpAggregatorFailureReason(err error) string {
 	return "tools/list failed: " + err.Error()
 }
 
+// listUpstreamTools lists the tools an aggregated MCP proxy exposes now and
+// keeps the ones the aggregator selects. A selected tool the proxy no longer
+// exposes is left out with a warning, so the aggregator keeps serving the rest.
 func (d mcpAggregatorDispatcher) listUpstreamTools(parent *http.Request, upstream mcpaggregator.Upstream) ([]mcpAggregatorTool, error) {
 	var tools []mcpAggregatorTool
+	exposed := map[string]struct{}{}
 	params := map[string]any{}
 	seenCursors := map[string]struct{}{}
 	for page := 0; ; page++ {
@@ -261,7 +269,21 @@ func (d mcpAggregatorDispatcher) listUpstreamTools(parent *http.Request, upstrea
 				}).Warn(mcpAggregatorUnnamedToolMsg)
 				continue
 			}
+			exposed[name] = struct{}{}
+			if !mcpAggregatorSelects(upstream, name) {
+				continue
+			}
 			aggregatedName := mcpaggregator.ToolName(upstream.Alias, name)
+			if !mcpAggregatorNameFits(aggregatedName) {
+				log.WithFields(logrus.Fields{
+					"aggregator_api_id": d.aggregator.APIID,
+					"upstream_api_id":   upstream.APIID,
+					"alias":             upstream.Alias,
+					"tool":              name,
+					"reason":            fmt.Sprintf("%q plus the tool name is %d characters, over the %d character limit for MCP tool names", upstream.Alias+mcpaggregator.NamespaceSeparator, utf8.RuneCountInString(aggregatedName), mcpaggregator.MaxToolNameLength),
+				}).Warn(mcpAggregatorToolNameTooLongMsg)
+				continue
+			}
 			encodedName, err := json.Marshal(aggregatedName)
 			if err != nil {
 				return nil, err
@@ -276,6 +298,7 @@ func (d mcpAggregatorDispatcher) listUpstreamTools(parent *http.Request, upstrea
 			})
 		}
 		if result.NextCursor == "" {
+			d.warnSelectedToolsMissing(upstream, exposed)
 			return tools, nil
 		}
 		if _, repeated := seenCursors[result.NextCursor]; repeated {
@@ -283,6 +306,19 @@ func (d mcpAggregatorDispatcher) listUpstreamTools(parent *http.Request, upstrea
 		}
 		seenCursors[result.NextCursor] = struct{}{}
 		params = map[string]any{"cursor": result.NextCursor}
+	}
+}
+
+func (d mcpAggregatorDispatcher) warnSelectedToolsMissing(upstream mcpaggregator.Upstream, exposed map[string]struct{}) {
+	for _, tool := range upstream.Tools {
+		if _, ok := exposed[tool]; !ok {
+			log.WithFields(logrus.Fields{
+				"aggregator_api_id": d.aggregator.APIID,
+				"upstream_api_id":   upstream.APIID,
+				"alias":             upstream.Alias,
+				"tool":              tool,
+			}).Warn(mcpAggregatorSelectedToolMissingMsg)
+		}
 	}
 }
 
