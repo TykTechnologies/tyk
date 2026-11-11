@@ -13,6 +13,7 @@ import (
 	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/TykTechnologies/tyk/internal/mcp"
+	"github.com/TykTechnologies/tyk/request"
 )
 
 var errMCPAggregatorUpstreamNotLoaded = errors.New("not loaded on this gateway")
@@ -83,7 +84,7 @@ func (d mcpAggregatorDispatcher) exchange(parent *http.Request, spec *APISpec, m
 		return nil, errMCPAggregatorUpstreamNotLoaded
 	}
 
-	req, err := http.NewRequestWithContext(mcpAggregatorUpstreamRequestContext(parent.Context()), http.MethodPost, spec.Proxy.ListenPath, bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(mcpAggregatorUpstreamRequestContext(parent.Context(), request.RealIP(parent)), http.MethodPost, spec.Proxy.ListenPath, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -150,18 +151,32 @@ func (w *mcpAggregatorResponseRecorder) Write(data []byte) (int, error) {
 	return w.bufferedResponseWriter.Write(data)
 }
 
-// mcpAggregatorUpstreamContext keeps the caller's cancellation but none of its
-// request-scoped values, so the aggregated proxy's chain starts clean.
+// mcpAggregatorClientIPContextKey is the context key request.RealIP reads
+// before any header or the remote address.
+const mcpAggregatorClientIPContextKey = "remote_addr"
+
+// mcpAggregatorUpstreamContext keeps the caller's cancellation and client IP
+// but none of its other request-scoped values, so the aggregated proxy's chain
+// starts clean.
 type mcpAggregatorUpstreamContext struct {
 	context.Context
+	clientIP string
 }
 
-func (mcpAggregatorUpstreamContext) Value(any) any { return nil }
+func (c mcpAggregatorUpstreamContext) Value(key any) any {
+	if key == mcpAggregatorClientIPContextKey {
+		return c.clientIP
+	}
+	return nil
+}
 
-// mcpAggregatorUpstreamRequestContext keeps only the caller's cancellation and
-// trace span, so upstream spans join the aggregator's trace.
-func mcpAggregatorUpstreamRequestContext(parent context.Context) context.Context {
-	return oteltrace.ContextWithSpan(mcpAggregatorUpstreamContext{parent}, oteltrace.SpanFromContext(parent))
+// mcpAggregatorUpstreamRequestContext keeps only the caller's cancellation,
+// trace span and client IP. Upstream spans join the aggregator's trace, and
+// request.RealIP in the aggregated proxy's chain returns clientIP, the address
+// the aggregator resolved for its caller, so the proxy's IP access control
+// sees the agent's address and not the load balancer's in front of it.
+func mcpAggregatorUpstreamRequestContext(parent context.Context, clientIP string) context.Context {
+	return oteltrace.ContextWithSpan(mcpAggregatorUpstreamContext{Context: parent, clientIP: clientIP}, oteltrace.SpanFromContext(parent))
 }
 
 func mcpAggregatorRequestBody(method string, params map[string]any) ([]byte, error) {
