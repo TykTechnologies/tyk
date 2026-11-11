@@ -27,6 +27,17 @@ const (
 	// one aggregated MCP proxy; a proxy that needs more is omitted.
 	mcpAggregatorMaxListPages = 100
 
+	// mcpAggregatorMaxCatalogueTools bounds the tools in one aggregator's
+	// merged tools/list. It is far above what an agent can use (clients and
+	// models degrade well before a few hundred tools) while still capping the
+	// work and memory of one tools/list at 50 aggregated proxies.
+	mcpAggregatorMaxCatalogueTools = 10000
+
+	// mcpAggregatorMaxCatalogueBytes bounds the JSON size of the tool
+	// definitions in one aggregator's merged tools/list, and of the tools/list
+	// pages read from one aggregated proxy: 10000 tools at about 3 KiB each.
+	mcpAggregatorMaxCatalogueBytes = 32 << 20
+
 	mcpAggregatorUnnamedToolMsg = "MCP aggregator skips aggregated tool without a name"
 )
 
@@ -206,8 +217,16 @@ func (d mcpAggregatorDispatcher) toolsCatalogue(parent *http.Request) mcpAggrega
 	wg.Wait()
 
 	var catalogue mcpAggregatorCatalogue
-	for _, tools := range results {
+	var catalogueBytes int
+	for i, tools := range results {
+		size := mcpAggregatorToolsSize(tools)
+		if reason := mcpAggregatorCatalogueOverflow(len(catalogue.Tools)+len(tools), catalogueBytes+size); reason != "" {
+			ref := ext.Upstreams[i]
+			logMCPAggregatorUpstreamOmitted(d.aggregator.APIID, ref.APIID, ref.Alias, reason)
+			continue
+		}
 		catalogue.Tools = append(catalogue.Tools, tools...)
+		catalogueBytes += size
 	}
 	sort.SliceStable(catalogue.Tools, func(i, j int) bool { return catalogue.Tools[i].Name < catalogue.Tools[j].Name })
 	return catalogue
@@ -225,6 +244,30 @@ func logMCPAggregatorVersionMismatch(aggregatorAPIID, upstreamAPIID, alias strin
 	}).Warn(mcpAggregatorUpstreamOmittedMsg)
 }
 
+// mcpAggregatorCatalogueOverflow says why a catalogue of the given tool count
+// and definition size is over the aggregator's bounds, or returns "".
+func mcpAggregatorCatalogueOverflow(tools, bytes int) string {
+	switch {
+	case tools > mcpAggregatorMaxCatalogueTools:
+		return fmt.Sprintf("catalogue limit: the aggregator serves at most %d tools", mcpAggregatorMaxCatalogueTools)
+	case bytes > mcpAggregatorMaxCatalogueBytes:
+		return fmt.Sprintf("catalogue limit: the aggregator serves at most %d bytes of tool definitions", mcpAggregatorMaxCatalogueBytes)
+	}
+	return ""
+}
+
+// mcpAggregatorToolsSize approximates the JSON size of tool definitions as the
+// size of their field names and raw values.
+func mcpAggregatorToolsSize(tools []mcpAggregatorTool) int {
+	var size int
+	for _, tool := range tools {
+		for key, value := range tool.Definition {
+			size += len(key) + len(value)
+		}
+	}
+	return size
+}
+
 func mcpAggregatorFailureReason(err error) string {
 	if errors.Is(err, errMCPAggregatorUpstreamNotLoaded) {
 		return err.Error()
@@ -236,6 +279,7 @@ func (d mcpAggregatorDispatcher) listUpstreamTools(parent *http.Request, upstrea
 	var tools []mcpAggregatorTool
 	params := map[string]any{}
 	seenCursors := map[string]struct{}{}
+	var listedBytes int
 	for page := 0; ; page++ {
 		if page == mcpAggregatorMaxListPages {
 			return nil, fmt.Errorf("returned more than %d pages", mcpAggregatorMaxListPages)
@@ -243,6 +287,11 @@ func (d mcpAggregatorDispatcher) listUpstreamTools(parent *http.Request, upstrea
 		raw, err := d.call(parent, upstream, mcp.MethodToolsList, params)
 		if err != nil {
 			return nil, err
+		}
+		// A proxy that lists more than the whole catalogue may hold can never
+		// be served, so its pages stop being read and buffered here.
+		if listedBytes += len(raw); listedBytes > mcpAggregatorMaxCatalogueBytes {
+			return nil, fmt.Errorf("returned more than %d bytes of tools", mcpAggregatorMaxCatalogueBytes)
 		}
 		var result struct {
 			Tools      []map[string]json.RawMessage `json:"tools"`
@@ -274,6 +323,9 @@ func (d mcpAggregatorDispatcher) listUpstreamTools(parent *http.Request, upstrea
 				UpstreamToolName: name,
 				Definition:       definition,
 			})
+		}
+		if len(tools) > mcpAggregatorMaxCatalogueTools {
+			return nil, fmt.Errorf("returned more than %d tools", mcpAggregatorMaxCatalogueTools)
 		}
 		if result.NextCursor == "" {
 			return tools, nil
