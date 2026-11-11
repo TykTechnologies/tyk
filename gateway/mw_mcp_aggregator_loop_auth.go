@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	mcpAggregatorLoopTrustKey  mcpContextKey = "mcp_aggregator_loop_trust"
-	mcpAggregatorLoopBypassKey mcpContextKey = "mcp_aggregator_loop_bypass"
+	mcpAggregatorLoopTrustKey       mcpContextKey = "mcp_aggregator_loop_trust"
+	mcpAggregatorLoopAuthSkippedKey mcpContextKey = "mcp_aggregator_loop_auth_skipped"
 
 	mcpAggregatorLoopSessionMetaKey = "mcp_aggregator_api_id"
 )
@@ -48,8 +48,8 @@ func isMCPAggregatorLoopRequest(r *http.Request) bool {
 }
 
 func ctxMCPAggregatorLoopAuthBypassed(r *http.Request) bool {
-	bypassed, _ := r.Context().Value(mcpAggregatorLoopBypassKey).(bool)
-	return bypassed
+	skipped, ok := r.Context().Value(mcpAggregatorLoopAuthSkippedKey).(bool)
+	return ok && skipped
 }
 
 func mcpAggregatorLoopAuthEnabledForSpec(spec *APISpec) bool {
@@ -101,7 +101,7 @@ func (m *MCPAggregatorLoopAuthBypassMiddleware) ProcessRequest(_ http.ResponseWr
 		"mcp_upstream_api_id":           trust.UpstreamAPIID,
 	}
 	ctxSetMCPAdapterLoopSession(r, session, gatewayHashKeys(m.Gw))
-	setCtxValue(r, mcpAggregatorLoopBypassKey, true)
+	setCtxValue(r, mcpAggregatorLoopAuthSkippedKey, true)
 	ctxSetRequestStatus(r, StatusOkAndIgnore)
 	return nil, http.StatusOK
 }
@@ -137,7 +137,7 @@ func (m *MCPAggregatorLoopAuthRestoreMiddleware) ProcessRequest(_ http.ResponseW
 	if ctxGetRequestStatus(r) == StatusOkAndIgnore {
 		ctxSetRequestStatus(r, StatusOk)
 	}
-	setCtxValue(r, mcpAggregatorLoopBypassKey, false)
+	setCtxValue(r, mcpAggregatorLoopAuthSkippedKey, false)
 	return nil, http.StatusOK
 }
 
