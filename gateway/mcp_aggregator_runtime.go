@@ -1,0 +1,204 @@
+package gateway
+
+import (
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"sync"
+
+	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/mcp"
+	mcpaggregator "github.com/TykTechnologies/tyk/internal/mcp/aggregator"
+	"github.com/TykTechnologies/tyk/internal/middleware"
+)
+
+const (
+	// mcpAggregatorMaxListPages bounds how many tools/list pages are read from
+	// one aggregated MCP proxy; a proxy that needs more is omitted.
+	mcpAggregatorMaxListPages = 100
+
+	mcpAggregatorUnnamedToolMsg = "MCP aggregator skips aggregated tool without a name"
+)
+
+// MCPAggregatorMiddleware serves an MCP aggregator's JSON-RPC methods after the
+// aggregator's own middleware chain, including authentication, has run.
+type MCPAggregatorMiddleware struct {
+	*BaseMiddleware
+}
+
+func (m *MCPAggregatorMiddleware) Name() string {
+	return "MCPAggregatorMiddleware"
+}
+
+func (m *MCPAggregatorMiddleware) EnabledForSpec() bool {
+	return m.Spec != nil && m.Spec.APIDefinition != nil && m.Spec.IsMCPAggregator()
+}
+
+//nolint:staticcheck // ST1008: middleware interface requires (error, int).
+func (m *MCPAggregatorMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ interface{}) (error, int) {
+	// A pending rewrite is the JSON-RPC router's hop into the method's VEM
+	// chain; the aggregator answers once that chain has completed.
+	if ctxGetURLRewriteTarget(r) != nil {
+		return nil, http.StatusOK
+	}
+
+	state := httpctx.GetJSONRPCRoutingState(r)
+	if r.Method != http.MethodPost || state == nil {
+		w.Header().Set("Allow", http.MethodPost)
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return nil, middleware.StatusRespond
+	}
+
+	switch state.Method {
+	case mcp.MethodToolsList:
+		catalogue := mcpAggregatorDispatcher{gw: m.Gw, aggregator: m.Spec}.toolsCatalogue(r)
+		writeMCPAggregatorResult(w, state.ID, map[string]any{"tools": catalogue.definitions()})
+	default:
+		writeMCPAggregatorError(w, state.ID, http.StatusNotFound, mcp.JSONRPCMethodNotFound, "method not supported by MCP aggregator")
+	}
+	return nil, middleware.StatusRespond
+}
+
+// mcpAggregatorTool is one tool of an aggregated MCP proxy exposed under its
+// namespaced name.
+type mcpAggregatorTool struct {
+	Name             string
+	Alias            string
+	UpstreamAPIID    string
+	UpstreamToolName string
+	Definition       map[string]json.RawMessage
+}
+
+// mcpAggregatorCatalogue is the aggregator's tool list in upstream order.
+type mcpAggregatorCatalogue struct {
+	Tools []mcpAggregatorTool
+}
+
+func (c mcpAggregatorCatalogue) definitions() []map[string]json.RawMessage {
+	out := make([]map[string]json.RawMessage, 0, len(c.Tools))
+	for _, tool := range c.Tools {
+		out = append(out, tool.Definition)
+	}
+	return out
+}
+
+// toolsCatalogue lists the tools of every aggregated MCP proxy concurrently.
+// A proxy that is not loaded or fails is left out with a warning.
+func (d mcpAggregatorDispatcher) toolsCatalogue(parent *http.Request) mcpAggregatorCatalogue {
+	ext := d.aggregator.OAS.GetTykMCPAggregatorExtension()
+	if ext == nil {
+		return mcpAggregatorCatalogue{}
+	}
+
+	results := make([][]mcpAggregatorTool, len(ext.Upstreams))
+	var wg sync.WaitGroup
+	for i, ref := range ext.Upstreams {
+		upstream := mcpaggregator.Upstream{APIID: ref.APIID, Alias: ref.Alias, Tools: ref.Tools}
+		if status := classifyMCPAggregatorUpstream(d.aggregator.OrgID, d.gw.getApiSpec(ref.APIID)); status != mcpAggregatorUpstreamAdmitted {
+			logMCPAggregatorUpstreamOmitted(d.aggregator.APIID, ref.APIID, ref.Alias, status.String())
+			continue
+		}
+		wg.Add(1)
+		go func(i int) {
+			defer wg.Done()
+			tools, err := d.listUpstreamTools(parent, upstream)
+			if err != nil {
+				logMCPAggregatorUpstreamOmitted(d.aggregator.APIID, upstream.APIID, upstream.Alias, mcpAggregatorFailureReason(err))
+				return
+			}
+			results[i] = tools
+		}(i)
+	}
+	wg.Wait()
+
+	var catalogue mcpAggregatorCatalogue
+	for _, tools := range results {
+		catalogue.Tools = append(catalogue.Tools, tools...)
+	}
+	return catalogue
+}
+
+func mcpAggregatorFailureReason(err error) string {
+	if errors.Is(err, errMCPAggregatorUpstreamNotLoaded) {
+		return err.Error()
+	}
+	return "tools/list failed: " + err.Error()
+}
+
+func (d mcpAggregatorDispatcher) listUpstreamTools(parent *http.Request, upstream mcpaggregator.Upstream) ([]mcpAggregatorTool, error) {
+	var tools []mcpAggregatorTool
+	params := map[string]any{}
+	seenCursors := map[string]struct{}{}
+	for page := 0; ; page++ {
+		if page == mcpAggregatorMaxListPages {
+			return nil, fmt.Errorf("returned more than %d pages", mcpAggregatorMaxListPages)
+		}
+		raw, err := d.call(parent, upstream, mcp.MethodToolsList, params)
+		if err != nil {
+			return nil, err
+		}
+		var result struct {
+			Tools      []map[string]json.RawMessage `json:"tools"`
+			NextCursor string                       `json:"nextCursor"`
+		}
+		if err := json.Unmarshal(raw, &result); err != nil {
+			return nil, err
+		}
+		for _, definition := range result.Tools {
+			var name string
+			if json.Unmarshal(definition["name"], &name) != nil || name == "" {
+				log.WithFields(logrus.Fields{
+					"aggregator_api_id": d.aggregator.APIID,
+					"upstream_api_id":   upstream.APIID,
+					"alias":             upstream.Alias,
+				}).Warn(mcpAggregatorUnnamedToolMsg)
+				continue
+			}
+			aggregatedName := mcpaggregator.ToolName(upstream.Alias, name)
+			encodedName, err := json.Marshal(aggregatedName)
+			if err != nil {
+				return nil, err
+			}
+			definition["name"] = encodedName
+			tools = append(tools, mcpAggregatorTool{
+				Name:             aggregatedName,
+				Alias:            upstream.Alias,
+				UpstreamAPIID:    upstream.APIID,
+				UpstreamToolName: name,
+				Definition:       definition,
+			})
+		}
+		if result.NextCursor == "" {
+			return tools, nil
+		}
+		if _, repeated := seenCursors[result.NextCursor]; repeated {
+			return nil, fmt.Errorf("repeated cursor %q", result.NextCursor)
+		}
+		seenCursors[result.NextCursor] = struct{}{}
+		params = map[string]any{"cursor": result.NextCursor}
+	}
+}
+
+func writeMCPAggregatorResult(w http.ResponseWriter, id any, result any) {
+	w.Header().Set(headerContentType, contentTypeJSON)
+	w.WriteHeader(http.StatusOK)
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"jsonrpc": apidef.JsonRPC20,
+		"id":      id,
+		"result":  result,
+	})
+}
+
+func writeMCPAggregatorError(w http.ResponseWriter, id any, httpCode, code int, message string) {
+	w.Header().Set(headerContentType, contentTypeJSON)
+	w.WriteHeader(httpCode)
+	_ = json.NewEncoder(w).Encode(JSONRPCErrorResponse{
+		JSONRPC: apidef.JsonRPC20,
+		Error:   JSONRPCError{Code: code, Message: message},
+		ID:      id,
+	})
+}
