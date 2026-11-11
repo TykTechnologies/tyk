@@ -57,8 +57,10 @@ func ValidateProtocolDeclarations(protocolContext *ProtocolContext, endpoints ..
 		return modernRequested, &IngressError{Code: CodeHeaderMismatch, Message: "conflicting MCP protocol declarations"}
 	}
 	// Legacy initialize negotiates an offered version upstream. Preserve that
-	// behavior for unrecognized body-only offers without modern metadata.
-	legacyNegotiation := !modernRequested && protocolContext.Envelope != nil && protocolContext.Envelope.Method == MethodInitialize && protocolContext.HeaderProtocolVersion == "" && !protocolContext.MetadataProtocolPresent
+	// behavior for unrecognized body-only offers without modern metadata, on
+	// endpoints that serve a legacy version to negotiate.
+	legacyNegotiation := !modernRequested && protocolContext.Envelope != nil && protocolContext.Envelope.Method == MethodInitialize && protocolContext.HeaderProtocolVersion == "" && !protocolContext.MetadataProtocolPresent &&
+		slices.ContainsFunc(versions, func(v string) bool { return v != ModernProtocolVersion })
 	if version != "" && !slices.Contains(versions, version) && !legacyNegotiation {
 		return modernRequested, unsupportedProtocol(version, versions)
 	}

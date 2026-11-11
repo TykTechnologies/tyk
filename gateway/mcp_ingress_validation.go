@@ -9,8 +9,12 @@ import (
 
 // SupportedProtocolVersions describes the runtime behind this endpoint. Native
 // and paired REST-as-MCP endpoints serve the same four Gateway-qualified
-// versions once the cached stateless adapter handler is active.
+// versions once the cached stateless adapter handler is active. An MCP
+// aggregator serves only the modern version and has no legacy fallback.
 func (s *APISpec) SupportedProtocolVersions() []string {
+	if s.IsMCPAggregator() {
+		return []string{mcp.ModernProtocolVersion}
+	}
 	return mcp.ServedProtocolVersions()
 }
 

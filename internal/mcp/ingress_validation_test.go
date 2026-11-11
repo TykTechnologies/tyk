@@ -258,3 +258,31 @@ func TestModernMirroredHeaderRejectsInvalidPrimitiveNameShapes(t *testing.T) {
 		require.Equal(t, CodeHeaderMismatch, err.Code, params)
 	}
 }
+
+type modernOnlyEndpoint struct{}
+
+func (modernOnlyEndpoint) SupportedProtocolVersions() []string {
+	return []string{ModernProtocolVersion}
+}
+
+func TestModernOnlyEndpointHasNoLegacyFallback(t *testing.T) {
+	t.Parallel()
+
+	for name, ctx := range map[string]*ProtocolContext{
+		"headerless request": NewProtocolContext("", "", &RequestEnvelope{Method: MethodToolsList}, nil),
+		"legacy session":     NewProtocolContext("", "session", &RequestEnvelope{Method: MethodToolsList}, nil),
+		"initialize offer":   NewProtocolContext("", "", &RequestEnvelope{Method: MethodInitialize, Params: json.RawMessage(`{"protocolVersion":"2025-11-25"}`)}, nil),
+		"older header":       NewProtocolContext("2025-11-25", "", &RequestEnvelope{Method: MethodToolsList}, nil),
+	} {
+		t.Run(name, func(t *testing.T) {
+			_, err := ValidateProtocolDeclarations(ctx, modernOnlyEndpoint{})
+			require.NotNil(t, err)
+			assert.Equal(t, CodeUnsupportedProtocolVersion, err.Code)
+			assert.Equal(t, []string{ModernProtocolVersion}, err.Data.(map[string]any)["supported"])
+		})
+	}
+
+	modern, err := ValidateProtocolDeclarations(modernIngressContext(t, MethodToolsList, `{}`), modernOnlyEndpoint{})
+	assert.True(t, modern)
+	assert.Nil(t, err)
+}
