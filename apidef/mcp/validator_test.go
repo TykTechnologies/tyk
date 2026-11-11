@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 	"testing"
@@ -8,6 +9,7 @@ import (
 	"github.com/buger/jsonparser"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 )
@@ -774,4 +776,86 @@ func TestGetMCPSchema_ContainsMCPExtensions(t *testing.T) {
 		_, _, _, err = jsonparser.Get(schema, keyProperties, ExtensionTykMCPServer)
 		assert.NoError(t, err, "x-tyk-mcp-server should be present in MCP schema")
 	})
+}
+
+func TestValidateMCPObject_WithTykMCPAggregatorExtension(t *testing.T) {
+	t.Parallel()
+
+	doc := func(aggregator string) []byte {
+		return []byte(`{
+			"openapi": "3.0.3",
+			"info": {"title": "company-tools", "version": "1.0.0"},
+			"paths": {},
+			"x-tyk-api-gateway": {
+				"info": {"name": "company-tools", "state": {"active": true}},
+				"upstream": {"url": "tyk://mcp-aggregator"},
+				"server": {"listenPath": {"value": "/company-tools/"}}
+			},
+			"x-tyk-mcp-aggregator": ` + aggregator + `
+		}`)
+	}
+
+	t.Run("schema contains the extension", func(t *testing.T) {
+		t.Parallel()
+		schema, err := GetMCPSchema("3.0")
+		require.NoError(t, err)
+		_, _, _, err = jsonparser.Get(schema, keyProperties, ExtensionTykMCPAggregator)
+		assert.NoError(t, err)
+	})
+
+	t.Run("accepts upstreams with and without tools", func(t *testing.T) {
+		t.Parallel()
+		assert.NoError(t, ValidateMCPObject(doc(`{"upstreams":[
+			{"apiId":"orders-mcp","alias":"orders","tools":["list_orders"]},
+			{"apiId":"github-mcp","alias":"github"}
+		]}`), "3.0.3"))
+	})
+
+	t.Run("requires apiId and alias", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateMCPObject(doc(`{"upstreams":[{"alias":"orders"}]}`), "3.0.3")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "apiId")
+
+		err = ValidateMCPObject(doc(`{"upstreams":[{"apiId":"orders-mcp"}]}`), "3.0.3")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "alias")
+	})
+
+	t.Run("rejects unknown fields and wrong tool types", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateMCPObject(doc(`{"upstreams":[{"apiId":"orders-mcp","alias":"orders","enabled":true}]}`), "3.0.3")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "enabled")
+
+		err = ValidateMCPObject(doc(`{"upstreams":[{"apiId":"orders-mcp","alias":"orders","tools":[1]}]}`), "3.0.3")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "x-tyk-mcp-aggregator.upstreams.0.tools.0")
+	})
+}
+
+func TestValidateMCPObject_LimitsMCPAggregatorUpstreams(t *testing.T) {
+	t.Parallel()
+
+	upstreams := make([]string, 51)
+	for i := range upstreams {
+		upstreams[i] = fmt.Sprintf(`{"apiId":"mcp-%d","alias":"a%d"}`, i, i)
+	}
+	doc := []byte(`{
+		"openapi": "3.0.3",
+		"info": {"title": "company-tools", "version": "1.0.0"},
+		"paths": {},
+		"x-tyk-api-gateway": {
+			"info": {"name": "company-tools", "state": {"active": true}},
+			"upstream": {"url": "tyk://mcp-aggregator"},
+			"server": {"listenPath": {"value": "/company-tools/"}}
+		},
+		"x-tyk-mcp-aggregator": {"upstreams": [` + strings.Join(upstreams, ",") + `]}
+	}`)
+
+	err := ValidateMCPObject(doc, "3.0.3")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "x-tyk-mcp-aggregator.upstreams")
+
+	assert.NoError(t, ValidateMCPObject(bytes.Replace(doc, []byte(`,{"apiId":"mcp-50","alias":"a50"}`), nil, 1), "3.0.3"))
 }
