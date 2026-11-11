@@ -14,6 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
 	"github.com/TykTechnologies/tyk/internal/mcp"
@@ -236,12 +237,48 @@ func (d mcpAggregatorDispatcher) callTool(parent *http.Request, upstream mcpaggr
 	switch {
 	case len(resp.Error) > 0 && string(resp.Error) != "null" && isMCPUnknownToolError(resp.Error):
 		return nil, errMCPAggregatorUnknownTool
+	case len(resp.Error) > 0 && string(resp.Error) != "null" && !isJSONObject(resp.Error):
+		return mcpAggregatorGatewayErrorReply(parent, rec.statusCode, resp.Error)
 	case len(resp.Error) > 0 && string(resp.Error) != "null":
 		return &mcpAggregatorToolReply{Error: resp.Error}, nil
 	case rec.statusCode >= http.StatusBadRequest || len(resp.Result) == 0:
 		return nil, mcpAggregatorUnavailable("tools/call failed with HTTP %d: JSON-RPC response has no result", rec.statusCode)
 	}
 	return &mcpAggregatorToolReply{Result: resp.Result}, nil
+}
+
+func isJSONObject(raw json.RawMessage) bool {
+	trimmed := bytes.TrimSpace(raw)
+	return len(trimmed) > 0 && trimmed[0] == '{'
+}
+
+// mcpAggregatorGatewayErrorReply turns a refusal an aggregated proxy wrote in
+// the gateway's generic {"error":"..."} form, as an API-to-MCP proxy does
+// before it reaches JSON-RPC routing, into the JSON-RPC error object the proxy
+// would have written as an MCP API: the code the gateway selects for the HTTP
+// status on 2026-07-28, the message, and data.http_code.
+func mcpAggregatorGatewayErrorReply(parent *http.Request, status int, raw json.RawMessage) (*mcpAggregatorToolReply, error) {
+	if status < http.StatusBadRequest {
+		return nil, mcpAggregatorUnavailable("tools/call failed with HTTP %d: invalid JSON-RPC response", status)
+	}
+	var message string
+	if json.Unmarshal(raw, &message) != nil || message == "" {
+		message = http.StatusText(status)
+	}
+	// A 403 is an access denial unless the gateway's message says quota.
+	var classification *tykerrors.ErrorClassification
+	if status == http.StatusForbidden && strings.Contains(strings.ToLower(message), "quota") {
+		classification = tykerrors.NewErrorClassification(tykerrors.QEX, "quota_exceeded")
+	}
+	encoded, err := json.Marshal(jsonrpcerrors.JSONRPCError{
+		Code:    jsonrpcerrors.SelectJSONRPCCode(status, classification, httpctx.GetMCPProtocolContext(parent)),
+		Message: message,
+		Data:    map[string]any{"http_code": status},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &mcpAggregatorToolReply{Error: encoded}, nil
 }
 
 // replaceJSONObjectField replaces the value of the top-level field key in a

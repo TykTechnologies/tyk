@@ -1,12 +1,15 @@
 package gateway
 
 import (
+	"encoding/json"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/user"
@@ -108,4 +111,51 @@ func TestMCPAggregatorIgnoresConsumerQuotasOfTheAggregatedProxy(t *testing.T) {
 	require.NotNil(t, sixth.rpc.Error, sixth.body)
 	assert.Equal(t, jsonrpcerrors.CodeModernQuotaExceeded, sixth.rpc.Error.Code)
 	assert.Len(t, orders.observed(mcp.MethodToolsCall), 12)
+}
+
+// TestMCPAggregatorAnswersAnAPIToMCPProxysRateLimitAsAJSONRPCError covers an
+// API-to-MCP proxy as /tyk/mcps stores it, whose rate-limit refusal is the
+// gateway's generic {"error":"..."} body rather than JSON-RPC: the agent still
+// gets a JSON-RPC error object.
+func TestMCPAggregatorAnswersAnAPIToMCPProxysRateLimitAsAJSONRPCError(t *testing.T) {
+	ts, _, ordersBackend := startMCPAggregatorRuntimeTest(t)
+	ts.Gw.LoadAPI(
+		ordersRESTSourceSpec(ordersBackend.URL, false),
+		withAPIRateLimit(ordersMCPProxyRuntimeSpec(), 10, 60),
+		remoteMCPProxyRuntimeSpec("github-mcp", newMCPRoutingUpstream(t, namedTools("list_issues")...).URL),
+		companyToolsRuntimeSpec(aggregated("orders-mcp", "orders"), aggregated("github-mcp", "github")),
+	)
+	key := companyToolsKey(t, ts)
+	for i := 1; i <= 10; i++ {
+		res := postMCPToolsCall(t, ts, key, toolCallParams("orders__list_orders", `{}`, ""))
+		require.Equal(t, http.StatusOK, res.status, "call %d: %s", i, res.body)
+		require.Nil(t, res.rpc.Error, "call %d: %s", i, res.body)
+	}
+
+	eleventh := postMCPToolsCall(t, ts, key, toolCallParams("orders__list_orders", `{}`, ""))
+
+	assert.Equal(t, http.StatusOK, eleventh.status, eleventh.body)
+	assert.JSONEq(t, `{"jsonrpc":"2.0","id":"call-1","error":{"code":-33004,"message":"API Rate Limit Exceeded","data":{"http_code":429}}}`, eleventh.body)
+}
+
+func TestMCPAggregatorMapsAProxysGenericRefusalToTheGatewaysCode(t *testing.T) {
+	parent := httptest.NewRequest(http.MethodPost, "/company-tools/", nil)
+	httpctx.SetMCPProtocolContext(parent, &mcp.ProtocolContext{EffectiveProtocolVersion: mcp.ModernProtocolVersion})
+	for name, tc := range map[string]struct {
+		status int
+		body   string
+		want   string
+	}{
+		"rate limit":    {http.StatusTooManyRequests, `"API Rate Limit Exceeded"`, `{"code":-33004,"message":"API Rate Limit Exceeded","data":{"http_code":429}}`},
+		"quota":         {http.StatusForbidden, `"Quota exceeded"`, `{"code":-33003,"message":"Quota exceeded","data":{"http_code":403}}`},
+		"access denied": {http.StatusForbidden, `"Access to this API has been disallowed"`, `{"code":-33002,"message":"Access to this API has been disallowed","data":{"http_code":403}}`},
+		"not a string":  {http.StatusUnauthorized, `42`, `{"code":-33001,"message":"Unauthorized","data":{"http_code":401}}`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			reply, err := mcpAggregatorGatewayErrorReply(parent, tc.status, json.RawMessage(tc.body))
+
+			require.NoError(t, err)
+			assert.JSONEq(t, tc.want, string(reply.Error))
+		})
+	}
 }
