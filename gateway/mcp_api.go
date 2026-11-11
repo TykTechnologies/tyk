@@ -93,7 +93,7 @@ func (gw *Gateway) validateMCP(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		if errMsg, errCode := gw.validatePairedMCPAdapterUpstream(r, mcpObj); errMsg != "" {
+		if errMsg, errCode := gw.validateMCPProxyReferences(r, mcpObj); errMsg != "" {
 			doJSONWrite(w, errCode, apiError(errMsg))
 			return
 		}
