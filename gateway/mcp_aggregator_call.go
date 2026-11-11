@@ -380,7 +380,10 @@ func ctxAddMCPAggregatorTransformedHeaders(r *http.Request, names []string) {
 	if len(names) == 0 {
 		return
 	}
-	previous, _ := r.Context().Value(mcpAggregatorTransformedHeadersKey).([]string)
+	previous, ok := r.Context().Value(mcpAggregatorTransformedHeadersKey).([]string)
+	if !ok {
+		previous = nil
+	}
 	setCtxValue(r, mcpAggregatorTransformedHeadersKey, append(slices.Clone(previous), names...))
 }
 
@@ -390,8 +393,11 @@ func ctxAddMCPAggregatorTransformedHeaders(r *http.Request, names []string) {
 // way, and neither are the headers mcpAggregatorForwardsTransformedHeader
 // refuses.
 func mcpAggregatorTransformedHeaders(r *http.Request) http.Header {
-	names, _ := r.Context().Value(mcpAggregatorTransformedHeadersKey).([]string)
 	out := http.Header{}
+	names, ok := r.Context().Value(mcpAggregatorTransformedHeadersKey).([]string)
+	if !ok {
+		return out
+	}
 	for _, name := range names {
 		if !mcpAggregatorForwardsTransformedHeader(name) {
 			continue
