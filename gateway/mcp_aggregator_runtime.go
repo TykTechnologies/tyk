@@ -240,15 +240,69 @@ func mcpAggregatorFailureReason(err error) string {
 // keeps the ones the aggregator selects. A selected tool the proxy no longer
 // exposes is left out with a warning, so the aggregator keeps serving the rest.
 func (d mcpAggregatorDispatcher) listUpstreamTools(parent *http.Request, upstream mcpaggregator.Upstream) ([]mcpAggregatorTool, error) {
+	spec, err := d.upstreamSpec(upstream.APIID)
+	if err != nil {
+		return nil, err
+	}
+	exposed, err := d.exposedTools(parent, spec, upstream.Alias, d.loopTrust(spec))
+	if err != nil {
+		return nil, err
+	}
 	var tools []mcpAggregatorTool
-	exposed := map[string]struct{}{}
+	names := make(map[string]struct{}, len(exposed))
+	for _, tool := range exposed {
+		names[tool.Name] = struct{}{}
+		if !mcpAggregatorSelects(upstream, tool.Name) {
+			continue
+		}
+		aggregatedName := mcpaggregator.ToolName(upstream.Alias, tool.Name)
+		if !mcpAggregatorNameFits(aggregatedName) {
+			log.WithFields(logrus.Fields{
+				"aggregator_api_id": d.aggregator.APIID,
+				"upstream_api_id":   upstream.APIID,
+				"alias":             upstream.Alias,
+				"tool":              tool.Name,
+				"reason":            fmt.Sprintf("%q plus the tool name is %d characters, over the %d character limit for MCP tool names", upstream.Alias+mcpaggregator.NamespaceSeparator, utf8.RuneCountInString(aggregatedName), mcpaggregator.MaxToolNameLength),
+			}).Warn(mcpAggregatorToolNameTooLongMsg)
+			continue
+		}
+		encodedName, err := json.Marshal(aggregatedName)
+		if err != nil {
+			return nil, err
+		}
+		tool.Definition["name"] = encodedName
+		tools = append(tools, mcpAggregatorTool{
+			Name:             aggregatedName,
+			Alias:            upstream.Alias,
+			UpstreamAPIID:    upstream.APIID,
+			UpstreamToolName: tool.Name,
+			Definition:       tool.Definition,
+		})
+	}
+	d.warnSelectedToolsMissing(upstream, names)
+	return tools, nil
+}
+
+// mcpAggregatorExposedTool is one tool as an aggregated MCP proxy lists it,
+// under the proxy's own name.
+type mcpAggregatorExposedTool struct {
+	Name       string
+	Definition map[string]json.RawMessage
+}
+
+// exposedTools reads every tools/list page of an aggregated MCP proxy under
+// the given loop trust: the proxy's complete current tool view, after its own
+// renames and restrictions. Admission and the runtime share it, so a selection
+// is checked against the same view the aggregator serves from.
+func (d mcpAggregatorDispatcher) exposedTools(parent *http.Request, spec *APISpec, alias string, trust *mcpAggregatorLoopTrust) ([]mcpAggregatorExposedTool, error) {
+	var tools []mcpAggregatorExposedTool
 	params := map[string]any{}
 	seenCursors := map[string]struct{}{}
 	for page := 0; ; page++ {
 		if page == mcpAggregatorMaxListPages {
 			return nil, fmt.Errorf("returned more than %d pages", mcpAggregatorMaxListPages)
 		}
-		raw, err := d.call(parent, upstream, mcp.MethodToolsList, params)
+		raw, err := d.send(parent, spec, mcp.MethodToolsList, params, trust)
 		if err != nil {
 			return nil, err
 		}
@@ -264,41 +318,14 @@ func (d mcpAggregatorDispatcher) listUpstreamTools(parent *http.Request, upstrea
 			if json.Unmarshal(definition["name"], &name) != nil || name == "" {
 				log.WithFields(logrus.Fields{
 					"aggregator_api_id": d.aggregator.APIID,
-					"upstream_api_id":   upstream.APIID,
-					"alias":             upstream.Alias,
+					"upstream_api_id":   spec.APIID,
+					"alias":             alias,
 				}).Warn(mcpAggregatorUnnamedToolMsg)
 				continue
 			}
-			exposed[name] = struct{}{}
-			if !mcpAggregatorSelects(upstream, name) {
-				continue
-			}
-			aggregatedName := mcpaggregator.ToolName(upstream.Alias, name)
-			if !mcpAggregatorNameFits(aggregatedName) {
-				log.WithFields(logrus.Fields{
-					"aggregator_api_id": d.aggregator.APIID,
-					"upstream_api_id":   upstream.APIID,
-					"alias":             upstream.Alias,
-					"tool":              name,
-					"reason":            fmt.Sprintf("%q plus the tool name is %d characters, over the %d character limit for MCP tool names", upstream.Alias+mcpaggregator.NamespaceSeparator, utf8.RuneCountInString(aggregatedName), mcpaggregator.MaxToolNameLength),
-				}).Warn(mcpAggregatorToolNameTooLongMsg)
-				continue
-			}
-			encodedName, err := json.Marshal(aggregatedName)
-			if err != nil {
-				return nil, err
-			}
-			definition["name"] = encodedName
-			tools = append(tools, mcpAggregatorTool{
-				Name:             aggregatedName,
-				Alias:            upstream.Alias,
-				UpstreamAPIID:    upstream.APIID,
-				UpstreamToolName: name,
-				Definition:       definition,
-			})
+			tools = append(tools, mcpAggregatorExposedTool{Name: name, Definition: definition})
 		}
 		if result.NextCursor == "" {
-			d.warnSelectedToolsMissing(upstream, exposed)
 			return tools, nil
 		}
 		if _, repeated := seenCursors[result.NextCursor]; repeated {

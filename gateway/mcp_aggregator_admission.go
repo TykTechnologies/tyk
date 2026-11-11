@@ -15,7 +15,8 @@ import (
 // loaded cannot be told apart from one that does not exist.
 //
 // Every aggregated MCP proxy must also serve MCP 2026-07-28, the only version
-// an aggregator uses to call it.
+// an aggregator uses to call it, and expose every tool the aggregator selects
+// from it.
 func (gw *Gateway) validateMCPAggregatorUpstreams(r *http.Request, mcpObj *oas.OAS) (string, int) {
 	if mcpObj == nil || mcpObj.GetTykExtension() == nil {
 		return "", 0
@@ -43,7 +44,7 @@ func (gw *Gateway) validateMCPAggregatorUpstreams(r *http.Request, mcpObj *oas.O
 			return msg, code
 		}
 	}
-	return gw.validateMCPAggregatorUpstreamVersions(r, &APISpec{APIDefinition: &incoming}, ext, upstreams)
+	return gw.validateMCPAggregatorUpstreamViews(r, &APISpec{APIDefinition: &incoming}, ext, upstreams)
 }
 
 // mcpAggregatorUpstreamStatus says whether an API can serve as an aggregated

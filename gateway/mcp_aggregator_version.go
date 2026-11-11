@@ -10,14 +10,19 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/mcp"
+	mcpaggregator "github.com/TykTechnologies/tyk/internal/mcp/aggregator"
 )
 
-const mcpAggregatorVersionUncheckedMsg = "MCP aggregator admits aggregated MCP proxy without a protocol version check"
+const (
+	mcpAggregatorVersionUncheckedMsg = "MCP aggregator admits aggregated MCP proxy without a protocol version check"
+	mcpAggregatorToolsUncheckedMsg   = "MCP aggregator admits aggregated MCP proxy without checking its tools"
+)
 
 const (
 	// mcpAggregatorDefaultProbeTimeout bounds the protocol version check of
@@ -155,49 +160,78 @@ func mcpAggregatorShortText(text string) string {
 	return text
 }
 
-// probeVersion checks that an aggregated MCP proxy serves 2026-07-28. It asks
-// server/discover first and falls back to tools/list for proxies whose
-// upstream does not answer discovery. It returns a version mismatch error
-// when the proxy does not serve 2026-07-28, nil when server/discover confirms
-// it, and any other error when the check could not be made.
+// mcpAggregatorProbe is what the admission probe learnt about one aggregated
+// MCP proxy.
+type mcpAggregatorProbe struct {
+	// Version is nil when server/discover confirms 2026-07-28, a version
+	// mismatch error when the proxy does not serve it, and any other error
+	// when the check could not be made.
+	Version error
+	// Tools are the names of every tool in the proxy's own tool view; nil
+	// when ToolsErr says why the tools could not be listed.
+	Tools    []string
+	ToolsErr error
+}
+
+// probeUpstream reads an aggregated MCP proxy once for admission: it checks
+// that the proxy serves 2026-07-28 and lists its complete current tool view.
+// It asks server/discover, then follows every tools/list page, which also
+// serves as the version check for proxies whose upstream does not answer
+// discovery.
 //
 // An upstream without server/discover whose tools/list answers a sessionless
 // 2026-07-28 request is reported as unconfirmed rather than as a mismatch:
 // header-unaware 2025-03-26 servers and modern servers that skip the optional
 // discovery answer alike, and rejecting the latter would break them.
-func (d mcpAggregatorDispatcher) probeVersion(parent *http.Request, spec *APISpec) error {
+func (d mcpAggregatorDispatcher) probeUpstream(parent *http.Request, spec *APISpec, alias string) mcpAggregatorProbe {
 	trust := &mcpAggregatorLoopTrust{
 		OrgID:           d.aggregator.OrgID,
 		AggregatorAPIID: d.aggregator.APIID,
 		UpstreamAPIID:   spec.APIID,
 		Probe:           true,
 	}
+	confirmed := false
 	raw, err := d.send(parent, spec, mcp.MethodServerDiscover, map[string]any{}, trust)
 	if err == nil {
 		var result struct {
 			SupportedVersions []string `json:"supportedVersions"`
 		}
 		if json.Unmarshal(raw, &result) == nil && result.SupportedVersions != nil {
-			if slices.Contains(result.SupportedVersions, mcp.ModernProtocolVersion) {
-				return nil
+			if !slices.Contains(result.SupportedVersions, mcp.ModernProtocolVersion) {
+				return mcpAggregatorProbe{Version: &mcpAggregatorVersionMismatchError{
+					Method: mcp.MethodServerDiscover,
+					Detail: "upstream supports only " + strings.Join(result.SupportedVersions, ", "),
+				}}
 			}
-			return &mcpAggregatorVersionMismatchError{
-				Method: mcp.MethodServerDiscover,
-				Detail: "upstream supports only " + strings.Join(result.SupportedVersions, ", "),
-			}
+			confirmed = true
+		} else {
+			err = errors.New("server/discover result has no supportedVersions")
 		}
-		err = errors.New("server/discover result has no supportedVersions")
 	}
 	if isMCPAggregatorVersionMismatch(err) {
-		return err
+		return mcpAggregatorProbe{Version: err}
 	}
-	if _, listErr := d.send(parent, spec, mcp.MethodToolsList, map[string]any{}, trust); listErr != nil {
-		if isMCPAggregatorVersionMismatch(listErr) {
-			return listErr
+
+	exposed, listErr := d.exposedTools(parent, spec, alias, trust)
+	switch {
+	case isMCPAggregatorVersionMismatch(listErr):
+		return mcpAggregatorProbe{Version: listErr}
+	case listErr != nil && confirmed:
+		return mcpAggregatorProbe{ToolsErr: fmt.Errorf("tools/list: %w", listErr)}
+	case listErr != nil:
+		return mcpAggregatorProbe{
+			Version:  fmt.Errorf("server/discover: %v; tools/list: %w", err, listErr),
+			ToolsErr: fmt.Errorf("tools/list: %w", listErr),
 		}
-		return fmt.Errorf("server/discover: %v; tools/list: %w", err, listErr)
 	}
-	return fmt.Errorf("%w: %v; tools/list answered without declaring a version", errMCPAggregatorVersionUnconfirmed, err)
+	probe := mcpAggregatorProbe{Tools: make([]string, 0, len(exposed))}
+	for _, tool := range exposed {
+		probe.Tools = append(probe.Tools, tool.Name)
+	}
+	if !confirmed {
+		probe.Version = fmt.Errorf("%w: %v; tools/list answered without declaring a version", errMCPAggregatorVersionUnconfirmed, err)
+	}
+	return probe
 }
 
 var errMCPAggregatorVersionUnconfirmed = errors.New("2026-07-28 support not confirmed")
@@ -207,12 +241,14 @@ func isMCPAggregatorVersionMismatch(err error) bool {
 	return errors.As(err, &mismatch)
 }
 
-// validateMCPAggregatorUpstreamVersions probes every aggregated MCP proxy of
-// an incoming aggregator on 2026-07-28 and rejects the aggregator when one of
-// them does not serve it. A proxy that cannot be checked, for example because
-// its upstream is down, is admitted with a warning: the runtime omits it from
-// tools/list until it answers, as it does any failing aggregated proxy.
-func (gw *Gateway) validateMCPAggregatorUpstreamVersions(r *http.Request, aggregator *APISpec, ext *oas.TykMCPAggregator, upstreams []*APISpec) (string, int) {
+// validateMCPAggregatorUpstreamViews probes every aggregated MCP proxy of an
+// incoming aggregator once and rejects the aggregator when one of them does
+// not serve 2026-07-28, or when its tool selection does not fit the proxy's
+// current tool view (see mcpAggregatorSelectionError). A proxy that cannot be
+// checked, for example because its upstream is down, is admitted with a
+// warning: the runtime omits it from tools/list until it answers, as it does
+// any failing aggregated proxy, and applies its selection from then on.
+func (gw *Gateway) validateMCPAggregatorUpstreamViews(r *http.Request, aggregator *APISpec, ext *oas.TykMCPAggregator, upstreams []*APISpec) (string, int) {
 	ctx := context.Background()
 	if r != nil {
 		ctx = r.Context()
@@ -222,32 +258,68 @@ func (gw *Gateway) validateMCPAggregatorUpstreamVersions(r *http.Request, aggreg
 	parent := (&http.Request{Header: http.Header{}, Host: mcpAggregatorProbeHost, RemoteAddr: mcpAggregatorProbeRemoteAddr}).WithContext(ctx)
 
 	dispatcher := mcpAggregatorDispatcher{gw: gw, aggregator: aggregator}
-	errs := make([]error, len(upstreams))
+	probes := make([]mcpAggregatorProbe, len(upstreams))
 	var wg sync.WaitGroup
 	for i, spec := range upstreams {
 		wg.Add(1)
 		go func(i int, spec *APISpec) {
 			defer wg.Done()
-			errs[i] = dispatcher.probeVersion(parent, spec)
+			probes[i] = dispatcher.probeUpstream(parent, spec, ext.Upstreams[i].Alias)
 		}(i, spec)
 	}
 	wg.Wait()
 
-	for i, err := range errs {
+	for i, probe := range probes {
 		var mismatch *mcpAggregatorVersionMismatchError
-		if errors.As(err, &mismatch) {
+		if errors.As(probe.Version, &mismatch) {
 			return fmt.Sprintf("aggregated MCP proxy %q does not support MCP version %s: %s", ext.Upstreams[i].APIID, mcp.ModernProtocolVersion, mismatch.Detail), http.StatusBadRequest
 		}
 	}
-	for i, err := range errs {
-		if err != nil {
-			log.WithFields(logrus.Fields{
-				"aggregator_api_id": aggregator.APIID,
-				"upstream_api_id":   ext.Upstreams[i].APIID,
-				"alias":             ext.Upstreams[i].Alias,
-				"reason":            err.Error(),
-			}).Warn(mcpAggregatorVersionUncheckedMsg)
+	for i, probe := range probes {
+		if probe.ToolsErr != nil {
+			continue
+		}
+		if msg := mcpAggregatorSelectionError(ext.Upstreams[i], probe.Tools); msg != "" {
+			return msg, http.StatusBadRequest
+		}
+	}
+	for i, probe := range probes {
+		fields := logrus.Fields{
+			"aggregator_api_id": aggregator.APIID,
+			"upstream_api_id":   ext.Upstreams[i].APIID,
+			"alias":             ext.Upstreams[i].Alias,
+		}
+		if probe.Version != nil {
+			log.WithFields(fields).WithField("reason", probe.Version.Error()).Warn(mcpAggregatorVersionUncheckedMsg)
+		}
+		if probe.ToolsErr != nil {
+			log.WithFields(fields).WithField("reason", probe.ToolsErr.Error()).Warn(mcpAggregatorToolsUncheckedMsg)
 		}
 	}
 	return "", 0
+}
+
+// mcpAggregatorSelectionError checks an aggregated MCP proxy's tool selection
+// against the names in the proxy's own tool view. Every selected name must be
+// one the proxy exposes, so a typo is never an empty selection and a selection
+// can only narrow what the proxy exposes, never widen it. Every aggregated
+// name, of the selected tools or of all exposed tools without a selection,
+// must fit MCP's tool name limit.
+func mcpAggregatorSelectionError(ref oas.TykMCPAggregatorUpstream, exposed []string) string {
+	for _, tool := range ref.Tools {
+		if !slices.Contains(exposed, tool) {
+			return fmt.Sprintf("tool %q not found in aggregated MCP proxy %q", tool, ref.Alias)
+		}
+	}
+	aggregated := exposed
+	if ref.Tools != nil {
+		aggregated = ref.Tools
+	}
+	for _, tool := range aggregated {
+		if length := utf8.RuneCountInString(mcpaggregator.ToolName(ref.Alias, tool)); length > mcpaggregator.MaxToolNameLength {
+			return fmt.Sprintf("tool %q of aggregated MCP proxy %q cannot be aggregated: %q plus the tool name is %d characters, over the %d character limit for MCP tool names",
+				tool, ref.Alias, ref.Alias+mcpaggregator.NamespaceSeparator, length, mcpaggregator.MaxToolNameLength)
+		}
+	}
+	return ""
 }

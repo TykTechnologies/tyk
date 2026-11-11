@@ -13,7 +13,6 @@ import (
 	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/TykTechnologies/tyk/internal/mcp"
-	mcpaggregator "github.com/TykTechnologies/tyk/internal/mcp/aggregator"
 )
 
 var errMCPAggregatorUpstreamNotLoaded = errors.New("not loaded on this gateway")
@@ -27,16 +26,6 @@ const mcpAggregatorMaxUpstreamResponseBytes = 10 << 20
 type mcpAggregatorDispatcher struct {
 	gw         *Gateway
 	aggregator *APISpec
-}
-
-// call sends one modern-protocol JSON-RPC request to an aggregated MCP proxy
-// and returns the raw JSON-RPC result.
-func (d mcpAggregatorDispatcher) call(parent *http.Request, upstream mcpaggregator.Upstream, method string, params map[string]any) (json.RawMessage, error) {
-	spec, err := d.upstreamSpec(upstream.APIID)
-	if err != nil {
-		return nil, err
-	}
-	return d.send(parent, spec, method, params, d.loopTrust(spec))
 }
 
 // upstreamSpec returns the loaded spec of an aggregated MCP proxy this
