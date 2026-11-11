@@ -110,7 +110,28 @@ func (d mcpAggregatorDispatcher) exchange(parent *http.Request, spec *APISpec, m
 	ctxSetMCPAggregatorLoopTrust(req, trust)
 
 	rec := &mcpAggregatorResponseRecorder{bufferedResponseWriter: newBufferedResponseWriter(), limit: d.maxResponseBytes()}
-	handler.ThisHandler.ServeHTTP(rec, req)
+	// The chain runs apart from this goroutine so that the caller's
+	// cancellation and the aggregator's timeout bound the exchange even when
+	// the chain does not stop on its context. An abandoned chain still writes
+	// to rec, which is never read again.
+	// The chain rewrites *req as it sets context values, so the context is
+	// read before it starts.
+	ctx := req.Context()
+	done := make(chan struct{})
+	var panicked any
+	go func() {
+		defer close(done)
+		defer func() { panicked = recover() }()
+		handler.ThisHandler.ServeHTTP(rec, req)
+	}()
+	select {
+	case <-done:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+	if panicked != nil {
+		return nil, fmt.Errorf("%s aborted: %v", method, panicked)
+	}
 	if rec.exceeded {
 		return nil, fmt.Errorf("response exceeds %d bytes", rec.limit)
 	}

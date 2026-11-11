@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -71,6 +72,24 @@ func (m *MCPAggregatorMiddleware) serveToolsCall(w http.ResponseWriter, r *http.
 
 	var unavailable *mcpAggregatorUnavailableError
 	switch {
+	case err != nil && mcpAggregatorClientGone(r):
+		log.WithFields(logrus.Fields{
+			"aggregator_api_id": m.Spec.APIID,
+			"upstream_api_id":   upstream.APIID,
+			"alias":             upstream.Alias,
+			"tool":              name,
+		}).Debug("MCP aggregator cancelled tool call: the agent cancelled the request")
+	case err != nil && errors.Is(r.Context().Err(), context.DeadlineExceeded):
+		timeout := mcpAggregatorTimeout(m.Spec, r)
+		log.WithFields(logrus.Fields{
+			"aggregator_api_id": m.Spec.APIID,
+			"upstream_api_id":   upstream.APIID,
+			"alias":             upstream.Alias,
+			"tool":              name,
+			"reason":            fmt.Sprintf("timeout after %s", timeout),
+		}).Warn(mcpAggregatorToolCallFailedMsg)
+		writeMCPAggregatorError(w, state.ID, http.StatusGatewayTimeout, mcpAggregatorUpstreamErrorCode,
+			fmt.Sprintf("upstream timeout: aggregated MCP proxy %q did not answer within %s", upstream.Alias, timeout))
 	case errors.Is(err, errMCPAggregatorUnknownTool):
 		writeMCPAggregatorError(w, state.ID, http.StatusBadRequest, mcp.JSONRPCInvalidParams, fmt.Sprintf("unknown tool %q", name))
 	case errors.Is(err, errMCPAggregatorAmbiguousName):

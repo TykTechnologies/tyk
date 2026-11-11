@@ -2,12 +2,14 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"sort"
 	"sync"
+	"time"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/sirupsen/logrus"
@@ -57,6 +59,12 @@ func (m *MCPAggregatorMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 		return nil, middleware.StatusRespond
 	}
 
+	if timeout := mcpAggregatorTimeout(m.Spec, r); timeout > 0 {
+		ctx, cancel := context.WithTimeout(r.Context(), timeout)
+		defer cancel()
+		r = r.WithContext(ctx)
+	}
+
 	switch state.Method {
 	case mcp.MethodServerDiscover:
 		writeMCPAggregatorResult(w, state.ID, map[string]any{
@@ -72,17 +80,24 @@ func (m *MCPAggregatorMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 			"capabilities":    mcpAggregatorCapabilities(),
 			"serverInfo":      m.serverInfo(),
 		})
-	case mcp.MethodNotificationsInitialized:
+	case mcp.MethodNotificationsInitialized, mcp.MethodNotificationsCancelled:
+		// On 2026-07-28 every request is its own HTTP exchange, so a call is
+		// cancelled by closing its connection, which cancels the in-flight
+		// upstream call. A notifications/cancelled arrives on another exchange
+		// and request ids are only unique per client, so it is acknowledged
+		// without acting on it, as the MCP SDK's stateless servers do.
 		if state.ID != nil {
 			writeMCPAggregatorError(w, state.ID, http.StatusBadRequest, mcp.JSONRPCInvalidRequest, "notifications must not carry an id")
 			break
 		}
-		// The aggregator keeps no session, so the handshake needs no state.
 		w.WriteHeader(http.StatusAccepted)
 	case mcp.MethodPing:
 		writeMCPAggregatorResult(w, state.ID, map[string]any{})
 	case mcp.MethodToolsList:
 		catalogue := mcpAggregatorDispatcher{gw: m.Gw, aggregator: m.Spec}.toolsCatalogue(r)
+		if mcpAggregatorClientGone(r) {
+			break
+		}
 		writeMCPAggregatorResult(w, state.ID, m.toolsListResult(catalogue, ctxGetSession(r)))
 	case mcp.MethodToolsCall:
 		m.serveToolsCall(w, r, state)
@@ -90,6 +105,23 @@ func (m *MCPAggregatorMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 		writeMCPAggregatorError(w, state.ID, http.StatusNotFound, mcp.JSONRPCMethodNotFound, "method not supported by MCP aggregator")
 	}
 	return nil, middleware.StatusRespond
+}
+
+// mcpAggregatorTimeout is the aggregator's API-level enforced timeout
+// (upstream.enforceTimeout in the OAS definition), which bounds every call the
+// aggregator makes to its aggregated MCP proxies for one request.
+func mcpAggregatorTimeout(spec *APISpec, r *http.Request) time.Duration {
+	version, _ := spec.Version(r)
+	if version == nil || version.GlobalEnforceTimeoutDisabled || version.GlobalEnforceTimeout <= 0 {
+		return 0
+	}
+	return time.Duration(version.GlobalEnforceTimeout)
+}
+
+// mcpAggregatorClientGone reports an agent that cancelled its request: there is
+// no one to send a result to.
+func mcpAggregatorClientGone(r *http.Request) bool {
+	return errors.Is(r.Context().Err(), context.Canceled)
 }
 
 // mcpAggregatorCapabilities lists what an aggregator serves: tools only.
