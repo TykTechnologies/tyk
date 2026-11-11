@@ -18,16 +18,22 @@ func getStrPointer(str string) *string {
 	return &str
 }
 
-func TestValidateMCPObject(t *testing.T) {
-	t.Parallel()
-
-	validOASObject := oas.OAS{
+// newMCPValidatorTestOAS returns a fresh OAS document carrying ext. Each call
+// has its own extensions map, so parallel subtests never share one.
+func newMCPValidatorTestOAS(ext *oas.XTykAPIGateway) oas.OAS {
+	doc := oas.OAS{
 		T: openapi3.T{
 			OpenAPI: "3.0.3",
 			Info:    &openapi3.Info{},
 			Paths:   openapi3.NewPaths(),
 		},
 	}
+	doc.SetTykExtension(ext)
+	return doc
+}
+
+func TestValidateMCPObject(t *testing.T) {
+	t.Parallel()
 
 	validXTykAPIGateway := oas.XTykAPIGateway{
 		Info: oas.Info{
@@ -57,7 +63,7 @@ func TestValidateMCPObject(t *testing.T) {
 		},
 	}
 
-	validOASObject.SetTykExtension(&validXTykAPIGateway)
+	validOASObject := newMCPValidatorTestOAS(&validXTykAPIGateway)
 	validMCP3Definition, err := validOASObject.MarshalJSON()
 	if err != nil {
 		t.Fatalf("failed to marshal valid OAS object: %v", err)
@@ -71,7 +77,6 @@ func TestValidateMCPObject(t *testing.T) {
 
 	t.Run("valid MCP object with resources", func(t *testing.T) {
 		t.Parallel()
-		mcpWithResources := validOASObject
 		extWithResources := validXTykAPIGateway
 		extWithResources.Middleware = &oas.Middleware{
 			McpResources: map[string]*oas.MCPPrimitive{
@@ -84,7 +89,7 @@ func TestValidateMCPObject(t *testing.T) {
 				},
 			},
 		}
-		mcpWithResources.SetTykExtension(&extWithResources)
+		mcpWithResources := newMCPValidatorTestOAS(&extWithResources)
 		definition, err := mcpWithResources.MarshalJSON()
 		if err != nil {
 			t.Fatalf("failed to marshal MCP with resources: %v", err)
@@ -96,7 +101,6 @@ func TestValidateMCPObject(t *testing.T) {
 
 	t.Run("valid MCP object with prompts", func(t *testing.T) {
 		t.Parallel()
-		mcpWithPrompts := validOASObject
 		extWithPrompts := validXTykAPIGateway
 		extWithPrompts.Middleware = &oas.Middleware{
 			McpPrompts: map[string]*oas.MCPPrimitive{
@@ -109,7 +113,7 @@ func TestValidateMCPObject(t *testing.T) {
 				},
 			},
 		}
-		mcpWithPrompts.SetTykExtension(&extWithPrompts)
+		mcpWithPrompts := newMCPValidatorTestOAS(&extWithPrompts)
 		definition, err := mcpWithPrompts.MarshalJSON()
 		if err != nil {
 			t.Fatalf("failed to marshal MCP with prompts: %v", err)
@@ -121,7 +125,6 @@ func TestValidateMCPObject(t *testing.T) {
 
 	t.Run("valid MCP object with all MCP fields", func(t *testing.T) {
 		t.Parallel()
-		mcpWithAll := validOASObject
 		extWithAll := validXTykAPIGateway
 		extWithAll.Middleware = &oas.Middleware{
 			McpTools: map[string]*oas.MCPPrimitive{
@@ -146,7 +149,7 @@ func TestValidateMCPObject(t *testing.T) {
 				},
 			},
 		}
-		mcpWithAll.SetTykExtension(&extWithAll)
+		mcpWithAll := newMCPValidatorTestOAS(&extWithAll)
 		definition, err := mcpWithAll.MarshalJSON()
 		if err != nil {
 			t.Fatalf("failed to marshal MCP with all fields: %v", err)
@@ -156,11 +159,10 @@ func TestValidateMCPObject(t *testing.T) {
 		assert.Nil(t, err)
 	})
 
-	invalidOASObject := validOASObject
 	invalidXTykAPIGateway := validXTykAPIGateway
 	invalidXTykAPIGateway.Info = oas.Info{} // Empty name should fail
 	invalidXTykAPIGateway.Server.GatewayTags = &oas.GatewayTags{Enabled: true, Tags: []string{}}
-	invalidOASObject.SetTykExtension(&invalidXTykAPIGateway)
+	invalidOASObject := newMCPValidatorTestOAS(&invalidXTykAPIGateway)
 	invalidMCP3Definition, err := invalidOASObject.MarshalJSON()
 	if err != nil {
 		t.Fatalf("failed to marshal invalid OAS object: %v", err)
