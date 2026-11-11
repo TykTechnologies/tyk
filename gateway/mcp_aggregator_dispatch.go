@@ -28,6 +28,43 @@ const mcpAggregatorMaxUpstreamResponseBytes = 10 << 20
 type mcpAggregatorDispatcher struct {
 	gw         *Gateway
 	aggregator *APISpec
+	// budget, when set, bounds the bytes buffered from one aggregated proxy's
+	// responses. It is used by one goroutine at a time.
+	budget *mcpAggregatorByteBudget
+}
+
+// mcpAggregatorByteBudget is one aggregated MCP proxy's share of the
+// catalogue byte budget for one tools/list.
+type mcpAggregatorByteBudget struct {
+	share int
+	used  int
+}
+
+// newResponseRecorder buffers one response up to the gateway's response size
+// limit, or up to what is left of the budget when that is less, so the
+// response being read and those already read together stay within the share.
+func (d mcpAggregatorDispatcher) newResponseRecorder() *mcpAggregatorResponseRecorder {
+	rec := &mcpAggregatorResponseRecorder{bufferedResponseWriter: newBufferedResponseWriter(), limit: d.maxResponseBytes()}
+	if d.budget != nil && d.budget.share-d.budget.used < rec.limit {
+		rec.limit = d.budget.share - d.budget.used
+		rec.budgeted = true
+	}
+	return rec
+}
+
+// recorded reports a response that went past its limit, and otherwise
+// charges the response to the budget.
+func (d mcpAggregatorDispatcher) recorded(rec *mcpAggregatorResponseRecorder) error {
+	if rec.exceeded {
+		if rec.budgeted {
+			return fmt.Errorf("responses exceed the %d byte share of the catalogue byte budget", d.budget.share)
+		}
+		return fmt.Errorf("response exceeds %d bytes", rec.limit)
+	}
+	if d.budget != nil {
+		d.budget.used += rec.body.Len()
+	}
+	return nil
 }
 
 // call sends one modern-protocol JSON-RPC request to an aggregated MCP proxy
@@ -76,10 +113,10 @@ func (d mcpAggregatorDispatcher) send(parent *http.Request, spec *APISpec, metho
 	req.Header.Set(mcp.HeaderMethod, method)
 	ctxSetMCPAggregatorLoopTrust(req, trust)
 
-	rec := &mcpAggregatorResponseRecorder{bufferedResponseWriter: newBufferedResponseWriter(), limit: d.maxResponseBytes()}
+	rec := d.newResponseRecorder()
 	handler.ThisHandler.ServeHTTP(rec, req)
-	if rec.exceeded {
-		return nil, fmt.Errorf("response exceeds %d bytes", rec.limit)
+	if err := d.recorded(rec); err != nil {
+		return nil, err
 	}
 	if detail := mcpAggregatorVersionMismatch(method, rec.statusCode, rec.header, rec.body.Bytes()); detail != "" {
 		return nil, &mcpAggregatorVersionMismatchError{Method: method, Detail: detail}
@@ -103,6 +140,8 @@ type mcpAggregatorResponseRecorder struct {
 	*bufferedResponseWriter
 	limit    int
 	exceeded bool
+	// budgeted is set when the limit is what is left of a byte budget.
+	budgeted bool
 }
 
 func (w *mcpAggregatorResponseRecorder) Write(data []byte) (int, error) {

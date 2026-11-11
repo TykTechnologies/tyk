@@ -29,8 +29,9 @@ const (
 	mcpAggregatorMaxCatalogueTools = 10000
 
 	// mcpAggregatorMaxCatalogueBytes bounds the JSON size of the tool
-	// definitions in one aggregator's merged tools/list, and of the tools/list
-	// pages read from one aggregated proxy: 10000 tools at about 3 KiB each.
+	// definitions in one aggregator's merged tools/list: 10000 tools at about
+	// 3 KiB each. It is also the budget for the tools/list responses buffered
+	// for one tools/list, shared equally between the aggregated proxies.
 	mcpAggregatorMaxCatalogueBytes = 32 << 20
 
 	mcpAggregatorUnnamedToolMsg = "MCP aggregator skips aggregated tool without a name"
@@ -137,6 +138,10 @@ func (d mcpAggregatorDispatcher) toolsCatalogue(parent *http.Request) mcpAggrega
 	}
 
 	results := make([][]mcpAggregatorTool, len(ext.Upstreams))
+	// Every configured proxy gets the same share of the byte budget, so the
+	// responses buffered at once stay within it however the reads interleave,
+	// and whether a proxy fits never depends on the others.
+	share := mcpAggregatorMaxCatalogueBytes / max(len(ext.Upstreams), 1)
 	var wg sync.WaitGroup
 	for i, ref := range ext.Upstreams {
 		upstream := mcpaggregator.Upstream{APIID: ref.APIID, Alias: ref.Alias, Tools: ref.Tools}
@@ -147,7 +152,9 @@ func (d mcpAggregatorDispatcher) toolsCatalogue(parent *http.Request) mcpAggrega
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			tools, err := d.listUpstreamTools(parent, upstream)
+			budgeted := d
+			budgeted.budget = &mcpAggregatorByteBudget{share: share}
+			tools, err := budgeted.listUpstreamTools(parent, upstream)
 			var mismatch *mcpAggregatorVersionMismatchError
 			switch {
 			case errors.As(err, &mismatch):

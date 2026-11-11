@@ -43,6 +43,8 @@ type mockRemoteMCPServer struct {
 	lastAuth     string
 	// pager, when set, serves tools/list pages by cursor.
 	pager func(cursor string) (tools []string, next string)
+	// descriptionPadding lengthens every tool description by this many bytes.
+	descriptionPadding int
 }
 
 func newMockRemoteMCPServer(t *testing.T, tools ...string) *mockRemoteMCPServer {
@@ -70,6 +72,7 @@ func (m *mockRemoteMCPServer) serve(w http.ResponseWriter, r *http.Request) {
 	tools := append([]string(nil), m.tools...)
 	sse := m.sse
 	pager := m.pager
+	padding := strings.Repeat("x", m.descriptionPadding)
 	m.mu.Unlock()
 	next := ""
 	if pager != nil {
@@ -88,7 +91,7 @@ func (m *mockRemoteMCPServer) serve(w http.ResponseWriter, r *http.Request) {
 
 	list := make([]map[string]any, 0, len(tools))
 	for _, name := range tools {
-		list = append(list, map[string]any{"name": name, "description": name + " tool", "inputSchema": map[string]any{"type": "object"}})
+		list = append(list, map[string]any{"name": name, "description": name + " tool" + padding, "inputSchema": map[string]any{"type": "object"}})
 	}
 	result := map[string]any{"tools": list}
 	if next != "" {
