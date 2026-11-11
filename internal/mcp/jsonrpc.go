@@ -23,6 +23,8 @@ const (
 
 	// MethodNotificationsInitialized completes the initialize handshake.
 	MethodNotificationsInitialized = "notifications/initialized"
+	// MethodPing checks that the other party is still responsive.
+	MethodPing = "ping"
 
 	// Tool methods
 	MethodToolsCall = "tools/call"

@@ -107,6 +107,9 @@ func ValidateProtocolDeclarations(protocolContext *ProtocolContext, endpoints ..
 		if isInitializeHandshakeMethod(method) && len(endpoints) > 0 && servesModernInitialize(endpoints[0]) {
 			return true, nil
 		}
+		if method == MethodPing && len(endpoints) > 0 && servesModernPing(endpoints[0]) {
+			return true, nil
+		}
 		switch method {
 		case "initialize", "ping", "notifications/initialized", "notifications/roots/list_changed", "logging/setLevel", "resources/subscribe", "resources/unsubscribe":
 			return true, &IngressError{Code: JSONRPCMethodNotFound, Message: "method removed in the modern protocol"}
@@ -137,6 +140,11 @@ func isInitializeHandshakeMethod(method string) bool {
 func servesModernInitialize(endpoint ProtocolSupport) bool {
 	support, ok := endpoint.(ModernInitializeSupport)
 	return ok && support.ServesModernInitialize()
+}
+
+func servesModernPing(endpoint ProtocolSupport) bool {
+	support, ok := endpoint.(ModernPingSupport)
+	return ok && support.ServesModernPing()
 }
 
 func unsupportedProtocol(version string, supported []string) *IngressError {

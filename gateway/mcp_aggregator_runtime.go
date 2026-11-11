@@ -1,10 +1,12 @@
 package gateway
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"sort"
 	"sync"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -15,6 +17,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	mcpaggregator "github.com/TykTechnologies/tyk/internal/mcp/aggregator"
 	"github.com/TykTechnologies/tyk/internal/middleware"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 const (
@@ -76,9 +79,11 @@ func (m *MCPAggregatorMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 		}
 		// The aggregator keeps no session, so the handshake needs no state.
 		w.WriteHeader(http.StatusAccepted)
+	case mcp.MethodPing:
+		writeMCPAggregatorResult(w, state.ID, map[string]any{})
 	case mcp.MethodToolsList:
 		catalogue := mcpAggregatorDispatcher{gw: m.Gw, aggregator: m.Spec}.toolsCatalogue(r)
-		writeMCPAggregatorResult(w, state.ID, map[string]any{"tools": catalogue.definitions()})
+		writeMCPAggregatorResult(w, state.ID, m.toolsListResult(catalogue, ctxGetSession(r)))
 	default:
 		writeMCPAggregatorError(w, state.ID, http.StatusNotFound, mcp.JSONRPCMethodNotFound, "method not supported by MCP aggregator")
 	}
@@ -104,17 +109,32 @@ type mcpAggregatorTool struct {
 	Definition       map[string]json.RawMessage
 }
 
-// mcpAggregatorCatalogue is the aggregator's tool list in upstream order.
+// mcpAggregatorCatalogue is the aggregator's tool list, sorted by aggregated
+// tool name so its order never depends on which proxy answered first.
 type mcpAggregatorCatalogue struct {
 	Tools []mcpAggregatorTool
 }
 
-func (c mcpAggregatorCatalogue) definitions() []map[string]json.RawMessage {
-	out := make([]map[string]json.RawMessage, 0, len(c.Tools))
-	for _, tool := range c.Tools {
-		out = append(out, tool.Definition)
+// toolsListResult is the tools/list result for one consumer: the catalogue
+// with the consumer's MCP tool rules applied to the aggregated names. The list
+// is built per credential, so it is always private and immediately stale,
+// whatever cache hints the aggregated proxies sent.
+func (m *MCPAggregatorMiddleware) toolsListResult(catalogue mcpAggregatorCatalogue, session *user.SessionState) map[string]json.RawMessage {
+	cfg := mcp.ListFilterConfigs["tools"]
+	items := make([]json.RawMessage, 0, len(catalogue.Tools))
+	for _, tool := range catalogue.Tools {
+		if definition, err := marshalMCPAggregatorJSON(tool.Definition); err == nil {
+			items = append(items, definition)
+		}
 	}
-	return out
+	items = mcp.FilterItemsWithRuleSets(items, cfg.NameField, effectiveMCPListRuleSets(m.Spec, session, cfg))
+	tools, err := marshalMCPAggregatorJSON(items)
+	if err != nil {
+		tools = json.RawMessage(`[]`)
+	}
+	result := map[string]json.RawMessage{"tools": tools}
+	mcp.SetPrivateCacheHints(result)
+	return result
 }
 
 // toolsCatalogue lists the tools of every aggregated MCP proxy concurrently.
@@ -155,6 +175,7 @@ func (d mcpAggregatorDispatcher) toolsCatalogue(parent *http.Request) mcpAggrega
 	for _, tools := range results {
 		catalogue.Tools = append(catalogue.Tools, tools...)
 	}
+	sort.SliceStable(catalogue.Tools, func(i, j int) bool { return catalogue.Tools[i].Name < catalogue.Tools[j].Name })
 	return catalogue
 }
 
@@ -231,10 +252,26 @@ func (d mcpAggregatorDispatcher) listUpstreamTools(parent *http.Request, upstrea
 	}
 }
 
+// marshalMCPAggregatorJSON marshals without HTML-escaping, so text from
+// aggregated proxies keeps the characters it was sent with.
+func marshalMCPAggregatorJSON(v any) (json.RawMessage, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return nil, err
+	}
+	return bytes.TrimSuffix(buf.Bytes(), []byte("\n")), nil
+}
+
+// writeMCPAggregatorResult writes a JSON-RPC result without HTML-escaping, so
+// descriptors from aggregated proxies keep their text as sent.
 func writeMCPAggregatorResult(w http.ResponseWriter, id any, result any) {
 	w.Header().Set(headerContentType, contentTypeJSON)
 	w.WriteHeader(http.StatusOK)
-	_ = json.NewEncoder(w).Encode(map[string]any{
+	enc := json.NewEncoder(w)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(map[string]any{
 		"jsonrpc": apidef.JsonRPC20,
 		"id":      id,
 		"result":  result,

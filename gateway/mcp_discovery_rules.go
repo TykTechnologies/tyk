@@ -15,6 +15,10 @@ import (
 const oasJSONRPCMethodOperationPrefix = "json-rpc-method:"
 
 func credentialSpecificMCPFilteringApplies(spec *APISpec, req *http.Request, ses *user.SessionState) bool {
+	if spec != nil && spec.APIDefinition != nil && spec.IsMCPAggregator() {
+		// An aggregator builds every response per credential.
+		return true
+	}
 	if spec == nil || req == nil || ses == nil || !spec.IsMCP() {
 		return false
 	}
