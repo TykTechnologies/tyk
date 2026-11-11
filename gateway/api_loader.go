@@ -1368,6 +1368,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 		specs = synthesizedSpecs
 		gw.mcpPairingIndex.Set(mcpPairingSnapshot)
 	}
+	gw.mcpAggregatorIndex.Set(computeMCPAggregation(specs))
 
 	// Only build usage map in RPC mode (when tracker exists)
 	if gw.certUsageTracker != nil {
