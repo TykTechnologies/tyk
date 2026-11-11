@@ -571,6 +571,10 @@ func (gw *Gateway) handleDeleteMCP(apiID string, fs afero.Fs) (interface{}, int)
 		return apiError("API is not an MCP Proxy"), http.StatusNotFound
 	}
 
+	if resp, code := gw.mcpAggregatorDeleteConflict(apiID); resp != nil {
+		return resp, code
+	}
+
 	if err := deleteAPIFiles(apiID, "mcp", gw.GetConfig().AppPath, fs); err != nil {
 		log.Warning("Delete failed: ", err)
 		return apiError(errMsgDeleteFailed), http.StatusInternalServerError

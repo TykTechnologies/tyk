@@ -1,9 +1,14 @@
 package gateway
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"path/filepath"
 	"testing"
 
+	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
+	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -94,4 +99,51 @@ func TestLoadAppsBuildsMCPAggregatorIndex(t *testing.T) {
 	ts.Gw.LoadAPI(githubMCP)
 	assert.False(t, ts.Gw.mcpAggregatorIndex.Allows("company-tools", "github-mcp"))
 	assert.Empty(t, ts.Gw.mcpAggregatorIndex.AggregatorsReferencing("github-mcp"))
+}
+
+func TestDeleteMCPProxyReferencedByAggregatorIsRejected(t *testing.T) {
+	appPath := t.TempDir()
+	gw := newMCPTestGateway(t, appPath)
+	githubMCP := mcpManagedTestSpec("github")
+	githubMCP.OrgID = "acme"
+	companyTools := mcpAggregatorSpec("company-tools", "acme", aggregated("github", "github"))
+	gw.apisByID["github"] = githubMCP
+	gw.apisByID["company-tools"] = companyTools
+	gw.mcpAggregatorIndex.Set(computeMCPAggregation([]*APISpec{githubMCP, companyTools}))
+
+	fs := afero.NewOsFs()
+	require.NoError(t, afero.WriteFile(fs, filepath.Join(appPath, "github.json"), []byte("{}"), 0644))
+	require.NoError(t, afero.WriteFile(fs, filepath.Join(appPath, "github-mcp.json"), []byte("{}"), 0644))
+
+	t.Run("MCP management API", func(t *testing.T) {
+		req := mux.SetURLVars(httptest.NewRequest(http.MethodDelete, "/tyk/mcps/github", nil), map[string]string{"apiID": "github"})
+		w := httptest.NewRecorder()
+
+		gw.mcpDeleteHandler(w, req)
+
+		assert.Equal(t, http.StatusConflict, w.Code)
+		assert.Contains(t, w.Body.String(), `API \"github\" is referenced by MCP aggregators: company-tools`)
+		assert.FileExists(t, filepath.Join(appPath, "github-mcp.json"))
+	})
+
+	t.Run("generic API", func(t *testing.T) {
+		resp, code := gw.handleDeleteAPI("github")
+
+		assert.Equal(t, http.StatusConflict, code)
+		msg, ok := resp.(apiStatusMessage)
+		require.True(t, ok)
+		assert.Equal(t, `API "github" is referenced by MCP aggregators: company-tools`, msg.Message)
+		assert.FileExists(t, filepath.Join(appPath, "github-mcp.json"))
+	})
+
+	t.Run("allowed once no aggregator references it", func(t *testing.T) {
+		gw.mcpAggregatorIndex.Set(computeMCPAggregation([]*APISpec{githubMCP}))
+		req := mux.SetURLVars(httptest.NewRequest(http.MethodDelete, "/tyk/mcps/github", nil), map[string]string{"apiID": "github"})
+		w := httptest.NewRecorder()
+
+		gw.mcpDeleteHandler(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+		assert.NoFileExists(t, filepath.Join(appPath, "github-mcp.json"))
+	})
 }
