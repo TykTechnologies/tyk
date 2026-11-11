@@ -116,3 +116,21 @@ func TestMCPAggregatorToolsSize(t *testing.T) {
 	assert.Equal(t, (4+6)+(4+6)+(11+5), mcpAggregatorToolsSize(tools))
 	assert.Zero(t, mcpAggregatorToolsSize(nil))
 }
+
+func TestMCPAggregatorCatalogueToolLimitCountsOnlySelectedTools(t *testing.T) {
+	ts, github, ordersBackend := startMCPAggregatorRuntimeTest(t)
+	github.pager = pageToolNames(generatedToolNames(mcpAggregatorMaxCatalogueTools-1), 2500)
+	ts.Gw.LoadAPI(
+		ordersRESTSourceSpec(ordersBackend.URL, false),
+		ordersMCPProxyRuntimeSpec(),
+		githubMCPProxyRuntimeSpec(github.URL),
+		companyToolsRuntimeSpec(aggregated("orders-mcp", "orders"), selecting("github-mcp", "github", "tool_00042")),
+	)
+	hook := log.GetTestHook(t)
+
+	res := postModernToolsList(t, ts, "/company-tools/", companyToolsKey(t, ts))
+
+	require.Equal(t, http.StatusOK, res.status)
+	assert.Equal(t, []string{"github__tool_00042", "orders__create_order", "orders__list_orders"}, res.tools)
+	assert.Empty(t, mcpAggregatorOmissionWarnings(hook, "github-mcp"), "unselected tools do not count towards the catalogue limit")
+}
