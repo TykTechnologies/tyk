@@ -66,13 +66,20 @@ func namedTools(names ...string) []string {
 }
 
 func (u *mcpRoutingUpstream) serve(w http.ResponseWriter, r *http.Request) {
-	raw, _ := io.ReadAll(r.Body)
+	raw, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "read request: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 	var req struct {
 		ID     json.RawMessage            `json:"id"`
 		Method string                     `json:"method"`
 		Params map[string]json.RawMessage `json:"params"`
 	}
-	_ = json.Unmarshal(raw, &req)
+	if err := json.Unmarshal(raw, &req); err != nil {
+		http.Error(w, "Parse error: "+err.Error(), http.StatusBadRequest)
+		return
+	}
 
 	u.mu.Lock()
 	u.requests = append(u.requests, mcpRoutingRequest{
@@ -121,7 +128,7 @@ func (u *mcpRoutingUpstream) serve(w http.ResponseWriter, r *http.Request) {
 		if status != 0 {
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(status)
-			_, _ = io.WriteString(w, body)
+			u.write(w, body)
 			return
 		}
 	default:
@@ -129,7 +136,15 @@ func (u *mcpRoutingUpstream) serve(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	_, _ = io.WriteString(w, `{"jsonrpc":"2.0","id":`+string(req.ID)+`,"result":`+result+`}`)
+	u.write(w, `{"jsonrpc":"2.0","id":`+string(req.ID)+`,"result":`+result+`}`)
+}
+
+// write sends body from the handler, which runs outside the test goroutine and
+// so reports a failed write with Errorf.
+func (u *mcpRoutingUpstream) write(w http.ResponseWriter, body string) {
+	if _, err := io.WriteString(w, body); err != nil {
+		u.t.Errorf("routing upstream could not write its response: %v", err)
+	}
 }
 
 func mcpRoutingUpstreamHasTool(descriptors []string, name json.RawMessage) bool {
@@ -270,7 +285,11 @@ func TestMCPAggregatorKeepsSameNamedToolsOfDifferentProxiesApart(t *testing.T) {
 func TestMCPAggregatorListsToolsRenamedOnTheAggregatedProxy(t *testing.T) {
 	ts := StartTest(nil)
 	t.Cleanup(ts.Close)
-	githubREST := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, `[]`) }))
+	githubREST := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if _, err := io.WriteString(w, `[]`); err != nil {
+			t.Errorf("io.WriteString: %v", err)
+		}
+	}))
 	t.Cleanup(githubREST.Close)
 
 	source := mcpRuntimeDoc("github-rest", githubREST.URL)
@@ -440,8 +459,9 @@ func TestMCPAggregatorSkipsTheResponseCacheLookup(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/company-tools/", nil)
 	ctxSetCacheOptions(req, &cacheOptions{key: "armed-by-an-earlier-api"})
 
-	_, code := mw.ProcessRequest(httptest.NewRecorder(), req, nil)
+	err, code := mw.ProcessRequest(httptest.NewRecorder(), req, nil)
 
+	require.NoError(t, err)
 	assert.Equal(t, http.StatusOK, code)
 	assert.Nil(t, ctxGetCacheOptions(req), "no cache key is armed for an aggregator response")
 }
@@ -477,7 +497,11 @@ func postMCPToolsCallTo(t *testing.T, ts *Test, listenPath, key, params string, 
 	raw, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	out := mcpTestResponse{status: resp.StatusCode, body: string(raw), header: resp.Header}
-	_ = json.Unmarshal(raw, &out.rpc)
+	// A body that is not JSON-RPC, such as a plain HTTP error, leaves rpc empty;
+	// the caller asserts on status and body instead.
+	if err := json.Unmarshal(raw, &out.rpc); err != nil {
+		t.Logf("response is not JSON-RPC: %v", err)
+	}
 	return out
 }
 
