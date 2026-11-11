@@ -29,8 +29,5 @@
       }
     }
   },
-  "required": [
-    "upstreams"
-  ],
   "additionalProperties": false
 }
