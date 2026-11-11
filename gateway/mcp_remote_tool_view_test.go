@@ -3,6 +3,7 @@ package gateway
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -17,6 +18,9 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/storage"
+	"github.com/TykTechnologies/tyk/user"
 )
 
 // fakeRemoteMCPServer is a minimal Streamable HTTP MCP server for remote
@@ -456,4 +460,308 @@ func TestRemoteMCPToolView_CatalogueCheckOnLoad(t *testing.T) {
 		assert.Nil(t, spec.remoteMCPToolViewCheckDone())
 		assert.Nil(t, spec.MCPToolView())
 	})
+}
+
+const (
+	upstreamDeleteRepo  = `{"name":"delete_repo","description":"Delete a repository","inputSchema":{"type":"object","properties":{"repo":{"type":"string"}}}}`
+	upstreamCreateIssue = `{"name":"create_issue","title":"Create issue","description":"Open an issue","inputSchema":{"type":"object"},"annotations":{"idempotentHint":false,"destructiveHint":false,"x-vendor":"kept"},"_meta":{"io.example/x":1},"vendorField":[1,2]}`
+	upstreamMergeBranch = `{"name":"merge_branch","inputSchema":{"type":"object"},"annotations":{"idempotentHint":true,"openWorldHint":true}}`
+	upstreamListRepos   = `{"name":"list_repos","inputSchema":{"type":"object"},"annotations":{"readOnlyHint":true},"outputSchema":{"type":"object"}}`
+)
+
+func githubToolOverrides() []oas.TykMCPServerPrimitive {
+	return []oas.TykMCPServerPrimitive{
+		annotationOverride("delete_repo", oas.DerivedToolAnnotations{DestructiveHint: boolPtr(true)}),
+		annotationOverride("create_issue", oas.DerivedToolAnnotations{Title: "Create GitHub issue"}),
+		annotationOverride("merge_branch", oas.DerivedToolAnnotations{IdempotentHint: boolPtr(false), OpenWorldHint: boolPtr(false)}),
+	}
+}
+
+// remoteMCPRequest sends one JSON-RPC request through the gateway and returns
+// the JSON-RPC response, unwrapped from an SSE stream when needed.
+func remoteMCPRequest(t *testing.T, ts *Test, key, method, params string) (int, http.Header, []byte) {
+	t.Helper()
+	body := `{"jsonrpc":"2.0","id":11,"method":"` + method + `","params":` + params + `}`
+	req, err := http.NewRequest(http.MethodPost, ts.URL+remoteMCPListenPath, strings.NewReader(body))
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json, text/event-stream")
+	req.Header.Set("MCP-Protocol-Version", "2025-06-18")
+	if key != "" {
+		req.Header.Set("Authorization", key)
+	}
+	res, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer res.Body.Close()
+	raw, err := io.ReadAll(res.Body)
+	require.NoError(t, err)
+
+	if strings.HasPrefix(res.Header.Get("Content-Type"), "text/event-stream") {
+		for _, line := range strings.Split(string(raw), "\n") {
+			if data, ok := strings.CutPrefix(line, "data: "); ok && strings.Contains(data, `"id":11`) {
+				return res.StatusCode, res.Header, []byte(data)
+			}
+		}
+		t.Fatalf("no response event in stream: %s", raw)
+	}
+	return res.StatusCode, res.Header, raw
+}
+
+func listedTools(t *testing.T, body []byte) (map[string]json.RawMessage, []string, map[string]json.RawMessage) {
+	t.Helper()
+	var envelope struct {
+		Result map[string]json.RawMessage `json:"result"`
+	}
+	require.NoError(t, json.Unmarshal(body, &envelope), string(body))
+	var tools []json.RawMessage
+	require.NoError(t, json.Unmarshal(envelope.Result["tools"], &tools), string(body))
+	byName := map[string]json.RawMessage{}
+	var names []string
+	for _, tool := range tools {
+		var named struct {
+			Name string `json:"name"`
+		}
+		require.NoError(t, json.Unmarshal(tool, &named))
+		byName[named.Name] = tool
+		names = append(names, named.Name)
+	}
+	return byName, names, envelope.Result
+}
+
+func startRemoteMCPProxyWithView(t *testing.T, apiID string, sse bool, primitives []oas.TykMCPServerPrimitive, tools ...string) (*Test, *fakeRemoteMCPServer, *APISpec) {
+	t.Helper()
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+	fake, upstream := newFakeRemoteMCPServer(t, tools...)
+	spec := loadRemoteMCPProxy(t, ts, apiID, upstream.URL, primitives)
+	waitForRemoteMCPToolViewCheck(t, spec)
+	require.NotNil(t, spec.MCPToolView())
+	fake.mu.Lock()
+	fake.sse = sse
+	fake.mu.Unlock()
+	return ts, fake, spec
+}
+
+func TestRemoteMCPToolView_ToolsListAnnotations(t *testing.T) {
+	for _, transport := range []string{"json", "sse"} {
+		t.Run(transport, func(t *testing.T) {
+			ts, _, _ := startRemoteMCPProxyWithView(t, "remote-mcp-annotations-"+transport, transport == "sse", githubToolOverrides(),
+				upstreamDeleteRepo, upstreamCreateIssue, upstreamMergeBranch, upstreamListRepos)
+
+			status, header, body := remoteMCPRequest(t, ts, "", "tools/list", `{}`)
+			require.Equal(t, http.StatusOK, status, string(body))
+			assert.Equal(t, transport == "sse", strings.HasPrefix(header.Get("Content-Type"), "text/event-stream"))
+			tools, names, result := listedTools(t, body)
+
+			assert.Equal(t, []string{"delete_repo", "create_issue", "merge_branch", "list_repos"}, names)
+			t.Run("A1 delete_repo without upstream annotations marked destructive", func(t *testing.T) {
+				assert.JSONEq(t, `{"name":"delete_repo","description":"Delete a repository","inputSchema":{"type":"object","properties":{"repo":{"type":"string"}}},"annotations":{"destructiveHint":true}}`, string(tools["delete_repo"]))
+			})
+			t.Run("A2 A3 idempotentHint and openWorldHint true overridden with false", func(t *testing.T) {
+				assert.JSONEq(t, `{"name":"merge_branch","inputSchema":{"type":"object"},"annotations":{"idempotentHint":false,"openWorldHint":false}}`, string(tools["merge_branch"]))
+			})
+			t.Run("A4 only annotations.title changes; upstream hints and top-level title kept", func(t *testing.T) {
+				assert.JSONEq(t, `{"name":"create_issue","title":"Create issue","description":"Open an issue","inputSchema":{"type":"object"},"annotations":{"title":"Create GitHub issue","idempotentHint":false,"destructiveHint":false,"x-vendor":"kept"},"_meta":{"io.example/x":1},"vendorField":[1,2]}`, string(tools["create_issue"]))
+			})
+			t.Run("A6 tool without override unchanged and result fields kept", func(t *testing.T) {
+				assert.JSONEq(t, upstreamListRepos, string(tools["list_repos"]))
+				assert.JSONEq(t, `{"upstream":"kept"}`, string(result["_meta"]))
+			})
+		})
+	}
+}
+
+func TestRemoteMCPToolView_ToolsListPagination(t *testing.T) {
+	for _, transport := range []string{"json", "sse"} {
+		t.Run(transport, func(t *testing.T) {
+			ts, fake, _ := startRemoteMCPProxyWithView(t, "remote-mcp-pages-"+transport, transport == "sse", githubToolOverrides(),
+				upstreamListRepos, upstreamDeleteRepo)
+			fake.mu.Lock()
+			fake.pageSize = 1
+			fake.mu.Unlock()
+
+			_, _, first := remoteMCPRequest(t, ts, "", "tools/list", `{}`)
+			tools, _, result := listedTools(t, first)
+			assert.JSONEq(t, upstreamListRepos, string(tools["list_repos"]))
+			assert.JSONEq(t, `"offset-1"`, string(result["nextCursor"]))
+
+			_, _, second := remoteMCPRequest(t, ts, "", "tools/list", `{"cursor":"offset-1"}`)
+			tools, _, result = listedTools(t, second)
+			assert.JSONEq(t, `{"destructiveHint":true}`, extractAnnotations(t, tools["delete_repo"]))
+			assert.NotContains(t, result, "nextCursor")
+		})
+	}
+}
+
+func extractAnnotations(t *testing.T, tool json.RawMessage) string {
+	t.Helper()
+	var fields map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(tool, &fields))
+	return string(fields["annotations"])
+}
+
+func TestRemoteMCPToolView_MissingSourceToolIsOmittedWithAWarning(t *testing.T) {
+	const apiID = "remote-mcp-missing-source"
+	ts, fake, _ := startRemoteMCPProxyWithView(t, apiID, false, []oas.TykMCPServerPrimitive{
+		annotationOverride("delete_repo", oas.DerivedToolAnnotations{DestructiveHint: boolPtr(true)}),
+		annotationOverride("archived_tool", oas.DerivedToolAnnotations{ReadOnlyHint: boolPtr(true)}),
+	}, upstreamDeleteRepo, upstreamListRepos)
+	logs := recordRemoteMCPLogs(t, apiID)
+
+	for range 3 {
+		_, _, body := remoteMCPRequest(t, ts, "", "tools/list", `{}`)
+		_, names, _ := listedTools(t, body)
+		assert.Equal(t, []string{"delete_repo", "list_repos"}, names)
+	}
+
+	assert.NotNil(t, logs.find(logrus.WarnLevel, "archived_tool"))
+	assert.Equal(t, 1, logs.count(logrus.WarnLevel, "archived_tool"), "the warning is rate limited")
+
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	assert.Equal(t, 4, fake.listCalls, "one catalogue check plus three client requests")
+}
+
+func TestRemoteMCPToolView_ToolsListCombinedWithAccessRules(t *testing.T) {
+	ts, _, spec := startRemoteMCPProxyWithView(t, "remote-mcp-acl", false, githubToolOverrides(),
+		upstreamDeleteRepo, upstreamCreateIssue, upstreamListRepos)
+	key := createRemoteMCPKey(t, ts, spec, user.AccessControlRules{Blocked: []string{"list_repos"}})
+
+	status, _, body := remoteMCPRequest(t, ts, key, "tools/list", `{}`)
+	require.Equal(t, http.StatusOK, status, string(body))
+	tools, names, _ := listedTools(t, body)
+	assert.Equal(t, []string{"delete_repo", "create_issue"}, names)
+	assert.JSONEq(t, `{"destructiveHint":true}`, extractAnnotations(t, tools["delete_repo"]))
+}
+
+func createRemoteMCPKey(t *testing.T, ts *Test, spec *APISpec, tools user.AccessControlRules) string {
+	t.Helper()
+	ts.Gw.BuildAndLoadAPI(func(s *APISpec) {
+		*s.APIDefinition = *spec.APIDefinition
+		s.UseKeylessAccess = false
+		s.IsOAS = true
+		s.OAS = spec.OAS
+	})
+	reloaded := ts.Gw.getApiSpec(spec.APIID)
+	waitForRemoteMCPToolViewCheck(t, reloaded)
+	require.NotNil(t, reloaded.MCPToolView())
+
+	policyID := ts.CreatePolicy(func(p *user.Policy) {
+		p.AccessRights = map[string]user.AccessDefinition{spec.APIID: {
+			APIID:           spec.APIID,
+			MCPAccessRights: user.MCPAccessRights{Tools: tools},
+		}}
+	})
+	_, key := ts.CreateSession(func(s *user.SessionState) {
+		s.ApplyPolicies = []string{policyID}
+	})
+	return key
+}
+
+func TestRemoteMCPToolView_AnnotationsDoNotChangeEnforcement(t *testing.T) {
+	ts, fake, spec := startRemoteMCPProxyWithView(t, "remote-mcp-enforcement", false, []oas.TykMCPServerPrimitive{
+		annotationOverride("delete_repo", oas.DerivedToolAnnotations{ReadOnlyHint: boolPtr(true), DestructiveHint: boolPtr(false)}),
+	}, upstreamDeleteRepo, upstreamListRepos)
+	key := createRemoteMCPKey(t, ts, spec, user.AccessControlRules{Blocked: []string{"delete_repo"}})
+
+	status, _, body := remoteMCPRequest(t, ts, key, "tools/call", `{"name":"delete_repo","arguments":{"repo":"tyk"}}`)
+	assert.Equal(t, http.StatusForbidden, status, string(body))
+
+	status, _, body = remoteMCPRequest(t, ts, key, "tools/call", `{"name":"list_repos","arguments":{}}`)
+	assert.Equal(t, http.StatusOK, status, string(body))
+
+	fake.mu.Lock()
+	defer fake.mu.Unlock()
+	assert.Equal(t, []string{"list_repos"}, fake.calls, "the blocked call must not reach the upstream")
+}
+
+func TestRemoteMCPToolView_CacheBypass(t *testing.T) {
+	for _, method := range []string{"tools/list", "tools/call"} {
+		t.Run(method, func(t *testing.T) {
+			_, _, spec := startRemoteMCPProxyWithView(t, "remote-mcp-cache-"+strings.ReplaceAll(method, "/", "-"), false,
+				githubToolOverrides(), upstreamDeleteRepo)
+			spec.CacheOptions.EnableCache = true
+
+			req := httptest.NewRequest(http.MethodPost, remoteMCPListenPath, nil)
+			httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{Method: method})
+			store := &cacheReadCountingStore{DummyStorage: storage.NewDummyStorage(), written: make(chan struct{}, 1)}
+			require.NoError(t, store.DummyStorage.SetKey("cached-before-overrides", "stale", 60))
+			ctxSetCacheOptions(req, &cacheOptions{key: "cached-before-overrides", timeout: 60})
+
+			reader := &RedisCacheMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec}, store: store}
+			err, status := reader.ProcessRequest(httptest.NewRecorder(), req, nil)
+			require.NoError(t, err)
+			require.Equal(t, http.StatusOK, status)
+			assert.Zero(t, store.getCalls, "the cache must not be read")
+			assert.Nil(t, ctxGetCacheOptions(req))
+
+			ctxSetCacheOptions(req, &cacheOptions{key: "must-not-be-written", timeout: 60})
+			writer := &ResponseCacheMiddleware{BaseTykResponseHandler: BaseTykResponseHandler{Spec: spec}, store: store}
+			res := &http.Response{StatusCode: http.StatusOK, Header: http.Header{"Content-Type": {"application/json"}}, Body: io.NopCloser(strings.NewReader("{}"))}
+			require.NoError(t, writer.HandleResponse(httptest.NewRecorder(), res, req, nil))
+			select {
+			case <-store.written:
+				t.Fatal("response was cached")
+			default:
+			}
+		})
+	}
+}
+
+func TestRemoteMCPToolView_NoViewLeavesToolsListUntouched(t *testing.T) {
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+	_, upstream := newFakeRemoteMCPServer(t, upstreamCreateIssue)
+	spec := loadRemoteMCPProxy(t, ts, "remote-mcp-no-view", upstream.URL, nil)
+	require.Nil(t, spec.MCPToolView())
+
+	_, _, body := remoteMCPRequest(t, ts, "", "tools/list", `{}`)
+	assert.JSONEq(t, `{"jsonrpc":"2.0","id":11,"result":{"tools":[`+upstreamCreateIssue+`],"_meta":{"upstream":"kept"}}}`, string(body))
+}
+
+func TestRemoteMCPToolView_ResponseCacheThroughTheGateway(t *testing.T) {
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+	const apiID = "remote-mcp-cached"
+	_, upstream := newFakeRemoteMCPServer(t, upstreamDeleteRepo, upstreamListRepos)
+
+	withCache := func(spec *APISpec) {
+		spec.CacheOptions.EnableCache = true
+		spec.CacheOptions.CacheTimeout = 60
+		spec.VersionData.NotVersioned = true
+		version := spec.VersionData.Versions["Default"]
+		version.UseExtendedPaths = true
+		version.ExtendedPaths.AdvanceCacheConfig = []apidef.CacheMeta{{Method: http.MethodPost, Path: "/"}}
+		spec.VersionData.Versions["Default"] = version
+	}
+	cachedDeleteRepo := func() (string, string) {
+		_, header, body := remoteMCPRequest(t, ts, "", "tools/list", `{}`)
+		tools, _, _ := listedTools(t, body)
+		return header.Get(cachedResponseHeader), extractAnnotations(t, tools["delete_repo"])
+	}
+
+	spec := loadRemoteMCPProxy(t, ts, apiID, upstream.URL, nil, withCache)
+	require.Nil(t, spec.MCPToolView())
+	_, annotations := cachedDeleteRepo()
+	assert.Empty(t, annotations)
+	cached, _ := cachedDeleteRepo()
+	require.Equal(t, "1", cached, "control: without a tool view the second tools/list is served from the cache")
+
+	spec = loadRemoteMCPProxy(t, ts, apiID, upstream.URL, []oas.TykMCPServerPrimitive{
+		annotationOverride("delete_repo", oas.DerivedToolAnnotations{DestructiveHint: boolPtr(true)}),
+	}, withCache)
+	waitForRemoteMCPToolViewCheck(t, spec)
+	for range 2 {
+		cached, annotations = cachedDeleteRepo()
+		assert.Empty(t, cached, "the entry cached before the overrides must not be served")
+		assert.JSONEq(t, `{"destructiveHint":true}`, annotations)
+	}
+
+	spec = loadRemoteMCPProxy(t, ts, apiID, upstream.URL, []oas.TykMCPServerPrimitive{
+		annotationOverride("delete_repo", oas.DerivedToolAnnotations{DestructiveHint: boolPtr(false), Title: "Delete repository"}),
+	}, withCache)
+	waitForRemoteMCPToolViewCheck(t, spec)
+	cached, annotations = cachedDeleteRepo()
+	assert.Empty(t, cached)
+	assert.JSONEq(t, `{"destructiveHint":false,"title":"Delete repository"}`, annotations, "a changed override is applied, not a stale response")
 }
