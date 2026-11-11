@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 )
 
 // githubMCPProxyWithIPAccessControl is the github MCP proxy with an IP allow
@@ -65,6 +66,45 @@ func TestMCPAggregatorAppliesAggregatedProxyIPAccessControlToTheClientIP(t *test
 			assert.Empty(t, res.tools)
 			require.Len(t, warnings, 1)
 			assert.Equal(t, "tools/list failed: tools/list failed with HTTP 403", warnings[0].Data["reason"])
+		})
+	}
+}
+
+// TestMCPAggregatorToolCallCarriesTheClientIP checks that tools/call, like
+// tools/list, reaches an aggregated MCP proxy's IP access control with the
+// client IP the aggregator resolved.
+func TestMCPAggregatorToolCallCarriesTheClientIP(t *testing.T) {
+	const clientIP, otherIP = "203.0.113.7", "198.51.100.9"
+
+	tests := []struct {
+		name      string
+		forwarded string
+		allowed   bool
+	}{
+		{name: "client IP in allow list", forwarded: clientIP, allowed: true},
+		{name: "client IP outside allow list", forwarded: otherIP},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			github := newMCPRoutingUpstream(t, namedTools("list_issues")...)
+			github.call = answering(`{"content":[{"type":"text","text":"no issues"}]}`)
+			ts := StartTest(nil)
+			t.Cleanup(ts.Close)
+			ts.Gw.LoadAPI(
+				githubMCPProxyWithIPAccessControl(github.URL, []string{clientIP}, nil),
+				companyToolsRuntimeSpec(aggregated("github-mcp", "github")),
+			)
+
+			res := postMCPToolsCall(t, ts, companyToolsKey(t, ts), toolCallParams("github__list_issues", `{}`, ""), "X-Forwarded-For", tc.forwarded)
+
+			if tc.allowed {
+				require.Equal(t, http.StatusOK, res.status, res.body)
+				assert.JSONEq(t, `{"content":[{"type":"text","text":"no issues"}]}`, string(res.rpc.Result))
+				assert.Len(t, github.observed(mcp.MethodToolsCall), 1)
+				return
+			}
+			assert.Empty(t, res.rpc.Result, res.body)
+			assert.Empty(t, github.observed(mcp.MethodToolsCall), "the aggregated proxy's allow list stops the call")
 		})
 	}
 }
