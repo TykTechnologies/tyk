@@ -5,6 +5,7 @@ package tooloverride
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -327,4 +328,52 @@ func jsonEqual(a, b json.RawMessage) bool {
 		return false
 	}
 	return bytes.Equal(compactA.Bytes(), compactB.Bytes())
+}
+
+// ResolveCall returns the upstream tool that a tools/call for the exposed
+// name must reach. known is false when name is an upstream tool renamed away
+// by an override and not bound to another one; such a call must not reach
+// the upstream. Names the view does not mention resolve to themselves.
+//
+// Resolution never consults the upstream catalogue. A call to a name whose
+// source tool has disappeared upstream is still sent under the source name,
+// so the upstream decides. An upstream tool that shares its own name with
+// an override of another tool cannot be called: the name always reaches the
+// override's source.
+func (v *View) ResolveCall(name string) (upstream string, known bool) {
+	if source, ok := v.exposed[name]; ok {
+		return source, true
+	}
+	if _, renamedAway := v.bySource[name]; renamedAway {
+		return "", false
+	}
+	return name, true
+}
+
+// TranslateToolsCall rewrites params.name of a JSON-RPC tools/call request
+// from exposed to upstream. Every other member of the request and of its
+// params, including id, arguments and _meta, is copied verbatim. It fails
+// when the body does not name exposed, so a call is never sent to a tool
+// other than the one that was authorised.
+func TranslateToolsCall(body []byte, exposed, upstream string) ([]byte, error) {
+	var envelope map[string]json.RawMessage
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return nil, fmt.Errorf("invalid tools/call request: %w", err)
+	}
+	var params map[string]json.RawMessage
+	if err := json.Unmarshal(envelope["params"], &params); err != nil || params == nil {
+		return nil, errors.New("invalid tools/call request: params is not an object")
+	}
+	var name string
+	if err := json.Unmarshal(params["name"], &name); err != nil || name != exposed {
+		return nil, fmt.Errorf("tools/call request does not name tool %q", exposed)
+	}
+
+	params["name"] = jsonString(upstream)
+	rawParams, err := json.Marshal(params)
+	if err != nil {
+		return nil, err
+	}
+	envelope["params"] = rawParams
+	return json.Marshal(envelope)
 }

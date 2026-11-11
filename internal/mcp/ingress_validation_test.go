@@ -258,3 +258,19 @@ func TestModernMirroredHeaderRejectsInvalidPrimitiveNameShapes(t *testing.T) {
 		require.Equal(t, CodeHeaderMismatch, err.Code, params)
 	}
 }
+
+func TestEncodeMirroredHeaderLike(t *testing.T) {
+	for _, tc := range []struct {
+		original, value, want string
+	}{
+		{original: "open_issue", value: "create_issue", want: "create_issue"},
+		{original: "=?base64?b3Blbl9pc3N1ZQ==?=", value: "create_issue", want: "=?base64?Y3JlYXRlX2lzc3Vl?="},
+		{original: "open_issue", value: "日本語", want: "=?base64?5pel5pys6Kqe?="},
+	} {
+		got := EncodeMirroredHeaderLike(tc.original, tc.value)
+		assert.Equal(t, tc.want, got)
+		decoded, ok := DecodeMirroredHeader(got)
+		assert.True(t, ok)
+		assert.Equal(t, tc.value, decoded)
+	}
+}

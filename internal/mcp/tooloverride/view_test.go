@@ -418,3 +418,55 @@ func BenchmarkView_RewriteToolsList_Renames(b *testing.B) {
 		}
 	}
 }
+
+func TestView_ResolveCall(t *testing.T) {
+	t.Parallel()
+
+	view := compileView(t,
+		rename("create_issue", "open_issue", ""),
+		rename("remove_repo", "delete_repo", ""),
+		rename("update_repo", "remove_repo", ""),
+		annotate("merge_branch", oas.DerivedToolAnnotations{DestructiveHint: boolPtr(true)}),
+	)
+
+	for _, tc := range []struct {
+		name     string
+		upstream string
+		known    bool
+	}{
+		{name: "open_issue", upstream: "create_issue", known: true},
+		{name: "create_issue", known: false},
+		{name: "delete_repo", upstream: "remove_repo", known: true},
+		{name: "remove_repo", upstream: "update_repo", known: true},
+		{name: "update_repo", known: false},
+		{name: "merge_branch", upstream: "merge_branch", known: true},
+		{name: "list_issues", upstream: "list_issues", known: true},
+	} {
+		upstream, known := view.ResolveCall(tc.name)
+		assert.Equal(t, tc.known, known, tc.name)
+		assert.Equal(t, tc.upstream, upstream, tc.name)
+	}
+}
+
+func TestTranslateToolsCall(t *testing.T) {
+	t.Parallel()
+
+	t.Run("only params.name changes", func(t *testing.T) {
+		body := []byte(`{"jsonrpc":"2.0","id":9007199254740993,"method":"tools/call","params":{"name":"open_issue","arguments":{"repo":"tyk","title":"Crash on startup","n":1.50},"_meta":{"progressToken":"p-1"},"x-extra":[1]},"x-envelope":true}`)
+		out, err := TranslateToolsCall(body, "open_issue", "create_issue")
+		require.NoError(t, err)
+		assert.JSONEq(t, `{"jsonrpc":"2.0","id":9007199254740993,"method":"tools/call","params":{"name":"create_issue","arguments":{"repo":"tyk","title":"Crash on startup","n":1.50},"_meta":{"progressToken":"p-1"},"x-extra":[1]},"x-envelope":true}`, string(out))
+		assert.Contains(t, string(out), `"id":9007199254740993`, "the id is copied verbatim")
+		assert.Contains(t, string(out), `"n":1.50`, "arguments are copied verbatim")
+	})
+
+	t.Run("a body naming another tool is refused", func(t *testing.T) {
+		_, err := TranslateToolsCall([]byte(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"list_issues"}}`), "open_issue", "create_issue")
+		assert.Error(t, err)
+	})
+
+	t.Run("a body without params is refused", func(t *testing.T) {
+		_, err := TranslateToolsCall([]byte(`{"jsonrpc":"2.0","id":1,"method":"tools/call"}`), "open_issue", "create_issue")
+		assert.Error(t, err)
+	})
+}
