@@ -28,6 +28,8 @@ type mcpVersionedUpstream struct {
 	versions []string
 	tools    []string
 	requests []mcpObservedRequest
+	// discoverVersions, when set, replaces versions in server/discover.
+	discoverVersions []string
 }
 
 // mcpObservedRequest is what an upstream saw of one JSON-RPC request.
@@ -100,6 +102,10 @@ func (u *mcpVersionedUpstream) serve(w http.ResponseWriter, r *http.Request) {
 	})
 	versions := append([]string(nil), u.versions...)
 	tools := append([]string(nil), u.tools...)
+	discoverVersions := versions
+	if u.discoverVersions != nil {
+		discoverVersions = append([]string(nil), u.discoverVersions...)
+	}
 	u.mu.Unlock()
 
 	if headerVersion != "" && !slices.Contains(versions, headerVersion) {
@@ -125,7 +131,7 @@ func (u *mcpVersionedUpstream) serve(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		result = map[string]any{
-			"supportedVersions": versions,
+			"supportedVersions": discoverVersions,
 			"capabilities":      map[string]any{"tools": map[string]any{}},
 		}
 	case mcp.MethodToolsList:
