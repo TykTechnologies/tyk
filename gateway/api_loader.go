@@ -203,6 +203,8 @@ func (gw *Gateway) processSpec(
 		return &chainDef
 	}
 
+	gw.loadRemoteMCPToolView(spec, logger)
+
 	// Expose API only to looping
 	if spec.Internal {
 		chainDef.Skip = true
