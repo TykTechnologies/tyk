@@ -187,7 +187,12 @@ func (w *mcpAggregatorResponseRecorder) Write(data []byte) (int, error) {
 		w.exceeded = true
 		return len(data), nil
 	}
-	return w.bufferedResponseWriter.Write(data)
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+	// Append to the in-memory buffer directly: the bytes are parsed by the
+	// aggregator and never reach a client connection.
+	return w.body.Write(data)
 }
 
 // mcpAggregatorClientIPContextKey is the context key request.RealIP reads
@@ -219,7 +224,7 @@ func mcpAggregatorUpstreamRequestContext(parent context.Context, clientIP string
 }
 
 func mcpAggregatorRequestBody(method string, params map[string]any) ([]byte, error) {
-	withMeta := make(map[string]any, len(params)+1)
+	withMeta := make(map[string]any)
 	for key, value := range params {
 		withMeta[key] = value
 	}
