@@ -1,9 +1,11 @@
 package catalogue
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -16,13 +18,15 @@ import (
 )
 
 type fakeMCPUpstream struct {
-	t        *testing.T
-	mu       sync.Mutex
-	pages    [][]string
-	sse      bool
-	session  string
-	requests []string
-	headers  []http.Header
+	t     *testing.T
+	mu    sync.Mutex
+	pages [][]string
+	sse   bool
+	// contentType replaces the event-stream Content-Type when set.
+	contentType string
+	session     string
+	requests    []string
+	headers     []http.Header
 }
 
 func (f *fakeMCPUpstream) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -107,7 +111,11 @@ func (f *fakeMCPUpstream) writeResult(w http.ResponseWriter, method string, id j
 		return
 	}
 	if f.sse {
-		w.Header().Set("Content-Type", "text/event-stream")
+		contentType := "text/event-stream"
+		if f.contentType != "" {
+			contentType = f.contentType
+		}
+		w.Header().Set("Content-Type", contentType)
 		if _, err := fmt.Fprintf(w, "event: message\ndata: {\"jsonrpc\":\"2.0\",\"method\":\"notifications/message\",\"params\":{}}\n\nevent: message\ndata: %s\n\n", body); err != nil {
 			f.t.Errorf("writing %s event: %v", method, err)
 		}
@@ -195,6 +203,52 @@ func repeatedCursorHandler(t *testing.T, upstream http.Handler) http.Handler {
 			t.Errorf("writing tools/list response: %v", err)
 		}
 	})
+}
+
+func TestFetchToolNames_EventStreamWithMalformedMediaParameter(t *testing.T) {
+	t.Parallel()
+
+	// mime.ParseMediaType returns the media type together with
+	// ErrInvalidMediaParameter for a bare parameter.
+	upstream := &fakeMCPUpstream{t: t, pages: [][]string{{"create_issue"}}, sse: true, contentType: "text/event-stream; charset"}
+	server := httptest.NewServer(upstream)
+	t.Cleanup(server.Close)
+
+	names, err := FetchToolNames(context.Background(), server.Client(), server.URL, nil)
+	require.NoError(t, err)
+	assert.Equal(t, []string{"create_issue"}, names)
+}
+
+func TestFetchToolNames_FailsWhenNotificationBodyCannotBeRead(t *testing.T) {
+	t.Parallel()
+
+	upstream := &fakeMCPUpstream{t: t, pages: [][]string{{"create_issue"}}}
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("reading request: %v", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if !bytes.Contains(body, []byte(`"notifications/initialized"`)) {
+			r.Body = io.NopCloser(bytes.NewReader(body))
+			upstream.ServeHTTP(w, r)
+			return
+		}
+		// Promise more bytes than are sent, so the client's read of this
+		// 2xx body ends with an unexpected EOF.
+		w.Header().Set("Content-Length", "100")
+		w.WriteHeader(http.StatusAccepted)
+		if _, err := w.Write([]byte("{")); err != nil {
+			t.Errorf("writing truncated body: %v", err)
+		}
+	}))
+	t.Cleanup(server.Close)
+
+	_, err := FetchToolNames(context.Background(), server.Client(), server.URL, nil)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "notifications/initialized: reading response")
+	assert.ErrorIs(t, err, io.ErrUnexpectedEOF)
 }
 
 func TestFetchToolNames_DoesNotFollowRedirects(t *testing.T) {
