@@ -26,6 +26,7 @@ import (
 // fakeRemoteMCPServer is a minimal Streamable HTTP MCP server for remote
 // proxy tests. Tools are raw JSON objects so tests control every field.
 type fakeRemoteMCPServer struct {
+	t         *testing.T
 	mu        sync.Mutex
 	tools     []json.RawMessage
 	pageSize  int
@@ -80,23 +81,13 @@ func (f *fakeRemoteMCPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	case "tools/list":
 		f.listCalls++
-		start := 0
-		if req.Params.Cursor != "" {
-			_, _ = fmt.Sscanf(req.Params.Cursor, "offset-%d", &start)
+		page, err := f.toolsListPage(req.Params.Cursor)
+		if err != nil {
+			f.mu.Unlock()
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
-		end := len(f.tools)
-		if f.pageSize > 0 && start+f.pageSize < end {
-			end = start + f.pageSize
-		}
-		parts := make([]string, 0, end-start)
-		for _, tool := range f.tools[start:end] {
-			parts = append(parts, string(tool))
-		}
-		result = `{"tools":[` + strings.Join(parts, ",") + `]`
-		if end < len(f.tools) {
-			result += fmt.Sprintf(`,"nextCursor":"offset-%d"`, end)
-		}
-		result += `,"_meta":{"upstream":"kept"}}`
+		result = page
 	case "tools/call":
 		f.calls = append(f.calls, req.Params.Name)
 		result = `{"content":[{"type":"text","text":"called ` + req.Params.Name + `"}]}`
@@ -111,16 +102,44 @@ func (f *fakeRemoteMCPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 	body := `{"jsonrpc":"2.0","id":` + string(req.ID) + `,"result":` + result + `}`
 	if sse {
 		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = fmt.Fprintf(w, "event: message\ndata: %s\n\n", body)
+		if _, err := fmt.Fprintf(w, "event: message\ndata: %s\n\n", body); err != nil {
+			f.t.Errorf("writing %s event: %v", req.Method, err)
+		}
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write([]byte(body))
+	if _, err := w.Write([]byte(body)); err != nil {
+		f.t.Errorf("writing %s response: %v", req.Method, err)
+	}
+}
+
+// toolsListPage returns the tools/list result for cursor. The caller holds
+// f.mu.
+func (f *fakeRemoteMCPServer) toolsListPage(cursor string) (string, error) {
+	start := 0
+	if cursor != "" {
+		if _, err := fmt.Sscanf(cursor, "offset-%d", &start); err != nil || start < 0 || start > len(f.tools) {
+			return "", fmt.Errorf("invalid cursor %q", cursor)
+		}
+	}
+	end := len(f.tools)
+	if f.pageSize > 0 && start+f.pageSize < end {
+		end = start + f.pageSize
+	}
+	parts := make([]string, 0, end-start)
+	for _, tool := range f.tools[start:end] {
+		parts = append(parts, string(tool))
+	}
+	result := `{"tools":[` + strings.Join(parts, ",") + `]`
+	if end < len(f.tools) {
+		result += fmt.Sprintf(`,"nextCursor":"offset-%d"`, end)
+	}
+	return result + `,"_meta":{"upstream":"kept"}}`, nil
 }
 
 func newFakeRemoteMCPServer(t *testing.T, tools ...string) (*fakeRemoteMCPServer, *httptest.Server) {
 	t.Helper()
-	fake := &fakeRemoteMCPServer{}
+	fake := &fakeRemoteMCPServer{t: t}
 	fake.setTools(tools...)
 	server := httptest.NewServer(fake)
 	t.Cleanup(server.Close)

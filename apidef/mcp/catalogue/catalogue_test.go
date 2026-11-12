@@ -16,6 +16,7 @@ import (
 )
 
 type fakeMCPUpstream struct {
+	t        *testing.T
 	mu       sync.Mutex
 	pages    [][]string
 	sse      bool
@@ -63,32 +64,59 @@ func (f *fakeMCPUpstream) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusAccepted)
 		return
 	case "tools/list":
-		page := 0
-		if req.Params.Cursor != "" {
-			_, _ = fmt.Sscanf(req.Params.Cursor, "page-%d", &page)
+		page, err := f.toolsListPage(req.Params.Cursor)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
-		tools := make([]map[string]any, 0, len(f.pages[page]))
-		for _, name := range f.pages[page] {
-			tools = append(tools, map[string]any{"name": name, "inputSchema": map[string]any{"type": "object"}})
-		}
-		res := map[string]any{"tools": tools}
-		if page+1 < len(f.pages) {
-			res["nextCursor"] = fmt.Sprintf("page-%d", page+1)
-		}
-		result = res
+		result = page
 	default:
 		http.Error(w, "unexpected method", http.StatusBadRequest)
 		return
 	}
+	f.writeResult(w, req.Method, req.ID, result)
+}
 
-	body, _ := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": result})
+// toolsListPage returns the tools/list result for cursor. The caller holds
+// f.mu.
+func (f *fakeMCPUpstream) toolsListPage(cursor string) (map[string]any, error) {
+	page := 0
+	if cursor != "" {
+		if _, err := fmt.Sscanf(cursor, "page-%d", &page); err != nil || page < 0 || page >= len(f.pages) {
+			return nil, fmt.Errorf("invalid cursor %q", cursor)
+		}
+	}
+	tools := make([]map[string]any, 0, len(f.pages[page]))
+	for _, name := range f.pages[page] {
+		tools = append(tools, map[string]any{"name": name, "inputSchema": map[string]any{"type": "object"}})
+	}
+	res := map[string]any{"tools": tools}
+	if page+1 < len(f.pages) {
+		res["nextCursor"] = fmt.Sprintf("page-%d", page+1)
+	}
+	return res, nil
+}
+
+// writeResult writes a JSON-RPC result, as a JSON body or, when f.sse is
+// set, as an event stream that starts with an unrelated server message.
+func (f *fakeMCPUpstream) writeResult(w http.ResponseWriter, method string, id json.RawMessage, result any) {
+	body, err := json.Marshal(map[string]any{"jsonrpc": "2.0", "id": id, "result": result})
+	if err != nil {
+		f.t.Errorf("encoding %s response: %v", method, err)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	if f.sse {
 		w.Header().Set("Content-Type", "text/event-stream")
-		_, _ = fmt.Fprintf(w, "event: message\ndata: {\"jsonrpc\":\"2.0\",\"method\":\"notifications/message\",\"params\":{}}\n\nevent: message\ndata: %s\n\n", body)
+		if _, err := fmt.Fprintf(w, "event: message\ndata: {\"jsonrpc\":\"2.0\",\"method\":\"notifications/message\",\"params\":{}}\n\nevent: message\ndata: %s\n\n", body); err != nil {
+			f.t.Errorf("writing %s event: %v", method, err)
+		}
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
-	_, _ = w.Write(body)
+	if _, err := w.Write(body); err != nil {
+		f.t.Errorf("writing %s response: %v", method, err)
+	}
 }
 
 func TestFetchToolNames(t *testing.T) {
@@ -96,7 +124,7 @@ func TestFetchToolNames(t *testing.T) {
 
 	for _, sse := range []bool{false, true} {
 		t.Run(fmt.Sprintf("sse=%t", sse), func(t *testing.T) {
-			upstream := &fakeMCPUpstream{pages: [][]string{{"create_issue", "delete_repo"}, {"remove_repo"}}, sse: sse, session: "session-1"}
+			upstream := &fakeMCPUpstream{t: t, pages: [][]string{{"create_issue", "delete_repo"}, {"remove_repo"}}, sse: sse, session: "session-1"}
 			server := httptest.NewServer(upstream)
 			t.Cleanup(server.Close)
 
@@ -128,24 +156,8 @@ func TestFetchToolNames(t *testing.T) {
 	})
 
 	t.Run("repeated cursor stops pagination", func(t *testing.T) {
-		upstream := &fakeMCPUpstream{pages: [][]string{{"a"}, {"b"}}}
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.Method == http.MethodPost && strings.Contains(r.Header.Get("MCP-Protocol-Version"), "2025") {
-				var req struct {
-					ID     json.RawMessage `json:"id"`
-					Method string          `json:"method"`
-				}
-				_ = json.NewDecoder(r.Body).Decode(&req)
-				if req.Method == "tools/list" {
-					w.Header().Set("Content-Type", "application/json")
-					_, _ = fmt.Fprintf(w, `{"jsonrpc":"2.0","id":%s,"result":{"tools":[{"name":"a"}],"nextCursor":"same"}}`, req.ID)
-					return
-				}
-				w.WriteHeader(http.StatusAccepted)
-				return
-			}
-			upstream.ServeHTTP(w, r)
-		}))
+		upstream := &fakeMCPUpstream{t: t, pages: [][]string{{"a"}, {"b"}}}
+		server := httptest.NewServer(repeatedCursorHandler(t, upstream))
 		t.Cleanup(server.Close)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -153,6 +165,35 @@ func TestFetchToolNames(t *testing.T) {
 		_, err := FetchToolNames(ctx, server.Client(), server.URL, nil)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "repeated")
+	})
+}
+
+// repeatedCursorHandler initializes through upstream and then answers every
+// tools/list with the same nextCursor.
+func repeatedCursorHandler(t *testing.T, upstream http.Handler) http.Handler {
+	t.Helper()
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || !strings.Contains(r.Header.Get("MCP-Protocol-Version"), "2025") {
+			upstream.ServeHTTP(w, r)
+			return
+		}
+		var req struct {
+			ID     json.RawMessage `json:"id"`
+			Method string          `json:"method"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Errorf("decoding request: %v", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+		if req.Method != "tools/list" {
+			w.WriteHeader(http.StatusAccepted)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if _, err := fmt.Fprintf(w, `{"jsonrpc":"2.0","id":%s,"result":{"tools":[{"name":"a"}],"nextCursor":"same"}}`, req.ID); err != nil {
+			t.Errorf("writing tools/list response: %v", err)
+		}
 	})
 }
 
