@@ -79,26 +79,64 @@ func Compile(ext *oas.TykMCPServer) (*View, error) {
 		exposed:  make(map[string]string, len(ext.Primitives)),
 	}
 	for _, primitive := range ext.Primitives {
-		override := &Override{source: primitive.Source.ToolName, name: primitive.Source.ToolName}
-		if primitive.Name != "" && primitive.Name != override.source {
-			override.name = primitive.Name
-			override.fields = append(override.fields, jsonField{key: "name", value: jsonString(primitive.Name)})
-			view.quotedNames = append(view.quotedNames, jsonString(primitive.Name))
+		override, err := compileOverride(primitive)
+		if err != nil {
+			return nil, fmt.Errorf("tool %q: %w", primitive.Source.ToolName, err)
 		}
-		if primitive.Description != "" {
-			override.fields = append(override.fields, jsonField{key: "description", value: jsonString(primitive.Description)})
+		names := []string{override.source}
+		if override.name != override.source {
+			names = []string{override.name, override.source}
 		}
-		override.annotations = compileAnnotations(primitive.Annotations)
+		for _, name := range names {
+			quoted, err := jsonString(name)
+			if err != nil {
+				return nil, fmt.Errorf("tool %q: %w", override.source, err)
+			}
+			view.quotedNames = append(view.quotedNames, quoted)
+		}
 		view.bySource[override.source] = override
 		view.exposed[override.name] = override.source
-		view.quotedNames = append(view.quotedNames, jsonString(override.source))
 	}
 	return view, nil
 }
 
-func jsonString(s string) json.RawMessage {
-	quoted, _ := json.Marshal(s) //nolint:errchkjson // a string always marshals
-	return quoted
+// compileOverride compiles the name, description and annotation overrides of
+// one primitive.
+func compileOverride(primitive oas.TykMCPServerPrimitive) (*Override, error) {
+	override := &Override{source: primitive.Source.ToolName, name: primitive.Source.ToolName}
+	if primitive.Name != "" && primitive.Name != override.source {
+		override.name = primitive.Name
+		field, err := stringField("name", primitive.Name)
+		if err != nil {
+			return nil, err
+		}
+		override.fields = append(override.fields, field)
+	}
+	if primitive.Description != "" {
+		field, err := stringField("description", primitive.Description)
+		if err != nil {
+			return nil, err
+		}
+		override.fields = append(override.fields, field)
+	}
+	annotations, err := compileAnnotations(primitive.Annotations)
+	if err != nil {
+		return nil, err
+	}
+	override.annotations = annotations
+	return override, nil
+}
+
+func jsonString(s string) (json.RawMessage, error) {
+	return json.Marshal(s)
+}
+
+func stringField(key, value string) (jsonField, error) {
+	quoted, err := jsonString(value)
+	if err != nil {
+		return jsonField{}, fmt.Errorf("%s: %w", key, err)
+	}
+	return jsonField{key: key, value: quoted}, nil
 }
 
 // Override returns the override configured for an upstream tool.
@@ -136,13 +174,17 @@ func (v *View) shouldWarn(key warning, now time.Time) bool {
 	return true
 }
 
-func compileAnnotations(a *oas.DerivedToolAnnotations) []jsonField {
+func compileAnnotations(a *oas.DerivedToolAnnotations) ([]jsonField, error) {
 	if a == nil {
-		return nil
+		return nil, nil
 	}
 	var fields []jsonField
 	if a.Title != "" {
-		fields = append(fields, jsonField{key: "title", value: jsonString(a.Title)})
+		title, err := stringField("title", a.Title)
+		if err != nil {
+			return nil, fmt.Errorf("annotations.%w", err)
+		}
+		fields = append(fields, title)
 	}
 	for _, hint := range []struct {
 		key   string
@@ -157,7 +199,7 @@ func compileAnnotations(a *oas.DerivedToolAnnotations) []jsonField {
 			fields = append(fields, jsonField{key: hint.key, value: json.RawMessage(strconv.FormatBool(*hint.value))})
 		}
 	}
-	return fields
+	return fields, nil
 }
 
 // RewriteToolsList applies the view to a JSON-RPC tools/list response body.
@@ -342,31 +384,42 @@ func (o *Override) apply(tool json.RawMessage) (json.RawMessage, bool, error) {
 	}
 
 	changed := mergeFields(fields, o.fields)
-	if len(o.annotations) > 0 {
-		var annotations map[string]json.RawMessage
-		if raw := fields["annotations"]; len(raw) > 0 && !bytes.Equal(raw, []byte("null")) {
-			if err := json.Unmarshal(raw, &annotations); err != nil {
-				return nil, false, fmt.Errorf("invalid annotations: %w", err)
-			}
-		}
-		if annotations == nil {
-			annotations = make(map[string]json.RawMessage, len(o.annotations))
-		}
-		if mergeFields(annotations, o.annotations) {
-			raw, err := json.Marshal(annotations)
-			if err != nil {
-				return nil, false, err
-			}
-			fields["annotations"] = raw
-			changed = true
-		}
+	annotationsChanged, err := o.applyAnnotations(fields)
+	if err != nil {
+		return nil, false, err
 	}
-	if !changed {
+	if !changed && !annotationsChanged {
 		return tool, false, nil
 	}
 
 	out, err := json.Marshal(fields)
 	return out, err == nil, err
+}
+
+// applyAnnotations merges the annotation overrides into the annotations
+// member of a decoded tool and reports whether it changed.
+func (o *Override) applyAnnotations(fields map[string]json.RawMessage) (bool, error) {
+	if len(o.annotations) == 0 {
+		return false, nil
+	}
+	var annotations map[string]json.RawMessage
+	if raw := fields["annotations"]; len(raw) > 0 && !bytes.Equal(raw, []byte("null")) {
+		if err := json.Unmarshal(raw, &annotations); err != nil {
+			return false, fmt.Errorf("invalid annotations: %w", err)
+		}
+	}
+	if annotations == nil {
+		annotations = make(map[string]json.RawMessage, len(o.annotations))
+	}
+	if !mergeFields(annotations, o.annotations) {
+		return false, nil
+	}
+	raw, err := json.Marshal(annotations)
+	if err != nil {
+		return false, err
+	}
+	fields["annotations"] = raw
+	return true, nil
 }
 
 // mergeFields sets each override in target and reports whether any value
@@ -430,7 +483,11 @@ func TranslateToolsCall(body []byte, exposed, upstream string) ([]byte, error) {
 		return nil, fmt.Errorf("tools/call request does not name tool %q", exposed)
 	}
 
-	params["name"] = jsonString(upstream)
+	quotedUpstream, err := jsonString(upstream)
+	if err != nil {
+		return nil, err
+	}
+	params["name"] = quotedUpstream
 	rawParams, err := json.Marshal(params)
 	if err != nil {
 		return nil, err

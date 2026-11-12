@@ -66,7 +66,8 @@ func TestMCPAPI_RemoteToolNameAndDescriptionOverrideRoundTrip(t *testing.T) {
 		]}
 	}`
 
-	_, _ = ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/mcps", Data: body, Code: http.StatusOK})
+	_, err := ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/mcps", Data: body, Code: http.StatusOK})
+	require.NoError(t, err)
 	ts.Gw.DoReload()
 
 	res, err := ts.Run(t, test.TestCase{AdminAuth: true, Method: http.MethodGet, Path: "/tyk/mcps/github-mcp", Code: http.StatusOK})
