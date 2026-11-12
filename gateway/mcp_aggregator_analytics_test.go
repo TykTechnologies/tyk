@@ -99,8 +99,10 @@ func startMCPAggregatorAnalyticsTest(t *testing.T, conf func(*config.Config), or
 	github := newMCPRoutingUpstream(t, namedTools("list_issues")...)
 	github.call = answering(`{"content":[{"type":"text","text":"0 issues"}]}`)
 
+	// As /tyk/mcps saves it: an API-to-MCP proxy is MCP-managed, not marked MCP.
 	ordersSpec := ordersMCPProxyRuntimeSpec()
-	ordersSpec.MarkAsMCP()
+	require.False(t, ordersSpec.IsMCP())
+	require.True(t, ordersSpec.IsPairedMCPAdapterProxy())
 	if orders != nil {
 		orders(ordersSpec)
 	}
@@ -231,6 +233,8 @@ func TestMCPProxyDirectCallHasNoAggregatorOrigin(t *testing.T) {
 			require.Nil(t, res.rpc.Error, res.body)
 
 			orders := singleRecord(t, records.forAPI("orders-mcp"), "orders-mcp")
+			assert.True(t, orders.MCPStats.IsMCP)
+			assert.Equal(t, mcp.MethodToolsCall, orders.MCPStats.JSONRPCMethod)
 			assert.Equal(t, "list_orders", orders.MCPStats.PrimitiveName)
 			assert.Empty(t, orders.MCPStats.AggregatorAPIID)
 			assert.Empty(t, records.withAggregatorOrigin())

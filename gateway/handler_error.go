@@ -243,7 +243,7 @@ func (e *ErrorHandler) handleErrorExtended(w http.ResponseWriter, r *http.Reques
 			ExpireAt:      t,
 		}
 		recordGraphDetails(&record, r, response, e.Spec)
-		if e.Spec.IsMCP() {
+		if e.Spec.IsMCPManaged() {
 			recordMCPDetails(&record, r)
 		}
 
