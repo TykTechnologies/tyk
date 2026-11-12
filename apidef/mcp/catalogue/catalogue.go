@@ -181,10 +181,13 @@ func (s *session) notify(ctx context.Context, method string) error {
 	if err != nil {
 		return fmt.Errorf("%s: %w", method, err)
 	}
-	_, _ = io.Copy(io.Discard, io.LimitReader(res.Body, maxBodyBytes))
+	_, drainErr := io.Copy(io.Discard, io.LimitReader(res.Body, maxBodyBytes))
 	_ = res.Body.Close()
 	if res.StatusCode < 200 || res.StatusCode > 299 {
 		return fmt.Errorf("%s: upstream returned status %d", method, res.StatusCode)
+	}
+	if drainErr != nil {
+		return fmt.Errorf("%s: reading response: %w", method, drainErr)
 	}
 	return nil
 }
@@ -210,8 +213,10 @@ func (s *session) close() {
 // JSON body or the first matching message event of an SSE stream.
 func readResponse(res *http.Response, id int) ([]byte, error) {
 	body := io.LimitReader(res.Body, maxBodyBytes)
-	mediaType, _, _ := mime.ParseMediaType(res.Header.Get("Content-Type"))
-	if mediaType != "text/event-stream" {
+	// A missing or malformed Content-Type is read as a plain JSON body; the
+	// JSON-RPC decoding that follows reports anything that is not one.
+	mediaType, _, err := mime.ParseMediaType(res.Header.Get("Content-Type"))
+	if err != nil || mediaType != "text/event-stream" {
 		return io.ReadAll(body)
 	}
 
@@ -231,7 +236,7 @@ func readResponse(res *http.Response, id int) ([]byte, error) {
 			data = append(data, strings.TrimPrefix(value, " "))
 		}
 	}
-	if err := scanner.Err(); err != nil {
+	if err = scanner.Err(); err != nil {
 		return nil, err
 	}
 	if raw, ok := matchingEvent(data, id); ok {

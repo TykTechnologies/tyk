@@ -175,54 +175,100 @@ func compileAnnotations(a *oas.DerivedToolAnnotations) []jsonField {
 // response also has no nextCursor the list is the whole catalogue, and
 // sources of overrides that it does not contain are reported as missing.
 func (v *View) RewriteToolsList(body []byte, complete bool) (out []byte, changed bool, drift Drift, err error) {
-	var envelope mcp.JSONRPCResponse
-	if err := json.Unmarshal(body, &envelope); err != nil {
+	list, err := decodeToolsList(body)
+	if err != nil {
 		return nil, false, Drift{}, err
 	}
-	if envelope.Result == nil {
+	if list == nil {
 		return body, false, Drift{}, nil
 	}
 
-	var result map[string]json.RawMessage
-	if err := json.Unmarshal(envelope.Result, &result); err != nil {
-		return nil, false, Drift{}, fmt.Errorf("invalid tools/list result: %w", err)
+	var seen sourceSet
+	if complete && !list.hasNextCursor() {
+		seen = make(sourceSet, len(v.bySource))
 	}
-	rawTools, ok := result["tools"]
+	kept, changed, err := v.applyOverrides(list.tools, seen, &drift)
+	if err != nil {
+		return nil, false, Drift{}, err
+	}
+	drift.Missing = v.missingSources(seen)
+
+	if !changed {
+		return body, false, drift, nil
+	}
+	out, err = mcp.ReencodeEnvelope(&list.envelope, list.result, "tools", kept)
+	if err != nil {
+		return nil, false, Drift{}, err
+	}
+	return out, true, drift, nil
+}
+
+// toolsList is a decoded tools/list response whose tools can be rewritten
+// in place and re-encoded with every other member preserved.
+type toolsList struct {
+	envelope mcp.JSONRPCResponse
+	result   map[string]json.RawMessage
+	tools    []json.RawMessage
+}
+
+// decodeToolsList decodes a tools/list response body. It returns a nil list
+// for responses that carry no tools to rewrite, such as errors and server
+// messages.
+func decodeToolsList(body []byte) (*toolsList, error) {
+	list := &toolsList{}
+	if err := json.Unmarshal(body, &list.envelope); err != nil {
+		return nil, err
+	}
+	if list.envelope.Result == nil {
+		return nil, nil
+	}
+	if err := json.Unmarshal(list.envelope.Result, &list.result); err != nil {
+		return nil, fmt.Errorf("invalid tools/list result: %w", err)
+	}
+	rawTools, ok := list.result["tools"]
 	if !ok {
-		return body, false, Drift{}, nil
+		return nil, nil
 	}
-	var tools []json.RawMessage
-	if err := json.Unmarshal(rawTools, &tools); err != nil {
-		return nil, false, Drift{}, fmt.Errorf("invalid tools/list tools: %w", err)
+	if err := json.Unmarshal(rawTools, &list.tools); err != nil {
+		return nil, fmt.Errorf("invalid tools/list tools: %w", err)
 	}
+	return list, nil
+}
 
-	_, hasNextCursor := result["nextCursor"]
-	var seen map[string]struct{}
-	if complete && !hasNextCursor {
-		seen = make(map[string]struct{}, len(v.bySource))
-	}
+func (l *toolsList) hasNextCursor() bool {
+	_, ok := l.result["nextCursor"]
+	return ok
+}
 
-	// Hidden tools are dropped in place; kept never overtakes the loop index.
-	kept := tools[:0]
+// sourceSet records the override sources found in a tools/list response. A
+// nil set records nothing; it is used when the response is not the complete
+// catalogue.
+type sourceSet map[string]struct{}
+
+func (s sourceSet) add(source string) {
+	if s != nil {
+		s[source] = struct{}{}
+	}
+}
+
+// applyOverrides returns tools with every overridden tool rewritten and
+// every upstream tool hidden behind an override dropped, and reports whether
+// anything changed. Sources of the overridden tools are added to seen and
+// hidden tools to drift.Hidden. Hidden tools are dropped in place, reusing
+// the backing array of tools; kept never overtakes the loop index.
+func (v *View) applyOverrides(tools []json.RawMessage, seen sourceSet, drift *Drift) (kept []json.RawMessage, changed bool, err error) {
+	kept = tools[:0]
 	for _, tool := range tools {
-		if !v.mayAffect(tool) {
+		name, ok := v.affectedToolName(tool)
+		if !ok {
 			kept = append(kept, tool)
 			continue
 		}
-		var named struct {
-			Name string `json:"name"`
-		}
-		if json.Unmarshal(tool, &named) != nil {
-			kept = append(kept, tool)
-			continue
-		}
-		if override, ok := v.bySource[named.Name]; ok {
-			if seen != nil {
-				seen[named.Name] = struct{}{}
-			}
+		if override, ok := v.bySource[name]; ok {
+			seen.add(name)
 			rewritten, toolChanged, err := override.apply(tool)
 			if err != nil {
-				return nil, false, Drift{}, fmt.Errorf("tool %q: %w", named.Name, err)
+				return nil, false, fmt.Errorf("tool %q: %w", name, err)
 			}
 			if toolChanged {
 				tool = rewritten
@@ -231,31 +277,46 @@ func (v *View) RewriteToolsList(body []byte, complete bool) (out []byte, changed
 			kept = append(kept, tool)
 			continue
 		}
-		if _, bound := v.exposed[named.Name]; bound {
-			drift.Hidden = append(drift.Hidden, named.Name)
+		if _, bound := v.exposed[name]; bound {
+			drift.Hidden = append(drift.Hidden, name)
 			changed = true
 			continue
 		}
 		kept = append(kept, tool)
 	}
+	return kept, changed, nil
+}
 
-	if seen != nil {
-		for source := range v.bySource {
-			if _, ok := seen[source]; !ok {
-				drift.Missing = append(drift.Missing, source)
-			}
+// affectedToolName returns the name of a raw tool that may be affected by
+// the view. Tools that cannot be decoded are left alone.
+func (v *View) affectedToolName(tool json.RawMessage) (string, bool) {
+	if !v.mayAffect(tool) {
+		return "", false
+	}
+	var named struct {
+		Name string `json:"name"`
+	}
+	if json.Unmarshal(tool, &named) != nil {
+		return "", false
+	}
+	return named.Name, true
+}
+
+// missingSources returns, sorted, the override sources that are not in seen.
+// It returns nil when seen is nil, because only a complete catalogue proves
+// that a source is missing.
+func (v *View) missingSources(seen sourceSet) []string {
+	if seen == nil {
+		return nil
+	}
+	var missing []string
+	for source := range v.bySource {
+		if _, ok := seen[source]; !ok {
+			missing = append(missing, source)
 		}
-		sort.Strings(drift.Missing)
 	}
-
-	if !changed {
-		return body, false, drift, nil
-	}
-	out, err = mcp.ReencodeEnvelope(&envelope, result, "tools", kept)
-	if err != nil {
-		return nil, false, Drift{}, err
-	}
-	return out, true, drift, nil
+	sort.Strings(missing)
+	return missing
 }
 
 // mayAffect reports whether a raw tool mentions any source or exposed name.

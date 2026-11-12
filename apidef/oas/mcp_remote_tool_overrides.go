@@ -21,34 +21,18 @@ func ValidateRemoteMCPToolOverrides(ext *TykMCPServer) error {
 	sources := make(map[string]struct{}, len(ext.Primitives))
 	finalNames := make(map[string]struct{}, len(ext.Primitives))
 	for i, primitive := range ext.Primitives {
-		source := primitive.Source
-		if source.OperationID != "" || source.Path != "" || source.Method != "" {
-			return fmt.Errorf("%s primitive %d: operationId and path+method selectors are valid only for MCP proxies targeting a REST-as-MCP adapter; use source.toolName", ExtensionTykMCPServer, i)
-		}
-		toolName := source.ToolName
-		if toolName == "" {
-			return fmt.Errorf("%s primitive %d: source.toolName is required on remote MCP proxies", ExtensionTykMCPServer, i)
-		}
-		if err := ValidateMCPToolName(toolName); err != nil {
-			return fmt.Errorf("%s primitive %d: source.toolName %q is not a valid tool name: %w", ExtensionTykMCPServer, i, toolName, err)
-		}
-		if len(primitive.Parameters) > 0 {
-			return fmt.Errorf("%s primitive %q: parameters are not supported on remote MCP proxies", ExtensionTykMCPServer, toolName)
-		}
-		if primitive.Allow != nil {
-			return fmt.Errorf("%s primitive %q: allow is not supported on remote MCP proxies; use tool access rules instead", ExtensionTykMCPServer, toolName)
+		toolName, err := validateRemoteMCPPrimitive(i, primitive)
+		if err != nil {
+			return err
 		}
 		if _, dup := sources[toolName]; dup {
 			return fmt.Errorf("%s has duplicate source.toolName %q", ExtensionTykMCPServer, toolName)
 		}
 		sources[toolName] = struct{}{}
 
-		finalName := toolName
-		if primitive.Name != "" {
-			if err := ValidateMCPToolName(primitive.Name); err != nil {
-				return fmt.Errorf("%s primitive %q: %w", ExtensionTykMCPServer, toolName, err)
-			}
-			finalName = primitive.Name
+		finalName, err := remoteMCPFinalToolName(toolName, primitive.Name)
+		if err != nil {
+			return err
 		}
 		if _, dup := finalNames[finalName]; dup {
 			return fmt.Errorf("%s: %q is a duplicate tool name", ExtensionTykMCPServer, finalName)
@@ -56,4 +40,39 @@ func ValidateRemoteMCPToolOverrides(ext *TykMCPServer) error {
 		finalNames[finalName] = struct{}{}
 	}
 	return nil
+}
+
+// validateRemoteMCPPrimitive checks the fields of the primitive at index i
+// that do not depend on other primitives and returns its source tool name.
+func validateRemoteMCPPrimitive(i int, primitive TykMCPServerPrimitive) (string, error) {
+	source := primitive.Source
+	if source.OperationID != "" || source.Path != "" || source.Method != "" {
+		return "", fmt.Errorf("%s primitive %d: operationId and path+method selectors are valid only for MCP proxies targeting a REST-as-MCP adapter; use source.toolName", ExtensionTykMCPServer, i)
+	}
+	toolName := source.ToolName
+	if toolName == "" {
+		return "", fmt.Errorf("%s primitive %d: source.toolName is required on remote MCP proxies", ExtensionTykMCPServer, i)
+	}
+	if err := ValidateMCPToolName(toolName); err != nil {
+		return "", fmt.Errorf("%s primitive %d: source.toolName %q is not a valid tool name: %w", ExtensionTykMCPServer, i, toolName, err)
+	}
+	if len(primitive.Parameters) > 0 {
+		return "", fmt.Errorf("%s primitive %q: parameters are not supported on remote MCP proxies", ExtensionTykMCPServer, toolName)
+	}
+	if primitive.Allow != nil {
+		return "", fmt.Errorf("%s primitive %q: allow is not supported on remote MCP proxies; use tool access rules instead", ExtensionTykMCPServer, toolName)
+	}
+	return toolName, nil
+}
+
+// remoteMCPFinalToolName returns the name a remote MCP tool is exposed under:
+// the override name when set, otherwise the upstream tool name.
+func remoteMCPFinalToolName(toolName, overrideName string) (string, error) {
+	if overrideName == "" {
+		return toolName, nil
+	}
+	if err := ValidateMCPToolName(overrideName); err != nil {
+		return "", fmt.Errorf("%s primitive %q: %w", ExtensionTykMCPServer, toolName, err)
+	}
+	return overrideName, nil
 }

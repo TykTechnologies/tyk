@@ -39,11 +39,12 @@ func TestMCPAPI_RejectsNonBooleanToolAnnotationHint(t *testing.T) {
 	require.NoError(t, err)
 	t.Logf("rejection: %s", rejection)
 
-	_, _ = ts.Run(t, []test.TestCase{
+	_, err = ts.Run(t, []test.TestCase{
 		{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/mcps", Data: body(`true`), Code: http.StatusOK},
 		{AdminAuth: true, Method: http.MethodPut, Path: "/tyk/mcps/remote-mcp-hint-api", Data: body(`"yes"`),
 			Code: http.StatusBadRequest, BodyMatch: `destructiveHint`},
 	}...)
+	require.NoError(t, err)
 }
 
 func TestMCPAPI_RemoteToolNameAndDescriptionOverrideRoundTrip(t *testing.T) {
