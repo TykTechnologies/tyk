@@ -570,26 +570,15 @@ func handleRPCError(err error, connectionString string) bool {
 	return false
 }
 
-var rpcConnectionsPool []net.Conn
-
 func onConnectFunc(conn net.Conn) (net.Conn, string, error) {
 	values.clientIsConnected.Store(true)
 	remoteAddr := conn.RemoteAddr().String()
 	Log.WithField("remoteAddr", remoteAddr).Debug("connected to RPC server")
-	rpcConnectionsPool = append(rpcConnectionsPool, conn)
 	return conn, remoteAddr, nil
 }
 
-func CloseConnections() {
-	for k, v := range rpcConnectionsPool {
-		err := v.Close()
-		if err != nil {
-			Log.WithError(err).Error("closing connection")
-		} else {
-			rpcConnectionsPool = append(rpcConnectionsPool[:k], rpcConnectionsPool[k+1:]...)
-		}
-	}
-}
+// Deprecated: CloseConnections is a no-op, connections are owned and closed by the gorpc client.
+func CloseConnections() {}
 
 func Disconnect() bool {
 	values.clientIsConnected.Store(false)
