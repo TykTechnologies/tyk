@@ -185,6 +185,7 @@ func recordMCPDetails(rec *analytics.AnalyticsRecord, r *http.Request) {
 		rec.MCPStats.DeclaredProtocolVersion = protocolContext.DeclaredProtocolVersion
 		rec.MCPStats.ProtocolVersionSource = string(protocolContext.ProtocolVersionSource)
 	}
+	recordMCPAggregatorOrigin(rec, r)
 }
 
 const traceTagPrefix = "trace-id-"

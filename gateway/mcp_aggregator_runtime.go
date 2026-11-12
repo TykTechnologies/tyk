@@ -68,6 +68,12 @@ func (m *MCPAggregatorMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 		return nil, http.StatusOK
 	}
 
+	// The aggregator answers here rather than through a proxy, so its
+	// analytics record is written once the answer is complete.
+	owner, observed := newMCPCompletionAnalyticsOwner(&SuccessHandler{m.BaseMiddleware}, r, w)
+	defer owner.Complete(r)
+	w = observed
+
 	state := httpctx.GetJSONRPCRoutingState(r)
 	if r.Method != http.MethodPost || state == nil {
 		w.Header().Set("Allow", http.MethodPost)
