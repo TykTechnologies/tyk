@@ -56,9 +56,16 @@ func Compile(ext *oas.TykMCPServer) (*View, error) {
 	view := &View{bySource: make(map[string]*Override, len(ext.Primitives))}
 	for _, primitive := range ext.Primitives {
 		override := &Override{source: primitive.Source.ToolName}
-		override.annotations = compileAnnotations(primitive.Annotations)
+		annotations, err := compileAnnotations(primitive.Annotations)
+		if err != nil {
+			return nil, fmt.Errorf("tool %q: %w", override.source, err)
+		}
+		override.annotations = annotations
 		view.bySource[override.source] = override
-		quoted, _ := json.Marshal(override.source) //nolint:errchkjson // a string always marshals
+		quoted, err := json.Marshal(override.source)
+		if err != nil {
+			return nil, fmt.Errorf("tool %q: %w", override.source, err)
+		}
 		view.quotedSources = append(view.quotedSources, quoted)
 	}
 	return view, nil
@@ -88,13 +95,16 @@ func (v *View) ShouldWarnMissing(source string, now time.Time) bool {
 	return true
 }
 
-func compileAnnotations(a *oas.DerivedToolAnnotations) []annotationField {
+func compileAnnotations(a *oas.DerivedToolAnnotations) ([]annotationField, error) {
 	if a == nil {
-		return nil
+		return nil, nil
 	}
 	var fields []annotationField
 	if a.Title != "" {
-		title, _ := json.Marshal(a.Title) //nolint:errchkjson // a string always marshals
+		title, err := json.Marshal(a.Title)
+		if err != nil {
+			return nil, fmt.Errorf("annotations.title: %w", err)
+		}
 		fields = append(fields, annotationField{key: "title", value: title})
 	}
 	for _, hint := range []struct {
@@ -110,7 +120,7 @@ func compileAnnotations(a *oas.DerivedToolAnnotations) []annotationField {
 			fields = append(fields, annotationField{key: hint.key, value: json.RawMessage(strconv.FormatBool(*hint.value))})
 		}
 	}
-	return fields
+	return fields, nil
 }
 
 // RewriteToolsList applies the view to a JSON-RPC tools/list response body.
@@ -125,77 +135,138 @@ func compileAnnotations(a *oas.DerivedToolAnnotations) []annotationField {
 // response also has no nextCursor the list is the whole catalogue, and
 // sources of overrides that it does not contain are returned as missing.
 func (v *View) RewriteToolsList(body []byte, complete bool) (out []byte, changed bool, missing []string, err error) {
-	var envelope mcp.JSONRPCResponse
-	if err := json.Unmarshal(body, &envelope); err != nil {
+	list, err := decodeToolsList(body)
+	if err != nil {
 		return nil, false, nil, err
 	}
-	if envelope.Result == nil {
+	if list == nil {
 		return body, false, nil, nil
 	}
 
-	var result map[string]json.RawMessage
-	if err := json.Unmarshal(envelope.Result, &result); err != nil {
-		return nil, false, nil, fmt.Errorf("invalid tools/list result: %w", err)
+	var seen sourceSet
+	if complete && !list.hasNextCursor() {
+		seen = make(sourceSet, len(v.bySource))
 	}
-	rawTools, ok := result["tools"]
+	changed, err = v.applyOverrides(list.tools, seen)
+	if err != nil {
+		return nil, false, nil, err
+	}
+	missing = v.missingSources(seen)
+
+	if !changed {
+		return body, false, missing, nil
+	}
+	out, err = mcp.ReencodeEnvelope(&list.envelope, list.result, "tools", list.tools)
+	if err != nil {
+		return nil, false, nil, err
+	}
+	return out, true, missing, nil
+}
+
+// toolsList is a decoded tools/list response whose tools can be rewritten
+// in place and re-encoded with every other member preserved.
+type toolsList struct {
+	envelope mcp.JSONRPCResponse
+	result   map[string]json.RawMessage
+	tools    []json.RawMessage
+}
+
+// decodeToolsList decodes a tools/list response body. It returns a nil list
+// for responses that carry no tools to rewrite, such as errors and server
+// messages.
+func decodeToolsList(body []byte) (*toolsList, error) {
+	list := &toolsList{}
+	if err := json.Unmarshal(body, &list.envelope); err != nil {
+		return nil, err
+	}
+	if list.envelope.Result == nil {
+		return nil, nil
+	}
+	if err := json.Unmarshal(list.envelope.Result, &list.result); err != nil {
+		return nil, fmt.Errorf("invalid tools/list result: %w", err)
+	}
+	rawTools, ok := list.result["tools"]
 	if !ok {
-		return body, false, nil, nil
+		return nil, nil
 	}
-	var tools []json.RawMessage
-	if err := json.Unmarshal(rawTools, &tools); err != nil {
-		return nil, false, nil, fmt.Errorf("invalid tools/list tools: %w", err)
+	if err := json.Unmarshal(rawTools, &list.tools); err != nil {
+		return nil, fmt.Errorf("invalid tools/list tools: %w", err)
 	}
+	return list, nil
+}
 
-	_, hasNextCursor := result["nextCursor"]
-	var seen map[string]struct{}
-	if complete && !hasNextCursor {
-		seen = make(map[string]struct{}, len(v.bySource))
-	}
+func (l *toolsList) hasNextCursor() bool {
+	_, ok := l.result["nextCursor"]
+	return ok
+}
 
+// sourceSet records the override sources found in a tools/list response. A
+// nil set records nothing; it is used when the response is not the complete
+// catalogue.
+type sourceSet map[string]struct{}
+
+func (s sourceSet) add(source string) {
+	if s != nil {
+		s[source] = struct{}{}
+	}
+}
+
+// applyOverrides rewrites, in place, every tool that has an override and
+// reports whether any tool changed. Sources of the overridden tools are
+// added to seen.
+func (v *View) applyOverrides(tools []json.RawMessage, seen sourceSet) (bool, error) {
+	changed := false
 	for i, tool := range tools {
-		if !v.mayHaveOverride(tool) {
-			continue
-		}
-		var named struct {
-			Name string `json:"name"`
-		}
-		if json.Unmarshal(tool, &named) != nil {
-			continue
-		}
-		override, ok := v.bySource[named.Name]
+		name, ok := v.overriddenToolName(tool)
 		if !ok {
 			continue
 		}
-		if seen != nil {
-			seen[named.Name] = struct{}{}
-		}
-		rewritten, toolChanged, err := override.apply(tool)
+		seen.add(name)
+		rewritten, toolChanged, err := v.bySource[name].apply(tool)
 		if err != nil {
-			return nil, false, nil, fmt.Errorf("tool %q: %w", named.Name, err)
+			return false, fmt.Errorf("tool %q: %w", name, err)
 		}
 		if toolChanged {
 			tools[i] = rewritten
 			changed = true
 		}
 	}
+	return changed, nil
+}
 
-	if seen != nil {
-		for source := range v.bySource {
-			if _, ok := seen[source]; !ok {
-				missing = append(missing, source)
-			}
+// overriddenToolName returns the name of a raw tool when the view has an
+// override for it. Tools that cannot be decoded are left alone.
+func (v *View) overriddenToolName(tool json.RawMessage) (string, bool) {
+	if !v.mayHaveOverride(tool) {
+		return "", false
+	}
+	var named struct {
+		Name string `json:"name"`
+	}
+	if json.Unmarshal(tool, &named) != nil {
+		return "", false
+	}
+	if _, ok := v.bySource[named.Name]; !ok {
+		return "", false
+	}
+	return named.Name, true
+}
+
+// missingSources returns, sorted, the override sources that are not in seen.
+// It returns nil when seen is nil, because only a complete catalogue proves
+// that a source is missing.
+func (v *View) missingSources(seen sourceSet) []string {
+	if seen == nil {
+		return nil
+	}
+	var missing []string
+	for source := range v.bySource {
+		if _, ok := seen[source]; !ok {
+			missing = append(missing, source)
 		}
-		sort.Strings(missing)
 	}
-
-	if !changed {
-		return body, false, missing, nil
-	}
-	out, err = mcp.ReencodeEnvelope(&envelope, result, "tools", tools)
-	if err != nil {
-		return nil, false, nil, err
-	}
-	return out, true, missing, nil
+	sort.Strings(missing)
+	return missing
 }
 
 // mayHaveOverride reports whether a raw tool mentions any source name.

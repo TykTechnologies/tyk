@@ -70,7 +70,7 @@ func TestValidateMCPObject(t *testing.T) {
 
 	t.Run("valid MCP object with resources", func(t *testing.T) {
 		t.Parallel()
-		mcpWithResources := validOASObject
+		mcpWithResources := copyWithoutExtensions(validOASObject)
 		extWithResources := validXTykAPIGateway
 		extWithResources.Middleware = &oas.Middleware{
 			McpResources: map[string]*oas.MCPPrimitive{
@@ -95,7 +95,7 @@ func TestValidateMCPObject(t *testing.T) {
 
 	t.Run("valid MCP object with prompts", func(t *testing.T) {
 		t.Parallel()
-		mcpWithPrompts := validOASObject
+		mcpWithPrompts := copyWithoutExtensions(validOASObject)
 		extWithPrompts := validXTykAPIGateway
 		extWithPrompts.Middleware = &oas.Middleware{
 			McpPrompts: map[string]*oas.MCPPrimitive{
@@ -120,7 +120,7 @@ func TestValidateMCPObject(t *testing.T) {
 
 	t.Run("valid MCP object with all MCP fields", func(t *testing.T) {
 		t.Parallel()
-		mcpWithAll := validOASObject
+		mcpWithAll := copyWithoutExtensions(validOASObject)
 		extWithAll := validXTykAPIGateway
 		extWithAll.Middleware = &oas.Middleware{
 			McpTools: map[string]*oas.MCPPrimitive{
@@ -155,7 +155,7 @@ func TestValidateMCPObject(t *testing.T) {
 		assert.Nil(t, err)
 	})
 
-	invalidOASObject := validOASObject
+	invalidOASObject := copyWithoutExtensions(validOASObject)
 	invalidXTykAPIGateway := validXTykAPIGateway
 	invalidXTykAPIGateway.Info = oas.Info{} // Empty name should fail
 	invalidXTykAPIGateway.Server.GatewayTags = &oas.GatewayTags{Enabled: true, Tags: []string{}}
@@ -842,4 +842,16 @@ func TestValidateMCPObject_RemoteToolOverrides(t *testing.T) {
 		assert.Contains(t, err.Error(), "x-tyk-mcp-server.primitives.0.name")
 		assert.Contains(t, err.Error(), "128")
 	})
+}
+
+// copyWithoutExtensions returns a copy of doc with its own, empty extensions
+// map and its own Info, the parts that SetTykExtension and MarshalJSON write,
+// so that parallel subtests never write to state shared with doc.
+func copyWithoutExtensions(doc oas.OAS) oas.OAS {
+	doc.Extensions = nil
+	if doc.Info != nil {
+		info := *doc.Info
+		doc.Info = &info
+	}
+	return doc
 }

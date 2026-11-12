@@ -194,7 +194,12 @@ func remoteMCPCatalogueHeader(spec *APISpec) http.Header {
 // credential cannot be sent to another host and the check cannot be steered
 // to other addresses; a 3xx is handled like an unreachable upstream.
 func (gw *Gateway) remoteMCPCatalogueClient(spec *APISpec) *http.Client {
-	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport := &http.Transport{}
+	// http.DefaultTransport is replaceable; start from its settings only when
+	// it is still a *http.Transport.
+	if base, ok := http.DefaultTransport.(*http.Transport); ok {
+		transport = base.Clone()
+	}
 	transport.Proxy = nil
 	transport.TLSClientConfig = &tls.Config{
 		InsecureSkipVerify: gw.GetConfig().ProxySSLInsecureSkipVerify || spec.Proxy.Transport.SSLInsecureSkipVerify, //nolint:gosec // mirrors the proxy's own upstream TLS setting
