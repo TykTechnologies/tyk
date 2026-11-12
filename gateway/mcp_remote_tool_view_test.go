@@ -33,7 +33,17 @@ type fakeRemoteMCPServer struct {
 	sse       bool
 	listCalls int
 	calls     []string
+	received  []receivedToolsCall
 	block     chan struct{}
+}
+
+// receivedToolsCall is what the upstream saw for one tools/call.
+type receivedToolsCall struct {
+	ID        json.RawMessage
+	Name      string
+	Arguments json.RawMessage
+	Meta      json.RawMessage
+	MCPName   []string
 }
 
 func (f *fakeRemoteMCPServer) setTools(tools ...string) {
@@ -61,8 +71,10 @@ func (f *fakeRemoteMCPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		ID     json.RawMessage `json:"id"`
 		Method string          `json:"method"`
 		Params struct {
-			Name   string `json:"name"`
-			Cursor string `json:"cursor"`
+			Name      string          `json:"name"`
+			Cursor    string          `json:"cursor"`
+			Arguments json.RawMessage `json:"arguments"`
+			Meta      json.RawMessage `json:"_meta"`
 		} `json:"params"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -90,6 +102,10 @@ func (f *fakeRemoteMCPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		result = page
 	case "tools/call":
 		f.calls = append(f.calls, req.Params.Name)
+		f.received = append(f.received, receivedToolsCall{
+			ID: req.ID, Name: req.Params.Name, Arguments: req.Params.Arguments, Meta: req.Params.Meta,
+			MCPName: r.Header.Values("Mcp-Name"),
+		})
 		result = `{"content":[{"type":"text","text":"called ` + req.Params.Name + `"}]}`
 	default:
 		f.mu.Unlock()
