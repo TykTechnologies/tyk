@@ -436,7 +436,7 @@ func writeMCPAggregatorResult(w http.ResponseWriter, id any, result any) {
 	w.WriteHeader(http.StatusOK)
 	enc := json.NewEncoder(w)
 	enc.SetEscapeHTML(false)
-	_ = enc.Encode(map[string]any{
+	encodeMCPAggregatorResponse(enc, map[string]any{
 		"jsonrpc": apidef.JsonRPC20,
 		"id":      id,
 		"result":  result,
@@ -446,9 +446,18 @@ func writeMCPAggregatorResult(w http.ResponseWriter, id any, result any) {
 func writeMCPAggregatorError(w http.ResponseWriter, id any, httpCode, code int, message string) {
 	w.Header().Set(headerContentType, contentTypeJSON)
 	w.WriteHeader(httpCode)
-	_ = json.NewEncoder(w).Encode(JSONRPCErrorResponse{
+	encodeMCPAggregatorResponse(json.NewEncoder(w), JSONRPCErrorResponse{
 		JSONRPC: apidef.JsonRPC20,
 		Error:   JSONRPCError{Code: code, Message: message},
 		ID:      id,
 	})
+}
+
+// encodeMCPAggregatorResponse writes a JSON-RPC response body. The status line
+// is already sent, so a failed write, usually a client that went away, can
+// only be logged.
+func encodeMCPAggregatorResponse(enc *json.Encoder, body any) {
+	if err := enc.Encode(body); err != nil {
+		log.WithError(err).Warn("MCP aggregator could not write the JSON-RPC response")
+	}
 }

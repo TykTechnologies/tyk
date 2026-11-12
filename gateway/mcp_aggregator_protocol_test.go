@@ -24,6 +24,7 @@ import (
 // It records the protocol declarations of every request it receives.
 type mcpVersionedUpstream struct {
 	*httptest.Server
+	t        *testing.T
 	mu       sync.Mutex
 	versions []string
 	tools    []string
@@ -43,7 +44,7 @@ type mcpObservedRequest struct {
 
 func newMCPVersionedUpstream(t *testing.T, versions []string, tools ...string) *mcpVersionedUpstream {
 	t.Helper()
-	u := &mcpVersionedUpstream{versions: versions, tools: tools}
+	u := &mcpVersionedUpstream{t: t, versions: versions, tools: tools}
 	u.Server = httptest.NewServer(http.HandlerFunc(u.serve))
 	t.Cleanup(u.Close)
 	return u
@@ -87,9 +88,16 @@ func (u *mcpVersionedUpstream) serve(w http.ResponseWriter, r *http.Request) {
 			Meta            map[string]json.RawMessage `json:"_meta"`
 		} `json:"params"`
 	}
-	_ = json.NewDecoder(r.Body).Decode(&req)
+	if !decodeMCPTestRequest(w, r, &req) {
+		return
+	}
 	var metaVersion string
-	_ = json.Unmarshal(req.Params.Meta[mcp.MetaKeyProtocolVersion], &metaVersion)
+	if raw, ok := req.Params.Meta[mcp.MetaKeyProtocolVersion]; ok {
+		if err := json.Unmarshal(raw, &metaVersion); err != nil {
+			http.Error(w, "invalid _meta protocol version: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
 	headerVersion := r.Header.Get(mcp.HeaderProtocolVersion)
 
 	u.mu.Lock()
@@ -127,7 +135,7 @@ func (u *mcpVersionedUpstream) serve(w http.ResponseWriter, r *http.Request) {
 		}
 	case mcp.MethodServerDiscover:
 		if !slices.Contains(versions, mcp.ModernProtocolVersion) {
-			writeMCPTestJSONRPCError(w, req.ID, mcp.JSONRPCMethodNotFound, "Method not found")
+			writeMCPTestJSONRPCError(u.t, w, req.ID, mcp.JSONRPCMethodNotFound, "Method not found")
 			return
 		}
 		result = map[string]any{
@@ -143,16 +151,35 @@ func (u *mcpVersionedUpstream) serve(w http.ResponseWriter, r *http.Request) {
 	case mcp.MethodToolsCall:
 		result = map[string]any{"content": []map[string]any{{"type": "text", "text": "ok"}}}
 	default:
-		writeMCPTestJSONRPCError(w, req.ID, mcp.JSONRPCMethodNotFound, "Method not found")
+		writeMCPTestJSONRPCError(u.t, w, req.ID, mcp.JSONRPCMethodNotFound, "Method not found")
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": result})
+	writeMCPTestJSON(u.t, w, map[string]any{"jsonrpc": "2.0", "id": req.ID, "result": result})
 }
 
-func writeMCPTestJSONRPCError(w http.ResponseWriter, id any, code int, message string) {
+func writeMCPTestJSONRPCError(t *testing.T, w http.ResponseWriter, id any, code int, message string) {
+	t.Helper()
+	writeMCPTestJSON(t, w, map[string]any{"jsonrpc": "2.0", "id": id, "error": map[string]any{"code": code, "message": message}})
+}
+
+// writeMCPTestJSON writes a JSON body from a test upstream's handler, which
+// runs outside the test goroutine and so reports a failed write with Errorf.
+func writeMCPTestJSON(t *testing.T, w http.ResponseWriter, body any) {
+	t.Helper()
 	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{"jsonrpc": "2.0", "id": id, "error": map[string]any{"code": code, "message": message}})
+	if err := json.NewEncoder(w).Encode(body); err != nil {
+		t.Errorf("test upstream could not write its response: %v", err)
+	}
+}
+
+// decodeMCPTestRequest reads a JSON-RPC request in a test upstream's handler.
+// A body that is not JSON gets HTTP 400, as the MCP SDKs answer it.
+func decodeMCPTestRequest(w http.ResponseWriter, r *http.Request, req any) bool {
+	if err := json.NewDecoder(r.Body).Decode(req); err != nil {
+		http.Error(w, "Parse error: "+err.Error(), http.StatusBadRequest)
+		return false
+	}
+	return true
 }
 
 // mcpTestCall is one client JSON-RPC request to a gateway listen path.
@@ -190,7 +217,10 @@ func (c mcpTestCall) body() string {
 	if c.notification {
 		delete(envelope, "id")
 	}
-	body, _ := json.Marshal(envelope)
+	body, err := json.Marshal(envelope)
+	if err != nil {
+		panic(fmt.Sprintf("marshal MCP test call: %v", err))
+	}
 	return string(body)
 }
 
@@ -248,7 +278,11 @@ func postMCPTestCall(t *testing.T, ts *Test, listenPath string, call mcpTestCall
 			message = event
 		}
 	}
-	_ = json.Unmarshal(message, &out.rpc)
+	// A body that is not JSON-RPC, such as a plain HTTP error, leaves rpc empty;
+	// the caller asserts on status and body instead.
+	if err := json.Unmarshal(message, &out.rpc); err != nil {
+		t.Logf("response is not JSON-RPC: %v", err)
+	}
 	return out
 }
 

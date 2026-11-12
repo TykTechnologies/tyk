@@ -152,7 +152,11 @@ func TestMCPAggregatorAppliesEachProxysSelectionIndependently(t *testing.T) {
 func TestMCPAggregatorSelectsByTheNameTheProxyExposes(t *testing.T) {
 	ts := StartTest(nil)
 	t.Cleanup(ts.Close)
-	githubREST := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _, _ = w.Write([]byte(`[]`)) }))
+	githubREST := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if _, err := w.Write([]byte(`[]`)); err != nil {
+			t.Errorf("w.Write: %v", err)
+		}
+	}))
 	t.Cleanup(githubREST.Close)
 	source := mcpRuntimeDoc("github-rest", githubREST.URL)
 	source.Paths.Set("/issues", &openapi3.PathItem{

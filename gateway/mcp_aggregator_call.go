@@ -327,7 +327,10 @@ func replaceJSONObjectField(object json.RawMessage, key string, value []byte) ([
 		if err := dec.Decode(&raw); err != nil {
 			return nil, err
 		}
-		field, _ := tok.(string)
+		field, ok := tok.(string)
+		if !ok {
+			return nil, errors.New("params must be a JSON object")
+		}
 		if !strings.EqualFold(field, key) {
 			continue
 		}
@@ -358,9 +361,15 @@ func writeMCPAggregatorRaw(w http.ResponseWriter, status int, id any, member str
 	}
 	w.Header().Set(headerContentType, contentTypeJSON)
 	w.WriteHeader(status)
-	_, _ = fmt.Fprintf(w, `{"jsonrpc":%q,"id":%s,%q:`, apidef.JsonRPC20, encodedID, member)
-	_, _ = w.Write(raw)
-	_, _ = w.Write([]byte("}\n"))
+	prefix := fmt.Appendf(nil, `{"jsonrpc":%q,"id":%s,%q:`, apidef.JsonRPC20, encodedID, member)
+	for _, part := range [][]byte{prefix, raw, []byte("}\n")} {
+		if _, err := w.Write(part); err != nil {
+			// The status line is already sent, so a failed write, usually a
+			// client that went away, can only be logged.
+			log.WithError(err).Warn("MCP aggregator could not write the JSON-RPC response")
+			return
+		}
+	}
 }
 
 const mcpAggregatorTransformedHeadersKey mcpContextKey = "mcp_aggregator_transformed_headers"
@@ -371,7 +380,10 @@ func ctxAddMCPAggregatorTransformedHeaders(r *http.Request, names []string) {
 	if len(names) == 0 {
 		return
 	}
-	previous, _ := r.Context().Value(mcpAggregatorTransformedHeadersKey).([]string)
+	previous, ok := r.Context().Value(mcpAggregatorTransformedHeadersKey).([]string)
+	if !ok {
+		previous = nil
+	}
 	setCtxValue(r, mcpAggregatorTransformedHeadersKey, append(slices.Clone(previous), names...))
 }
 
@@ -381,8 +393,11 @@ func ctxAddMCPAggregatorTransformedHeaders(r *http.Request, names []string) {
 // way, and neither are the headers mcpAggregatorForwardsTransformedHeader
 // refuses.
 func mcpAggregatorTransformedHeaders(r *http.Request) http.Header {
-	names, _ := r.Context().Value(mcpAggregatorTransformedHeadersKey).([]string)
 	out := http.Header{}
+	names, ok := r.Context().Value(mcpAggregatorTransformedHeadersKey).([]string)
+	if !ok {
+		return out
+	}
 	for _, name := range names {
 		if !mcpAggregatorForwardsTransformedHeader(name) {
 			continue

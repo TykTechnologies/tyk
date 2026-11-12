@@ -124,7 +124,10 @@ func TestAPIRateLimitStillCountsLoopsOutsideMCPRouting(t *testing.T) {
 		return r
 	}
 	status := func(rl *RateLimitForAPI, r *http.Request) int {
-		_, code := rl.ProcessRequest(httptest.NewRecorder(), r, nil)
+		err, code := rl.ProcessRequest(httptest.NewRecorder(), r, nil)
+		if (err != nil) != (code != http.StatusOK) {
+			t.Errorf("ProcessRequest returned error %v with status %d", err, code)
+		}
 		return code
 	}
 
@@ -329,7 +332,9 @@ func startMCPAggregatorRuntimeTestWith(t *testing.T, conf ...func(*config.Config
 	github := newMockRemoteMCPServer(t, "search_repos", "create_issue")
 	ordersBackend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`[]`))
+		if _, err := w.Write([]byte(`[]`)); err != nil {
+			t.Errorf("w.Write: %v", err)
+		}
 	}))
 	t.Cleanup(ordersBackend.Close)
 	return ts, github, ordersBackend
