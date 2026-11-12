@@ -93,7 +93,8 @@ func startMCPAggregatorAnalyticsTest(t *testing.T, conf func(*config.Config), or
 	t.Cleanup(ts.Close)
 	ordersBackend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`[]`))
+		_, err := w.Write([]byte(`[]`))
+		assert.NoError(t, err)
 	}))
 	t.Cleanup(ordersBackend.Close)
 	github := newMCPRoutingUpstream(t, namedTools("list_issues")...)
@@ -295,7 +296,7 @@ func installSpanRecorder(t *testing.T, ts *Test) *tracetest.SpanRecorder {
 	t.Cleanup(func() {
 		otelglobal.SetTracerProvider(previousProvider)
 		otelglobal.SetTextMapPropagator(previousPropagator)
-		_ = provider.Shutdown(context.Background())
+		assert.NoError(t, provider.Shutdown(context.Background()))
 	})
 	return recorder
 }
