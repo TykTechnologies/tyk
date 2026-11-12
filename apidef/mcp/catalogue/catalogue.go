@@ -213,10 +213,12 @@ func (s *session) close() {
 // JSON body or the first matching message event of an SSE stream.
 func readResponse(res *http.Response, id int) ([]byte, error) {
 	body := io.LimitReader(res.Body, maxBodyBytes)
-	// A missing or malformed Content-Type is read as a plain JSON body; the
-	// JSON-RPC decoding that follows reports anything that is not one.
+	// A missing or unparsable Content-Type is read as a plain JSON body; the
+	// JSON-RPC decoding that follows reports anything that is not one. A
+	// malformed parameter still yields the media type, so an event stream
+	// with, say, a bare "charset" is parsed as one.
 	mediaType, _, err := mime.ParseMediaType(res.Header.Get("Content-Type"))
-	if err != nil || mediaType != "text/event-stream" {
+	if (err != nil && !errors.Is(err, mime.ErrInvalidMediaParameter)) || mediaType != "text/event-stream" {
 		return io.ReadAll(body)
 	}
 
