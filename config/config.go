@@ -313,8 +313,8 @@ type AnalyticsConfigConfig struct {
 	// Tyk can store GeoIP information based on MaxMind DB’s to enable GeoIP tracking on inbound request analytics. Set this value to `true` and assign a DB using the `geo_ip_db_path` setting.
 	EnableGeoIP bool `json:"enable_geo_ip"`
 
-	// Path to a MaxMind GeoIP database
-	// The analytics GeoIP DB can be replaced on disk. It will cleanly auto-reload every hour.
+	// Path to a MaxMind GeoIP database.
+	// The Gateway opens the database at startup. To load a new database file, restart the Gateway.
 	GeoIPDBLocation string `json:"geo_ip_db_path"`
 
 	// This section describes methods that enable you to normalise inbound URLs in your analytics to have more meaningful per-path data.
@@ -1166,11 +1166,11 @@ type Config struct {
 	HealthCheck HealthCheckConfig `json:"health_check"`
 
 	// HealthCheckEndpointName Enables you to change the liveness endpoint.
-	// Default is "/hello"
+	// Default is `hello`, which serves the endpoint at `/hello`.
 	HealthCheckEndpointName string `json:"health_check_endpoint_name"`
 
-	// ReadinessCheckEndpointName Enables you to change the readiness endpoint
-	// Default is "/ready"
+	// ReadinessCheckEndpointName Enables you to change the readiness endpoint.
+	// Default is `ready`, which serves the endpoint at `/ready`.
 	ReadinessCheckEndpointName string `json:"readiness_check_endpoint_name"`
 
 	// GracefulShutdownTimeoutDuration sets how many seconds the gateway should wait for an existing connection

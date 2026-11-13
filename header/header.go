@@ -79,6 +79,6 @@ const (
 	// XRateLimitRemaining The number of requests remaining in the current rate limit window.
 	XRateLimitRemaining = "X-RateLimit-Remaining"
 
-	// XRateLimitReset The number of seconds until the rate limit resets.
+	// XRateLimitReset The time when the rate limit resets, as a Unix timestamp in seconds.
 	XRateLimitReset = "X-RateLimit-Reset"
 )
