@@ -253,10 +253,10 @@ func candidatesErrorResponseCode(candidates []ValidateRequestCandidate) int {
 }
 
 // pathParamsMatchOperation checks whether the given path parameter values satisfy
-// the path parameter schemas defined in the OAS operation. This is used as a quick
+// the path parameter schemas that apply to the OAS operation. This is used as a quick
 // pre-filter before committing to full request validation.
-func pathParamsMatchOperation(pathParams map[string]string, operation *openapi3.Operation) bool {
-	for _, paramRef := range operation.Parameters {
+func pathParamsMatchOperation(pathParams map[string]string, parameters openapi3.Parameters) bool {
+	for _, paramRef := range parameters {
 		if paramRef == nil || paramRef.Value == nil || paramRef.Value.In != "path" {
 			continue
 		}

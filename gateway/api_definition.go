@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -1779,7 +1780,7 @@ func pathParamRestrictiveness(oasPath, method string, oasPaths *openapi3.Paths) 
 	}
 
 	score := 0
-	for _, paramRef := range op.Parameters {
+	for _, paramRef := range candidatePathParameters(pathItem, op) {
 		if paramRef == nil || paramRef.Value == nil || paramRef.Value.In != "path" {
 			continue
 		}
@@ -1849,7 +1850,7 @@ func pathParamPatternLength(oasPath, method string, oasPaths *openapi3.Paths) in
 	}
 
 	total := 0
-	for _, paramRef := range op.Parameters {
+	for _, paramRef := range candidatePathParameters(pathItem, op) {
 		if paramRef == nil || paramRef.Value == nil || paramRef.Value.In != "path" {
 			continue
 		}
@@ -1858,6 +1859,36 @@ func pathParamPatternLength(oasPath, method string, oasPaths *openapi3.Paths) in
 		}
 	}
 	return total
+}
+
+// candidatePathParameters returns the operation's parameters plus the path item's,
+// leaving out any path-item parameter the operation redeclares.
+func candidatePathParameters(pathItem *openapi3.PathItem, op *openapi3.Operation) openapi3.Parameters {
+	if len(pathItem.Parameters) == 0 {
+		return op.Parameters
+	}
+
+	if len(op.Parameters) == 0 {
+		return pathItem.Parameters
+	}
+
+	params := make(openapi3.Parameters, 0, len(op.Parameters)+len(pathItem.Parameters))
+	params = append(params, op.Parameters...)
+
+	for _, ref := range pathItem.Parameters {
+		if ref == nil || ref.Value == nil {
+			continue
+		}
+
+		redeclared := slices.ContainsFunc(op.Parameters, func(own *openapi3.ParameterRef) bool {
+			return own != nil && own.Value != nil && own.Value.In == ref.Value.In && own.Value.Name == ref.Value.Name
+		})
+		if !redeclared {
+			params = append(params, ref)
+		}
+	}
+
+	return params
 }
 
 // compileOASMockResponsePathSpec extracts MockResponse operations from OAS middleware
