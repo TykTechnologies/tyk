@@ -6,11 +6,14 @@ import (
 	"github.com/TykTechnologies/tyk/apidef/oas"
 )
 
-// Target is the (audience, scopes) pair sent to the IdP.
+// Target is the audience, scopes and explicit resources sent to the IdP.
 // Nil means no exchange target could be resolved.
 type Target struct {
 	Audience string
 	Scopes   []string
+	// Resources are the explicitly configured RFC 8707 resource indicators;
+	// empty when none is configured or the provider is jwt-bearer.
+	Resources []string
 }
 
 // SelectExchangeProvider returns the provider whose Issuers matches iss, or
@@ -57,17 +60,25 @@ func MergeTargetForProvider(ex *oas.OAuth2Exchange, provider *oas.OAuth2TokenExc
 	if ex != nil {
 		t.Audience = ex.Audience
 		t.Scopes = append([]string(nil), ex.Scopes...)
+		t.Resources = append([]string(nil), ex.Resources...)
 		if len(t.Scopes) == 0 && ex.InfersScopesFromSecurity() && len(inferredScopes) > 0 {
 			t.Scopes = append([]string(nil), inferredScopes...)
 		}
 	}
-	if (t.Audience == "" || len(t.Scopes) == 0) && provider != nil && provider.DefaultTarget != nil {
+	if provider != nil && provider.DefaultTarget != nil {
 		if t.Audience == "" {
 			t.Audience = provider.DefaultTarget.Audience
 		}
 		if len(t.Scopes) == 0 {
 			t.Scopes = append([]string(nil), provider.DefaultTarget.Scopes...)
 		}
+		if len(t.Resources) == 0 {
+			t.Resources = append([]string(nil), provider.DefaultTarget.Resources...)
+		}
+	}
+	// RFC 7523 has no resource parameter; nil also normalises an empty list.
+	if provider.IsJWTBearer() || len(t.Resources) == 0 {
+		t.Resources = nil
 	}
 	if t.Audience == "" && !provider.IsJWTBearer() {
 		return nil

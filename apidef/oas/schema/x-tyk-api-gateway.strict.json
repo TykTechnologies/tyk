@@ -2402,6 +2402,12 @@
           "items": {
             "type": "string"
           }
+        },
+        "resources": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
@@ -2416,6 +2422,12 @@
           "type": "string"
         },
         "scopes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "resources": {
           "type": "array",
           "items": {
             "type": "string"

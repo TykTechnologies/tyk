@@ -82,3 +82,36 @@ func TestCacheKey_TenantEndpoint(t *testing.T) {
 		assert.Equal(t, base.Build(), withField.Build())
 	})
 }
+
+func TestCacheKey_Resources(t *testing.T) {
+	base := CacheKeyInput{
+		Issuer: "https://idp", SubjectID: "user-1", APIID: "api1",
+		Audience: "https://orders.example.com", Scopes: []string{"write", "read"}, ProviderName: "p",
+	}
+
+	t.Run("no resources keeps the key computed before the field existed", func(t *testing.T) {
+		assert.Equal(t, "oauth2:exchange:890aa8eec73de554541d23be43fe6309229178f52806e5850a7b000bbd5ae83b", base.Build())
+	})
+
+	t.Run("different resources yield different keys", func(t *testing.T) {
+		a, b := base, base
+		a.Resources = []string{"https://r1"}
+		b.Resources = []string{"https://r2"}
+		assert.NotEqual(t, a.Build(), b.Build())
+		assert.NotEqual(t, base.Build(), a.Build())
+	})
+
+	t.Run("resource order does not matter", func(t *testing.T) {
+		a, b := base, base
+		a.Resources = []string{"https://r1", "https://r2"}
+		b.Resources = []string{"https://r2", "https://r1"}
+		assert.Equal(t, a.Build(), b.Build())
+	})
+
+	t.Run("resources cannot collide with a tenant endpoint", func(t *testing.T) {
+		a, b := base, base
+		a.TenantEndpoint = "https://r1"
+		b.Resources = []string{"https://r1"}
+		assert.NotEqual(t, a.Build(), b.Build())
+	})
+}

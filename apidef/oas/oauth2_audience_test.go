@@ -1,6 +1,7 @@
 package oas
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -146,4 +147,116 @@ func TestValidateOAuth2Schemes_Audience_AcceptedConfigurations(t *testing.T) {
 		s := withMiddleware(newOAuth2WithTokenExchange("corpOAuth", te), activeExchangeOp(""))
 		assert.NoError(t, s.ValidateOAuth2Schemes())
 	})
+}
+
+func TestIsResourceIndicator(t *testing.T) {
+	tests := []struct {
+		in   string
+		want bool
+	}{
+		{"https://orders.example.com", true},
+		{"https://orders.example.com/v1?x=1", true},
+		{"api://orders", true},
+		{"urn:example:orders", true},
+		{"abc123", false},
+		{"/relative/path", false},
+		{"https://orders.example.com#frag", false},
+		{"https://orders.example.com#", false},
+		{"HTTPS://orders.example.com", true},
+		{"https:", false},
+		{"https://", false},
+		{"https:///path", false},
+		{"x:", false},
+		{"urn:a urn:b", false},
+		{"https://x/a b", false},
+		{"https://x/\ta", false},
+		{"", false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.in, func(t *testing.T) {
+			assert.Equal(t, tc.want, IsResourceIndicator(tc.in))
+		})
+	}
+}
+
+func TestValidateOAuth2Schemes_Resources(t *testing.T) {
+	validate := func(provider OAuth2TokenExchangeProvider, mw *Middleware) error {
+		te := &OAuth2TokenExchange{Enabled: true, Providers: []OAuth2TokenExchangeProvider{provider}}
+		s := newOAuth2WithTokenExchange("corpOAuth", te)
+		if mw != nil {
+			s = withMiddleware(s, mw)
+		}
+		return s.ValidateOAuth2Schemes()
+	}
+	opWithResources := func(resources ...string) *Middleware {
+		mw := activeExchangeOp("abc123")
+		mw.Operations["getOrders"].Exchange.Resources = resources
+		return mw
+	}
+	enabled := true
+	mcpWithResources := func(resources ...string) *Middleware {
+		return &Middleware{McpTools: MCPPrimitives{
+			"searchOrders": &MCPPrimitive{Operation: Operation{Exchange: &OAuth2Exchange{Enabled: &enabled, Audience: "abc123", Resources: resources}}},
+		}}
+	}
+	defaultTarget := func(resources ...string) *OAuth2DefaultTarget {
+		return &OAuth2DefaultTarget{Audience: "abc123", Resources: resources}
+	}
+
+	t.Run("accepted", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			provider OAuth2TokenExchangeProvider
+			mw       *Middleware
+		}{
+			{"provider default list", exchangeProvider("p", OAuth2ProviderGrantTokenExchange, defaultTarget("https://orders.example.com", "api://orders", "urn:example:orders")), nil},
+			{"operation list", exchangeProvider("p", OAuth2ProviderGrantTokenExchange, defaultTarget()), opWithResources("https://orders.example.com")},
+			{"MCP primitive list", exchangeProvider("p", OAuth2ProviderGrantTokenExchange, defaultTarget()), mcpWithResources("https://orders.example.com")},
+			{"operation list beside a jwt-bearer provider is ignored, not rejected", exchangeProvider("p", OAuth2ProviderGrantJWTBearer, nil), opWithResources("https://orders.example.com")},
+		}
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				assert.NoError(t, validate(tc.provider, tc.mw))
+			})
+		}
+	})
+
+	t.Run("rejected", func(t *testing.T) {
+		tests := []struct {
+			name     string
+			provider OAuth2TokenExchangeProvider
+			mw       *Middleware
+			wantErr  string
+		}{
+			{"relative provider value", exchangeProvider("p", OAuth2ProviderGrantTokenExchange, defaultTarget("orders")), nil, `defaultTarget.resources entry "orders"`},
+			{"provider value with a fragment", exchangeProvider("p", OAuth2ProviderGrantTokenExchange, defaultTarget("https://orders.example.com#x")), nil, "absolute URI without a fragment"},
+			{"empty provider value", exchangeProvider("p", OAuth2ProviderGrantTokenExchange, defaultTarget("")), nil, `defaultTarget.resources entry ""`},
+			{"jwt-bearer provider with resources", exchangeProvider("p", OAuth2ProviderGrantJWTBearer, defaultTarget("https://orders.example.com")), nil, "remove defaultTarget.resources"},
+			{"relative operation value", exchangeProvider("p", OAuth2ProviderGrantTokenExchange, defaultTarget()), opWithResources("/orders"), `exchange on "getOrders" resources entry "/orders"`},
+			{"MCP primitive value with a fragment", exchangeProvider("p", OAuth2ProviderGrantTokenExchange, defaultTarget()), mcpWithResources("api://orders#tool"), `exchange on "searchOrders"`},
+		}
+		for _, tc := range tests {
+			t.Run(tc.name, func(t *testing.T) {
+				err := validate(tc.provider, tc.mw)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), `oauth2 scheme "corpOAuth"`)
+				assert.Contains(t, err.Error(), tc.wantErr)
+			})
+		}
+	})
+}
+
+func TestOAuth2Exchange_RoundTripPreservesResources(t *testing.T) {
+	in := OAuth2TokenExchangeProvider{DefaultTarget: &OAuth2DefaultTarget{Audience: "abc123", Resources: []string{"https://a", "https://b"}}}
+	b, err := json.Marshal(in)
+	require.NoError(t, err)
+	assert.Contains(t, string(b), `"resources":["https://a","https://b"]`)
+
+	var out OAuth2TokenExchangeProvider
+	require.NoError(t, json.Unmarshal(b, &out))
+	assert.Equal(t, in.DefaultTarget.Resources, out.DefaultTarget.Resources)
+
+	b, err = json.Marshal(OAuth2Exchange{Audience: "abc123"})
+	require.NoError(t, err)
+	assert.NotContains(t, string(b), "resources")
 }

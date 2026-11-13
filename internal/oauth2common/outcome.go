@@ -63,6 +63,10 @@ type Outcome struct {
 	// Scopes is the resolved scope list sent to the IdP.
 	Scopes []string
 
+	// Resources are the RFC 8707 resource values requested for the target;
+	// empty when the request carries no resource parameter.
+	Resources []string
+
 	// ExchangedToken is the IdP's exchanged access token; empty on failure.
 	ExchangedToken string
 

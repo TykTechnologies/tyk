@@ -250,6 +250,40 @@ func TestProcessRequest_SuccessSpanMetricAudit(t *testing.T) {
 	assert.NotContains(t, meta, "sub")
 }
 
+func TestProcessRequest_ResourceFieldFollowsTheWire(t *testing.T) {
+	tests := []struct {
+		name         string
+		audience     string
+		grantType    string
+		wantResource []string
+	}{
+		{name: "URL audience logs the derived resource", audience: "https://api.internal", wantResource: []string{"https://api.internal"}},
+		{name: "client id audience logs no resource", audience: "abc123"},
+		{name: "jwt-bearer logs no resource", audience: "https://api.internal", grantType: oas.OAuth2ProviderGrantJWTBearer},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			idp := okIdP(t, 0, "downstream-app")
+			t.Cleanup(idp.Close)
+			p := provider("corpIdP", idp.URL, false)
+			p.GrantType = tc.grantType
+			p.DefaultTarget.Audience = tc.audience
+
+			base := newFakeBase()
+			processInTrace(t, newMiddleware(base, nil), exchangeState(p), installRecorder(t))
+
+			require.Len(t, base.events, 1)
+			meta := base.events[0].meta
+			assert.Equal(t, tc.audience, meta["oauth2_audience"])
+			if tc.wantResource == nil {
+				assert.NotContains(t, meta, "oauth2_resource")
+				return
+			}
+			assert.Equal(t, tc.wantResource, meta["oauth2_resource"])
+		})
+	}
+}
+
 // TestProcessRequest_IdPErrorEmitsFailed pins TC3/TC8: an IdP rejection records
 // the idp_error metric and fires the Failed audit event with the IdP code.
 func TestProcessRequest_IdPErrorEmitsFailed(t *testing.T) {
