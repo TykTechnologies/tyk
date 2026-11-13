@@ -18,9 +18,6 @@ type storage interface {
 type FileSystemStorage struct{}
 
 func (FileSystemStorage) fileExist(path string) bool {
-	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
-		log.Warningf("plugin file %v doesn't exist", path)
-		return false
-	}
-	return true
+	_, err := os.Stat(path)
+	return !errors.Is(err, os.ErrNotExist)
 }
