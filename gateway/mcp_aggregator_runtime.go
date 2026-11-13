@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"sync"
 
+	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/sirupsen/logrus"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -66,6 +67,27 @@ func (m *MCPAggregatorMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 	}
 
 	switch state.Method {
+	case mcp.MethodServerDiscover:
+		writeMCPAggregatorResult(w, state.ID, map[string]any{
+			"resultType":        "complete",
+			"supportedVersions": m.Spec.SupportedProtocolVersions(),
+			"capabilities":      mcpAggregatorCapabilities(),
+			"_meta":             map[string]any{mcpsdk.MetaKeyServerInfo: m.serverInfo()},
+		})
+	case mcp.MethodInitialize:
+		// Ingress admits initialize only when it declares 2026-07-28.
+		writeMCPAggregatorResult(w, state.ID, map[string]any{
+			"protocolVersion": mcp.ModernProtocolVersion,
+			"capabilities":    mcpAggregatorCapabilities(),
+			"serverInfo":      m.serverInfo(),
+		})
+	case mcp.MethodNotificationsInitialized:
+		if state.ID != nil {
+			writeMCPAggregatorError(w, state.ID, http.StatusBadRequest, mcp.JSONRPCInvalidRequest, "notifications must not carry an id")
+			break
+		}
+		// The aggregator keeps no session, so the handshake needs no state.
+		w.WriteHeader(http.StatusAccepted)
 	case mcp.MethodToolsList:
 		catalogue := mcpAggregatorDispatcher{gw: m.Gw, aggregator: m.Spec}.toolsCatalogue(r)
 		writeMCPAggregatorResult(w, state.ID, map[string]any{"tools": catalogue.definitions()})
@@ -73,6 +95,15 @@ func (m *MCPAggregatorMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 		writeMCPAggregatorError(w, state.ID, http.StatusNotFound, mcp.JSONRPCMethodNotFound, "method not supported by MCP aggregator")
 	}
 	return nil, middleware.StatusRespond
+}
+
+// mcpAggregatorCapabilities lists what an aggregator serves: tools only.
+func mcpAggregatorCapabilities() map[string]any {
+	return map[string]any{"tools": map[string]any{}}
+}
+
+func (m *MCPAggregatorMiddleware) serverInfo() map[string]any {
+	return map[string]any{"name": m.Spec.Name, "version": VERSION}
 }
 
 // mcpAggregatorTool is one tool of an aggregated MCP proxy exposed under its
@@ -124,7 +155,12 @@ func (d mcpAggregatorDispatcher) toolsCatalogue(parent *http.Request) mcpAggrega
 			budgeted := d
 			budgeted.budget = &mcpAggregatorByteBudget{share: share}
 			tools, err := budgeted.listUpstreamTools(parent, upstream)
-			if err != nil {
+			var mismatch *mcpAggregatorVersionMismatchError
+			switch {
+			case errors.As(err, &mismatch):
+				logMCPAggregatorVersionMismatch(d.aggregator.APIID, upstream.APIID, upstream.Alias, mismatch)
+				return
+			case err != nil:
 				logMCPAggregatorUpstreamOmitted(d.aggregator.APIID, upstream.APIID, upstream.Alias, mcpAggregatorFailureReason(err))
 				return
 			}
@@ -146,6 +182,18 @@ func (d mcpAggregatorDispatcher) toolsCatalogue(parent *http.Request) mcpAggrega
 		catalogueBytes += size
 	}
 	return catalogue
+}
+
+// logMCPAggregatorVersionMismatch warns that an aggregated MCP proxy is left
+// out because it no longer serves 2026-07-28.
+func logMCPAggregatorVersionMismatch(aggregatorAPIID, upstreamAPIID, alias string, mismatch *mcpAggregatorVersionMismatchError) {
+	log.WithFields(logrus.Fields{
+		"aggregator_api_id":    aggregatorAPIID,
+		"upstream_api_id":      upstreamAPIID,
+		"alias":                alias,
+		"mcp_protocol_version": mcp.ModernProtocolVersion,
+		"reason":               fmt.Sprintf("version mismatch: does not support MCP version %s: %s", mcp.ModernProtocolVersion, mismatch.Detail),
+	}).Warn(mcpAggregatorUpstreamOmittedMsg)
 }
 
 // mcpAggregatorCatalogueOverflow says why a catalogue of the given tool count

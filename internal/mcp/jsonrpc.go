@@ -21,6 +21,9 @@ const (
 	MethodServerDiscover      = "server/discover"
 	MethodSubscriptionsListen = "subscriptions/listen"
 
+	// MethodNotificationsInitialized completes the initialize handshake.
+	MethodNotificationsInitialized = "notifications/initialized"
+
 	// Tool methods
 	MethodToolsCall = "tools/call"
 	MethodToolsList = "tools/list"
