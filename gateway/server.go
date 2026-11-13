@@ -59,6 +59,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/dnsdiscovery"
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/mcp"
+	mcpaggregator "github.com/TykTechnologies/tyk/internal/mcp/aggregator"
 	"github.com/TykTechnologies/tyk/internal/mcp/pairing"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/netutil"
@@ -180,6 +181,8 @@ type Gateway struct {
 	apisByID        map[string]*APISpec
 	apisHandlesByID *sync.Map
 	mcpPairingIndex pairing.Index
+
+	mcpAggregatorIndex mcpaggregator.Index
 
 	// prmCache memoises upstream Protected Resource Metadata (RFC 9728) docs
 	// for MCP APIs running in mirror mode. Lazily initialised on first use.

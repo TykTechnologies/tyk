@@ -464,6 +464,11 @@ func (gw *Gateway) processSpec(
 		&MCPLoopAuthBypassMiddleware{BaseMiddleware: baseMid.Copy()},
 		isMCPAdapterLoopRequest,
 	)
+	gw.mwAppendEnabledForRequest(
+		&chainArray,
+		&MCPAggregatorLoopAuthBypassMiddleware{BaseMiddleware: baseMid.Copy()},
+		isMCPAggregatorLoopRequest,
+	)
 
 	// Track auth middlewares for OR wrapper
 	var authMiddlewares []TykMiddleware
@@ -640,6 +645,11 @@ func (gw *Gateway) processSpec(
 		&MCPLoopAuthRestoreMiddleware{BaseMiddleware: baseMid.Copy()},
 		isMCPAdapterLoopRequest,
 	)
+	gw.mwAppendEnabledForRequest(
+		&chainArray,
+		&MCPAggregatorLoopAuthRestoreMiddleware{BaseMiddleware: baseMid.Copy()},
+		ctxMCPAggregatorLoopAuthBypassed,
+	)
 
 	gw.mwAppendEnabled(&chainArray, &RateLimitForAPI{BaseMiddleware: baseMid.Copy(), quotaKey: options.quotaKey})
 	gw.mwAppendEnabled(&chainArray, &GraphQLMiddleware{BaseMiddleware: baseMid.Copy()})
@@ -703,6 +713,7 @@ func (gw *Gateway) processSpec(
 	// After all VEM-specific middleware has been applied, it checks the routing state
 	// and either continues to the next VEM or allows the request to proceed to upstream.
 	gw.mwAppendEnabled(&chainArray, &MCPVEMContinuationMiddleware{BaseMiddleware: baseMid.Copy()})
+	gw.mwAppendEnabled(&chainArray, &MCPAggregatorMiddleware{BaseMiddleware: baseMid.Copy()})
 
 	chain = alice.New(chainArray...).Then(&DummyProxyHandler{SH: SuccessHandler{baseMid.Copy()}, Gw: gw})
 
@@ -844,6 +855,7 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			}
 		} else {
 			ctxSetVersionInfo(r, nil)
+			endMCPAggregatorLoopSession(r)
 
 			if targetAPI := d.Gw.fuzzyFindAPI(r.URL.Hostname()); targetAPI != nil {
 				if h, found := d.Gw.apisHandlesByID.Load(targetAPI.APIID); found {
@@ -883,6 +895,11 @@ func (d *DummyProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if d.SH.Spec.target.Scheme == "tyk" {
+		// Paired proxies hand their session to the synthetic adapter, which
+		// derives the MCP session owner from it.
+		if !d.SH.Spec.IsPairedMCPAdapterProxy() {
+			endMCPAggregatorLoopSession(r)
+		}
 		handler, targetSpec, found := d.Gw.findInternalHTTPHandlerForLoop(d.SH.Spec.target.Host, d.SH.Spec, r)
 
 		if !found {
@@ -1368,6 +1385,7 @@ func (gw *Gateway) loadApps(specs []*APISpec) {
 		specs = synthesizedSpecs
 		gw.mcpPairingIndex.Set(mcpPairingSnapshot)
 	}
+	gw.mcpAggregatorIndex.Set(computeMCPAggregation(specs))
 
 	// Only build usage map in RPC mode (when tracker exists)
 	if gw.certUsageTracker != nil {

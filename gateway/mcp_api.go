@@ -93,7 +93,7 @@ func (gw *Gateway) validateMCP(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		if errMsg, errCode := gw.validatePairedMCPAdapterUpstream(r, mcpObj); errMsg != "" {
+		if errMsg, errCode := gw.validateMCPProxyReferences(r, mcpObj); errMsg != "" {
 			doJSONWrite(w, errCode, apiError(errMsg))
 			return
 		}
@@ -569,6 +569,10 @@ func (gw *Gateway) handleDeleteMCP(apiID string, fs afero.Fs) (interface{}, int)
 
 	if !spec.IsMCPManaged() {
 		return apiError("API is not an MCP Proxy"), http.StatusNotFound
+	}
+
+	if resp, code := gw.mcpAggregatorDeleteConflict(apiID); resp != nil {
+		return resp, code
 	}
 
 	if err := deleteAPIFiles(apiID, "mcp", gw.GetConfig().AppPath, fs); err != nil {

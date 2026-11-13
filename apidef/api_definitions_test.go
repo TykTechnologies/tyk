@@ -1384,3 +1384,40 @@ func TestVersionDefinition_ResolvedDefault(t *testing.T) {
 		})
 	}
 }
+
+func TestAPIDefinition_IsMCPAggregator(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		target string
+		want   bool
+	}{
+		{name: "reserved aggregator target", target: MCPAggregatorTargetURL, want: true},
+		{name: "reserved aggregator target with spaces", target: " " + MCPAggregatorTargetURL + " ", want: true},
+		{name: "remote MCP upstream", target: "http://mcp.example", want: false},
+		{name: "loop to another API", target: "tyk://mcp-aggregator-2", want: false},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			api := &APIDefinition{Proxy: ProxyConfig{TargetURL: tt.target}}
+			api.MarkAsMCP()
+
+			assert.Equal(t, tt.want, api.IsMCPAggregator())
+			assert.True(t, api.IsMCPManaged())
+			assert.False(t, api.IsPairedMCPAdapterProxy())
+		})
+	}
+
+	classicLoop := &APIDefinition{Proxy: ProxyConfig{TargetURL: MCPAggregatorTargetURL}}
+	assert.False(t, classicLoop.IsMCPAggregator(), "a non-MCP API looping to an API named mcp-aggregator is not an aggregator")
+	assert.False(t, classicLoop.IsMCPManaged())
+
+	paired := &APIDefinition{Proxy: ProxyConfig{TargetURL: "tyk://rest-1/mcp"}}
+	assert.False(t, paired.IsMCPAggregator())
+	assert.False(t, (*APIDefinition)(nil).IsMCPAggregator())
+}

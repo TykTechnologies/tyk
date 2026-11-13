@@ -28,6 +28,9 @@ const (
 	// ExtensionTykMCPServer is the OAS schema key for REST-as-MCP proxy tool-view configuration.
 	ExtensionTykMCPServer = "x-tyk-mcp-server"
 
+	// ExtensionTykMCPAggregator is the OAS schema key for MCP aggregator configuration.
+	ExtensionTykMCPAggregator = "x-tyk-mcp-aggregator"
+
 	// Main holds the default version value (empty).
 	Main = ""
 
@@ -229,6 +232,7 @@ func (s *OAS) Initialize() {
 	s.GetTykExtension()
 	s.GetTykStreamingExtension()
 	s.GetTykMCPServerExtension()
+	s.GetTykMCPAggregatorExtension()
 
 	if s.Components == nil || s.Components.SecuritySchemes == nil {
 		return
@@ -573,10 +577,11 @@ func (s *OAS) Validate(ctx context.Context, opts ...openapi3.ValidationOption) e
 	compliantModeErr := s.validateCompliantModeAuthentication()
 	prmErr := s.validatePRM()
 	mcpServerErr := s.validateMCPServerExtensionPlacement(false)
+	mcpAggregatorErr := s.validateMCPAggregatorExtension(false)
 	mcpOriginErr := s.validateMCPOrigins(false)
 	oauth2Err := s.ValidateOAuth2Schemes()
 
-	return errors.Join(validationErr, securityErr, compliantModeErr, prmErr, mcpServerErr, mcpOriginErr, oauth2Err)
+	return errors.Join(validationErr, securityErr, compliantModeErr, prmErr, mcpServerErr, mcpAggregatorErr, mcpOriginErr, oauth2Err)
 }
 
 // Normalize converts the OAS api to a normalized state.
@@ -773,9 +778,10 @@ func (s *OAS) ValidateForMCP(ctx context.Context, opts ...openapi3.ValidationOpt
 		prmErr = tykAuth.ProtectedResourceMetadata.Validate(true)
 	}
 	mcpServerErr := s.validateMCPServerExtensionPlacement(true)
+	mcpAggregatorErr := s.validateMCPAggregatorExtension(true)
 	mcpOriginErr := s.validateMCPOrigins(true)
 
-	return errors.Join(validationErr, securityErr, compliantModeErr, prmErr, mcpServerErr, mcpOriginErr, oauth2Err)
+	return errors.Join(validationErr, securityErr, compliantModeErr, prmErr, mcpServerErr, mcpAggregatorErr, mcpOriginErr, oauth2Err)
 }
 
 func (s *OAS) validateMCPOrigins(isMCP bool) error {

@@ -1927,11 +1927,12 @@ func (gw *Gateway) writeOASFile(spec *APISpec, index int, appPath string) {
 }
 
 // getOASFilePath returns the file path for an OAS spec.
-// Uses -mcp.json suffix for MCP APIs, -oas.json for regular OAS APIs.
+// Uses -mcp.json suffix for MCP-managed APIs, -oas.json for regular OAS APIs,
+// matching writeOASAndAPIDefToFile.
 func (gw *Gateway) getOASFilePath(spec *APISpec, index int, appPath string) string {
 	baseName := spec.APIID + strconv.Itoa(index)
 	suffix := "-oas.json"
-	if spec.IsMCP() {
+	if spec.IsMCPManaged() {
 		suffix = "-mcp.json"
 	}
 	return filepath.Join(appPath, baseName+suffix)
