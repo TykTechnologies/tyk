@@ -140,6 +140,7 @@ func (d mcpAggregatorDispatcher) exchange(parent *http.Request, spec *APISpec, m
 	ctxSetMCPAggregatorLoopTrust(req, trust)
 	sink := &mcpAggregatorErrorSink{}
 	setCtxValue(req, mcpAggregatorErrorSinkKey, sink)
+	ctxSetMCPAggregatorOrigin(req, trust)
 
 	rec := d.newResponseRecorder()
 	// The chain runs apart from this goroutine so that the caller's
