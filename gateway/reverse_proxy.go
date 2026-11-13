@@ -573,7 +573,7 @@ func augmentMCPWWWAuthenticate(res *http.Response, inboundReq *http.Request, spe
 		return
 	}
 
-	scheme := httputil.RequestScheme(inboundReq)
+	scheme := httputil.ForwardedScheme(inboundReq)
 	host := inboundReq.Host
 	if host == "" && inboundReq.URL != nil {
 		host = inboundReq.URL.Host

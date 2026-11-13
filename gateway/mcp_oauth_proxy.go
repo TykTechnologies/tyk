@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 )
 
@@ -33,13 +34,11 @@ const (
 
 // mcpASProxyBaseURL builds the public URL Tyk advertises as the
 // authorization server in a mirrored PRM doc. It is per-API so each MCP
-// proxy gets its own scope under the gateway root.
+// proxy gets its own scope under the gateway root. The scheme honours
+// X-Forwarded-Proto so the URL stays HTTPS behind a TLS-terminating proxy;
+// MCP clients refuse to send credentials to a non-HTTPS token endpoint.
 func mcpASProxyBaseURL(r *http.Request, spec *APISpec) string {
-	scheme := "http"
-	if r.TLS != nil || strings.EqualFold(r.URL.Scheme, "https") {
-		scheme = "https"
-	}
-	return fmt.Sprintf("%s://%s%s%s", scheme, r.Host, mcpASProxyPathPrefix, spec.APIID)
+	return fmt.Sprintf("%s://%s%s%s", httputil.ForwardedScheme(r), r.Host, mcpASProxyPathPrefix, spec.APIID)
 }
 
 // upstreamResourceURL is the canonical URL the AS knows the resource by.

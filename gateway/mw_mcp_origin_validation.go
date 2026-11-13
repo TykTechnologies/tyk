@@ -2,6 +2,9 @@ package gateway
 
 import (
 	"net/http"
+	"net/netip"
+
+	"github.com/sirupsen/logrus"
 
 	internalhttputil "github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/middleware"
@@ -50,7 +53,7 @@ func (m *MCPOriginValidationMiddleware) ProcessRequest(w http.ResponseWriter, r 
 	if err != nil {
 		return rejectMCPOrigin(w)
 	}
-	if origin == external {
+	if origin == external || origin == tlsTerminatedOriginForSpec(r, m.Spec) {
 		acceptMCPOrigin(r, m.Spec, origin)
 		return nil, http.StatusOK
 	}
@@ -65,7 +68,29 @@ func (m *MCPOriginValidationMiddleware) ProcessRequest(w http.ResponseWriter, r 
 		}
 	}
 
+	// The rejected Origin value is client-controlled, so it is not logged.
+	fields := logrus.Fields{"gateway_origin": external}
+	if m.Spec != nil {
+		fields["api_id"] = m.Spec.APIID
+	}
+	log.WithFields(fields).
+		Debug("MCP Origin validation rejected an origin that is neither the Gateway's own nor trusted")
 	return rejectMCPOrigin(w)
+}
+
+// tlsTerminatedOriginForSpec returns the HTTPS origin a client saw when TLS
+// ended at a proxy outside trusted_proxy_cidrs, or "" when that does not
+// apply. Its configuration was already prepared by externalOriginForSpec.
+func tlsTerminatedOriginForSpec(r *http.Request, spec *APISpec) string {
+	var prefixes []netip.Prefix
+	if spec != nil {
+		prefixes = spec.mcpTrustedProxyPrefixes
+	}
+	origin, ok := internalhttputil.TLSTerminatedOrigin(r, prefixes)
+	if !ok {
+		return ""
+	}
+	return origin
 }
 
 func externalOriginForSpec(r *http.Request, spec *APISpec) (string, error) {
