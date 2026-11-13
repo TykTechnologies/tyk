@@ -2,8 +2,10 @@ package oauth2common
 
 import (
 	"context"
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -115,4 +117,64 @@ func TestNewIdPHTTPClient_EmitsNoHTTPClientMetrics(t *testing.T) {
 	for _, sm := range rm.ScopeMetrics {
 		assert.Empty(t, sm.Metrics, "IdP transport must not emit metrics (scope %s)", sm.Scope.Name)
 	}
+}
+
+// rfcCompliantServerCreds decodes client credentials the way an RFC 6749
+// §2.3.1 compliant IdP does: base64-decode, split on the first colon, then
+// form-decode each half.
+func rfcCompliantServerCreds(t *testing.T, authHeader string) (clientID, clientSecret string, err error) {
+	t.Helper()
+	const prefix = "Basic "
+	require.True(t, strings.HasPrefix(authHeader, prefix), "expected a Basic auth header, got %q", authHeader)
+	raw, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(authHeader, prefix))
+	require.NoError(t, err)
+	id, secret, found := strings.Cut(string(raw), ":")
+	require.True(t, found, "credentials must contain a colon separator")
+	if clientID, err = url.QueryUnescape(id); err != nil {
+		return "", "", err
+	}
+	if clientSecret, err = url.QueryUnescape(secret); err != nil {
+		return "", "", err
+	}
+	return clientID, clientSecret, nil
+}
+
+func TestSetFormEncodedBasicAuth_RoundTripsThroughCompliantIdP(t *testing.T) {
+	for _, tc := range []struct {
+		name, clientID, clientSecret string
+	}{
+		{"plain credentials", "client", "secret"},
+		{"secret with plus", "client", "sec+ret"},
+		{"secret with percent", "client", "sec%ret"},
+		{"secret with percent escape", "client", "sec%20ret"},
+		{"secret with space", "client", "sec ret"},
+		{"secret with colon", "client", "sec:ret"},
+		{"client id with colon", "cli:ent", "secret"},
+		{"both need encoding", "cli:ent", "sec+re%t"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodPost, "https://idp.example/token", nil)
+			require.NoError(t, err)
+			SetFormEncodedBasicAuth(req, tc.clientID, tc.clientSecret)
+
+			gotID, gotSecret, err := rfcCompliantServerCreds(t, req.Header.Get("Authorization"))
+			require.NoError(t, err, "a compliant IdP must be able to form-decode the credentials")
+			assert.Equal(t, tc.clientID, gotID, "client id must survive the round-trip")
+			assert.Equal(t, tc.clientSecret, gotSecret, "client secret must survive the round-trip")
+		})
+	}
+}
+
+// TestSetBasicAuthUnencodedWouldCorrupt documents why the helper exists: Go's
+// SetBasicAuth skips the form-encoding step, so a compliant IdP decodes these
+// credentials to a different value than was configured.
+func TestSetBasicAuthUnencodedWouldCorrupt(t *testing.T) {
+	req, err := http.NewRequest(http.MethodPost, "https://idp.example/token", nil)
+	require.NoError(t, err)
+	req.SetBasicAuth("client", "sec+ret")
+
+	_, gotSecret, err := rfcCompliantServerCreds(t, req.Header.Get("Authorization"))
+	require.NoError(t, err)
+	assert.Equal(t, "sec ret", gotSecret,
+		"unencoded '+' is decoded as a space by a compliant IdP, which is why SetFormEncodedBasicAuth is used instead")
 }

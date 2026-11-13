@@ -29,13 +29,13 @@ func TestBuildExchangeForm_JWTBearer(t *testing.T) {
 	target := &oauth2common.Target{Audience: "api://orders-api", Scopes: []string{"Orders.Read"}}
 
 	t.Run("sends the jwt-bearer grant with the inbound token as assertion", func(t *testing.T) {
-		form := buildExchangeForm(jwtBearerTestProvider(nil), "user-token", target, oas.OAuth2ClientAuthPost)
+		form := buildExchangeForm(jwtBearerTestProvider(nil), "user-token", "", target, oas.OAuth2ClientAuthPost)
 		assert.Equal(t, oas.OAuth2GrantTypeJWTBearer, form.Get(oas.OAuth2FormGrantType))
 		assert.Equal(t, "user-token", form.Get(oas.OAuth2FormAssertion))
 	})
 
 	t.Run("renders the target into scope and emits no audience or resource", func(t *testing.T) {
-		form := buildExchangeForm(jwtBearerTestProvider(nil), "s", target, oas.OAuth2ClientAuthPost)
+		form := buildExchangeForm(jwtBearerTestProvider(nil), "s", "", target, oas.OAuth2ClientAuthPost)
 		assert.Equal(t, "api://orders-api/Orders.Read", form.Get(oas.OAuth2FormScope))
 		_, hasAudience := form[oas.OAuth2FormAudience]
 		_, hasResource := form[oas.OAuth2FormResource]
@@ -44,7 +44,7 @@ func TestBuildExchangeForm_JWTBearer(t *testing.T) {
 	})
 
 	t.Run("emits no RFC 8693 subject token fields", func(t *testing.T) {
-		form := buildExchangeForm(jwtBearerTestProvider(nil), "s", target, oas.OAuth2ClientAuthPost)
+		form := buildExchangeForm(jwtBearerTestProvider(nil), "s", "", target, oas.OAuth2ClientAuthPost)
 		_, hasSubjectToken := form[oas.OAuth2FormSubjectToken]
 		_, hasSubjectTokenType := form[oas.OAuth2FormSubjectTokenType]
 		assert.False(t, hasSubjectToken)
@@ -52,7 +52,7 @@ func TestBuildExchangeForm_JWTBearer(t *testing.T) {
 	})
 
 	t.Run("audience with no scopes renders no scope parameter at all", func(t *testing.T) {
-		form := buildExchangeForm(jwtBearerTestProvider(nil), "s", &oauth2common.Target{Audience: "api://orders-api"}, oas.OAuth2ClientAuthPost)
+		form := buildExchangeForm(jwtBearerTestProvider(nil), "s", "", &oauth2common.Target{Audience: "api://orders-api"}, oas.OAuth2ClientAuthPost)
 		_, hasScope := form[oas.OAuth2FormScope]
 		assert.False(t, hasScope, "the gateway never invents a scope")
 	})
@@ -62,25 +62,25 @@ func TestBuildExchangeForm_JWTBearer(t *testing.T) {
 			"requested_token_use":  "on_behalf_of",
 			oas.OAuth2FormAudience: "https://idp-specific",
 		})
-		form := buildExchangeForm(provider, "s", target, oas.OAuth2ClientAuthPost)
+		form := buildExchangeForm(provider, "s", "", target, oas.OAuth2ClientAuthPost)
 		assert.Equal(t, "on_behalf_of", form.Get("requested_token_use"))
 		assert.Equal(t, "https://idp-specific", form.Get(oas.OAuth2FormAudience))
 	})
 
 	t.Run("bare provider sends no vendor parameters of its own", func(t *testing.T) {
-		form := buildExchangeForm(jwtBearerTestProvider(nil), "s", target, oas.OAuth2ClientAuthPost)
+		form := buildExchangeForm(jwtBearerTestProvider(nil), "s", "", target, oas.OAuth2ClientAuthPost)
 		_, hasRequestedTokenUse := form["requested_token_use"]
 		assert.False(t, hasRequestedTokenUse, "the gateway never adds vendor flags on its own")
 	})
 
 	t.Run("client_secret_post injects credentials into the form", func(t *testing.T) {
-		form := buildExchangeForm(jwtBearerTestProvider(nil), "s", target, oas.OAuth2ClientAuthPost)
+		form := buildExchangeForm(jwtBearerTestProvider(nil), "s", "", target, oas.OAuth2ClientAuthPost)
 		assert.Equal(t, "cid", form.Get(oas.OAuth2FormClientID))
 		assert.Equal(t, "secret", form.Get(oas.OAuth2FormClientSecret))
 	})
 
 	t.Run("basic auth keeps credentials out of the form", func(t *testing.T) {
-		form := buildExchangeForm(jwtBearerTestProvider(nil), "s", target, oas.OAuth2ClientAuthBasic)
+		form := buildExchangeForm(jwtBearerTestProvider(nil), "s", "", target, oas.OAuth2ClientAuthBasic)
 		assert.Empty(t, form.Get(oas.OAuth2FormClientID))
 		assert.Empty(t, form.Get(oas.OAuth2FormClientSecret))
 	})
@@ -115,7 +115,7 @@ func TestExchangeAtIdP_JWTBearer(t *testing.T) {
 		provider.TokenEndpoint = idp.URL
 		provider.ClientAuth.Method = oas.OAuth2ClientAuthPost
 
-		tok, _, err := mwWithoutTykOps().exchangeAtIdP(context.Background(), provider, "inbound-user-token", target)
+		tok, _, err := mwWithoutTykOps().exchangeAtIdP(context.Background(), provider, "inbound-user-token", "", target)
 		require.NoError(t, err)
 		assert.Equal(t, "downstream-token", tok)
 		assert.Equal(t, oas.OAuth2GrantTypeJWTBearer, got.grantType)
@@ -137,7 +137,7 @@ func TestExchangeAtIdP_JWTBearer(t *testing.T) {
 		provider := jwtBearerTestProvider(nil)
 		provider.TokenEndpoint = idp.URL
 
-		_, _, err := mwWithoutTykOps().exchangeAtIdP(context.Background(), provider, "inbound", target)
+		_, _, err := mwWithoutTykOps().exchangeAtIdP(context.Background(), provider, "inbound", "", target)
 		var failed *oauth2common.ExchangeFailedError
 		require.ErrorAs(t, err, &failed)
 		assert.Equal(t, "invalid_grant", failed.IdpError)
