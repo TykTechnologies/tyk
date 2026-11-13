@@ -122,6 +122,24 @@ func TestMCPAggregatorToolsSize(t *testing.T) {
 	assert.Zero(t, mcpAggregatorToolsSize(nil))
 }
 
+func TestMCPAggregatorCatalogueToolLimitCountsOnlySelectedTools(t *testing.T) {
+	ts, github, ordersBackend := startMCPAggregatorRuntimeTest(t)
+	github.pager = pageToolNames(generatedToolNames(mcpAggregatorMaxCatalogueTools-1), 2500)
+	ts.Gw.LoadAPI(
+		ordersRESTSourceSpec(ordersBackend.URL, false),
+		ordersMCPProxyRuntimeSpec(),
+		githubMCPProxyRuntimeSpec(github.URL),
+		companyToolsRuntimeSpec(aggregated("orders-mcp", "orders"), selecting("github-mcp", "github", "tool_00042")),
+	)
+	hook := log.GetTestHook(t)
+
+	res := postModernToolsList(t, ts, "/company-tools/", companyToolsKey(t, ts))
+
+	require.Equal(t, http.StatusOK, res.status)
+	assert.Equal(t, []string{"github__tool_00042", "orders__create_order", "orders__list_orders"}, res.tools)
+	assert.Empty(t, mcpAggregatorOmissionWarnings(hook, "github-mcp"), "unselected tools do not count towards the catalogue limit")
+}
+
 // TestMCPAggregatorSharesTheCatalogueByteBudgetBetweenProxies configures 32
 // aggregated proxies, 30 of them not loaded, so each proxy's share of the
 // byte budget is 1 MiB. github-mcp serves two tools/list pages of one tool
