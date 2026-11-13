@@ -104,6 +104,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 func (e *ErrorHandler) handleErrorExtended(w http.ResponseWriter, r *http.Request, err error, errCode int, writeResponse bool) {
 	defer e.Base().UpdateRequestSession(r)
+	recordMCPAggregatorErrorClassification(r)
 	response := &http.Response{}
 	errMsg := err.Error()
 

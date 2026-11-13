@@ -163,6 +163,7 @@ func (m *JSONRPCMiddleware) setupSequentialRouting(r *http.Request, rpcReq *JSON
 	}
 
 	state := &httpctx.JSONRPCRoutingState{
+		APIID:         m.Spec.APIID,
 		Method:        method,
 		Params:        rpcReq.Params,
 		ID:            rpcReq.ID,

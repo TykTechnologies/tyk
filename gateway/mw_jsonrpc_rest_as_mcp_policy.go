@@ -52,7 +52,7 @@ func (m *JSONRPCMiddleware) prepareRESTAsMCPPolicy(w http.ResponseWriter, r *htt
 	if state := httpctx.GetJSONRPCRoutingState(r); state != nil {
 		policyCtx.callerVisitedVEMs = slices.Clone(state.VisitedVEMs)
 	}
-	policyCtx.setJSONRPCState(r, route.VEMChain, route.PrimitiveName)
+	policyCtx.setJSONRPCState(r, m.Spec.APIID, route.VEMChain, route.PrimitiveName)
 	m.loadRESTAsMCPPolicyCaller(r, policyCtx)
 
 	if m.deniesRESTAsMCPPolicies(w, r, policyCtx) {
@@ -75,9 +75,10 @@ func (m *JSONRPCMiddleware) routeSyntheticAdapterJSONRPC(rpcReq *JSONRPCRequest)
 	return result, nil
 }
 
-func (c *restAsMCPPolicyContext) setJSONRPCState(r *http.Request, vemChain []string, primitiveName string) {
+func (c *restAsMCPPolicyContext) setJSONRPCState(r *http.Request, apiID string, vemChain []string, primitiveName string) {
 	primitiveType, primitiveName := primitiveInfoForMethod(c.rpcReq.Method, primitiveName)
 	httpctx.SetJSONRPCRoutingState(r, &httpctx.JSONRPCRoutingState{
+		APIID:         apiID,
 		Method:        c.rpcReq.Method,
 		Params:        c.rpcReq.Params,
 		ID:            c.rpcReq.ID,
