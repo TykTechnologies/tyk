@@ -25,6 +25,12 @@ func (s *APISpec) ServesModernInitialize() bool {
 	return s.IsMCPAggregator()
 }
 
+// ServesModernPing reports whether this endpoint answers ping on 2026-07-28
+// itself: the MCP aggregator answers it locally.
+func (s *APISpec) ServesModernPing() bool {
+	return s.IsMCPAggregator()
+}
+
 func (m *JSONRPCMiddleware) validateMCPIngress(w http.ResponseWriter, r *http.Request) bool {
 	ingress := httpctx.GetMCPProtocolContext(r)
 	if err := mcp.ValidateProtocolHeader(r.Header); err != nil {

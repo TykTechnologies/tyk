@@ -400,3 +400,37 @@ func TestHandshakeOptInOnlyRelaxesTheHandshake(t *testing.T) {
 	t.Logf("%d cases, %d accepted only through the opt-in", cases, relaxed)
 	assert.NotZero(t, relaxed)
 }
+
+type modernPingEndpoint struct{ modernOnlyEndpoint }
+
+func (modernPingEndpoint) ServesModernPing() bool { return true }
+
+func TestModernPingIsKeptOnlyWhereTheEndpointServesIt(t *testing.T) {
+	t.Parallel()
+
+	modern, err := ValidateProtocolDeclarations(modernIngressContext(t, MethodPing, `{}`), modernPingEndpoint{})
+	assert.Nil(t, err)
+	assert.True(t, modern, "ping keeps the modern declaration checks")
+
+	_, err = ValidateProtocolDeclarations(modernIngressContext(t, MethodPing, `{}`), modernOnlyEndpoint{})
+	require.NotNil(t, err)
+	assert.Equal(t, JSONRPCMethodNotFound, err.Code)
+
+	_, err = ValidateProtocolDeclarations(NewProtocolContext(ModernProtocolVersion, "", &RequestEnvelope{Method: MethodPing}, nil), modernPingEndpoint{})
+	require.NotNil(t, err, "ping without _meta is still refused")
+	assert.Equal(t, JSONRPCInvalidParams, err.Code)
+
+	_, err = ValidateProtocolDeclarations(modernIngressContext(t, MethodInitialize, `{"protocolVersion":"2026-07-28"}`), modernPingEndpoint{})
+	require.NotNil(t, err, "the ping opt-in does not keep initialize")
+}
+
+func TestEncodeMirroredHeaderRoundTrips(t *testing.T) {
+	t.Parallel()
+
+	for _, name := range []string{"list_issues", "get__order", "naïve tool", "line\nbreak", ""} {
+		decoded, ok := DecodeMirroredHeader(EncodeMirroredHeader(name))
+		assert.True(t, ok, name)
+		assert.Equal(t, name, decoded)
+	}
+	assert.Equal(t, "list_issues", EncodeMirroredHeader("list_issues"), "plain ASCII stays readable")
+}

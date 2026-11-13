@@ -148,6 +148,8 @@ func (u *mcpVersionedUpstream) serve(w http.ResponseWriter, r *http.Request) {
 			list = append(list, map[string]any{"name": name, "inputSchema": map[string]any{"type": "object"}})
 		}
 		result = map[string]any{"tools": list}
+	case mcp.MethodToolsCall:
+		result = map[string]any{"content": []map[string]any{{"type": "text", "text": "ok"}}}
 	default:
 		writeMCPTestJSONRPCError(u.t, w, req.ID, mcp.JSONRPCMethodNotFound, "Method not found")
 		return
