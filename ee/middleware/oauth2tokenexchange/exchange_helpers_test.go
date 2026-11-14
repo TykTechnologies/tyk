@@ -73,6 +73,7 @@ func TestBuildExchangeForm(t *testing.T) {
 		assert.Equal(t, oas.OAuth2GrantTypeTokenExchange, form.Get(oas.OAuth2FormGrantType))
 		assert.Equal(t, "subject-token", form.Get(oas.OAuth2FormSubjectToken))
 		assert.Equal(t, oas.OAuth2TokenTypeAccessToken, form.Get(oas.OAuth2FormSubjectTokenType))
+		assert.Equal(t, oas.OAuth2TokenTypeAccessToken, form.Get(oas.OAuth2FormRequestedTokenType))
 	})
 
 	t.Run("audience populates both audience and resource", func(t *testing.T) {
