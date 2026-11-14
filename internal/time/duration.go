@@ -72,6 +72,22 @@ func (d *ReadableDuration) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// UnmarshalText converts human-readable shorthand notation for time.Duration into ReadableDuration.
+// It is used when the value comes from an environment variable.
+func (d *ReadableDuration) UnmarshalText(text []byte) error {
+	if len(text) == 0 {
+		*d = 0
+		return nil
+	}
+
+	duration, err := time.ParseDuration(string(text))
+	if err != nil {
+		return err
+	}
+	*d = ReadableDuration(duration)
+	return nil
+}
+
 // Seconds returns ReadableDuration rounded down to the seconds.
 func (d ReadableDuration) Seconds() float64 {
 	durationInSeconds := math.Floor(Duration(d).Seconds())
