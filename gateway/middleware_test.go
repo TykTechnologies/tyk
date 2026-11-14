@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -16,6 +17,9 @@ import (
 	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/codes"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.uber.org/mock/gomock"
 
 	"github.com/TykTechnologies/opentelemetry/metric/metrictest"
@@ -51,6 +55,20 @@ type requestConditionalMiddleware struct {
 	calls int
 }
 
+type traceStatusMiddleware struct {
+	*BaseMiddleware
+	err error
+}
+
+func (m *traceStatusMiddleware) Name() string {
+	return "traceStatusMiddleware"
+}
+
+//nolint:staticcheck // ST1008: middleware interface requires (error, int).
+func (m *traceStatusMiddleware) ProcessRequest(http.ResponseWriter, *http.Request, interface{}) (error, int) {
+	return m.err, http.StatusOK
+}
+
 func (m *requestConditionalMiddleware) Name() string {
 	return "requestConditionalMiddleware"
 }
@@ -59,6 +77,63 @@ func (m *requestConditionalMiddleware) Name() string {
 func (m *requestConditionalMiddleware) ProcessRequest(http.ResponseWriter, *http.Request, interface{}) (error, int) {
 	m.calls++
 	return nil, http.StatusOK
+}
+
+func TestTraceMiddlewareProcessRequestSpanStatus(t *testing.T) {
+	tests := []struct {
+		name       string
+		err        error
+		wantStatus codes.Code
+	}{
+		{
+			name:       "successful response sentinel",
+			err:        ErrResponseSucceed,
+			wantStatus: codes.Unset,
+		},
+		{
+			name:       "wrapped successful response sentinel",
+			err:        fmt.Errorf("plugin response: %w", ErrResponseSucceed),
+			wantStatus: codes.Unset,
+		},
+		{
+			name:       "plugin error response sentinel",
+			err:        fmt.Errorf("%w: status 400", ErrResponseErrorSent),
+			wantStatus: codes.Error,
+		},
+		{
+			name:       "regular error",
+			err:        errors.New("middleware failed"),
+			wantStatus: codes.Error,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			recorder := tracetest.NewSpanRecorder()
+			tracerProvider := sdktrace.NewTracerProvider(sdktrace.WithSpanProcessor(recorder))
+			t.Cleanup(func() {
+				require.NoError(t, tracerProvider.Shutdown(context.Background()))
+			})
+
+			ctx, span := tracerProvider.Tracer("test").Start(t.Context(), "request")
+			conf := config.Config{}
+			conf.OpenTelemetry.Enabled = true
+			gw := NewGateway(conf, t.Context())
+			mw := TraceMiddleware{TykMiddleware: &traceStatusMiddleware{
+				BaseMiddleware: &BaseMiddleware{Gw: gw},
+				err:            tt.err,
+			}}
+
+			req := httptest.NewRequest(http.MethodGet, "/", nil).WithContext(ctx)
+			gotErr, _ := mw.ProcessRequest(httptest.NewRecorder(), req, nil)
+			require.ErrorIs(t, gotErr, tt.err)
+			span.End()
+
+			ended := recorder.Ended()
+			require.Len(t, ended, 1)
+			assert.Equal(t, tt.wantStatus, ended[0].Status().Code)
+		})
+	}
 }
 
 func (m mockStore) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
