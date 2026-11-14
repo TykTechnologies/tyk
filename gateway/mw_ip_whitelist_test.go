@@ -8,7 +8,9 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/request"
 )
 
 var testWhiteListIPData = []struct {
@@ -21,6 +23,8 @@ var testWhiteListIPData = []struct {
 	{"10.0.0.1:80", "127.0.0.1", "", http.StatusOK},  // forwarded exact match
 	{"10.0.0.1:80", "127.0.0.2", "", http.StatusOK},  // forwarded CIDR match
 	{"10.0.0.1:80", "", "bob", http.StatusForbidden}, // no match
+	{"203.0.113.9:80", "127.0.0.1", "", http.StatusForbidden}, // untrusted peer, forwarded IP ignored
+	{"203.0.113.9:80", "", "127.0.0.1", http.StatusForbidden}, // untrusted peer, X-Real-IP ignored
 }
 
 func testPrepareIPMiddlewarePass() *APISpec {
@@ -110,6 +114,16 @@ func TestIPWhiteListMiddleware_EnabledForSpec(t *testing.T) {
 
 func TestIPMiddlewarePass(t *testing.T) {
 	spec := testPrepareIPMiddlewarePass()
+
+	// Only 10.0.0.0/8 is a trusted proxy here, matching the "forwarded"
+	// test rows below. The 203.0.113.9 rows are an untrusted peer and must
+	// not be able to forge its way past the allowlist via X-Forwarded-For
+	// or X-Real-IP.
+	previousGlobal := request.Global
+	mockConfig := config.Config{}
+	mockConfig.HttpServerOptions.TrustedProxyCIDRs = []string{"10.0.0.0/8"}
+	request.Global = func() config.Config { return mockConfig }
+	t.Cleanup(func() { request.Global = previousGlobal })
 
 	for ti, tc := range testWhiteListIPData {
 		rec := httptest.NewRecorder()
