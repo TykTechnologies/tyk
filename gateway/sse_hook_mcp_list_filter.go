@@ -10,6 +10,7 @@ import (
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/mcp"
+	"github.com/TykTechnologies/tyk/internal/mcp/tooloverride"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -26,6 +27,8 @@ type MCPListFilterSSEHook struct {
 	ses               *user.SessionState
 	req               *http.Request
 	expectedID        any
+	toolView          *tooloverride.View
+	toolsListState    *httpctx.JSONRPCRoutingState
 	discoveryGlobal   []user.AccessControlRules
 	discoverySession  []user.AccessControlRules
 	discoveryVersions []string
@@ -45,17 +48,22 @@ func NewMCPListFilterSSEHook(spec *APISpec, ses *user.SessionState, requests ...
 	discoveryRequest := false
 	var req *http.Request
 	var expectedID any
+	var state *httpctx.JSONRPCRoutingState
 	if len(requests) > 0 && requests[0] != nil {
 		req = requests[0]
-		if state := httpctx.GetJSONRPCRoutingState(req); state != nil {
+		if state = httpctx.GetJSONRPCRoutingState(req); state != nil {
 			discoveryRequest = state.Method == mcp.MethodServerDiscover
 			expectedID = state.ID
 		}
 	}
-	if !spec.IsMCP() || (!discoveryRequest && !hasMCPDiscoveryFiltering(spec, ses)) {
+	toolView := remoteMCPToolsListView(spec, state)
+	if !spec.IsMCP() || (!discoveryRequest && toolView == nil && !hasMCPDiscoveryFiltering(spec, ses)) {
 		return nil
 	}
 	hook := &MCPListFilterSSEHook{spec: spec, ses: ses, req: req, expectedID: expectedID, waitingDiscovery: discoveryRequest}
+	if toolView != nil {
+		hook.toolView, hook.toolsListState = toolView, state
+	}
 	if discoveryRequest {
 		hook.discoveryGlobal, hook.discoverySession = discoveryJSONRPCRuleSets(spec, ses)
 		hook.discoveryVersions = spec.SupportedProtocolVersions()
@@ -94,8 +102,21 @@ func (h *MCPListFilterSSEHook) FilterEvent(event *SSEEvent) (bool, *SSEEvent) {
 		return true, nil
 	}
 
+	rewritten := false
+	if h.toolView != nil && mcp.JSONRPCResponseIDMatches([]byte(data), h.expectedID) {
+		var body []byte
+		body, rewritten = rewriteRemoteMCPToolsList(h.spec, h.toolView, h.toolsListState, []byte(data), log.NewEntry())
+		if rewritten {
+			data = string(body)
+			markMCPResponseEdited(h.req)
+		}
+	}
+
 	newData, ok := h.filterSSEData([]byte(data))
 	if !ok {
+		if rewritten {
+			return true, cloneSSEEventWithData(event, []byte(data))
+		}
 		return true, nil
 	}
 

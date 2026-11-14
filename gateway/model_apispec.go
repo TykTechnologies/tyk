@@ -26,6 +26,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/jsonrpc"
 	restmcpadapter "github.com/TykTechnologies/tyk/internal/mcp/adapter"
+	"github.com/TykTechnologies/tyk/internal/mcp/tooloverride"
 
 	_ "github.com/TykTechnologies/tyk/internal/mcp" // registers MCP VEM prefixes
 )
@@ -94,6 +95,11 @@ type APISpec struct {
 	// MCPAdapter holds runtime-only REST-as-MCP synthetic adapter state. It is
 	// never extracted to/persisted from API definitions or OAS documents.
 	MCPAdapter MCPAdapterRuntime
+
+	// mcpToolView is the admitted x-tyk-mcp-server tool view of a remote MCP
+	// proxy; nil serves upstream tools unchanged. See loadRemoteMCPToolView.
+	mcpToolView      atomic.Pointer[tooloverride.View]
+	mcpToolViewState remoteMCPToolViewState
 
 	JSONRPCRouter jsonrpc.Router
 
