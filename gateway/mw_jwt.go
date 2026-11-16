@@ -917,8 +917,11 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 
 	k.Logger().Debug("JWT Temporary session ID is: ", sessionID)
 
-	// CheckSessionAndIdentityForValidKey returns a session with keyID populated
-	session, exists := k.CheckSessionAndIdentityForValidKey(sessionID, r)
+	// checkSessionAndIdentityForValidKey returns a session with keyID populated
+	session, exists := k.checkSessionAndIdentityForValidKey(sessionID, r)
+	if exists && claimsOnly && !isJWTClaimsOnlySession(&session) {
+		exists = false
+	}
 
 	sessionID = session.KeyID
 	isDefaultPol := false
@@ -973,6 +976,9 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		}
 
 		session.MetaData = map[string]interface{}{"TykJWTSessionID": sessionID}
+		if claimsOnly {
+			session.MetaData[jwtClaimsOnlyMetaKey] = true
+		}
 		session.Alias = baseFieldData
 
 		// Update the session in the session manager in case it gets called again
@@ -1179,8 +1185,10 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		}
 	}
 
-	if claimsOnly && k.restrictSessionToAPI(&session) {
-		updateSession = true
+	if claimsOnly {
+		restricted := k.restrictSessionToAPI(&session)
+		bounded := k.boundClaimsOnlySession(&session)
+		updateSession = updateSession || restricted || bounded
 	}
 
 	// ensure to set the sessionID
@@ -1199,18 +1207,37 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	return nil, http.StatusOK
 }
 
+// jwtClaimsOnlyMetaKey marks a session created for a claims-only API. Its key is
+// derivable from public data, so it must never be accepted as a credential.
+const jwtClaimsOnlyMetaKey = "tyk_jwt_claims_only"
+
+func isJWTClaimsOnlySession(session *user.SessionState) bool {
+	claimsOnly, _ := session.MetaData[jwtClaimsOnlyMetaKey].(bool)
+	return claimsOnly
+}
+
+// claimsOnlySessionLifetime bounds, in seconds, the Redis record of a claims-only
+// session whose JWT has no exp claim, unless the API sets a session lifetime.
+const claimsOnlySessionLifetime int64 = 3600
+
 // claimsOnlyMode reports whether custom claim validation alone decides access
 // for this request: a Tyk OAS API without any policy source (base policy claim,
-// client ID base field, default policies, effective scope-to-policy mapping)
-// and with at least one custom claim rule that restricts access.
+// client ID base field, default policies, scope claim, effective scope-to-policy
+// mapping) and with at least one custom claim rule that restricts access.
 func (k *JWTMiddleware) claimsOnlyMode(scopeMap map[string]string) bool {
 	if !k.Spec.IsOAS || len(scopeMap) > 0 || len(k.Spec.JWTDefaultPolicies) > 0 ||
-		k.Spec.JWTPolicyFieldName != "" || k.Spec.JWTClientIDBaseField != "" {
+		k.Spec.JWTPolicyFieldName != "" || k.Spec.JWTClientIDBaseField != "" ||
+		k.Spec.GetScopeClaimName() != "" {
 		return false
 	}
 
 	jwtConfig := k.Spec.OAS.GetJWTConfiguration()
 	if jwtConfig == nil || len(jwtConfig.BasePolicyClaims) > 0 {
+		return false
+	}
+
+	// OAS scopes.claims is not extracted into the classic scope claim name.
+	if jwtConfig.Scopes != nil && (jwtConfig.Scopes.ClaimName != "" || len(jwtConfig.Scopes.Claims) > 0) {
 		return false
 	}
 
@@ -1252,6 +1279,29 @@ func claimRuleRestrictsAccess(rule oas.CustomClaimValidationConfig) bool {
 func claimsOnlySessionKeyID(apiID, identity string) string {
 	sum := sha256.Sum256([]byte(apiID + "\x00" + identity))
 	return hex.EncodeToString(sum[:])
+}
+
+// boundClaimsOnlySession gives a claims-only session the lifetime of its JWT:
+// the Redis record is deleted when the session expires, or, when the JWT has no
+// exp claim, after the API's session lifetime or claimsOnlySessionLifetime.
+// It reports whether it changed the session.
+func (k *JWTMiddleware) boundClaimsOnlySession(session *user.SessionState) bool {
+	postExpiryAction, lifetime := user.PostExpiryActionDelete, int64(0)
+	if session.Expires <= 0 {
+		postExpiryAction, lifetime = "", claimsOnlySessionLifetime
+		if k.Spec.SessionLifetime > 0 {
+			lifetime = k.Spec.SessionLifetime
+		}
+	}
+
+	if session.PostExpiryAction == postExpiryAction && session.SessionLifetime == lifetime {
+		return false
+	}
+
+	session.PostExpiryAction = postExpiryAction
+	session.SessionLifetime = lifetime
+
+	return true
 }
 
 // restrictSessionToAPI limits the session's access rights to this API and

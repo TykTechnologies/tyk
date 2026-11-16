@@ -113,6 +113,10 @@ func jwtWithClaims(claims map[string]interface{}) map[string]string {
 		}
 		mapClaims["exp"] = time.Now().Add(time.Hour).Unix()
 		for name, value := range claims {
+			if value == nil {
+				delete(mapClaims, name)
+				continue
+			}
 			mapClaims[name] = value
 		}
 	})
@@ -230,6 +234,20 @@ func TestJWTClaimsOnly_Detection(t *testing.T) {
 			},
 		},
 		{
+			name: "scope claim name without a mapping",
+			configure: func(c *oas.JWT) {
+				c.CustomClaimValidation = restricting
+				c.Scopes = &oas.Scopes{ClaimName: "scope"}
+			},
+		},
+		{
+			name: "scope claims without a mapping",
+			configure: func(c *oas.JWT) {
+				c.CustomClaimValidation = restricting
+				c.Scopes = &oas.Scopes{Claims: []string{"scp"}}
+			},
+		},
+		{
 			name:      "scope-to-policy mapping from a registry binding",
 			configure: func(c *oas.JWT) { c.CustomClaimValidation = restricting },
 			scopeMap:  map[string]string{"read": "pol"},
@@ -261,6 +279,40 @@ func TestJWTClaimsOnly_Detection(t *testing.T) {
 
 		assert.False(t, mw.claimsOnlyMode(nil))
 	})
+}
+
+// A scope claim is a policy field: with it configured the API stays
+// policy-based even without a scope-to-policy mapping.
+func TestJWTClaimsOnly_ScopeClaimWithoutMappingStaysForbidden(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	alice := "alice-" + uuid.New()
+
+	specs := []*APISpec{
+		buildJWTTestAPI("scope-claim-name", true, func(jwtConf *oas.JWT) {
+			jwtConf.CustomClaimValidation = blockingClaimRule("trusted-client")
+			jwtConf.Scopes = &oas.Scopes{ClaimName: "scope"}
+		}),
+		buildJWTTestAPI("scope-claims", true, func(jwtConf *oas.JWT) {
+			jwtConf.CustomClaimValidation = blockingClaimRule("trusted-client")
+			jwtConf.Scopes = &oas.Scopes{Claims: []string{"scp"}}
+		}),
+	}
+	ts.Gw.LoadAPI(specs...)
+
+	headers := jwtWithClaims(map[string]interface{}{
+		"user_id":   alice,
+		"client_id": "trusted-client",
+		"scope":     "read",
+		"scp":       "read",
+	})
+
+	for _, spec := range specs {
+		t.Run(spec.APIID, func(t *testing.T) {
+			_, _ = ts.Run(t, test.TestCase{Path: spec.Proxy.ListenPath, Headers: headers, Code: http.StatusForbidden})
+		})
+	}
 }
 
 func TestJWTClaimsOnly_AllowsMatchingClaims(t *testing.T) {
@@ -581,4 +633,88 @@ func TestJWTClaimsOnly_NumericContainsRule(t *testing.T) {
 		{Path: "/tier-api/", Headers: jwtWithClaims(map[string]interface{}{"user_id": bob, "tier": 2}), Code: http.StatusOK},
 		{Path: "/tier-api/", Headers: jwtWithClaims(map[string]interface{}{"user_id": carol, "tier": 3}), Code: http.StatusUnauthorized},
 	}...)
+}
+
+// On a multi-auth API in compliant mode the claim rules are the only access
+// control, so the derivable claims-only session key must not pass as an auth token.
+func TestJWTClaimsOnly_SessionKeyRejectedByOtherAuthMethods(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	alice := "alice-" + uuid.New()
+
+	spec := claimsOnlyAPI("multi-auth-api")
+	spec.OAS.T.Components.SecuritySchemes["apiKey"] = &openapi3.SecuritySchemeRef{
+		Value: &openapi3.SecurityScheme{Type: "apiKey", In: "header", Name: "X-Tyk-Key"},
+	}
+	spec.OAS.T.Security = openapi3.SecurityRequirements{{"jwtAuth": []string{}}, {"apiKey": []string{}}}
+	authentication := spec.OAS.GetTykExtension().Server.Authentication
+	authentication.SecurityProcessingMode = oas.SecurityProcessingModeCompliant
+	enabled := true
+	authentication.SecuritySchemes["apiKey"] = &oas.Token{
+		Enabled:     &enabled,
+		AuthSources: oas.AuthSources{Header: &oas.AuthSource{Enabled: true, Name: "X-Tyk-Key"}},
+	}
+	spec.OAS.ExtractTo(spec.APIDefinition)
+	ts.Gw.LoadAPI(spec)
+
+	headers := jwtWithClaims(map[string]interface{}{"user_id": alice, "client_id": "trusted-client"})
+	perAPIKey := ts.claimsOnlySessionID("multi-auth-api", alice)
+
+	_, _ = ts.Run(t, test.TestCase{Path: "/multi-auth-api/", Headers: headers, Code: http.StatusOK})
+	_, found := ts.storedSession(perAPIKey)
+	require.True(t, found)
+
+	_, _ = ts.Run(t, []test.TestCase{
+		{Path: "/multi-auth-api/", Headers: map[string]string{"X-Tyk-Key": perAPIKey}, Code: http.StatusForbidden},
+		{Path: "/multi-auth-api/", Headers: headers, Code: http.StatusOK},
+	}...)
+}
+
+// A claims-only session is a cache of the JWT: its Redis record expires with
+// the token, and without an exp claim after a bounded lifetime.
+func TestJWTClaimsOnly_SessionLifetimeIsBounded(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ts.Gw.LoadAPI(claimsOnlyAPI("claims-api"))
+	store := ts.Gw.GlobalSessionManager.Store()
+
+	t.Run("expires with the JWT", func(t *testing.T) {
+		alice := "alice-" + uuid.New()
+		exp := time.Now().Add(10 * time.Minute).Unix()
+
+		headers := jwtWithClaims(map[string]interface{}{"user_id": alice, "client_id": "trusted-client", "exp": exp})
+		_, _ = ts.Run(t, test.TestCase{Path: "/claims-api/", Headers: headers, Code: http.StatusOK})
+
+		sessionID := ts.claimsOnlySessionID("claims-api", alice)
+		session, found := ts.storedSession(sessionID)
+		require.True(t, found)
+		assert.Equal(t, exp, session.Expires)
+
+		ttl, err := store.GetExp(sessionID)
+		require.NoError(t, err)
+		assert.Greater(t, ttl, int64(0))
+		assert.LessOrEqual(t, ttl, exp-time.Now().Unix()+1)
+	})
+
+	t.Run("bounded without exp", func(t *testing.T) {
+		bob := "bob-" + uuid.New()
+
+		headers := jwtWithClaims(map[string]interface{}{"user_id": bob, "client_id": "trusted-client", "exp": nil})
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/claims-api/", Headers: headers, Code: http.StatusOK},
+			{Path: "/claims-api/", Headers: headers, Code: http.StatusOK},
+		}...)
+
+		sessionID := ts.claimsOnlySessionID("claims-api", bob)
+		session, found := ts.storedSession(sessionID)
+		require.True(t, found)
+		assert.Zero(t, session.Expires, "a JWT without exp does not expire")
+
+		ttl, err := store.GetExp(sessionID)
+		require.NoError(t, err)
+		assert.Greater(t, ttl, int64(0))
+		assert.LessOrEqual(t, ttl, claimsOnlySessionLifetime)
+	})
 }
