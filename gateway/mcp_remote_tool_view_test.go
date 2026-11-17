@@ -327,7 +327,7 @@ func recordRemoteMCPLogs(t *testing.T, apiID string) *remoteMCPLogRecorder {
 }
 
 // remoteMCPCollisionWarning identifies the catalogue check's collision warning.
-const remoteMCPCollisionWarning = "sets a name that an upstream tool without an override already has"
+const remoteMCPCollisionWarning = "the override wins and the upstream tool is hidden"
 
 func renameOverride(source, name string) oas.TykMCPServerPrimitive {
 	return oas.TykMCPServerPrimitive{Source: oas.TykMCPServerSource{ToolName: source}, Name: name}
@@ -357,7 +357,7 @@ func TestRemoteMCPToolView_CatalogueCheckOnLoad(t *testing.T) {
 		assert.NotNil(t, logs.find(logrus.WarnLevel, "archived_tool"), "missing source tool must be logged as a warning")
 	})
 
-	t.Run("fresh load with a colliding upstream tool admits the overrides and warns about the collision", func(t *testing.T) {
+	t.Run("fresh load with a colliding upstream tool admits the overrides and warns that the override wins", func(t *testing.T) {
 		ts := StartTest(nil)
 		t.Cleanup(ts.Close)
 		const apiID = "remote-mcp-collision"

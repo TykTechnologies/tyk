@@ -106,9 +106,10 @@ func (s *APISpec) isLatestRemoteMCPToolViewCheck(generation uint64) bool {
 //
 // The upstream catalogue is then checked in the background, only to report
 // problems; the check never changes the admitted view and never blocks
-// loading. It warns when an override sets the name of an upstream tool that
-// has no override, when an override's source tool is not in the catalogue,
-// and when the catalogue cannot be listed.
+// loading. It warns when an override takes the name of an upstream tool that
+// has no override (the override wins and the upstream tool is hidden, the
+// same rule the tools/list rewrite applies), when an override's source tool
+// is not in the catalogue, and when the catalogue cannot be listed.
 //
 // Fetch scope: the check calls Proxy.TargetURL directly, sending only static
 // upstream basic auth (see remoteMCPCatalogueHeader). It does not use load
@@ -156,7 +157,7 @@ func (gw *Gateway) loadRemoteMCPToolView(spec *APISpec, logger *logrus.Entry) {
 		missing, collisions := oas.InspectRemoteMCPToolCatalogue(ext, names)
 		for _, collision := range collisions {
 			logger.WithFields(logrus.Fields{"exposed_name": collision.Name, "source_tool": collision.Source}).
-				Warning("MCP tool override sets a name that an upstream tool without an override already has")
+				Warning("MCP tool override takes the name of an upstream tool that has no override; the override wins and the upstream tool is hidden")
 		}
 		for _, source := range missing {
 			logger.WithField("source_tool", source).Warning("MCP tool override source tool is not in the upstream tool list; it is not exposed")
