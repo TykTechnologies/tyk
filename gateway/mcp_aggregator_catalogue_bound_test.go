@@ -176,10 +176,14 @@ func TestMCPAggregatorServesALargeListingHoweverManyProxiesAreAggregated(t *test
 }
 
 // TestMCPAggregatorOmitsAProxyListingMoreThanItsBudget has github-mcp list two
-// pages of about 4.5 MiB each, each under the gateway's 10 MiB response limit.
+// pages of over half the listing budget each, each under the gateway's 10 MiB
+// response limit.
 func TestMCPAggregatorOmitsAProxyListingMoreThanItsBudget(t *testing.T) {
+	page := mcpAggregatorMaxUpstreamListBytes * 9 / 16
+	require.Less(t, page, mcpAggregatorMaxUpstreamResponseBytes, "each page fits the response limit, so only the listing budget can omit the proxy")
+
 	ts, github, ordersBackend := startMCPAggregatorRuntimeTest(t)
-	github.descriptionPadding = 4_500_000
+	github.descriptionPadding = page
 	var pages atomic.Int32
 	pager := pageToolNames([]string{"search_repos", "create_issue"}, 1)
 	github.pager = func(cursor string) ([]string, string) {
@@ -196,7 +200,7 @@ func TestMCPAggregatorOmitsAProxyListingMoreThanItsBudget(t *testing.T) {
 	assert.Equal(t, []string{"orders__create_order", "orders__list_orders"}, res.tools, "the other proxies keep being served")
 	warnings := mcpAggregatorOmissionWarnings(hook, "github-mcp")
 	require.Len(t, warnings, 1)
-	assert.Equal(t, "tools/list failed: responses exceed the 8388608 byte listing budget of one aggregated proxy", warnings[0].Data["reason"])
+	assert.Equal(t, fmt.Sprintf("tools/list failed: responses exceed the %d byte listing budget of one aggregated proxy", mcpAggregatorMaxUpstreamListBytes), warnings[0].Data["reason"])
 }
 
 func TestMCPAggregatorResponseRecorderStaysWithinTheBudget(t *testing.T) {
