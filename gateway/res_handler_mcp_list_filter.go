@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/header"
 	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/mcp"
@@ -99,14 +100,19 @@ func (h *MCPListFilterResponseHandler) HandleResponse(_ http.ResponseWriter, res
 		return nil
 	}
 
-	body, err := readAndCloseBody(res)
-	if err != nil || len(body) == 0 {
+	raw, err := readAndCloseBody(res)
+	if err != nil || len(raw) == 0 {
 		if discovery {
 			replaceInvalidDiscoveryResponse(res, req)
 		}
 		return nil //nolint:nilerr // fail-open: pass through on read error
 	}
-	if discovery && !mcp.JSONRPCResponseIDMatches(body, state.ID) {
+	body, decoded := h.decodeBody(res, raw)
+	if !decoded && !discovery {
+		res.Body = io.NopCloser(bytes.NewReader(raw))
+		return nil
+	}
+	if discovery && (!decoded || !mcp.JSONRPCResponseIDMatches(body, state.ID)) {
 		replaceInvalidDiscoveryResponse(res, req)
 		return nil
 	}
@@ -117,18 +123,20 @@ func (h *MCPListFilterResponseHandler) HandleResponse(_ http.ResponseWriter, res
 		return nil
 	}
 	if !ok {
-		res.Body = io.NopCloser(bytes.NewReader(body))
+		// Unedited responses keep the upstream bytes and encoding.
+		res.Body = io.NopCloser(bytes.NewReader(raw))
 		return nil
 	}
 
+	// An edited body is sent decoded, whatever the upstream encoding was.
+	res.Header.Del(header.ContentEncoding)
 	res.Body = io.NopCloser(bytes.NewReader(newBody))
 	res.ContentLength = int64(len(newBody))
 	res.Header.Set("Content-Length", strconv.Itoa(len(newBody)))
-	if toolView != nil {
-		// The upstream validators describe the unmodified catalogue.
-		res.Header.Del("ETag")
-		res.Header.Del("Last-Modified")
-	}
+	// The upstream validators describe the unmodified (and possibly encoded)
+	// representation.
+	res.Header.Del("ETag")
+	res.Header.Del("Last-Modified")
 	if state.Method != mcp.MethodServerDiscover {
 		markMCPResponseEdited(req)
 	}
@@ -150,6 +158,27 @@ func replaceInvalidDiscoveryResponse(res *http.Response, req *http.Request) {
 	res.Header.Set("Content-Type", "application/json")
 	res.Header.Set("Content-Length", strconv.Itoa(len(body)))
 	markMCPResponseEdited(req)
+}
+
+// decodeBody returns the decoded upstream body so it can be filtered and
+// rewritten. When the body cannot be decoded it reports false after a
+// rate-limited warning: list responses then pass through unchanged and
+// discovery fails closed.
+func (h *MCPListFilterResponseHandler) decodeBody(res *http.Response, raw []byte) ([]byte, bool) {
+	encoding := mcpResponseContentEncoding(res.Header)
+	if encoding == "" {
+		return raw, true
+	}
+	var configured int64
+	if h.Gw != nil {
+		configured = h.Gw.GetConfig().HttpServerOptions.MaxResponseBodySize
+	}
+	decoded, err := decodeMCPResponseBody(encoding, raw, mcpDecodeLimit(configured))
+	if err != nil {
+		warnMCPResponseEncoding(h.Spec, encoding, err, h.logger())
+		return nil, false
+	}
+	return decoded, true
 }
 
 // listConfig returns the filter configuration for a given JSON-RPC method,

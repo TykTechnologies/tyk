@@ -34,6 +34,10 @@ type fakeRemoteMCPServer struct {
 	listCalls int
 	calls     []string
 	block     chan struct{}
+	// encoding, when set, compresses every tools/list and tools/call
+	// response body with that Content-Encoding (see encodeFakeBody);
+	// "negotiate" picks one from the request's Accept-Encoding.
+	encoding string
 }
 
 func (f *fakeRemoteMCPServer) setTools(tools ...string) {
@@ -97,18 +101,27 @@ func (f *fakeRemoteMCPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	sse := f.sse
+	encoding := f.encoding
 	f.mu.Unlock()
 
 	body := `{"jsonrpc":"2.0","id":` + string(req.ID) + `,"result":` + result + `}`
+	payload := []byte(body)
 	if sse {
 		w.Header().Set("Content-Type", "text/event-stream")
-		if _, err := fmt.Fprintf(w, "event: message\ndata: %s\n\n", body); err != nil {
-			f.t.Errorf("writing %s event: %v", req.Method, err)
-		}
-		return
+		payload = []byte(fmt.Sprintf("event: message\ndata: %s\n\n", body))
+	} else {
+		w.Header().Set("Content-Type", "application/json")
 	}
-	w.Header().Set("Content-Type", "application/json")
-	if _, err := w.Write([]byte(body)); err != nil {
+	if encoding == "negotiate" {
+		// Answer with the client's first offered encoding, as servers that
+		// prefer br do.
+		encoding = negotiatedFakeEncoding(r.Header.Get("Accept-Encoding"))
+	}
+	if encoding != "" && (req.Method == "tools/list" || req.Method == "tools/call") {
+		w.Header().Set("Content-Encoding", encoding)
+		payload = encodeFakeBody(f.t, encoding, payload)
+	}
+	if _, err := w.Write(payload); err != nil {
 		f.t.Errorf("writing %s response: %v", req.Method, err)
 	}
 }

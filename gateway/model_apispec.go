@@ -100,6 +100,8 @@ type APISpec struct {
 	// proxy; nil serves upstream tools unchanged. See loadRemoteMCPToolView.
 	mcpToolView      atomic.Pointer[tooloverride.View]
 	mcpToolViewState remoteMCPToolViewState
+	// mcpResponseWarnings rate limits per-request MCP response warnings.
+	mcpResponseWarnings mcpWarningLimiter
 
 	JSONRPCRouter jsonrpc.Router
 
