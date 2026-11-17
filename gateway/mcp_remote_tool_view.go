@@ -33,10 +33,10 @@ var (
 	errRemoteMCPToolViewSuperseded   = errors.New("superseded by a newer catalogue check")
 )
 
-// remoteMCPToolViewState is the per-spec admission state of a remote MCP tool
-// view. generation identifies the latest catalogue check; a check may only
-// admit its view while it is still the latest one, so a superseded or
-// unloaded check can never overwrite a newer decision.
+// remoteMCPToolViewState tracks the background catalogue check of a remote
+// MCP tool view. generation identifies the latest check; a check may only log
+// while it is still the latest one, so a superseded or unloaded check never
+// reports on a newer configuration.
 type remoteMCPToolViewState struct {
 	mu         sync.Mutex
 	generation uint64
@@ -90,36 +90,31 @@ func (s *APISpec) stopRemoteMCPToolViewCheck() {
 	}
 }
 
-// admitRemoteMCPToolView stores view if generation is still the latest check.
-func (s *APISpec) admitRemoteMCPToolView(generation uint64, view *tooloverride.View) bool {
+// isLatestRemoteMCPToolViewCheck reports whether generation is still the
+// latest catalogue check of the spec.
+func (s *APISpec) isLatestRemoteMCPToolViewCheck(generation uint64) bool {
 	state := &s.mcpToolViewState
 	state.mu.Lock()
 	defer state.mu.Unlock()
-	if state.generation != generation {
-		return false
-	}
-	s.mcpToolView.Store(view)
-	return true
+	return state.generation == generation
 }
 
 // loadRemoteMCPToolView compiles a remote MCP proxy's x-tyk-mcp-server tool
-// overrides and admits them once the upstream catalogue has been checked.
+// overrides and admits them immediately. Invalid configurations were already
+// rejected by static validation; a configuration that still fails to compile
+// is not applied.
 //
-// Overrides can rename tools, so a view is only admitted after a check that no
-// final name collides with an upstream tool that has no override. The check
-// needs the upstream catalogue, so it runs in the background and never blocks
-// loading. Until it finishes, and when it finds a collision, the API keeps
-// serving the view admitted for the spec it replaces (none for a new API).
-// When the upstream cannot be listed, the view is admitted unchecked, because
-// the configuration was already validated and the upstream may only be
-// temporarily unreachable.
+// The upstream catalogue is then checked in the background, only to report
+// problems; the check never changes the admitted view and never blocks
+// loading. It warns when an override sets the name of an upstream tool that
+// has no override, when an override's source tool is not in the catalogue,
+// and when the catalogue cannot be listed.
 //
 // Fetch scope: the check calls Proxy.TargetURL directly, sending only static
 // upstream basic auth (see remoteMCPCatalogueHeader). It does not use load
 // balancing, service discovery, the egress proxy, upstream mTLS certificates,
 // request header transforms or other upstream auth, and it does not follow
-// redirects. APIs that depend on those get the "applying them unchecked"
-// warning.
+// redirects. APIs that depend on those get the "could not list" warning.
 func (gw *Gateway) loadRemoteMCPToolView(spec *APISpec, logger *logrus.Entry) {
 	if !spec.IsOAS || !spec.IsMCP() || spec.IsPairedMCPAdapterProxy() {
 		return
@@ -133,12 +128,7 @@ func (gw *Gateway) loadRemoteMCPToolView(spec *APISpec, logger *logrus.Entry) {
 	if view == nil {
 		return
 	}
-
-	// When the replaced spec's own check is still pending, its admitted view
-	// is nil, so the new spec also starts without overrides.
-	if previous := gw.getApiSpec(spec.APIID); previous != nil && previous != spec {
-		spec.mcpToolView.Store(previous.MCPToolView())
-	}
+	spec.mcpToolView.Store(view)
 
 	ctx, generation, done := spec.startRemoteMCPToolViewCheck(gw.ctx)
 	client := gw.remoteMCPCatalogueClient(spec)
@@ -155,20 +145,18 @@ func (gw *Gateway) loadRemoteMCPToolView(spec *APISpec, logger *logrus.Entry) {
 		if cause := context.Cause(ctx); errors.Is(cause, errRemoteMCPToolViewSpecUnloaded) || errors.Is(cause, errRemoteMCPToolViewSuperseded) {
 			return
 		}
+		if !spec.isLatestRemoteMCPToolViewCheck(generation) {
+			return
+		}
 		if err != nil {
-			if spec.admitRemoteMCPToolView(generation, view) {
-				logger.WithError(err).Warning("Could not list the upstream MCP tool catalogue to check tool overrides; applying them unchecked")
-			}
+			logger.WithError(err).Warning("Could not list the upstream MCP tool catalogue to check tool overrides; applying them unchecked")
 			return
 		}
 
-		missing, err := oas.CheckRemoteMCPToolCatalogue(ext, names)
-		if err != nil {
-			logger.WithError(err).Error("MCP tool overrides are not applied; keeping the previously applied tool overrides")
-			return
-		}
-		if !spec.admitRemoteMCPToolView(generation, view) {
-			return
+		missing, collisions := oas.InspectRemoteMCPToolCatalogue(ext, names)
+		for _, collision := range collisions {
+			logger.WithFields(logrus.Fields{"exposed_name": collision.Name, "source_tool": collision.Source}).
+				Warning("MCP tool override sets a name that an upstream tool without an override already has")
 		}
 		for _, source := range missing {
 			logger.WithField("source_tool", source).Warning("MCP tool override source tool is not in the upstream tool list; it is not exposed")
@@ -232,11 +220,13 @@ func remoteMCPToolsListView(spec *APISpec, state *httpctx.JSONRPCRoutingState) *
 func rewriteRemoteMCPToolsList(spec *APISpec, view *tooloverride.View, state *httpctx.JSONRPCRoutingState, body []byte, logger *logrus.Entry) ([]byte, bool) {
 	logger = logger.WithFields(logrus.Fields{"api_id": spec.APIID, "api_name": spec.Name})
 	out, changed, drift, err := view.RewriteToolsList(body, isFirstToolsListPage(state))
+	now := time.Now()
 	if err != nil {
-		logger.WithError(err).Debug("Upstream tools/list response was not rewritten with MCP tool overrides")
+		if spec.mcpResponseWarnings.due("rewrite", now) {
+			logger.WithError(err).Warning("Upstream tools/list response was not rewritten with MCP tool overrides; it is passed through unchanged")
+		}
 		return body, false
 	}
-	now := time.Now()
 	for _, source := range drift.Missing {
 		if view.ShouldWarnMissing(source, now) {
 			logger.WithField("source_tool", source).Warning("MCP tool override source tool is not in the upstream tool list; it is not exposed")

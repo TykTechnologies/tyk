@@ -35,6 +35,10 @@ type fakeRemoteMCPServer struct {
 	calls     []string
 	received  []receivedToolsCall
 	block     chan struct{}
+	// encoding, when set, compresses every tools/list and tools/call
+	// response body with that Content-Encoding (see encodeFakeBody);
+	// "negotiate" picks one from the request's Accept-Encoding.
+	encoding string
 }
 
 // receivedToolsCall is what the upstream saw for one tools/call.
@@ -113,18 +117,27 @@ func (f *fakeRemoteMCPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	sse := f.sse
+	encoding := f.encoding
 	f.mu.Unlock()
 
 	body := `{"jsonrpc":"2.0","id":` + string(req.ID) + `,"result":` + result + `}`
+	payload := []byte(body)
 	if sse {
 		w.Header().Set("Content-Type", "text/event-stream")
-		if _, err := fmt.Fprintf(w, "event: message\ndata: %s\n\n", body); err != nil {
-			f.t.Errorf("writing %s event: %v", req.Method, err)
-		}
-		return
+		payload = []byte(fmt.Sprintf("event: message\ndata: %s\n\n", body))
+	} else {
+		w.Header().Set("Content-Type", "application/json")
 	}
-	w.Header().Set("Content-Type", "application/json")
-	if _, err := w.Write([]byte(body)); err != nil {
+	if encoding == "negotiate" {
+		// Answer with the client's first offered encoding, as servers that
+		// prefer br do.
+		encoding = negotiatedFakeEncoding(r.Header.Get("Accept-Encoding"))
+	}
+	if encoding != "" && (req.Method == "tools/list" || req.Method == "tools/call") {
+		w.Header().Set("Content-Encoding", encoding)
+		payload = encodeFakeBody(f.t, encoding, payload)
+	}
+	if _, err := w.Write(payload); err != nil {
 		f.t.Errorf("writing %s response: %v", req.Method, err)
 	}
 }
@@ -313,6 +326,9 @@ func recordRemoteMCPLogs(t *testing.T, apiID string) *remoteMCPLogRecorder {
 	return recorder
 }
 
+// remoteMCPCollisionWarning identifies the catalogue check's collision warning.
+const remoteMCPCollisionWarning = "sets a name that an upstream tool without an override already has"
+
 func renameOverride(source, name string) oas.TykMCPServerPrimitive {
 	return oas.TykMCPServerPrimitive{Source: oas.TykMCPServerSource{ToolName: source}, Name: name}
 }
@@ -341,7 +357,7 @@ func TestRemoteMCPToolView_CatalogueCheckOnLoad(t *testing.T) {
 		assert.NotNil(t, logs.find(logrus.WarnLevel, "archived_tool"), "missing source tool must be logged as a warning")
 	})
 
-	t.Run("brand-new API with a catalogue collision serves without overrides", func(t *testing.T) {
+	t.Run("fresh load with a colliding upstream tool admits the overrides and warns about the collision", func(t *testing.T) {
 		ts := StartTest(nil)
 		t.Cleanup(ts.Close)
 		const apiID = "remote-mcp-collision"
@@ -349,13 +365,18 @@ func TestRemoteMCPToolView_CatalogueCheckOnLoad(t *testing.T) {
 		_, upstream := newFakeRemoteMCPServer(t, `{"name":"remove_repo"}`, `{"name":"delete_repo"}`)
 
 		spec := loadRemoteMCPProxy(t, ts, apiID, upstream.URL, []oas.TykMCPServerPrimitive{renameOverride("remove_repo", "delete_repo")})
+		require.NotNil(t, spec.MCPToolView(), "the overrides apply from load")
 		waitForRemoteMCPToolViewCheck(t, spec)
 
-		assert.Nil(t, spec.MCPToolView())
-		assert.NotNil(t, logs.find(logrus.ErrorLevel, `"delete_repo" would be exposed by two tools`))
+		assert.NotNil(t, spec.MCPToolView())
+		collision := logs.find(logrus.WarnLevel, remoteMCPCollisionWarning)
+		require.NotNil(t, collision, "the collision must be logged as a warning")
+		assert.Contains(t, collision.text, "exposed_name=delete_repo")
+		assert.Contains(t, collision.text, "source_tool=remove_repo")
+		assert.Nil(t, logs.find(logrus.ErrorLevel, "would be exposed by two tools"), "a collision no longer rejects the overrides")
 	})
 
-	t.Run("reload with a catalogue collision keeps the previously admitted view", func(t *testing.T) {
+	t.Run("reload with a catalogue collision behaves like a fresh load", func(t *testing.T) {
 		ts := StartTest(nil)
 		t.Cleanup(ts.Close)
 		const apiID = "remote-mcp-reload-collision"
@@ -366,15 +387,57 @@ func TestRemoteMCPToolView_CatalogueCheckOnLoad(t *testing.T) {
 			annotationOverride("delete_repo", oas.DerivedToolAnnotations{DestructiveHint: boolPtr(true)}),
 		})
 		waitForRemoteMCPToolViewCheck(t, first)
-		admitted := first.MCPToolView()
-		require.NotNil(t, admitted)
+		previous := first.MCPToolView()
+		require.NotNil(t, previous)
 
 		second := loadRemoteMCPProxy(t, ts, apiID, upstream.URL, []oas.TykMCPServerPrimitive{renameOverride("remove_repo", "delete_repo")})
 		require.NotSame(t, first, second)
+		reloaded := second.MCPToolView()
+		require.NotNil(t, reloaded, "the new overrides apply from load")
+		assert.NotSame(t, previous, reloaded)
+		_, renamed := reloaded.Override("remove_repo")
+		assert.True(t, renamed, "the reloaded view is the new configuration, not the previous one")
 		waitForRemoteMCPToolViewCheck(t, second)
 
-		assert.Same(t, admitted, second.MCPToolView())
-		assert.NotNil(t, logs.find(logrus.ErrorLevel, `"delete_repo" would be exposed by two tools`))
+		assert.Same(t, reloaded, second.MCPToolView())
+		assert.NotNil(t, logs.find(logrus.WarnLevel, remoteMCPCollisionWarning, "exposed_name=delete_repo"))
+	})
+
+	t.Run("overrides are active while the catalogue check is still running", func(t *testing.T) {
+		ts := StartTest(nil)
+		t.Cleanup(ts.Close)
+		fake, _ := newFakeRemoteMCPServer(t, upstreamDeleteRepo)
+		// Only the check initializes a session; client requests below go
+		// straight to tools/list, so blocking initialize blocks only the check.
+		release := make(chan struct{})
+		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			body, _ := io.ReadAll(r.Body)
+			if strings.Contains(string(body), `"method":"initialize"`) {
+				select {
+				case <-release:
+				case <-r.Context().Done():
+					return
+				}
+			}
+			r.Body = io.NopCloser(strings.NewReader(string(body)))
+			fake.ServeHTTP(w, r)
+		}))
+		t.Cleanup(upstream.Close)
+		// Cleanups run last-in first-out: release the check before closing.
+		t.Cleanup(func() { close(release) })
+
+		spec := loadRemoteMCPProxy(t, ts, "remote-mcp-before-check", upstream.URL, []oas.TykMCPServerPrimitive{
+			annotationOverride("delete_repo", oas.DerivedToolAnnotations{DestructiveHint: boolPtr(true)}),
+		})
+		require.NotNil(t, spec.remoteMCPToolViewCheckDone())
+		_, _, body := remoteMCPRequest(t, ts, "", "tools/list", `{}`)
+		select {
+		case <-spec.remoteMCPToolViewCheckDone():
+			t.Fatal("catalogue check finished while the upstream was still blocked")
+		default:
+		}
+		tools, _, _ := listedTools(t, body)
+		assert.JSONEq(t, `{"destructiveHint":true}`, extractAnnotations(t, tools["delete_repo"]), "the overrides must not wait for the check")
 	})
 
 	t.Run("unreachable upstream keeps the compiled view and logs a warning", func(t *testing.T) {
@@ -407,7 +470,7 @@ func TestRemoteMCPToolView_CatalogueCheckOnLoad(t *testing.T) {
 			annotationOverride("delete_repo", oas.DerivedToolAnnotations{DestructiveHint: boolPtr(true)}),
 		})
 		assert.Less(t, time.Since(started), remoteMCPCatalogueTimeout)
-		assert.Nil(t, spec.MCPToolView(), "the view is admitted only after the check")
+		assert.NotNil(t, spec.MCPToolView(), "the view is admitted at load, before the check")
 		require.NotNil(t, spec.remoteMCPToolViewCheckDone())
 		select {
 		case <-spec.remoteMCPToolViewCheckDone():

@@ -12,7 +12,7 @@ import (
 // syntax, duplicate sources and duplicate final names. Swapping names between
 // overridden tools, or reusing a name freed by another override, is allowed.
 // Collisions with upstream tools that have no override need the upstream
-// catalogue; see CheckRemoteMCPToolCatalogue.
+// catalogue; see InspectRemoteMCPToolCatalogue and CheckRemoteMCPToolCatalogue.
 func ValidateRemoteMCPToolOverrides(ext *TykMCPServer) error {
 	if ext == nil {
 		return nil

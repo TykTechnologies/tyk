@@ -1,6 +1,6 @@
 // Package catalogue lists the tools of a remote MCP server, for checking
 // x-tyk-mcp-server tool overrides against the upstream catalogue with
-// oas.CheckRemoteMCPToolCatalogue.
+// oas.InspectRemoteMCPToolCatalogue or oas.CheckRemoteMCPToolCatalogue.
 package catalogue
 
 import (
