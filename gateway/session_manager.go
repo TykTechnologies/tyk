@@ -228,6 +228,11 @@ func (l *SessionLimiter) RateLimitInfo(r *http.Request, api *APISpec, endpoints 
 		api.StripListenPath(r.URL.Path),
 		r.URL.Path,
 	}
+	if isMCPJSONRPCVirtualEndpointLoop(api, r) {
+		// Virtual endpoint paths do not contain the public listen path. For
+		// example, stripping /mcp from /mcp-tool:name would corrupt the match.
+		urlPaths = []string{r.URL.Path}
+	}
 
 	for _, endpoint := range endpoints {
 		if !endpoint.Methods.Contains(r.Method) {

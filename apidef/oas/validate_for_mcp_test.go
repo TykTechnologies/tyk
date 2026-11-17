@@ -78,4 +78,21 @@ func TestValidateForMCP(t *testing.T) {
 		assert.NoError(t, o.ValidateForMCP(context.Background()))
 		assert.NoError(t, o.Validate(context.Background()))
 	})
+
+	t.Run("trusted MCP origins validate only in MCP context", func(t *testing.T) {
+		o := mkOAS(nil)
+		o.GetTykExtension().Server.MCP = &MCP{TrustedOrigins: []string{"HTTPS://CLIENT.EXAMPLE:443"}}
+		assert.NoError(t, o.ValidateForMCP(context.Background()))
+		err := o.Validate(context.Background())
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "server.mcp")
+	})
+
+	t.Run("invalid trusted MCP origin is rejected", func(t *testing.T) {
+		o := mkOAS(nil)
+		o.GetTykExtension().Server.MCP = &MCP{TrustedOrigins: []string{"https://*.example"}}
+		err := o.ValidateForMCP(context.Background())
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid origin")
+	})
 }

@@ -179,26 +179,23 @@ func (r *RPCStorageHandler) buildNodeInfo() []byte {
 	}
 
 	r.Gw.getHostDetails()
+	meta := r.Gw.nodeMetadata()
 	node := model.NodeData{
 		NodeID:          r.Gw.GetNodeID(),
 		GroupID:         config.SlaveOptions.GroupID,
 		APIKey:          config.SlaveOptions.APIKey,
-		NodeVersion:     VERSION,
+		NodeVersion:     meta.Version,
 		TTL:             intCheckDuration,
-		NodeIsSegmented: config.DBAppConfOptions.NodeIsSegmented,
-		Tags:            config.DBAppConfOptions.Tags,
+		NodeIsSegmented: meta.IsSegmented,
+		Tags:            meta.Tags,
 		Health:          r.Gw.getHealthCheckInfo(),
 		Stats: model.GWStats{
-			APIsCount:      r.Gw.apisByIDLen(),
-			PoliciesCount:  r.Gw.policies.PolicyCount(),
+			APIsCount:      meta.APIsCount,
+			PoliciesCount:  meta.PoliciesCount,
 			LoadedAPIs:     r.Gw.GetLoadedAPIIDs(),
 			LoadedPolicies: r.Gw.GetLoadedPolicyIDs(),
 		},
-		HostDetails: model.HostDetails{
-			Hostname: r.Gw.hostDetails.Hostname,
-			PID:      r.Gw.hostDetails.PID,
-			Address:  r.Gw.hostDetails.Address,
-		},
+		HostDetails: meta.HostDetails,
 	}
 
 	data, err := json.Marshal(node)

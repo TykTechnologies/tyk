@@ -23,6 +23,11 @@ var (
 	// apidef.All, apidef.Any and the empty string (which means apidef.All) are
 	// accepted, so that a typo cannot quietly change how options combine.
 	ErrAccessConditionOn = errors.New(`access condition "on" must be "all", "any" or empty`)
+
+	// ErrAccessConditionBodyFieldPath is returned for a body field match with
+	// an empty path. An empty path addresses no field, so the match could never
+	// be satisfied, or with Reverse would always be.
+	ErrAccessConditionBodyFieldPath = errors.New("body field path must not be empty")
 )
 
 // Validate reports whether the condition is well formed enough to be
@@ -69,6 +74,20 @@ func (c AccessCondition) Validate() error {
 		}
 	}
 
+	if len(c.Options.BodyFieldMatches) > 0 {
+		configured++
+
+		for index, match := range c.Options.BodyFieldMatches {
+			if match.Path == "" {
+				return fmt.Errorf("body_field_matches[%d]: %w", index, ErrAccessConditionBodyFieldPath)
+			}
+
+			if err := validatePattern(match.MatchPattern); err != nil {
+				return fmt.Errorf("body_field_matches[%d] (%q): %w", index, match.Path, err)
+			}
+		}
+	}
+
 	if c.Options.PayloadMatches.MatchPattern != "" {
 		configured++
 
@@ -84,12 +103,12 @@ func (c AccessCondition) Validate() error {
 	return nil
 }
 
-// Validate checks every condition on the spec, identifying failures by the URL
-// they were configured against.
+// Validate checks every condition on the spec, identifying failures by the
+// condition's index.
 func (s AccessSpec) Validate() error {
 	for index, condition := range s.Conditions {
 		if err := condition.Validate(); err != nil {
-			return fmt.Errorf("allowed_urls[%q].conditions[%d]: %w", s.URL, index, err)
+			return fmt.Errorf("conditions[%d]: %w", index, err)
 		}
 	}
 
@@ -99,10 +118,14 @@ func (s AccessSpec) Validate() error {
 // ValidateAccessSpecs checks the conditions on every spec in the list. It is
 // the entry point for callers that accept keys and policies over an API, such
 // as the Dashboard.
+//
+// Failures identify the spec by its index as well as its URL. The URL alone is
+// ambiguous, because several specs can share a URL and differ only by their
+// conditions.
 func ValidateAccessSpecs(specs []AccessSpec) error {
-	for _, spec := range specs {
+	for index, spec := range specs {
 		if err := spec.Validate(); err != nil {
-			return err
+			return fmt.Errorf("allowed_urls[%d] (%q).%w", index, spec.URL, err)
 		}
 	}
 

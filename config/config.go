@@ -15,6 +15,7 @@ import (
 	"github.com/TykTechnologies/storage/kv"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	internalhttputil "github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -305,7 +306,7 @@ type AnalyticsConfigConfig struct {
 	// This setting can be overridden with an organization flag, enabed at an API level, or on individual Key level.
 	EnableDetailedRecording bool `json:"enable_detailed_recording"`
 
-	// AllowUnsafeDetailedLogs controls whether sensitive headers (Authorization) are obfuscated when detailed recording is enabled.
+	// AllowUnsafeDetailedLogs controls whether sensitive headers (the standard `Authorization` header and any custom auth headers defined for the API) are obfuscated when detailed recording is enabled.
 	// Setting this to true restores the legacy behavior where raw requests are captured as-is, which may expose sensitive tokens in plain text.
 	AllowUnsafeDetailedLogs bool `json:"allow_unsafe_detailed_logs"`
 
@@ -694,12 +695,25 @@ type HttpServerOptionsConfig struct {
 	// A value of 1 means using the last IP, 2 means second to last, and so on.
 	XFFDepth int `json:"xff_depth"`
 
+	// TrustedProxyCIDRs lists the proxy networks whose Forwarded and
+	// X-Forwarded-* headers may be used to determine the request's public
+	// origin. Requests received directly, or from any other peer, ignore those
+	// headers.
+	TrustedProxyCIDRs []string `json:"trusted_proxy_cidrs"`
+
 	// MaxResponseBodySize sets an upper limit on the response body (payload) size in bytes. It defaults to 0, which means there is no restriction on the response body size.
 	//
 	// The Gateway will return `HTTP 500 Response Body Too Large` if the response payload exceeds MaxResponseBodySize+1 bytes.
 	//
 	// **Note:** The limit is applied only when the [Response Body Transform middleware](/api-management/traffic-transformation/response-body) is enabled.
 	MaxResponseBodySize int64 `json:"max_response_body_size"`
+}
+
+// ValidateTrustedProxyCIDRs validates the networks permitted to supply public
+// request-origin headers.
+func (h HttpServerOptionsConfig) ValidateTrustedProxyCIDRs() error {
+	_, err := internalhttputil.ParseTrustedProxyCIDRs(h.TrustedProxyCIDRs)
+	return err
 }
 
 type AuthOverrideConf struct {
@@ -767,9 +781,11 @@ type CertificatesConfig struct {
 	Upstream map[string]string `json:"upstream"`
 	// Certificates used for Control API Mutual TLS
 	ControlAPI []string `json:"control_api"`
-	// Used for communicating with the Dashboard if it is configured to use Mutual TLS
+	// Has no effect. Tyk Gateway doesn't use this setting. It verifies the server
+	// certificate of Tyk Dashboard against the system CA store.
 	Dashboard []string `json:"dashboard_api"`
-	// Certificates used for MDCB Mutual TLS
+	// Has no effect. Tyk Gateway doesn't use this setting, and MDCB doesn't
+	// support mutual TLS with Data Plane Gateways.
 	MDCB []string `json:"mdcb_api"`
 }
 
@@ -970,7 +986,9 @@ type Config struct {
 	// If you are using the Tyk Dashboard, you must configure this setting with the same value in both Gateway and Dashboard
 	DisableKeyActionsByUsername bool `json:"disable_key_actions_by_username"`
 
-	// Specify the Key hashing algorithm. Possible values: murmur64, murmur128, sha256.
+	// Specify the Key hashing algorithm. Possible values: murmur32, murmur64, murmur128, sha256.
+	// Values are case-sensitive. An unknown value is logged and falls back to murmur64.
+	// If not set, keys are generated in the legacy format and hashed with murmur32.
 	HashKeyFunction string `json:"hash_key_function"`
 
 	// Specify the Key hashing algorithm for "basic auth". Possible values: murmur64, murmur128, sha256, bcrypt.
@@ -1133,6 +1151,13 @@ type Config struct {
 	// This can cause a file-handler limit to be exceeded. Setting to false can have performance benefits as the connection can be reused.
 	ProxyCloseConnections bool `json:"proxy_close_connections"`
 
+	// ApplyStripListenPathToURLRewrite restores the legacy behavior, where
+	// listen path stripping also applied to paths rewritten by URL Rewrite. If a rewritten path starts
+	// with the API’s listen path, Gateway strips the listen path before proxying upstream.
+	// Defaults to false, which proxies rewritten paths unchanged.
+	// Enable it only if your APIs rely on the legacy behavior.
+	ApplyStripListenPathToURLRewrite bool `json:"apply_strip_listen_path_to_url_rewrite"`
+
 	// Tyk nodes can provide uptime awareness, uptime testing and analytics for your underlying APIs uptime and availability.
 	// Tyk can also notify you when a service goes down.
 	UptimeTests UptimeTestsConfig `json:"uptime_tests"`
@@ -1292,12 +1317,18 @@ type Config struct {
 
 	// You can now set a logging level (log_level). The following levels can be set: debug, info, warn, error.
 	// If not set or left empty, it will default to `info`.
-	LogLevel string `json:"log_level"`
+	// Only entries at or above this level are generated, whether or not log sinks are configured.
+	// `TYK_GW_LOGLEVEL` and the `--debug` flag override it.
+	LogLevel logger.Level `json:"log_level"`
 
-	// Configures the output format used for application logs.
-	// Allowed values are `text`, `json`, or `legacy`.
-	// If not set or left empty, it defaults to `text`.
-	LogFormat logger.Format `json:"log_format"`
+	// LogFormat configures the output format used for application logs.
+	// Allowed values are `text`, `json`, `legacy` or an array of log sinks.
+	// If not set, null, empty or an empty array, all logs go to stderr in `text` format.
+	// Each sink defines the range of levels it accepts (`level`, `high_level`), its `format` with
+	// `format_options`, and its `output` (`stdout` or `stderr`). Values are case-insensitive, and
+	// a sink with an unknown value or field stops the Gateway at startup.
+	// `TYK_GW_LOGFORMAT` accepts the same JSON array and overrides the file.
+	LogFormat LogFormat `json:"log_format"`
 
 	// AccessLogs configures the output for access logs.
 	// If not configured, the access log is disabled.
@@ -1471,6 +1502,18 @@ type Config struct {
 	// The standard characters are alphanumeric characters plus underscore (_), hyphen (-), dot (.) and tilde (~).
 	// The use of other characters in IDs can cause unpredictable behavior and is not recommended.
 	AllowUnsafePolicyIds bool `json:"allow_unsafe_policy_ids"`
+
+	// AllowUnsafeWebhookTemplatePaths disables webhook template path validation. This is provided for compatibility with legacy webhook definitions containing potentially unsafe template paths (default: false).
+	AllowUnsafeWebhookTemplatePaths bool `json:"allow_unsafe_webhook_template_paths"`
+
+	// AllowUnsafeApiIds allows the use of non-standard characters in API identifiers (default: false).
+	// The standard characters are alphanumeric characters plus underscore (_), hyphen (-), dot (.) and tilde (~).
+	// A standard ID must also contain at least one letter or digit, so IDs made only of punctuation (e.g. "." or "..") are rejected.
+	// The use of other characters in IDs can cause unpredictable behavior and is not recommended.
+	AllowUnsafeApiIds bool `json:"allow_unsafe_api_ids"`
+
+	// AllowUnsafeBodyTransformTemplatePaths disables body transform template path validation. This is provided for compatibility with legacy API definitions containing potentially unsafe template paths (default: false).
+	AllowUnsafeBodyTransformTemplatePaths bool `json:"allow_unsafe_body_transform_template_paths"`
 }
 
 // LabsConfig include config for streaming

@@ -21,6 +21,10 @@ import (
 
 const (
 	msgBodyTransformed = "Body transformed"
+	// msgTemplateExecutionFailed is deliberately generic so a rejected template
+	// path gives no hint about the filesystem.
+	msgTemplateExecutionFailed   = "Template execution failed"
+	msgTemplateCompilationFailed = "Template compilation failed"
 )
 
 var (
@@ -129,8 +133,7 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 	body, err := r.GetResponseBody(respBody, logger)
 	if err != nil {
 		if errors.Is(err, ErrResponseSizeLimitExceeded) {
-			handler := ErrorHandler{&BaseMiddleware{Spec: r.Spec, Gw: r.Gw}}
-			handler.HandleError(rw, req, "Response body too large", http.StatusInternalServerError, true)
+			r.handleError(rw, req, http.StatusInternalServerError, "Response body too large")
 		}
 
 		return err
@@ -188,13 +191,23 @@ func (r *ResponseTransformMiddleware) HandleResponse(rw http.ResponseWriter, res
 		}
 	}
 
+	tpl, err := tmeta.Template.Get()
+	if err != nil {
+		logger.WithError(err).Error("Body transform failure")
+		code, msg := templateLoadFailure(err)
+		r.handleError(rw, req, code, msg)
+		return err
+	}
+
 	// Apply to template
 	var bodyBuffer bytes.Buffer
-	if err := tmeta.Template.Execute(&bodyBuffer, bodyData); err != nil {
+	if err := tpl.Execute(&bodyBuffer, bodyData); err != nil {
 		logger.WithError(err).Error("Failed to apply template to request")
-	} else {
-		logger.Debugf("%s", msgBodyTransformed)
+		r.handleError(rw, req, http.StatusInternalServerError, msgTemplateExecutionFailed)
+		return err
 	}
+
+	logger.Debugf("%s", msgBodyTransformed)
 
 	// Re-compress if original upstream response was compressed
 	encoding := res.Header.Get("Content-Encoding")
@@ -232,4 +245,19 @@ func (r *ResponseTransformMiddleware) GetResponseBody(respBody io.Reader, logger
 	}
 
 	return body, nil
+}
+
+func (r *ResponseTransformMiddleware) handleError(rw http.ResponseWriter, req *http.Request, code int, message string) {
+	handler := ErrorHandler{&BaseMiddleware{Spec: r.Spec, Gw: r.Gw}}
+	handler.HandleError(rw, req, message, code, true)
+}
+
+// templateLoadFailure maps a template load error to the client status and message.
+// A rejected template path keeps the 400 shipped in v5.16.0 (TT-6554).
+func templateLoadFailure(err error) (int, string) {
+	if errors.Is(err, errUnsafeTemplatePath) {
+		return http.StatusBadRequest, msgTemplateExecutionFailed
+	}
+
+	return http.StatusInternalServerError, msgTemplateCompilationFailed
 }

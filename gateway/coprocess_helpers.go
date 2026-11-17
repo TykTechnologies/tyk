@@ -228,18 +228,21 @@ func tykAccessConditions(protoConditions []*coprocess.AccessCondition) []user.Ac
 	return conditions
 }
 
-func tykTriggerOptions(protoOptions *coprocess.RoutingTriggerOptions) apidef.RoutingTriggerOptions {
+func tykTriggerOptions(protoOptions *coprocess.RoutingTriggerOptions) user.AccessConditionOptions {
 	if protoOptions == nil {
-		return apidef.RoutingTriggerOptions{}
+		return user.AccessConditionOptions{}
 	}
 
-	return apidef.RoutingTriggerOptions{
-		HeaderMatches:         tykStringRegexMaps(protoOptions.HeaderMatches),
-		QueryValMatches:       tykStringRegexMaps(protoOptions.QueryValMatches),
-		PathPartMatches:       tykStringRegexMaps(protoOptions.PathPartMatches),
-		SessionMetaMatches:    tykStringRegexMaps(protoOptions.SessionMetaMatches),
-		RequestContextMatches: tykStringRegexMaps(protoOptions.RequestContextMatches),
-		PayloadMatches:        tykStringRegexMap(protoOptions.PayloadMatches),
+	return user.AccessConditionOptions{
+		RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+			HeaderMatches:         tykStringRegexMaps(protoOptions.HeaderMatches),
+			QueryValMatches:       tykStringRegexMaps(protoOptions.QueryValMatches),
+			PathPartMatches:       tykStringRegexMaps(protoOptions.PathPartMatches),
+			SessionMetaMatches:    tykStringRegexMaps(protoOptions.SessionMetaMatches),
+			RequestContextMatches: tykStringRegexMaps(protoOptions.RequestContextMatches),
+			PayloadMatches:        tykStringRegexMap(protoOptions.PayloadMatches),
+		},
+		BodyFieldMatches: tykBodyFieldMatches(protoOptions.BodyFieldMatches),
 	}
 }
 
@@ -285,7 +288,7 @@ func protoAccessConditions(conditions []user.AccessCondition) []*coprocess.Acces
 	return protoConditions
 }
 
-func protoTriggerOptions(options apidef.RoutingTriggerOptions) *coprocess.RoutingTriggerOptions {
+func protoTriggerOptions(options user.AccessConditionOptions) *coprocess.RoutingTriggerOptions {
 	return &coprocess.RoutingTriggerOptions{
 		HeaderMatches:         protoStringRegexMaps(options.HeaderMatches),
 		QueryValMatches:       protoStringRegexMaps(options.QueryValMatches),
@@ -293,6 +296,7 @@ func protoTriggerOptions(options apidef.RoutingTriggerOptions) *coprocess.Routin
 		SessionMetaMatches:    protoStringRegexMaps(options.SessionMetaMatches),
 		RequestContextMatches: protoStringRegexMaps(options.RequestContextMatches),
 		PayloadMatches:        protoStringRegexMap(options.PayloadMatches),
+		BodyFieldMatches:      protoBodyFieldMatches(options.BodyFieldMatches),
 	}
 }
 
@@ -314,4 +318,41 @@ func protoStringRegexMap(in apidef.StringRegexMap) *coprocess.StringRegexMap {
 		MatchRx: in.MatchPattern,
 		Reverse: in.Reverse,
 	}
+}
+
+func tykBodyFieldMatches(in []*coprocess.BodyFieldMatch) []user.BodyFieldMatch {
+	if len(in) == 0 {
+		return nil
+	}
+
+	out := make([]user.BodyFieldMatch, 0, len(in))
+	for _, match := range in {
+		if match == nil {
+			continue
+		}
+
+		out = append(out, user.BodyFieldMatch{
+			Path:           match.Path,
+			StringRegexMap: apidef.StringRegexMap{MatchPattern: match.MatchRx, Reverse: match.Reverse},
+		})
+	}
+
+	return out
+}
+
+func protoBodyFieldMatches(in []user.BodyFieldMatch) []*coprocess.BodyFieldMatch {
+	if len(in) == 0 {
+		return nil
+	}
+
+	out := make([]*coprocess.BodyFieldMatch, 0, len(in))
+	for _, match := range in {
+		out = append(out, &coprocess.BodyFieldMatch{
+			Path:    match.Path,
+			MatchRx: match.MatchPattern,
+			Reverse: match.Reverse,
+		})
+	}
+
+	return out
 }

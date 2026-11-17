@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"strings"
 	"sync"
@@ -65,6 +66,12 @@ type APISpec struct {
 	OrgHasNoSession          bool
 	AnalyticsPluginConfig    *GoAnalyticsPlugin
 
+	// Swapped by a reload while requests read it, so the reads stay lock-free.
+	dnsDiscovery atomic.Pointer[dnsDiscoveryPlan]
+
+	// So reconciling a spec twice does not stack unload hooks.
+	dnsDiscoveryHooked bool
+
 	unloadHooks []func()
 
 	network analytics.NetworkStats
@@ -115,6 +122,13 @@ type APISpec struct {
 	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
 	// Built from apidef.ErrorOverrides during gateway startup.
 	compiledErrorOverrides atomic.Pointer[CompiledErrorOverrides]
+
+	// MCP origin-security configuration is immutable for a loaded spec. Parse it
+	// once and retain the canonical origins/proxy networks off the request path.
+	mcpOriginConfigOnce     sync.Once
+	mcpTrustedOrigins       map[string]struct{}
+	mcpTrustedProxyPrefixes []netip.Prefix
+	mcpOriginConfigErr      error
 }
 
 // MCPAdapterRuntime groups runtime-only state for a synthetic REST-as-MCP

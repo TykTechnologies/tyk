@@ -34,6 +34,9 @@ type Server struct {
 	// Tyk classic API definition: `detailed_tracing`
 	DetailedTracing *DetailedTracing `bson:"detailedTracing,omitempty" json:"detailedTracing,omitempty"`
 
+	// MCP contains request-security settings for MCP APIs.
+	MCP *MCP `bson:"mcp,omitempty" json:"mcp,omitempty"`
+
 	// EventHandlers contains the configuration related to Tyk Events.
 	//
 	// Tyk classic API definition: `event_handlers`
@@ -113,6 +116,21 @@ func (s *Server) Fill(api apidef.APIDefinition) {
 		s.DetailedTracing = nil
 	}
 
+	s.MCP = nil
+	if api.MCP != nil {
+		s.MCP = &MCP{TrustedOrigins: append([]string(nil), api.MCP.TrustedOrigins...)}
+		if api.MCP.OAuthBroker != nil {
+			s.MCP.OAuthBroker = &MCPOAuthBroker{
+				Enabled:                api.MCP.OAuthBroker.Enabled,
+				PublicOrigin:           api.MCP.OAuthBroker.PublicOrigin,
+				PublicResource:         api.MCP.OAuthBroker.PublicResource,
+				UpstreamResource:       api.MCP.OAuthBroker.UpstreamResource,
+				TrustedEndpointOrigins: append([]string(nil), api.MCP.OAuthBroker.TrustedEndpointOrigins...),
+				AllowInsecureLoopback:  api.MCP.OAuthBroker.AllowInsecureLoopback,
+			}
+		}
+	}
+
 	if s.EventHandlers == nil {
 		s.EventHandlers = EventHandlers{}
 	}
@@ -176,6 +194,21 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 
 	s.DetailedTracing.ExtractTo(api)
 
+	api.MCP = nil
+	if s.MCP != nil {
+		api.MCP = &apidef.MCPConfig{TrustedOrigins: append([]string(nil), s.MCP.TrustedOrigins...)}
+		if s.MCP.OAuthBroker != nil {
+			api.MCP.OAuthBroker = &apidef.MCPOAuthBrokerConfig{
+				Enabled:                s.MCP.OAuthBroker.Enabled,
+				PublicOrigin:           s.MCP.OAuthBroker.PublicOrigin,
+				PublicResource:         s.MCP.OAuthBroker.PublicResource,
+				UpstreamResource:       s.MCP.OAuthBroker.UpstreamResource,
+				TrustedEndpointOrigins: append([]string(nil), s.MCP.OAuthBroker.TrustedEndpointOrigins...),
+				AllowInsecureLoopback:  s.MCP.OAuthBroker.AllowInsecureLoopback,
+			}
+		}
+	}
+
 	if s.EventHandlers == nil {
 		s.EventHandlers = EventHandlers{}
 		defer func() {
@@ -189,21 +222,53 @@ func (s *Server) ExtractTo(api *apidef.APIDefinition) {
 	s.extractBatchProcessingTo(api)
 }
 
+// MCP contains MCP request-security settings.
+type MCP struct {
+	// TrustedOrigins contains concrete HTTP(S) origins allowed to send MCP
+	// requests in addition to the API's own externally visible origin.
+	//
+	// Tyk classic API definition: `mcp.trusted_origins`.
+	TrustedOrigins []string `bson:"trustedOrigins,omitempty" json:"trustedOrigins,omitempty"`
+
+	// OAuthBroker configures a Gateway-owned OAuth identity for an MCP mirror.
+	OAuthBroker *MCPOAuthBroker `bson:"oauthBroker,omitempty" json:"oauthBroker,omitempty"`
+}
+
+// MCPOAuthBroker contains the fixed public and upstream identities used by
+// the MCP OAuth authorization broker.
+type MCPOAuthBroker struct {
+	// Enabled activates the Gateway-owned OAuth authorization broker for this MCP mirror.
+	Enabled bool `bson:"enabled" json:"enabled"`
+	// PublicOrigin is the fixed externally visible origin used to construct the broker issuer and callback URLs.
+	PublicOrigin string `bson:"publicOrigin,omitempty" json:"publicOrigin,omitempty"`
+	// PublicResource identifies the MCP resource requested by downstream OAuth clients.
+	PublicResource string `bson:"publicResource,omitempty" json:"publicResource,omitempty"`
+	// UpstreamResource identifies the upstream MCP resource used in authorization and token requests.
+	UpstreamResource string `bson:"upstreamResource,omitempty" json:"upstreamResource,omitempty"`
+	// TrustedEndpointOrigins lists additional origins permitted for upstream OAuth endpoints outside the issuer origin.
+	TrustedEndpointOrigins []string `bson:"trustedEndpointOrigins,omitempty" json:"trustedEndpointOrigins,omitempty"`
+	// AllowInsecureLoopback permits HTTP loopback OAuth endpoints for local development.
+	AllowInsecureLoopback bool `bson:"allowInsecureLoopback,omitempty" json:"allowInsecureLoopback,omitempty"`
+}
+
 // ListenPath is the base path on Tyk to which requests for this API
 // should be sent. Tyk listens out for any requests coming into the host at
 // this path, on the port that Tyk is configured to run on and processes
 // these accordingly.
 type ListenPath struct {
-	// Value is the value of the listen path e.g. `/api/` or `/` or `/httpbin/`.
+	// Value is the listen path, for example `/api/` or `/`. It must start with
+	// a slash (`/`). Tyk Dashboard rejects a listen path without a leading slash,
+	// and Tyk Gateway adds a missing leading slash when it loads the API.
+	// See [Request Matching](/getting-started/key-concepts/url-matching) for how
+	// Tyk Gateway matches requests to the listen path.
+	//
 	// Tyk classic API definition: `proxy.listen_path`
 	Value string `bson:"value" json:"value"` // required
 
-	// Strip removes the inbound listen path (as accessed by the client) when generating the outbound request for the upstream service.
-	//
-	// For example, consider the scenario where the Tyk base address is `http://acme.com/`, the listen path is `example/` and the upstream URL is `http://httpbin.org/`:
-	//
-	// - If the client application sends a request to `http://acme.com/example/get` then the request will be proxied to `http://httpbin.org/example/get`
-	// - If stripListenPath is set to `true`, the `example` listen path is removed and the request would be proxied to `http://httpbin.org/get`.
+	// Strip removes the listen path from the request path before Tyk Gateway
+	// forwards the request to the upstream service. See
+	// [Request Forwarding](/planning-for-production/ensure-high-availability/load-balancing#the-upstream-target)
+	// for an example.
 	//
 	// Tyk classic API definition: `proxy.strip_listen_path`
 	Strip bool `bson:"strip,omitempty" json:"strip,omitempty"`

@@ -172,7 +172,12 @@ func NewRequest(tc *TestCase) (req *http.Request, err error) {
 		}
 	}
 
-	req.Header.Add("Content-Type", "application/json")
+	// Default to JSON without turning an explicitly supplied Content-Type into
+	// an accidental duplicate. Tests that need duplicate wire values use
+	// HeadersArray explicitly.
+	if len(req.Header.Values("Content-Type")) == 0 {
+		req.Header.Set("Content-Type", "application/json")
+	}
 
 	for _, c := range tc.Cookies {
 		req.AddCookie(c)

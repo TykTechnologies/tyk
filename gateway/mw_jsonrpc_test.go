@@ -19,6 +19,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/jsonrpc"
 	"github.com/TykTechnologies/tyk/internal/mcp"
+	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -88,17 +89,36 @@ func TestSyntheticJSONRPCMethod_UsesRoutingStateBeforeReadingBody(t *testing.T) 
 	assert.Equal(t, mcp.MethodToolsList, syntheticJSONRPCMethod(r))
 }
 
-func TestSyntheticJSONRPCMethod_LimitsFallbackBodyReadAndPreservesBody(t *testing.T) {
-	body := `{"jsonrpc":"2.0","method":"tools/list","params":{"padding":"` +
-		strings.Repeat("x", syntheticJSONRPCMethodReadLimit+1) +
-		`"}}`
-	r := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(body))
+func TestSyntheticJSONRPCMethod_UsesParsedIngressEnvelope(t *testing.T) {
+	r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	httpctx.SetMCPProtocolContext(r, mcp.NewProtocolContext("", "", &mcp.RequestEnvelope{Method: mcp.MethodToolsList}, nil))
 
-	assert.Equal(t, "", syntheticJSONRPCMethod(r))
+	assert.Equal(t, mcp.MethodToolsList, syntheticJSONRPCMethod(r))
+}
 
-	preserved, err := io.ReadAll(r.Body)
+func TestJSONRPCMiddleware_ReadsAndParsesIngressOnce(t *testing.T) {
+	body := `{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}}`
+	req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(body))
+	req.Header.Set(headerContentType, contentTypeJSON)
+	req.Header.Set(mcp.HeaderProtocolVersion, "2026-07-28")
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{}}
+	rec := httptest.NewRecorder()
+
+	first, raw, err := mw.readAndParseJSONRPC(rec, req)
 	require.NoError(t, err)
-	assert.Equal(t, body, string(preserved))
+	require.Equal(t, mcp.MethodToolsList, first.Method)
+	assert.Equal(t, body, string(raw))
+
+	req.Body = &errorReadCloser{err: io.ErrUnexpectedEOF}
+	second, secondRaw, err := mw.readAndParseJSONRPC(rec, req)
+	require.NoError(t, err)
+	assert.Same(t, first, second)
+	assert.Equal(t, raw, secondRaw)
+
+	protocolContext := httpctx.GetMCPProtocolContext(req)
+	require.NotNil(t, protocolContext)
+	assert.Equal(t, mcp.ProtocolVersionSourceHeaderBody, protocolContext.ProtocolVersionSource)
+	assert.Equal(t, "2026-07-28", protocolContext.EffectiveProtocolVersion)
 }
 
 func TestBufferedResponseWriter_WriteToSetsSafeContentHeaders(t *testing.T) {
@@ -154,7 +174,7 @@ func TestJSONRPCMiddleware_ProcessRequest_NonPostPassthrough(t *testing.T) {
 	assert.Equal(t, http.StatusOK, code)
 }
 
-func TestJSONRPCMiddleware_ProcessRequest_NonJSONPassthrough(t *testing.T) {
+func TestJSONRPCMiddleware_ProcessRequest_NonJSONRejected(t *testing.T) {
 	spec := &APISpec{
 		APIDefinition: &apidef.APIDefinition{
 			ApplicationProtocol: apidef.AppProtocolMCP,
@@ -172,7 +192,13 @@ func TestJSONRPCMiddleware_ProcessRequest_NonJSONPassthrough(t *testing.T) {
 
 	err, code := m.ProcessRequest(w, r, nil)
 	assert.Nil(t, err)
-	assert.Equal(t, http.StatusOK, code)
+	assert.Equal(t, middleware.StatusRespond, code)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+
+	var response JSONRPCErrorResponse
+	require.NoError(t, json.NewDecoder(w.Body).Decode(&response))
+	assert.Equal(t, mcp.JSONRPCInvalidRequest, response.Error.Code)
+	assert.Equal(t, "MCP POST requires application/json", response.Error.Message)
 }
 
 func TestJSONRPCMiddleware_ProcessRequest_InvalidJSON(t *testing.T) {
@@ -302,6 +328,36 @@ func TestJSONRPCMiddleware_ProcessRequest_ToolsCall_RoutesToVEM(t *testing.T) {
 	assert.Equal(t, []string{jsonrpc.MethodVEMPrefix + "tools/call", mcp.ToolPrefix + "get-weather"}, state.VEMChain)
 
 	assert.True(t, httpctx.IsJsonRPCRouting(r))
+}
+
+func TestJSONRPCMiddleware_PairedMCPProxy_RoutesToCallerVEM(t *testing.T) {
+	proxy := pairedMCPProxySpec("proxy-1", "org-1", "rest-1", nil)
+	proxy.MCPPrimitives = map[string]string{
+		"tool:list_orders_source": mcp.ToolPrefix + "list_orders_source",
+	}
+	proxy.JSONRPCRouter = mcp.NewRouter()
+
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: proxy}}
+	req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(`{
+		"jsonrpc":"2.0",
+		"id":1,
+		"method":"tools/call",
+		"params":{"name":"list_orders_source","arguments":{}}
+	}`))
+	req.Header.Set(headerContentType, contentTypeJSON)
+	rec := httptest.NewRecorder()
+
+	err, status := mw.ProcessRequest(rec, req, nil)
+
+	require.NoError(t, err)
+	assert.Equal(t, http.StatusOK, status)
+	redirect := ctxGetURLRewriteTarget(req)
+	require.NotNil(t, redirect)
+	assert.Equal(t, jsonrpc.MethodVEMPrefix+mcp.MethodToolsCall, redirect.Path)
+	state := httpctx.GetJSONRPCRoutingState(req)
+	require.NotNil(t, state)
+	assert.Equal(t, mcp.ToolPrefix+"list_orders_source", state.NextVEM)
+	assert.Equal(t, "list_orders_source", state.PrimitiveName)
 }
 
 func TestJSONRPCMiddleware_ProcessRequest_ToolsCall_NotFound(t *testing.T) {
@@ -1534,6 +1590,16 @@ func TestJSONRPCMiddleware_setupSequentialRouting(t *testing.T) {
 			expectedRedirectTo:    jsonrpc.MethodVEMPrefix + "prompts/get",
 			expectedPrimitiveType: mcp.PrimitiveTypePrompt,
 			expectedPrimitiveName: "summarize",
+		},
+		{
+			name:                  "initialize - ignores router metadata for non-primitive method",
+			method:                mcp.MethodInitialize,
+			primitiveName:         "initialize",
+			expectedNextVEM:       "",
+			expectedVEMChain:      []string{jsonrpc.MethodVEMPrefix + mcp.MethodInitialize},
+			expectedRedirectTo:    jsonrpc.MethodVEMPrefix + mcp.MethodInitialize,
+			expectedPrimitiveType: "",
+			expectedPrimitiveName: "",
 		},
 		{
 			name:                  "tools/list - 1-stage routing (operation only)",

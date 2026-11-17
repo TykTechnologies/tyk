@@ -153,7 +153,7 @@ var metadataExtractors = map[string]func(rc *RequestContext) string{
 		if rc.MCPErrorCode == 0 {
 			return ""
 		}
-		return strconv.Itoa(rc.MCPErrorCode)
+		return strconv.FormatInt(rc.MCPErrorCode, 10)
 	},
 }
 

@@ -18,6 +18,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	mcpadapter "github.com/TykTechnologies/tyk/internal/mcp/adapter"
 	"github.com/TykTechnologies/tyk/internal/middleware"
@@ -25,15 +26,16 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
-func TestParseSyntheticAdapterJSONRPC_ReturnsUnmarshalError(t *testing.T) {
+func TestJSONRPCIngressParse_ReturnsUnmarshalErrorAndPreservesBody(t *testing.T) {
 	body := `{"jsonrpc":"2.0",`
 	req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(body))
 	req.Header.Set(headerContentType, contentTypeJSON)
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{}}
+	rec := httptest.NewRecorder()
 
-	rpcReq, ok, err := parseSyntheticAdapterJSONRPC(req)
+	rpcReq, _, err := mw.readAndParseJSONRPC(rec, req)
 
 	require.Error(t, err)
-	assert.False(t, ok)
 	assert.Nil(t, rpcReq)
 
 	preserved, readErr := io.ReadAll(req.Body)
@@ -72,7 +74,7 @@ func TestRESTAsMCPPolicy_DeniesBlockedToolBeforeSDK(t *testing.T) {
 	}))
 	rec := httptest.NewRecorder()
 
-	err, status := mw.ProcessRequest(rec, req, nil)
+	err, status := processAdmittedSyntheticForTest(t, mw, rec, req)
 
 	require.NoError(t, err)
 	assert.Equal(t, middleware.StatusRespond, status)
@@ -103,7 +105,7 @@ func TestRESTAsMCPPolicy_MethodDeniedBeforeSDK(t *testing.T) {
 	}))
 	rec := httptest.NewRecorder()
 
-	err, status := mw.ProcessRequest(rec, req, nil)
+	err, status := processAdmittedSyntheticForTest(t, mw, rec, req)
 
 	require.NoError(t, err)
 	assert.Equal(t, middleware.StatusRespond, status)
@@ -130,7 +132,7 @@ func TestRESTAsMCPPolicy_FiltersToolsListResponseForCallerView(t *testing.T) {
 	}))
 	rec := httptest.NewRecorder()
 
-	err, status := mw.ProcessRequest(rec, req, nil)
+	err, status := processAdmittedSyntheticForTest(t, mw, rec, req)
 
 	require.NoError(t, err)
 	assert.Equal(t, middleware.StatusRespond, status)
@@ -138,6 +140,11 @@ func TestRESTAsMCPPolicy_FiltersToolsListResponseForCallerView(t *testing.T) {
 	tools := jsonRPCToolsList(t, rec.Body.Bytes())
 	assert.Equal(t, []string{"orders"}, tools)
 	assert.NotContains(t, rec.Body.String(), "make_order")
+	var envelope map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &envelope))
+	result := envelope["result"].(map[string]any)
+	assert.Equal(t, "private", result["cacheScope"])
+	assert.EqualValues(t, 0, result["ttlMs"])
 }
 
 func TestRESTAsMCPPolicy_EndpointRateLimitBlocksToolCall(t *testing.T) {
@@ -171,17 +178,57 @@ func TestRESTAsMCPPolicy_EndpointRateLimitBlocksToolCall(t *testing.T) {
 	}
 
 	first := httptest.NewRecorder()
-	err, status := mw.ProcessRequest(first, makeRequest(), nil)
+	err, status := processAdmittedSyntheticForTest(t, mw, first, makeRequest())
 	require.NoError(t, err)
 	assert.Equal(t, middleware.StatusRespond, status)
 	assert.Equal(t, http.StatusOK, first.Code)
 
 	second := httptest.NewRecorder()
-	err, status = mw.ProcessRequest(second, makeRequest(), nil)
+	err, status = processAdmittedSyntheticForTest(t, mw, second, makeRequest())
 	require.NoError(t, err)
 	assert.Equal(t, middleware.StatusRespond, status)
 	assert.Equal(t, http.StatusTooManyRequests, second.Code)
 	assert.Contains(t, second.Body.String(), "Rate Limit Exceeded")
+}
+
+func TestRESTAsMCPPolicy_DoesNotRecountVisitedCallerEndpoint(t *testing.T) {
+	gw, adapterSpec, _ := syntheticAdapterGatewayForCallTest(t)
+	cfg := config.Default
+	drlManager := &drl.DRL{RequestTokenValue: 1}
+	drlManager.SetCurrentTokenValue(1)
+	gw.SessionLimiter = NewSessionLimiter(t.Context(), &cfg, drlManager, &cfg.ExternalServices)
+	gw.limitHeaderFactory = rate.NewSenderFactory(cfg.RateLimitResponseHeaders)
+	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: adapterSpec, Gw: gw}}
+	sessionID := initializeSyntheticAdapterSession(t, mw, "proxy-1")
+	session := restAsMCPSession("proxy-1", user.AccessDefinition{
+		APIID: "proxy-1",
+		MCPPrimitives: []user.MCPPrimitiveLimit{
+			{Type: mcp.PrimitiveTypeTool, Name: "orders", Limit: user.RateLimit{Rate: 1, Per: 60}},
+		},
+	})
+	NormalizeMCPEndpoints(session)
+	req := restAsMCPPolicyRequest(t, sessionID, `{
+		"jsonrpc":"2.0", "id":2, "method":"tools/call",
+		"params":{"name":"orders","arguments":{}}
+	}`)
+	ctxSetMCPAdapterCallerProxyID(req, "proxy-1")
+	setSessionForTest(req, session)
+	endpoint := mcp.ToolPrefix + "orders"
+	proxy := gw.getApiSpec("proxy-1")
+	reason := gw.SessionLimiter.ForwardMessage(restAsMCPRateLimitRequest(req, endpoint),
+		session, session.KeyID, "", true, false, proxy, false, nil)
+	require.Equal(t, sessionFailNone, reason, "the public caller endpoint admits its first request")
+	httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{
+		VisitedVEMs: []string{endpoint},
+	})
+	rec := httptest.NewRecorder()
+	err, status := processAdmittedSyntheticForTest(t, mw, rec, req)
+	require.NoError(t, err)
+	require.Equal(t, middleware.StatusRespond, status)
+	require.Equal(t, http.StatusOK, rec.Code, "the adapter must not charge the visited caller endpoint twice")
+	reason = gw.SessionLimiter.ForwardMessage(restAsMCPRateLimitRequest(req, endpoint),
+		session, session.KeyID, "", true, false, proxy, false, nil)
+	require.Equal(t, sessionFailRateLimit, reason, "the next public request still exceeds its endpoint limit")
 }
 
 func TestRESTAsMCPPolicy_AliasUsesCallerFacingName(t *testing.T) {
@@ -203,7 +250,7 @@ func TestRESTAsMCPPolicy_AliasUsesCallerFacingName(t *testing.T) {
 	}))
 	rec := httptest.NewRecorder()
 
-	err, status := mw.ProcessRequest(rec, req, nil)
+	err, status := processAdmittedSyntheticForTest(t, mw, rec, req)
 
 	require.NoError(t, err)
 	assert.Equal(t, middleware.StatusRespond, status)
@@ -228,19 +275,19 @@ func TestRESTAsMCPPolicy_RejectsOversizedJSONRPCBeforeSDK(t *testing.T) {
 	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{Spec: adapterSpec, Gw: gw}}
 	sessionID := initializeSyntheticAdapterSession(t, mw, "proxy-1")
 	body := `{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"orders","arguments":{"payload":"` +
-		strings.Repeat("x", syntheticJSONRPCMethodReadLimit) +
+		strings.Repeat("x", mcpIngressReadLimit) +
 		`"}}}`
 	req := restAsMCPPolicyRequest(t, sessionID, body)
 	ctxSetMCPAdapterCallerProxyID(req, "proxy-1")
 	setSessionForTest(req, restAsMCPSession("proxy-1", user.AccessDefinition{APIID: "proxy-1"}))
 	rec := httptest.NewRecorder()
 
-	err, status := mw.ProcessRequest(rec, req, nil)
+	err, status := processAdmittedSyntheticForTest(t, mw, rec, req)
 
 	require.NoError(t, err)
 	assert.Equal(t, middleware.StatusRespond, status)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
-	assert.Contains(t, rec.Body.String(), mcp.ErrMsgParseError)
+	assert.Contains(t, rec.Body.String(), mcp.ErrMsgInvalidRequest)
 	assert.False(t, called)
 }
 

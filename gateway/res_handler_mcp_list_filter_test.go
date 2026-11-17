@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -801,7 +802,8 @@ func TestMCPListFilterResponseHandler_HandleResponse_InitializeCapabilitiesFilte
 		return capabilities
 	}
 
-	t.Run("session method block removes sampling capability", func(t *testing.T) {
+	runSessionRules := func(t *testing.T, rules user.AccessControlRules) (map[string]json.RawMessage, map[string]json.RawMessage) {
+		t.Helper()
 		h := buildMCPListFilterHandler("api-1", true)
 		rw := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
@@ -812,10 +814,8 @@ func TestMCPListFilterResponseHandler_HandleResponse_InitializeCapabilitiesFilte
 		session := &user.SessionState{
 			AccessRights: map[string]user.AccessDefinition{
 				"api-1": {
-					APIID: "api-1",
-					JSONRPCMethodsAccessRights: user.AccessControlRules{
-						Blocked: []string{mcp.MethodSamplingCreate},
-					},
+					APIID:                      "api-1",
+					JSONRPCMethodsAccessRights: rules,
 				},
 			},
 		}
@@ -823,7 +823,57 @@ func TestMCPListFilterResponseHandler_HandleResponse_InitializeCapabilitiesFilte
 		res := makeHTTPResponse(makeInitializeResponse())
 		require.NoError(t, h.HandleResponse(rw, res, req, session))
 
-		capabilities := extractCapabilityKeys(t, readResponseBody(t, res))
+		body := readResponseBody(t, res)
+		capabilities := extractCapabilityKeys(t, body)
+		var envelope mcp.JSONRPCResponse
+		require.NoError(t, json.Unmarshal(body, &envelope))
+		var result map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(envelope.Result, &result))
+		return capabilities, result
+	}
+
+	t.Run("session createMessage block removes sampling capability", func(t *testing.T) {
+		capabilities, result := runSessionRules(t, user.AccessControlRules{Blocked: []string{mcp.MethodSamplingCreateMessage}})
+		assert.NotContains(t, capabilities, "sampling")
+		assert.Contains(t, capabilities, "tools")
+		assert.Contains(t, capabilities, "resources")
+		assert.Contains(t, capabilities, "prompts")
+		assert.JSONEq(t, `"private"`, string(result["cacheScope"]))
+		assert.JSONEq(t, `0`, string(result["ttlMs"]))
+	})
+
+	t.Run("obsolete create block keeps sampling private", func(t *testing.T) {
+		capabilities, result := runSessionRules(t, user.AccessControlRules{Blocked: []string{"sampling/create"}})
+		assert.Contains(t, capabilities, "sampling")
+		assert.Contains(t, capabilities, "tools")
+		assert.JSONEq(t, `"private"`, string(result["cacheScope"]))
+		assert.JSONEq(t, `0`, string(result["ttlMs"]))
+	})
+
+	t.Run("allowed createMessage keeps sampling private", func(t *testing.T) {
+		capabilities, result := runSessionRules(t, user.AccessControlRules{Allowed: []string{
+			mcp.MethodSamplingCreateMessage,
+			mcp.MethodToolsList,
+			mcp.MethodToolsCall,
+			mcp.MethodResourcesList,
+			mcp.MethodResourcesTemplatesList,
+			mcp.MethodResourcesRead,
+			mcp.MethodPromptsList,
+			mcp.MethodPromptsGet,
+		}})
+		assert.Contains(t, capabilities, "sampling")
+		assert.Contains(t, capabilities, "tools")
+		assert.Contains(t, capabilities, "resources")
+		assert.Contains(t, capabilities, "prompts")
+		assert.JSONEq(t, `"private"`, string(result["cacheScope"]))
+		assert.JSONEq(t, `0`, string(result["ttlMs"]))
+	})
+
+	t.Run("session block takes precedence over allow", func(t *testing.T) {
+		capabilities, _ := runSessionRules(t, user.AccessControlRules{
+			Allowed: []string{mcp.MethodSamplingCreateMessage, mcp.MethodToolsList, mcp.MethodToolsCall},
+			Blocked: []string{mcp.MethodSamplingCreateMessage},
+		})
 		assert.NotContains(t, capabilities, "sampling")
 		assert.Contains(t, capabilities, "tools")
 	})
@@ -1074,6 +1124,162 @@ func TestMCPListFilterResponseHandler_HandleResponse_ContentLengthUpdated(t *tes
 		"Content-Length should match actual body size")
 	assert.Equal(t, fmt.Sprintf("%d", len(body)), res.Header.Get("Content-Length"),
 		"Content-Length header should match actual body size")
+}
+
+func TestMCPListFilterResponseHandler_CacheSafetyTracksActualEdits(t *testing.T) {
+	h := buildMCPListFilterHandler("api-1", true)
+	session := &user.SessionState{AccessRights: map[string]user.AccessDefinition{
+		"api-1": {
+			APIID: "api-1",
+			MCPAccessRights: user.MCPAccessRights{
+				Tools: user.AccessControlRules{Allowed: []string{"visible"}},
+			},
+		},
+	}}
+
+	t.Run("removed item makes result private and disables cache write", func(t *testing.T) {
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/mcp", nil)
+		httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{Method: mcp.MethodToolsList, ID: 1})
+		options := &cacheOptions{}
+		ctxSetCacheOptions(req, options)
+		res := makeHTTPResponse([]byte(`{"jsonrpc":"2.0","id":1,"result":{"tools":[{"name":"visible"},{"name":"hidden"}],"nextCursor":"two","cacheScope":"public","ttlMs":5000}}`))
+
+		require.NoError(t, h.HandleResponse(httptest.NewRecorder(), res, req, session))
+		body := readResponseBody(t, res)
+		var envelope mcp.JSONRPCResponse
+		require.NoError(t, json.Unmarshal(body, &envelope))
+		var result map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(envelope.Result, &result))
+		assert.JSONEq(t, `"private"`, string(result["cacheScope"]))
+		assert.JSONEq(t, `0`, string(result["ttlMs"]))
+		assert.JSONEq(t, `"two"`, string(result["nextCursor"]))
+		assert.True(t, options.responseEdited)
+	})
+
+	t.Run("fully authorized page remains credential dependent", func(t *testing.T) {
+		req := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/mcp", nil)
+		httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{Method: mcp.MethodToolsList, ID: 1})
+		options := &cacheOptions{}
+		ctxSetCacheOptions(req, options)
+		original := []byte("{\n  \"jsonrpc\": \"2.0\", \"id\": 1, \"result\": {\"tools\": [{\"name\": \"visible\"}], \"cacheScope\": \"public\", \"ttlMs\": 5000}\n}")
+		res := makeHTTPResponse(original)
+
+		require.NoError(t, h.HandleResponse(httptest.NewRecorder(), res, req, session))
+		assert.Contains(t, string(readResponseBody(t, res)), `"cacheScope":"private"`)
+		assert.True(t, options.responseEdited)
+	})
+}
+
+func TestMCPListFilterResponseHandler_DiscoveryFiltering(t *testing.T) {
+	h := buildMCPListFilterHandler("api-1", true)
+	session := &user.SessionState{AccessRights: map[string]user.AccessDefinition{
+		"api-1": {
+			APIID:                      "api-1",
+			JSONRPCMethodsAccessRights: user.AccessControlRules{Blocked: []string{mcp.MethodToolsCall}},
+		},
+	}}
+	req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{Method: mcp.MethodServerDiscover, ID: 1})
+	options := &cacheOptions{}
+	ctxSetCacheOptions(req, options)
+	res := makeHTTPResponse([]byte(`{"jsonrpc":"2.0","id":1,"result":{"resultType":"complete","_meta":{"vendor":"kept"},"supportedVersions":["2026-07-28","2024-11-05"],"capabilities":{"tools":{},"resources":{},"vendor":{}},"instructions":"kept"}}`))
+
+	require.NoError(t, h.HandleResponse(httptest.NewRecorder(), res, req, session))
+	var envelope mcp.JSONRPCResponse
+	require.NoError(t, json.Unmarshal(readResponseBody(t, res), &envelope))
+	var result map[string]json.RawMessage
+	require.NoError(t, json.Unmarshal(envelope.Result, &result))
+	assert.JSONEq(t, `["2026-07-28"]`, string(result["supportedVersions"]))
+	assert.JSONEq(t, `{"resources":{},"vendor":{}}`, string(result["capabilities"]))
+	assert.JSONEq(t, `"private"`, string(result["cacheScope"]))
+	assert.JSONEq(t, `0`, string(result["ttlMs"]))
+	assert.JSONEq(t, `{"vendor":"kept"}`, string(result["_meta"]))
+	assert.JSONEq(t, `"kept"`, string(result["instructions"]))
+	assert.True(t, options.responseEdited)
+}
+
+func TestMCPListFilterResponseHandler_DiscoveryGlobalEditDoesNotDisableCache(t *testing.T) {
+	h := buildMCPListFilterHandler("api-1", true)
+	req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{Method: mcp.MethodServerDiscover, ID: 1})
+	options := &cacheOptions{}
+	ctxSetCacheOptions(req, options)
+	res := makeHTTPResponse([]byte(`{"jsonrpc":"2.0","id":1,"result":{"cacheScope":"public","ttlMs":99,"supportedVersions":["2025-03-26","2024-11-05"],"capabilities":{"tools":{}}}}`))
+
+	require.NoError(t, h.HandleResponse(httptest.NewRecorder(), res, req, nil))
+	body := readResponseBody(t, res)
+	assert.NotContains(t, string(body), "2024-11-05")
+	assert.Contains(t, string(body), `"cacheScope":"public"`)
+	assert.False(t, options.responseEdited)
+}
+
+func TestMCPListFilterResponseHandler_CredentialDiscoveryErrorDisablesCache(t *testing.T) {
+	h := buildMCPListFilterHandler("api-1", true)
+	req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+	httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{Method: mcp.MethodServerDiscover, ID: "request"})
+	options := &cacheOptions{}
+	ctxSetCacheOptions(req, options)
+	session := &user.SessionState{AccessRights: map[string]user.AccessDefinition{
+		"api-1": {
+			APIID: "api-1",
+			JSONRPCMethodsAccessRights: user.AccessControlRules{
+				Blocked: []string{"prompts/get"},
+			},
+		},
+	}}
+	original := []byte("{ \"jsonrpc\":\"2.0\",\"id\":\"request\",\"error\":{\"code\":-32001,\"message\":\"upstream\",\"data\":{\"opaque\":true}} }")
+	res := makeHTTPResponse(original)
+	res.Header.Set("Cache-Control", "public, max-age=300")
+
+	require.NoError(t, h.HandleResponse(httptest.NewRecorder(), res, req, session))
+	require.Equal(t, original, readResponseBody(t, res), "valid upstream error must remain byte-for-byte unchanged")
+	require.Equal(t, "private, no-store", res.Header.Get("Cache-Control"))
+	require.True(t, options.responseEdited, "credential-specific errors must not enter the shared response cache")
+}
+
+func TestMCPListFilterResponseHandler_InvalidDiscoveryFailsClosed(t *testing.T) {
+	h := buildMCPListFilterHandler("api-1", true)
+	for _, test := range []struct {
+		name string
+		body string
+	}{
+		{"truncated", `{"jsonrpc":"2.0","id":9007199254740993,"result":`},
+		{"null result", `{"jsonrpc":"2.0","id":9007199254740993,"result":null}`},
+		{"hybrid method and result", `{"jsonrpc":"2.0","id":9007199254740993,"method":"notifications/progress","result":{"supportedVersions":[],"capabilities":{}}}`},
+		{"wrong adjacent id", `{"jsonrpc":"2.0","id":9007199254740992,"result":{"supportedVersions":[],"capabilities":{}}}`},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+			requestID := json.Number("9007199254740993")
+			httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{Method: mcp.MethodServerDiscover, ID: requestID})
+			httpctx.SetMCPProtocolContext(req, mcp.NewProtocolContext(mcp.ModernProtocolVersion, "", &mcp.RequestEnvelope{ID: requestID}, nil))
+			options := &cacheOptions{}
+			ctxSetCacheOptions(req, options)
+			res := makeHTTPResponse([]byte(test.body))
+			res.Header.Set("Cache-Control", "public, max-age=300")
+			res.Header.Set("ETag", `"stale"`)
+			res.Header.Set("Last-Modified", "yesterday")
+
+			require.NoError(t, h.HandleResponse(httptest.NewRecorder(), res, req, nil))
+			require.Equal(t, http.StatusBadGateway, res.StatusCode)
+			require.Equal(t, "application/json", res.Header.Get("Content-Type"))
+			require.Equal(t, "no-store", res.Header.Get("Cache-Control"))
+			require.Empty(t, res.Header.Get("ETag"))
+			require.Empty(t, res.Header.Get("Last-Modified"))
+			body := readResponseBody(t, res)
+			require.NotContains(t, string(body), "stale")
+			var response struct {
+				ID    json.RawMessage    `json:"id"`
+				Error struct{ Code int } `json:"error"`
+			}
+			require.NoError(t, json.Unmarshal(body, &response))
+			require.Equal(t, "9007199254740993", string(response.ID))
+			require.Equal(t, -33006, response.Error.Code)
+			require.EqualValues(t, response.Error.Code, ctxGetJSONRPCErrorCode(req))
+			require.True(t, options.responseEdited)
+			require.Equal(t, int64(len(body)), res.ContentLength)
+		})
+	}
 }
 
 func TestMCPListFilterResponseHandler_HandleResponse_WrongAPIID(t *testing.T) {

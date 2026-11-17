@@ -37,6 +37,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
+	"github.com/TykTechnologies/tyk/internal/result"
 	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 	"github.com/TykTechnologies/tyk/pkg/schema"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -140,7 +141,7 @@ type EndPointCacheMeta struct {
 
 type TransformSpec struct {
 	apidef.TemplateMeta
-	Template *texttemplate.Template
+	Template result.Result[*texttemplate.Template]
 }
 
 type ExtendedCircuitBreakerMeta struct {
@@ -198,9 +199,7 @@ func (s *APISpec) Unload() {
 	}
 
 	if s.HTTPTransport != nil {
-		// Prevent new idle connections to be generated.
-		s.HTTPTransport.transport.DisableKeepAlives = true
-		s.HTTPTransport.transport.CloseIdleConnections()
+		s.HTTPTransport.Retire()
 		s.HTTPTransport = nil
 	}
 
@@ -232,6 +231,25 @@ func (s *APISpec) Validate(oasConfig config.OASConfig) error {
 			return err
 		}
 	}
+	if s.MCP != nil {
+		if !s.IsMCPManaged() {
+			if len(s.MCP.TrustedOrigins) > 0 || hasMCPOAuthBrokerConfiguration(s.MCP.OAuthBroker) {
+				return errors.New("mcp configuration is valid only for MCP APIs")
+			}
+		} else {
+			if err := s.MCP.Validate(); err != nil {
+				return err
+			}
+			if s.MCP.OAuthBroker != nil {
+				if err := s.MCP.OAuthBroker.Validate(s.Proxy.ListenPath); err != nil {
+					return err
+				}
+				if s.MCP.OAuthBroker.Enabled && s.UpstreamAuth.IsEnabled() {
+					return errors.New("MCP OAuth broker cannot be combined with generic upstream authentication")
+				}
+			}
+		}
+	}
 
 	// For tcp services we need to make sure we can bind to the port.
 	switch s.Protocol {
@@ -240,6 +258,15 @@ func (s *APISpec) Validate(oasConfig config.OASConfig) error {
 	default:
 		return s.validateHTTP()
 	}
+}
+
+func hasMCPOAuthBrokerConfiguration(config *apidef.MCPOAuthBrokerConfig) bool {
+	return config != nil && (config.Enabled ||
+		config.PublicOrigin != "" ||
+		config.PublicResource != "" ||
+		config.UpstreamResource != "" ||
+		len(config.TrustedEndpointOrigins) > 0 ||
+		config.AllowInsecureLoopback)
 }
 
 func (s *APISpec) validateTCP() error {
@@ -273,7 +300,7 @@ type APIDefinitionLoader struct {
 // keyed to the Api version name, which is determined during routing to speed up lookups
 func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry) (*APISpec, error) {
 	if logger == nil {
-		logger = logrus.NewEntry(log).WithFields(logrus.Fields{
+		logger = log.WithFields(logrus.Fields{
 			"api_id": def.APIID,
 			"org_id": def.OrgID,
 			"name":   def.Name,
@@ -403,7 +430,6 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 		if v.UseExtendedPaths {
 			pathSpecs, whiteListSpecs = a.getExtendedPathSpecs(v, spec, a.Gw.GetConfig())
 		} else {
-			logger.Warning("Legacy path detected! Upgrade to extended.")
 			pathSpecs, whiteListSpecs = a.getPathSpecs(v, a.Gw.GetConfig())
 		}
 		spec.RxPaths[v.Name] = pathSpecs
@@ -1064,10 +1090,64 @@ func (a APIDefinitionLoader) filterSprigFuncs() texttemplate.FuncMap {
 	return texttemplate.FuncMap(tmp)
 }
 
+// errUnsafeTemplatePath marks a body transform template path rejected by resolveTemplatePath.
+var errUnsafeTemplatePath = errors.New("unsafe template path")
+
+// resolveTemplatePath returns the body transform template path the gateway will read.
+// By default the path is confined to the configured TemplatePath root via the
+// gateway's osutil.Root, which also resolves symlinks and relative segments. A
+// relative path is tried against the root first, then against the working directory;
+// either way the result must lie inside the root. When
+// AllowUnsafeBodyTransformTemplatePaths is set the path is returned verbatim, without
+// any validation.
+func (a APIDefinitionLoader) resolveTemplatePath(path string) (string, error) {
+	if a.Gw == nil {
+		return "", errors.New("gateway is not initialized")
+	}
+
+	if a.Gw.GetConfig().AllowUnsafeBodyTransformTemplatePaths {
+		return path, nil
+	}
+
+	if a.Gw.OSRoot == nil {
+		return "", errors.New("OSRoot is not initialized")
+	}
+
+	resolved, err := a.Gw.OSRoot.Ensure(path)
+	if filepath.IsAbs(path) {
+		return resolved, err
+	}
+
+	if err == nil && fileExists(resolved) {
+		return resolved, nil
+	}
+
+	// Before paths were confined, relative paths resolved against the working
+	// directory, which is how the docs write them (templates/x.tmpl). Keep that
+	// working, but only when the file exists and lies inside the root.
+	if legacy, absErr := filepath.Abs(path); absErr == nil && fileExists(legacy) {
+		return a.Gw.OSRoot.Ensure(legacy)
+	}
+
+	return resolved, err
+}
+
+func fileExists(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && !info.IsDir()
+}
+
 func (a APIDefinitionLoader) loadFileTemplate(path string) (*texttemplate.Template, error) {
 	log.Debug("-- Loading template: ", path)
-	tmpName := filepath.Base(path)
-	return apidef.Template.New(tmpName).Funcs(a.filterSprigFuncs()).ParseFiles(path)
+
+	templatePath, err := a.resolveTemplatePath(path)
+	if err != nil {
+		log.WithError(err).Warning("Path escape detected or invalid template path")
+		return nil, fmt.Errorf("%w: %w", errUnsafeTemplatePath, err)
+	}
+
+	tmpName := filepath.Base(templatePath)
+	return apidef.Template.New(tmpName).Funcs(a.filterSprigFuncs()).ParseFiles(templatePath)
 }
 
 func (a APIDefinitionLoader) loadBlobTemplate(blob string) (*texttemplate.Template, error) {
@@ -1097,19 +1177,18 @@ func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMet
 
 		newTransformSpec := TransformSpec{TemplateMeta: stringSpec}
 
-		// Load the templates
-		var err error
-
 		switch stringSpec.TemplateData.Mode {
 		case apidef.UseFile:
 			log.Debug("-- Using File mode")
-			newTransformSpec.Template, err = a.loadFileTemplate(stringSpec.TemplateData.TemplateSource)
+			newTransformSpec.Template = result.New(a.loadFileTemplate(stringSpec.TemplateData.TemplateSource))
 		case apidef.UseBlob:
 			log.Debug("-- Blob mode")
-			newTransformSpec.Template, err = a.loadBlobTemplate(stringSpec.TemplateData.TemplateSource)
+			newTransformSpec.Template = result.New(a.loadBlobTemplate(stringSpec.TemplateData.TemplateSource))
 		default:
 			log.Warning("[Transform Templates] No template mode defined! Found: ", stringSpec.TemplateData.Mode)
-			err = errors.New("No valid template mode defined, must be either 'file' or 'blob'")
+			newTransformSpec.Template = result.Err[*texttemplate.Template](
+				errors.New("no valid template mode defined, must be either 'file' or 'blob'"),
+			)
 		}
 
 		if stat == Transformed {
@@ -1118,13 +1197,7 @@ func (a APIDefinitionLoader) compileTransformPathSpec(paths []apidef.TemplateMet
 			newSpec.TransformResponseAction = newTransformSpec
 		}
 
-		if err == nil {
-			urlSpec = append(urlSpec, newSpec)
-			log.Debug("-- Loaded")
-		} else {
-			log.Error("Template load failure! Skipping transformation: ", err)
-		}
-
+		urlSpec = append(urlSpec, newSpec)
 	}
 
 	return urlSpec
@@ -2253,7 +2326,7 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 			}
 		}
 
-		if rxPaths[i].TransformAction.Template != nil {
+		if rxPaths[i].Status == Transformed {
 			return a.getURLStatus(rxPaths[i].Status), &rxPaths[i].TransformAction
 		}
 
@@ -2546,7 +2619,7 @@ func (a *APISpec) SanitizeProxyPaths(r *http.Request) {
 	}
 
 	// Do not strip an already-final path selected by a rewrite-like middleware.
-	if ctxGetUrlRewritePath(r) != "" {
+	if !a.GlobalConfig.ApplyStripListenPathToURLRewrite && ctxGetUrlRewritePath(r) != "" {
 		return
 	}
 

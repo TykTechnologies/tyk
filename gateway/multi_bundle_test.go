@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -54,7 +53,7 @@ func TestGojaIIFEIsolatesMultiFileHandlers(t *testing.T) {
 	})[0]
 
 	jsvm := &GojaJSVM{}
-	jsvm.Init(spec, logrus.NewEntry(log), g.Gw)
+	jsvm.Init(spec, log.NewEntry(), g.Gw)
 	require.True(t, jsvm.Initialized())
 
 	// Two programs, both declaring `var handler = ...`. Without isolation,
@@ -104,7 +103,7 @@ func TestGojaIIFEPreservesClosureCaptures(t *testing.T) {
 	})[0]
 
 	jsvm := &GojaJSVM{}
-	jsvm.Init(spec, logrus.NewEntry(log), g.Gw)
+	jsvm.Init(spec, log.NewEntry(), g.Gw)
 
 	// `handler` is referenced inside its own callback — exactly the pattern
 	// real plugins use (e.g. `handler.NewProcessRequest(function(){ ... handler.ReturnData(...) })`).
@@ -138,7 +137,7 @@ func TestGojaRebrandSkipsNonMiddlewarePrograms(t *testing.T) {
 	})[0]
 
 	jsvm := &GojaJSVM{}
-	jsvm.Init(spec, logrus.NewEntry(log), g.Gw)
+	jsvm.Init(spec, log.NewEntry(), g.Gw)
 
 	// LoadScript registers no aliases — it's the "support code" path.
 	require.NoError(t, jsvm.LoadScript(`var supportLib = "still-here";`))
@@ -372,7 +371,7 @@ func TestLoadInlineGojaMiddleware(t *testing.T) {
 		spec.APIID = "inline-loader-test"
 		spec.CustomMiddleware.Driver = apidef.JavaScriptDriver
 	})[0]
-	spec.GojaJSVM.Init(spec, logrus.NewEntry(log), ts.Gw)
+	spec.GojaJSVM.Init(spec, log.NewEntry(), ts.Gw)
 	require.True(t, spec.GojaJSVM.Initialized())
 
 	t.Run("valid base64 populates RuntimeHandlerName and bumps counter", func(t *testing.T) {
@@ -381,7 +380,7 @@ func TestLoadInlineGojaMiddleware(t *testing.T) {
 			Code: "dmFyIGhhbmRsZXIgPSAxOw==", // "var handler = 1;"
 		}
 		counter := 0
-		ts.Gw.loadInlineGojaMiddleware(spec, md, &counter, logrus.NewEntry(log))
+		ts.Gw.loadInlineGojaMiddleware(spec, md, &counter, log.NewEntry())
 
 		assert.NotEmpty(t, md.RuntimeHandlerName, "valid inline code must register and stamp the alias")
 		assert.Equal(t, 1, counter, "counter must increment after a successful load")
@@ -393,7 +392,7 @@ func TestLoadInlineGojaMiddleware(t *testing.T) {
 			Code: "not-valid-base64!!!",
 		}
 		counter := 7
-		ts.Gw.loadInlineGojaMiddleware(spec, md, &counter, logrus.NewEntry(log))
+		ts.Gw.loadInlineGojaMiddleware(spec, md, &counter, log.NewEntry())
 
 		assert.Empty(t, md.RuntimeHandlerName, "bad base64 must not stamp an alias")
 		assert.Equal(t, 7, counter, "counter must not advance on decode failure")

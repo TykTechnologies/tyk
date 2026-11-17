@@ -52,6 +52,20 @@ var tests = []struct {
 	},
 	{"Empty", `{}`, nil},
 	{"Default", onDefaults(`{}`), nil},
+	{
+		"TrustedProxyCIDRs", `{"http_server_options":{"trusted_proxy_cidrs":["10.0.0.0/8","2001:db8::/32"]}}`, nil,
+	},
+	{
+		"NullTrustedProxyCIDRs", `{"http_server_options":{"trusted_proxy_cidrs":null}}`, nil,
+	},
+	{
+		"WrongTrustedProxyCIDRsType", `{"http_server_options":{"trusted_proxy_cidrs":"10.0.0.0/8"}}`,
+		"cannot unmarshal string into Go struct field HttpServerOptionsConfig.http_server_options.trusted_proxy_cidrs of type []string",
+	},
+	{
+		"WrongTrustedProxyCIDRItemType", `{"http_server_options":{"trusted_proxy_cidrs":[42]}}`,
+		"cannot unmarshal number into Go struct field HttpServerOptionsConfig.http_server_options.trusted_proxy_cidrs of type string",
+	},
 	{"OldMonitor", `{"Monitor": {}}`, nil},
 	{"NullObject", `{"event_handlers": null}`, nil},
 	{

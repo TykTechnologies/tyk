@@ -4,16 +4,18 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/internal/policy"
+	tyklog "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/user"
 )
 
 func TestMergeAllowedURLs(t *testing.T) {
-	svc := policy.New(nil, nil, logrus.New())
+	logger, _ := tyklog.NewNullLogger()
+
+	svc := policy.New(nil, nil, logger)
 
 	session := &user.SessionState{}
 	policies := []user.Policy{
@@ -70,9 +72,11 @@ func TestMergeAllowedURLs_Conditions(t *testing.T) {
 	condition := func(param, pattern string) []user.AccessCondition {
 		return []user.AccessCondition{{
 			On: apidef.All,
-			Options: apidef.RoutingTriggerOptions{
-				QueryValMatches: map[string]apidef.StringRegexMap{
-					param: {MatchPattern: pattern},
+			Options: user.AccessConditionOptions{
+				RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+					QueryValMatches: map[string]apidef.StringRegexMap{
+						param: {MatchPattern: pattern},
+					},
 				},
 			},
 		}}
@@ -104,6 +108,29 @@ func TestMergeAllowedURLs_Conditions(t *testing.T) {
 	assert.Equal(t, want, policy.MergeAllowedURLs(s1, s2))
 }
 
+func TestMergeAllowedURLs_BodyFieldConditions(t *testing.T) {
+	condition := func(pattern string) []user.AccessCondition {
+		return []user.AccessCondition{{
+			On: apidef.All,
+			Options: user.AccessConditionOptions{
+				BodyFieldMatches: []user.BodyFieldMatch{
+					{Path: "customer.id", StringRegexMap: apidef.StringRegexMap{MatchPattern: pattern}},
+				},
+			},
+		}}
+	}
+
+	// Specs that differ only by their body field matches must stay separate,
+	// or merging would evaluate one policy's rule under the other's methods.
+	s1 := []user.AccessSpec{{URL: "/orders", Methods: []string{"GET"}, Conditions: condition("^1$")}}
+	s2 := []user.AccessSpec{{URL: "/orders", Methods: []string{"POST"}, Conditions: condition("^2$")}}
+
+	assert.Equal(t, []user.AccessSpec{
+		{URL: "/orders", Methods: []string{"GET"}, Conditions: condition("^1$")},
+		{URL: "/orders", Methods: []string{"POST"}, Conditions: condition("^2$")},
+	}, policy.MergeAllowedURLs(s1, s2))
+}
+
 // BenchmarkMergeAllowedURLs measures the cost of merging access specs with and
 // without conditions. Specs without conditions are keyed by URL alone and never
 // reach the JSON encoding, so the "no conditions" case is what every existing
@@ -111,13 +138,15 @@ func TestMergeAllowedURLs_Conditions(t *testing.T) {
 func BenchmarkMergeAllowedURLs(b *testing.B) {
 	condition := []user.AccessCondition{{
 		On: apidef.All,
-		Options: apidef.RoutingTriggerOptions{
-			QueryValMatches: map[string]apidef.StringRegexMap{
-				"persnbr": {MatchPattern: "^[0-9]+$"},
-				"account": {Reverse: true},
-			},
-			HeaderMatches: map[string]apidef.StringRegexMap{
-				"X-Tenant": {MatchPattern: "^acme$"},
+		Options: user.AccessConditionOptions{
+			RoutingTriggerOptions: apidef.RoutingTriggerOptions{
+				QueryValMatches: map[string]apidef.StringRegexMap{
+					"persnbr": {MatchPattern: "^[0-9]+$"},
+					"account": {Reverse: true},
+				},
+				HeaderMatches: map[string]apidef.StringRegexMap{
+					"X-Tenant": {MatchPattern: "^acme$"},
+				},
 			},
 		},
 	}}

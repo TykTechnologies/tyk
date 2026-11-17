@@ -12,3 +12,13 @@ type SSEHook interface {
 	//     output stream. Ignored when allowed is false.
 	FilterEvent(event *SSEEvent) (allowed bool, modifiedEvent *SSEEvent)
 }
+
+// SSETerminalHook lets a hook end a stream after its final event is buffered.
+type SSETerminalHook interface {
+	Terminal() bool
+}
+
+// SSEFailureHook converts framing/size failures into a final protocol event.
+type SSEFailureHook interface {
+	FailureEvent(error) *SSEEvent
+}

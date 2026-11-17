@@ -390,6 +390,92 @@ func TestSchema_GlobalEnforceTimeout(t *testing.T) {
 	})
 }
 
+func TestSchema_DNSDiscovery(t *testing.T) {
+	schemaLoader := gojsonschema.NewBytesLoader([]byte(Schema))
+
+	validate := func(t *testing.T, dnsDiscovery string) *gojsonschema.Result {
+		t.Helper()
+
+		spec := DummyAPI()
+		data, err := json.Marshal(spec)
+		require.NoError(t, err)
+
+		var doc map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(data, &doc))
+
+		var proxy map[string]json.RawMessage
+		require.NoError(t, json.Unmarshal(doc["proxy"], &proxy))
+		proxy["dns_discovery"] = json.RawMessage(dnsDiscovery)
+
+		doc["proxy"], err = json.Marshal(proxy)
+		require.NoError(t, err)
+		data, err = json.Marshal(doc)
+		require.NoError(t, err)
+
+		result, err := gojsonschema.Validate(schemaLoader, gojsonschema.NewBytesLoader(data))
+		require.NoError(t, err)
+		return result
+	}
+
+	t.Run("default definition passes schema", func(t *testing.T) {
+		spec := DummyAPI()
+		spec.Proxy.DNSDiscovery = DNSDiscoveryConfig{
+			Enabled:            true,
+			RefreshInterval:    tyktime.ReadableDuration(10 * time.Second),
+			ConnectionDraining: &ConnectionDrainingConfig{Enabled: true},
+		}
+
+		result, err := gojsonschema.Validate(schemaLoader, gojsonschema.NewGoLoader(spec))
+		require.NoError(t, err)
+		assert.True(t, result.Valid(), result.Errors())
+	})
+
+	validCases := map[string]string{
+		"valid durations": `{"enabled": true, "refresh_interval": "10s", "stale_ttl": "2m", "connection_draining": {"enabled": true, "timeout": "1m30s"}}`,
+		"empty durations": `{"enabled": true, "refresh_interval": "", "stale_ttl": "", "connection_draining": {"enabled": true, "timeout": ""}}`,
+		"zero durations":  `{"enabled": true, "refresh_interval": "0s", "stale_ttl": "0s"}`,
+		"null block":      `null`,
+	}
+
+	for name, dnsDiscovery := range validCases {
+		t.Run(name+" pass schema", func(t *testing.T) {
+			result := validate(t, dnsDiscovery)
+			assert.True(t, result.Valid(), result.Errors())
+		})
+	}
+
+	invalidCases := map[string]struct {
+		dnsDiscovery string
+		field        string
+	}{
+		"malformed refresh_interval": {
+			dnsDiscovery: `{"enabled": true, "refresh_interval": "invalid"}`,
+			field:        "proxy.dns_discovery.refresh_interval",
+		},
+		"negative stale_ttl": {
+			dnsDiscovery: `{"enabled": true, "stale_ttl": "-10s"}`,
+			field:        "proxy.dns_discovery.stale_ttl",
+		},
+		"malformed connection_draining.timeout": {
+			dnsDiscovery: `{"enabled": true, "connection_draining": {"enabled": true, "timeout": "30sec"}}`,
+			field:        "proxy.dns_discovery.connection_draining.timeout",
+		},
+		"non-string refresh_interval": {
+			dnsDiscovery: `{"enabled": true, "refresh_interval": 10}`,
+			field:        "proxy.dns_discovery.refresh_interval",
+		},
+	}
+
+	for name, tc := range invalidCases {
+		t.Run(name+" fails schema", func(t *testing.T) {
+			result := validate(t, tc.dnsDiscovery)
+			require.False(t, result.Valid())
+			require.Len(t, result.Errors(), 1)
+			assert.Equal(t, tc.field, result.Errors()[0].Field())
+		})
+	}
+}
+
 func TestStringRegexMap(t *testing.T) {
 	var v StringRegexMap
 	assert.True(t, v.Empty())

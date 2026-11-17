@@ -41,6 +41,8 @@ type EngineV2Injections struct {
 }
 
 type EngineV2 struct {
+	baseEngine
+
 	ExecutionEngine *graphql.ExecutionEngineV2
 	Schema          *graphql.Schema
 	ApiDefinition   *apidef.APIDefinition
@@ -48,11 +50,8 @@ type EngineV2 struct {
 	StreamingClient *http.Client
 	OpenTelemetry   *EngineV2OTelConfig
 
-	logger                    abstractlogger.Logger
 	gqlTools                  graphqlGoToolsV1
 	graphqlRequestProcessor   GraphQLRequestProcessor
-	complexityChecker         ComplexityChecker
-	granularAccessChecker     GranularAccessChecker
 	reverseProxyPreHandler    ReverseProxyPreHandler
 	specCtx                   context.Context
 	contextCancel             context.CancelFunc
@@ -139,17 +138,19 @@ func NewEngineV2(options EngineV2Options) (*EngineV2, error) {
 	}
 
 	engineV2 := &EngineV2{
+		baseEngine: baseEngine{
+			logger:                logger,
+			complexityChecker:     complexityChecker,
+			granularAccessChecker: granularAccessChecker,
+		},
 		ExecutionEngine:           executionEngine,
 		Schema:                    parsedSchema,
 		ApiDefinition:             options.ApiDefinition,
 		HttpClient:                options.HttpClient,
 		StreamingClient:           options.StreamingClient,
 		OpenTelemetry:             &options.OpenTelemetry,
-		logger:                    logger,
 		gqlTools:                  gqlTools,
 		graphqlRequestProcessor:   requestProcessor,
-		complexityChecker:         complexityChecker,
-		granularAccessChecker:     granularAccessChecker,
 		reverseProxyPreHandler:    reverseProxyPreHandler,
 		specCtx:                   specCtx,
 		contextCancel:             cancel,
@@ -226,15 +227,6 @@ func (e *EngineV2) ProcessAndStoreGraphQLRequest(w http.ResponseWriter, r *http.
 	}
 
 	return e.graphqlRequestProcessor.ProcessRequest(r.Context(), w, r)
-}
-
-func (e *EngineV2) ProcessGraphQLComplexity(r *http.Request, accessDefinition *ComplexityAccessDefinition) (err error, statusCode int) {
-	return complexityFailReasonAsHttpStatusCode(e.complexityChecker.DepthLimitExceeded(r, accessDefinition))
-}
-
-func (e *EngineV2) ProcessGraphQLGranularAccess(w http.ResponseWriter, r *http.Request, accessDefinition *GranularAccessDefinition) (err error, statusCode int) {
-	result := e.granularAccessChecker.CheckGraphQLRequestFieldAllowance(w, r, accessDefinition)
-	return granularAccessFailReasonAsHttpStatusCode(e.logger, &result, w)
 }
 
 func (e *EngineV2) HandleReverseProxy(params ReverseProxyParams) (res *http.Response, hijacked bool, err error) {

@@ -278,8 +278,8 @@ func TestTraceHttpRequest(t *testing.T) {
 			Value string
 		}
 
-		type UuidDto struct {
-			Uuid string `json:"uuid"`
+		type UuidTransformedDto struct {
+			Data string `json:"data"`
 		}
 
 		var hdr = HeaderCnf{Name: "Content-Type", Value: "application/json"}
@@ -291,7 +291,7 @@ func TestTraceHttpRequest(t *testing.T) {
 					TransformResponseHeaders(func(headers *oas.TransformHeaders) {
 						headers.AppendAddOp(hdr.Name, hdr.Value)
 					}).
-					TransformResponseBodyJson(`{"data": {{ . | toJSON }}}`)
+					TransformResponseBodyJson(`{"data": "{{.uuid}}"}`)
 			}),
 		)
 
@@ -343,11 +343,11 @@ func TestTraceHttpRequest(t *testing.T) {
 		require.NoError(t, err)
 
 		// todo: should be replace by other struct cause of builder does not work properly
-		var uuidDto UuidDto
+		var uuidDto UuidTransformedDto
 		require.NoError(t, json.Unmarshal(responseBody, &uuidDto))
 
 		require.True(t, lo.CountBy(logs, byMiddleware(new(ResponseTransformMiddleware).Name())) > 0)
-		require.NoError(t, uuid.Validate(uuidDto.Uuid))
+		require.NoError(t, uuid.Validate(uuidDto.Data))
 	})
 
 	t.Run("transform body request writes logs", func(t *testing.T) {

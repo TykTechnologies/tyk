@@ -1,14 +1,43 @@
 package gateway
 
 import (
+	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/ctx"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
+	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 )
+
+func TestSelectAndStoreMCPJSONRPCCode(t *testing.T) {
+	tests := []struct {
+		name     string
+		protocol string
+		want     int
+	}{
+		{name: "modern", protocol: mcp.ModernProtocolVersion, want: jsonrpcerrors.CodeModernAuthRequired},
+		{name: "legacy", protocol: mcp.LegacyFallbackProtocolVersion, want: jsonrpcerrors.CodeAccessDenied},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			r := httptest.NewRequest(http.MethodPost, "/mcp", nil)
+			httpctx.SetMCPProtocolContext(r, mcp.NewProtocolContext(test.protocol, "", nil, nil))
+			ctx.SetErrorClassification(r, tykerrors.NewErrorClassification(tykerrors.AKI, "invalid_key"))
+
+			got := selectAndStoreMCPJSONRPCCode(r, http.StatusForbidden)
+
+			assert.Equal(t, test.want, got)
+			assert.EqualValues(t, got, ctxGetJSONRPCErrorCode(r))
+		})
+	}
+}
 
 func TestWriteJSONRPCAccessDenied_WithState(t *testing.T) {
 	r := httptest.NewRequest("POST", "/mcp", nil)
@@ -27,6 +56,21 @@ func TestWriteJSONRPCAccessDenied_WithState(t *testing.T) {
 	assert.Contains(t, body, "jsonrpc")
 }
 
+func TestWriteJSONRPCAccessDenied_ModernCodeIsSharedWithContext(t *testing.T) {
+	r := httptest.NewRequest("POST", "/mcp", nil)
+	envelope := &mcp.RequestEnvelope{JSONRPC: "2.0", Method: "tools/list", ID: 7}
+	httpctx.SetMCPProtocolContext(r, mcp.NewProtocolContext(mcp.ModernProtocolVersion, "", envelope, nil))
+	httpctx.SetJSONRPCRoutingState(r, &httpctx.JSONRPCRoutingState{Method: envelope.Method, ID: envelope.ID})
+	w := httptest.NewRecorder()
+
+	writeJSONRPCAccessDenied(w, r, "denied")
+
+	var response jsonrpcerrors.JSONRPCErrorResponse
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &response))
+	assert.Equal(t, jsonrpcerrors.CodeModernAccessDenied, response.Error.Code)
+	assert.EqualValues(t, response.Error.Code, ctxGetJSONRPCErrorCode(r))
+}
+
 func TestWriteJSONRPCAccessDenied_WithoutState(t *testing.T) {
 	r := httptest.NewRequest("POST", "/mcp", nil)
 	// No routing state set
@@ -37,4 +81,31 @@ func TestWriteJSONRPCAccessDenied_WithoutState(t *testing.T) {
 	require.Equal(t, 403, w.Code)
 	body := w.Body.String()
 	assert.Contains(t, body, "jsonrpc")
+}
+
+func TestMCPAdapterUsesStatelessHandler(t *testing.T) {
+	t.Parallel()
+	request := func(header, session, method, params string) *mcp.ProtocolContext {
+		return mcp.NewProtocolContext(header, session, &mcp.RequestEnvelope{Method: method, Params: json.RawMessage(params)}, nil)
+	}
+	modernMetadata := `{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28","io.modelcontextprotocol/clientCapabilities":{}}}`
+
+	tests := []struct {
+		name string
+		ctx  *mcp.ProtocolContext
+		want bool
+	}{
+		{"modern", request(mcp.ModernProtocolVersion, "", mcp.MethodToolsList, modernMetadata), true},
+		{"modern ignores session header", request(mcp.ModernProtocolVersion, "session", mcp.MethodToolsList, modernMetadata), true},
+		{"modern initialize", request(mcp.ModernProtocolVersion, "", mcp.MethodInitialize, modernMetadata), true},
+		{"explicit legacy", request(mcp.LegacyFallbackProtocolVersion, "", mcp.MethodToolsList, `{}`), false},
+		{"session fallback", request("", "session", mcp.MethodToolsList, `{}`), false},
+		{"declaration free fallback", request("", "", mcp.MethodToolsList, `{}`), false},
+		{"mismatch", request(mcp.ModernProtocolVersion, "", mcp.MethodToolsList, `{"_meta":{"io.modelcontextprotocol/protocolVersion":"2025-11-25"}}`), false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			assert.Equal(t, test.want, mcpAdapterUsesStatelessHandler(test.ctx))
+		})
+	}
 }

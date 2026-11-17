@@ -2,9 +2,12 @@ package gateway
 
 import (
 	"context"
+	"io"
 	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/stretchr/testify/assert"
@@ -18,6 +21,8 @@ import (
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
 	ctxpkg "github.com/TykTechnologies/tyk/ctx"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/test"
 )
 
@@ -357,6 +362,8 @@ func TestRecordMCPDetails(t *testing.T) {
 		ctxSetMCPMethod(req, "tools/call")
 		ctxSetMCPPrimitiveType(req, "tool")
 		ctxSetMCPPrimitiveName(req, "my_tool")
+		httpctx.SetMCPProtocolContext(req, mcp.NewProtocolContext("2026-07-28", "", &mcp.RequestEnvelope{Method: "tools/call"}, nil))
+		ctxSetJSONRPCErrorCode(req, -33002)
 
 		var rec analytics.AnalyticsRecord
 		recordMCPDetails(&rec, req)
@@ -365,6 +372,10 @@ func TestRecordMCPDetails(t *testing.T) {
 		assert.Equal(t, "tools/call", rec.MCPStats.JSONRPCMethod)
 		assert.Equal(t, "tool", rec.MCPStats.PrimitiveType)
 		assert.Equal(t, "my_tool", rec.MCPStats.PrimitiveName)
+		assert.Equal(t, "2026-07-28", rec.MCPStats.EffectiveProtocolVersion)
+		assert.Equal(t, "2026-07-28", rec.MCPStats.DeclaredProtocolVersion)
+		assert.Equal(t, "header", rec.MCPStats.ProtocolVersionSource)
+		assert.EqualValues(t, -33002, rec.MCPStats.JSONRPCErrorCode)
 	})
 
 	t.Run("list operation has empty PrimitiveType and PrimitiveName", func(t *testing.T) {
@@ -561,6 +572,76 @@ func TestSuccessHandler_classifyUpstreamError(t *testing.T) {
 			} else {
 				assert.Nil(t, errClass, "expected no error classification")
 			}
+		})
+	}
+}
+
+type mockReturningHttpHandler struct {
+	serveHTTPCalled         bool
+	serveHTTPForCacheCalled bool
+}
+
+func (m *mockReturningHttpHandler) ServeHTTP(_ http.ResponseWriter, _ *http.Request) ProxyResponse {
+	m.serveHTTPCalled = true
+	return ProxyResponse{}
+}
+
+func (m *mockReturningHttpHandler) ServeHTTPForCache(_ http.ResponseWriter, _ *http.Request) ProxyResponse {
+	m.serveHTTPForCacheCalled = true
+	return ProxyResponse{}
+}
+
+func (m *mockReturningHttpHandler) CopyResponse(_ io.Writer, _ io.Reader, _ time.Duration) error {
+	return nil
+}
+
+func TestSuccessHandler_ServeHTTP_Branching(t *testing.T) {
+	tests := []struct {
+		name                    string
+		graphqlEnabled          bool
+		expectServeHTTP         bool
+		expectServeHTTPForCache bool
+	}{
+		{
+			name:                    "GraphQL disabled calls ServeHTTP",
+			graphqlEnabled:          false,
+			expectServeHTTP:         true,
+			expectServeHTTPForCache: false,
+		},
+		{
+			name:                    "GraphQL enabled calls ServeHTTPForCache",
+			graphqlEnabled:          true,
+			expectServeHTTP:         false,
+			expectServeHTTPForCache: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockProxy := &mockReturningHttpHandler{}
+
+			spec := &APISpec{
+				APIDefinition: &apidef.APIDefinition{
+					GraphQL: apidef.GraphQLConfig{
+						Enabled: tt.graphqlEnabled,
+					},
+				},
+			}
+
+			handler := &SuccessHandler{
+				BaseMiddleware: &BaseMiddleware{
+					Spec:  spec,
+					Proxy: mockProxy,
+				},
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			w := httptest.NewRecorder()
+
+			handler.ServeHTTP(w, req)
+
+			assert.Equal(t, tt.expectServeHTTP, mockProxy.serveHTTPCalled)
+			assert.Equal(t, tt.expectServeHTTPForCache, mockProxy.serveHTTPForCacheCalled)
 		})
 	}
 }
