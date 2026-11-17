@@ -152,3 +152,13 @@ func endMCPAggregatorLoopSession(r *http.Request) {
 	setCtxValue(r, ctx.SessionData, (*user.SessionState)(nil))
 	httpctx.SetSelfLooping(r, false)
 }
+
+// isMCPAggregatorCatalogueHop reports whether r is an aggregator listing the
+// tools of spec, one of its aggregated MCP proxies, or discovering it.
+func isMCPAggregatorCatalogueHop(spec *APISpec, r *http.Request) bool {
+	if mcpAggregatorOriginOf(r, spec.APIID) == "" {
+		return false
+	}
+	method := ctxGetMCPMethod(r)
+	return method == mcp.MethodToolsList || method == mcp.MethodServerDiscover
+}

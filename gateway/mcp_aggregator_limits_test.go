@@ -196,3 +196,32 @@ func TestMCPAggregatorKeepsTheProxyChainsErrorClassificationWithTracing(t *testi
 		})
 	}
 }
+
+// TestMCPAggregatorListingDoesNotSpendTheProxysRateLimit checks that the
+// aggregator listing an aggregated proxy's tools leaves the proxy's API-level
+// rate limit to tool calls: every agent sees the proxy's tools however often
+// agents connect, while calls still count against the limit.
+func TestMCPAggregatorListingDoesNotSpendTheProxysRateLimit(t *testing.T) {
+	orders := newMCPRoutingUpstream(t, namedTools("list_orders")...)
+	orders.call = answering(`{"content":[]}`)
+	ts := startExactRateLimitTest(t)
+	ts.Gw.LoadAPI(
+		withAPIRateLimit(remoteMCPProxyRuntimeSpec("orders-mcp", orders.URL), 1, 60),
+		remoteMCPProxyRuntimeSpec("github-mcp", newMCPRoutingUpstream(t, namedTools("list_issues")...).URL),
+		companyToolsRuntimeSpec(aggregated("orders-mcp", "orders"), aggregated("github-mcp", "github")),
+	)
+	key := companyToolsKey(t, ts)
+
+	first := postModernToolsList(t, ts, "/company-tools/", key)
+	second := postModernToolsList(t, ts, "/company-tools/", key)
+	call := postMCPToolsCall(t, ts, key, toolCallParams("orders__list_orders", `{}`, ""))
+	secondCall := postMCPToolsCall(t, ts, key, toolCallParams("orders__list_orders", `{}`, ""))
+
+	assert.Equal(t, []string{"github__list_issues", "orders__list_orders"}, first.tools, first.body)
+	assert.Equal(t, []string{"github__list_issues", "orders__list_orders"}, second.tools, second.body)
+	require.Equal(t, http.StatusOK, call.status, call.body)
+	assert.Nil(t, call.rpc.Error, "listing left the limit to the call: %s", call.body)
+	require.NotNil(t, secondCall.rpc.Error, secondCall.body)
+	assert.Equal(t, jsonrpcerrors.CodeModernRateLimitExceeded, secondCall.rpc.Error.Code, "calls still count against the limit")
+	assert.Len(t, orders.observed(mcp.MethodToolsCall), 1)
+}
