@@ -464,6 +464,38 @@ func (v *View) ResolveCall(name string) (upstream string, known bool) {
 	return name, true
 }
 
+// RenamedAway reports whether name is an upstream tool that an override
+// renames and that no override exposes under that name again, and returns the
+// name it is exposed under instead. Settings that still name such a tool no
+// longer match any exposed tool.
+func (v *View) RenamedAway(name string) (exposed string, renamedAway bool) {
+	if v == nil {
+		return "", false
+	}
+	if _, known := v.ResolveCall(name); known {
+		return "", false
+	}
+	return v.bySource[name].name, true
+}
+
+// NameTakenBy reports whether name is an upstream tool that another
+// override's tool is now exposed under, as after a swap or a chained rename,
+// and returns that other upstream tool. Settings that name such a tool now
+// apply to the other one.
+func (v *View) NameTakenBy(name string) (source string, taken bool) {
+	if v == nil {
+		return "", false
+	}
+	if _, isSource := v.bySource[name]; !isSource {
+		return "", false
+	}
+	source, exposed := v.exposed[name]
+	if !exposed || source == name {
+		return "", false
+	}
+	return source, true
+}
+
 // TranslateToolsCall rewrites params.name of a JSON-RPC tools/call request
 // from exposed to upstream. Every other member of the request and of its
 // params, including id, arguments and _meta, is copied verbatim. It fails
