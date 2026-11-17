@@ -140,64 +140,67 @@ func TestMCPAggregatorCatalogueToolLimitCountsOnlySelectedTools(t *testing.T) {
 	assert.Empty(t, mcpAggregatorOmissionWarnings(hook, "github-mcp"), "unselected tools do not count towards the catalogue limit")
 }
 
-// TestMCPAggregatorSharesTheCatalogueByteBudgetBetweenProxies configures 32
-// aggregated proxies, 30 of them not loaded, so each proxy's share of the
-// byte budget is 1 MiB. github-mcp serves two tools/list pages of one tool
-// each, under the gateway's 10 MiB response limit.
-func TestMCPAggregatorSharesTheCatalogueByteBudgetBetweenProxies(t *testing.T) {
-	const configured = 32
-	share := mcpAggregatorMaxCatalogueBytes / configured
-	require.Equal(t, 1<<20, share)
-
-	tests := []struct {
-		name    string
-		padding int
-		served  bool
-	}{
-		{name: "pages within the share are served", padding: 400_000, served: true},
-		{name: "page past what is left of the share is omitted", padding: 700_000},
+// loadGithubWithGhosts loads company-tools with orders-mcp, github-mcp and
+// enough aggregated proxies that are not loaded to configure the given total.
+func loadGithubWithGhosts(ts *Test, configured int, githubURL, ordersURL string) {
+	upstreams := []oas.TykMCPAggregatorUpstream{aggregated("orders-mcp", "orders"), aggregated("github-mcp", "github")}
+	for i := len(upstreams); i < configured; i++ {
+		upstreams = append(upstreams, aggregated(fmt.Sprintf("ghost-%d", i), fmt.Sprintf("ghost%d", i)))
 	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
+	ts.Gw.LoadAPI(
+		ordersRESTSourceSpec(ordersURL, false),
+		ordersMCPProxyRuntimeSpec(),
+		githubMCPProxyRuntimeSpec(githubURL),
+		companyToolsRuntimeSpec(upstreams...),
+	)
+}
+
+// TestMCPAggregatorServesALargeListingHoweverManyProxiesAreAggregated has
+// github-mcp list about 2 MiB of tools in two pages.
+func TestMCPAggregatorServesALargeListingHoweverManyProxiesAreAggregated(t *testing.T) {
+	for _, configured := range []int{2, 20} {
+		t.Run(fmt.Sprintf("%d aggregated proxies", configured), func(t *testing.T) {
 			ts, github, ordersBackend := startMCPAggregatorRuntimeTest(t)
-			github.descriptionPadding = tc.padding
-			var pages atomic.Int32
-			pager := pageToolNames([]string{"search_repos", "create_issue"}, 1)
-			github.pager = func(cursor string) ([]string, string) {
-				pages.Add(1)
-				return pager(cursor)
-			}
-			upstreams := []oas.TykMCPAggregatorUpstream{aggregated("orders-mcp", "orders"), aggregated("github-mcp", "github")}
-			for i := len(upstreams); i < configured; i++ {
-				upstreams = append(upstreams, aggregated(fmt.Sprintf("ghost-%d", i), fmt.Sprintf("ghost%d", i)))
-			}
-			ts.Gw.LoadAPI(
-				ordersRESTSourceSpec(ordersBackend.URL, false),
-				ordersMCPProxyRuntimeSpec(),
-				githubMCPProxyRuntimeSpec(github.URL),
-				companyToolsRuntimeSpec(upstreams...),
-			)
+			github.descriptionPadding = 1 << 20
+			github.pager = pageToolNames([]string{"search_repos", "create_issue"}, 1)
+			loadGithubWithGhosts(ts, configured, github.URL, ordersBackend.URL)
 			hook := log.GetTestHook(t)
 
 			res := postModernToolsList(t, ts, "/company-tools/", companyToolsKey(t, ts))
 
 			require.Equal(t, http.StatusOK, res.status)
-			assert.EqualValues(t, 2, pages.Load())
-			warnings := mcpAggregatorOmissionWarnings(hook, "github-mcp")
-			if tc.served {
-				assert.Equal(t, []string{"github__create_issue", "github__search_repos", "orders__create_order", "orders__list_orders"}, res.tools)
-				assert.Empty(t, warnings)
-				return
-			}
-			assert.Equal(t, []string{"orders__create_order", "orders__list_orders"}, res.tools, "the other proxies keep being served")
-			require.Len(t, warnings, 1)
-			assert.Equal(t, "tools/list failed: responses exceed the 1048576 byte share of the catalogue byte budget", warnings[0].Data["reason"])
+			assert.Equal(t, []string{"github__create_issue", "github__search_repos", "orders__create_order", "orders__list_orders"}, res.tools)
+			assert.Empty(t, mcpAggregatorOmissionWarnings(hook, "github-mcp"))
 		})
 	}
 }
 
+// TestMCPAggregatorOmitsAProxyListingMoreThanItsBudget has github-mcp list two
+// pages of about 4.5 MiB each, each under the gateway's 10 MiB response limit.
+func TestMCPAggregatorOmitsAProxyListingMoreThanItsBudget(t *testing.T) {
+	ts, github, ordersBackend := startMCPAggregatorRuntimeTest(t)
+	github.descriptionPadding = 4_500_000
+	var pages atomic.Int32
+	pager := pageToolNames([]string{"search_repos", "create_issue"}, 1)
+	github.pager = func(cursor string) ([]string, string) {
+		pages.Add(1)
+		return pager(cursor)
+	}
+	loadGithubWithGhosts(ts, 2, github.URL, ordersBackend.URL)
+	hook := log.GetTestHook(t)
+
+	res := postModernToolsList(t, ts, "/company-tools/", companyToolsKey(t, ts))
+
+	require.Equal(t, http.StatusOK, res.status)
+	assert.EqualValues(t, 2, pages.Load())
+	assert.Equal(t, []string{"orders__create_order", "orders__list_orders"}, res.tools, "the other proxies keep being served")
+	warnings := mcpAggregatorOmissionWarnings(hook, "github-mcp")
+	require.Len(t, warnings, 1)
+	assert.Equal(t, "tools/list failed: responses exceed the 8388608 byte listing budget of one aggregated proxy", warnings[0].Data["reason"])
+}
+
 func TestMCPAggregatorResponseRecorderStaysWithinTheBudget(t *testing.T) {
-	d := mcpAggregatorDispatcher{gw: &Gateway{}, budget: &mcpAggregatorByteBudget{share: 10}}
+	d := mcpAggregatorDispatcher{gw: &Gateway{}, budget: &mcpAggregatorByteBudget{limit: 10}}
 	d.gw.SetConfig(config.Config{})
 
 	first := d.newResponseRecorder()
@@ -211,7 +214,7 @@ func TestMCPAggregatorResponseRecorderStaysWithinTheBudget(t *testing.T) {
 	_, err = second.Write([]byte("12345"))
 	require.NoError(t, err, "a write past the budget is dropped, not failed")
 	assert.Equal(t, 0, second.body.Len(), "nothing past the budget is buffered")
-	assert.EqualError(t, d.recorded(second), "responses exceed the 10 byte share of the catalogue byte budget")
+	assert.EqualError(t, d.recorded(second), "responses exceed the 10 byte listing budget of one aggregated proxy")
 
 	unbudgeted := mcpAggregatorDispatcher{gw: d.gw}
 	assert.Equal(t, mcpAggregatorMaxUpstreamResponseBytes, unbudgeted.newResponseRecorder().limit)
