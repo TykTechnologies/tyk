@@ -781,9 +781,11 @@ type CertificatesConfig struct {
 	Upstream map[string]string `json:"upstream"`
 	// Certificates used for Control API Mutual TLS
 	ControlAPI []string `json:"control_api"`
-	// Used for communicating with the Dashboard if it is configured to use Mutual TLS
+	// Has no effect. Tyk Gateway doesn't use this setting. It verifies the server
+	// certificate of Tyk Dashboard against the system CA store.
 	Dashboard []string `json:"dashboard_api"`
-	// Certificates used for MDCB Mutual TLS
+	// Has no effect. Tyk Gateway doesn't use this setting, and MDCB doesn't
+	// support mutual TLS with Data Plane Gateways.
 	MDCB []string `json:"mdcb_api"`
 }
 
@@ -984,7 +986,9 @@ type Config struct {
 	// If you are using the Tyk Dashboard, you must configure this setting with the same value in both Gateway and Dashboard
 	DisableKeyActionsByUsername bool `json:"disable_key_actions_by_username"`
 
-	// Specify the Key hashing algorithm. Possible values: murmur64, murmur128, sha256.
+	// Specify the Key hashing algorithm. Possible values: murmur32, murmur64, murmur128, sha256.
+	// Values are case-sensitive. An unknown value is logged and falls back to murmur64.
+	// If not set, keys are generated in the legacy format and hashed with murmur32.
 	HashKeyFunction string `json:"hash_key_function"`
 
 	// Specify the Key hashing algorithm for "basic auth". Possible values: murmur64, murmur128, sha256, bcrypt.
@@ -1313,12 +1317,18 @@ type Config struct {
 
 	// You can now set a logging level (log_level). The following levels can be set: debug, info, warn, error.
 	// If not set or left empty, it will default to `info`.
-	LogLevel string `json:"log_level"`
+	// Only entries at or above this level are generated, whether or not log sinks are configured.
+	// `TYK_GW_LOGLEVEL` and the `--debug` flag override it.
+	LogLevel logger.Level `json:"log_level"`
 
-	// Configures the output format used for application logs.
-	// Allowed values are `text`, `json`, or `legacy`.
-	// If not set or left empty, it defaults to `text`.
-	LogFormat logger.Format `json:"log_format"`
+	// LogFormat configures the output format used for application logs.
+	// Allowed values are `text`, `json`, `legacy` or an array of log sinks.
+	// If not set, null, empty or an empty array, all logs go to stderr in `text` format.
+	// Each sink defines the range of levels it accepts (`level`, `high_level`), its `format` with
+	// `format_options`, and its `output` (`stdout` or `stderr`). Values are case-insensitive, and
+	// a sink with an unknown value or field stops the Gateway at startup.
+	// `TYK_GW_LOGFORMAT` accepts the same JSON array and overrides the file.
+	LogFormat LogFormat `json:"log_format"`
 
 	// AccessLogs configures the output for access logs.
 	// If not configured, the access log is disabled.

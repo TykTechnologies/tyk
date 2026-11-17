@@ -25,11 +25,10 @@ import (
 // Both otto (JSVM.LoadTykJSApi) and goja (GojaJSVM.registerAPI) delegate
 // to these methods; only the VM value-wrapping differs.
 type JSVMAPIHelper struct {
-	Spec   *APISpec
-	Gw     *Gateway
-	Log    *logrus.Entry
-	RawLog *logrus.Logger
-	Store  *storage.RedisCluster
+	Spec  *APISpec
+	Gw    *Gateway
+	Log   *logrus.Entry
+	Store *storage.RedisCluster
 }
 
 // JSVM storage binding limits. All keys live under jsvmStoreKeyPrefix so
@@ -50,7 +49,7 @@ func (h *JSVMAPIHelper) LogMessage(msg string) {
 }
 
 func (h *JSVMAPIHelper) RawLogMessage(msg string) {
-	h.RawLog.Print(msg + "\n")
+	h.Log.Warn(msg)
 }
 
 func (h *JSVMAPIHelper) B64Decode(in string) (string, error) {

@@ -78,7 +78,10 @@ func (r *RedisAnalyticsHandler) Init() {
 	r.workerBufferSize = recordsBufferSize / uint64(ps)
 	log.WithField("workerBufferSize", r.workerBufferSize).Debug("Analytics pool worker buffer size")
 	r.enableMultipleAnalyticsKeys = r.globalConf.AnalyticsConfig.EnableMultipleAnalyticsKeys
-	r.analyticsSerializer = serializer.NewAnalyticsSerializer(r.globalConf.AnalyticsConfig.SerializerType)
+	r.analyticsSerializer = serializer.NewAnalyticsSerializer(
+		r.globalConf.AnalyticsConfig.SerializerType,
+		serializer.WithLogger(log.AsLogrus()),
+	)
 
 	r.Start()
 }

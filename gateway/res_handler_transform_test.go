@@ -3,6 +3,8 @@ package gateway
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -215,6 +217,16 @@ func TestTransformResponseBody(t *testing.T) {
 }
 
 func TestTransformResponseBody_UnsafeFileTemplatePath(t *testing.T) {
+	t.Run("load failure mapping", func(t *testing.T) {
+		code, msg := templateLoadFailure(fmt.Errorf("%w: escaped root", errUnsafeTemplatePath))
+		assert.Equal(t, http.StatusBadRequest, code)
+		assert.Equal(t, msgTemplateExecutionFailed, msg)
+
+		code, msg = templateLoadFailure(errors.New("template: unexpected EOF"))
+		assert.Equal(t, http.StatusInternalServerError, code)
+		assert.Equal(t, msgTemplateCompilationFailed, msg)
+	})
+
 	// A file outside the configured template root that the transform must never read.
 	secretPath := filepath.Join(t.TempDir(), "secret.tmpl")
 	require.NoError(t, os.WriteFile(secretPath, []byte("TOPSECRET"), 0o644))
@@ -242,7 +254,7 @@ func TestTransformResponseBody_UnsafeFileTemplatePath(t *testing.T) {
 
 		_, _ = ts.Run(t, test.TestCase{
 			Path: "/transform", Code: http.StatusBadRequest,
-			BodyMatch:    `{"error": "Template execution failed"}`,
+			BodyMatch:    `"error": "Template execution failed"`,
 			BodyNotMatch: "TOPSECRET",
 			HeadersMatch: map[string]string{header.ContentType: header.ApplicationJSON},
 		})
@@ -336,6 +348,101 @@ func TestHeaderTransformBase(t *testing.T) {
 }
 
 func TestResponseTransformMiddleware(t *testing.T) {
+	t.Run("response transform responds 500 if provided template is invalid", func(t *testing.T) {
+		ts := StartTest(nil)
+
+		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, err := w.Write([]byte(`{"name":"world"}`))
+			assert.NoError(t, err)
+			w.WriteHeader(http.StatusOK)
+		}))
+
+		t.Cleanup(testServer.Close)
+		t.Cleanup(ts.Close)
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = testServer.URL
+
+			v := spec.VersionData.Versions["Default"]
+
+			v.UseExtendedPaths = true
+			v.ExtendedPaths.TransformResponse = []apidef.TemplateMeta{
+				{
+					Path:   "/invalid-template",
+					Method: http.MethodGet,
+					TemplateData: apidef.TemplateData{
+						Mode:           apidef.UseBlob,
+						TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{"greeting": "hello {{.name"}`)),
+						Input:          apidef.RequestJSON,
+						EnableSession:  false,
+					},
+				},
+			}
+
+			spec.VersionData.Versions["Default"] = v
+		})
+
+		_, err := ts.Run(t, test.TestCase{
+			Path:         "/invalid-template",
+			Method:       http.MethodGet,
+			Code:         http.StatusInternalServerError,
+			BodyMatch:    msgTemplateCompilationFailed,
+			BodyNotMatch: "unexpected",
+		})
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("response transform responds 500 without partial output if template execution fails", func(t *testing.T) {
+		ts := StartTest(nil)
+
+		testServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			_, err := w.Write([]byte(`{"items":[1]}`))
+			assert.NoError(t, err)
+		}))
+
+		t.Cleanup(testServer.Close)
+		t.Cleanup(ts.Close)
+
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.Proxy.TargetURL = testServer.URL
+
+			v := spec.VersionData.Versions["Default"]
+
+			v.UseExtendedPaths = true
+			v.ExtendedPaths.TransformResponse = []apidef.TemplateMeta{
+				{
+					Path:   "/out-of-range",
+					Method: http.MethodGet,
+					TemplateData: apidef.TemplateData{
+						Mode:           apidef.UseBlob,
+						TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{"out":"{{ index .items 5 }}"}`)),
+						Input:          apidef.RequestJSON,
+					},
+				},
+			}
+
+			spec.VersionData.Versions["Default"] = v
+		})
+
+		resp, err := ts.Run(t, test.TestCase{
+			Path:         "/out-of-range",
+			Method:       http.MethodGet,
+			Code:         http.StatusInternalServerError,
+			BodyMatch:    msgTemplateExecutionFailed,
+			BodyNotMatch: `"out"`,
+		})
+		assert.NoError(t, err)
+
+		var body map[string]string
+		assert.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+		assert.Equal(t, map[string]string{"error": msgTemplateExecutionFailed}, body)
+	})
+
 	t.Run("Response transform alone", func(t *testing.T) {
 		ts := StartTest(nil)
 

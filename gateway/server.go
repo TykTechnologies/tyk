@@ -8,7 +8,6 @@ import (
 	"fmt"
 	htmltemplate "html/template"
 	"io/ioutil"
-	stdlog "log"
 	"log/syslog"
 	"net"
 	"net/http"
@@ -84,10 +83,10 @@ import (
 var (
 	globalMu sync.Mutex
 
-	log       = tyklog.Get()
+	log = tyklog.Get()
+
 	mainLog   = log.WithField("prefix", "main")
 	pubSubLog = log.WithField("prefix", "pub-sub")
-	rawLog    = tyklog.GetRaw()
 
 	memProfFile *os.File
 
@@ -1339,7 +1338,7 @@ func (gw *Gateway) DoReloadWithError() error {
 	// Initialize/reset the JSVM
 	if gw.GetConfig().EnableJSVM {
 		gw.GlobalEventsJSVM.DeInit()
-		gw.GlobalEventsJSVM.Init(nil, logrus.NewEntry(log), gw)
+		gw.GlobalEventsJSVM.Init(nil, log.NewEntry(), gw)
 	}
 
 	// Re-initialize global event handlers to ensure they persist across reloads
@@ -1586,8 +1585,140 @@ func (gw *Gateway) reloadURLStructure(done func()) {
 	gw.reloadQueue <- done
 }
 
-func (gw *Gateway) setupLogger() {
+func (gw *Gateway) extractLogLevel(cfg *config.Config) logrus.Level {
+	var level logrus.Level
+	var ok bool
+
+	if logLevel := tyklog.CoalesceEnvOr(cfg.LogLevel, tyklog.EnvTykLoglevel, tyklog.EnvTykGwLoglevel); logLevel != "" {
+		if level, ok = logLevel.LogrusLevel(); !ok {
+			mainLog.Fatalf("Invalid log level %q specified in config, must be error, warn, debug or info. ", logLevel)
+		}
+	} else {
+		level = logrus.InfoLevel
+	}
+
+	return level
+}
+
+// resolveLogFormat picks the log format to use.
+// Precedence: TYK_LOGFORMAT > TYK_GW_LOGFORMAT > config.LogFormat.
+// An environment variable may hold a format name or a JSON array of sinks; an unknown name is skipped.
+func (gw *Gateway) resolveLogFormat(cfg *config.Config) (config.LogFormat, error) {
+	for _, envName := range []string{tyklog.EnvTykLogformat, tyklog.EnvTykGwLogformat} {
+		raw := os.Getenv(envName)
+		if raw == "" {
+			continue
+		}
+
+		envFormat, err := config.ParseLogFormatEnv(raw)
+		if err != nil {
+			return config.LogFormat{}, fmt.Errorf("%s: %w", envName, err)
+		}
+
+		if format, ok := envFormat.Format(); !envFormat.Defined() || (ok && !format.Valid()) {
+			continue
+		}
+
+		if cfg.LogFormat.Defined() {
+			log.Warnf("%s environment variable is set. Ignoring 'log_format' configuration in tyk.conf.", envName)
+		}
+
+		return envFormat, nil
+	}
+
+	return cfg.LogFormat, nil
+}
+
+// buildSinks returns the configured sinks, or a single stderr sink in the configured format.
+// The returned format is empty when sinks are configured.
+func (gw *Gateway) buildSinks(cfg *config.Config) ([]*tyklog.Sink, tyklog.Format, error) {
+	logFormat, err := gw.resolveLogFormat(cfg)
+	if err != nil {
+		return nil, "", err
+	}
+
+	if sinkConfigs, ok := logFormat.Sinks(); ok {
+		log.Debugf("Building logger from provided sinks=%#v", sinkConfigs)
+		sinks, err := tyklog.NewSinksFromConfig(sinkConfigs)
+		return sinks, "", err
+	}
+
+	format, _ := logFormat.Format()
+	if !format.Valid() {
+		format = tyklog.FormatText
+	}
+
+	log.Debugf("Building logger format=%q", format)
+	sink := tyklog.NewSink(os.Stderr, tyklog.NewFormatter(format), tyklog.AcceptorAllowAll)
+
+	return []*tyklog.Sink{sink}, format, nil
+}
+
+// warnUncoveredLevels reports generated levels that no sink accepts. The warning goes through
+// the logger, and straight to stderr when no sink would show it.
+func (gw *Gateway) warnUncoveredLevels(level logrus.Level, sinks []*tyklog.Sink) {
+	acceptors := make([]tyklog.Acceptor, 0, len(sinks))
+	for _, sink := range sinks {
+		acceptors = append(acceptors, sink)
+	}
+
+	uncovered := tyklog.UncoveredLevels(level, acceptors...)
+	if len(uncovered) == 0 {
+		return
+	}
+
+	names := lo.Map(uncovered, func(l logrus.Level, _ int) string { return l.String() })
+	msg := fmt.Sprintf("No log sink accepts %s entries; they will be discarded", strings.Join(names, ", "))
+	mainLog.Warn(msg)
+
+	warnEntry := &logrus.Entry{Level: logrus.WarnLevel}
+	if lo.SomeBy(acceptors, func(a tyklog.Acceptor) bool { return a.Accept(warnEntry) }) {
+		return
+	}
+
+	stderrSink := tyklog.NewSink(os.Stderr, tyklog.NewFormatter(tyklog.FormatText), tyklog.AcceptorAllowAll)
+	stderrSink.Sink(&logrus.Entry{
+		Level:   logrus.WarnLevel,
+		Message: msg,
+		Time:    time.Now(),
+		Data:    logrus.Fields{"prefix": "main"},
+	})
+}
+
+func (gw *Gateway) setupLogger(builder *tyklog.Builder) {
 	gwConfig := gw.GetConfig()
+	builder.RedirectStdlib(logrus.WarnLevel)
+
+	level := gw.extractLogLevel(&gwConfig)
+	discardOutput := gw.isRunningTests() && os.Getenv(tyklog.EnvTykLoglevel) == ""
+
+	if discardOutput {
+		// `go test` without TYK_LOGLEVEL set defaults to no log
+		// output
+		level = logrus.ErrorLevel
+		builder.WithDiscardOutput()
+		gorpc.SetErrorLogger(func(string, ...any) {})
+	} else if *cli.DebugMode {
+		level = logrus.DebugLevel
+		mainLog.Debug("Enabling debug-level output")
+	}
+
+	builder.WithLevel(level)
+
+	sinks, format, err := gw.buildSinks(&gwConfig)
+	if err != nil {
+		log.Fatalf("Failed to build log sinks: %v", err)
+		return
+	}
+	builder.SetLogformat(format)
+	for _, sink := range sinks {
+		builder.AddSinker(sink)
+	}
+
+	if !discardOutput {
+		gw.warnUncoveredLevels(level, sinks)
+	}
+
 	if gwConfig.UseSentry {
 		mainLog.Debug("Enabling Sentry support")
 
@@ -1610,8 +1741,7 @@ func (gw *Gateway) setupLogger() {
 
 		if err == nil {
 			hook.Timeout = 0
-			log.Hooks.Add(hook)
-			rawLog.Hooks.Add(hook)
+			builder.AddHook(hook)
 		}
 		mainLog.Debug("Sentry hook active")
 	}
@@ -1623,8 +1753,7 @@ func (gw *Gateway) setupLogger() {
 			syslog.LOG_INFO, "")
 
 		if err == nil {
-			log.Hooks.Add(hook)
-			rawLog.Hooks.Add(hook)
+			builder.AddHook(hook)
 		}
 		mainLog.Debug("Syslog hook active")
 	}
@@ -1634,8 +1763,7 @@ func (gw *Gateway) setupLogger() {
 		hook := grayloghook.NewGraylogHook(gwConfig.GraylogNetworkAddr,
 			map[string]interface{}{"tyk-module": "gateway"})
 
-		log.Hooks.Add(hook)
-		rawLog.Hooks.Add(hook)
+		builder.AddHook(hook)
 
 		mainLog.Debug("Graylog hook active")
 	}
@@ -1660,17 +1788,14 @@ func (gw *Gateway) setupLogger() {
 			hook = logstashhook.New(conn, logstashhook.DefaultFormatter(logrus.Fields{
 				"type": appName,
 			}))
-			log.Hooks.Add(hook)
-			rawLog.Hooks.Add(hook)
+			builder.AddHook(hook)
 			mainLog.Debug("Logstash hook active")
 		}
 	}
 
 	if gwConfig.UseRedisLog {
 		hook := gw.newRedisHook()
-		log.Hooks.Add(hook)
-		rawLog.Hooks.Add(hook)
-
+		builder.AddHook(hook)
 		mainLog.Debug("Redis log hook active")
 	}
 }
@@ -1678,46 +1803,11 @@ func (gw *Gateway) setupLogger() {
 func (gw *Gateway) initSystem() error {
 	globalMu.Lock()
 	defer globalMu.Unlock()
+	defer log.Flush()
 
 	gwConfig := gw.GetConfig()
 	if err := gwConfig.HttpServerOptions.ValidateTrustedProxyCIDRs(); err != nil {
 		return fmt.Errorf("invalid http_server_options.trusted_proxy_cidrs: %w", err)
-	}
-
-	// Initialize the appropriate log formatter
-	if !gw.isRunningTests() && os.Getenv("TYK_LOGFORMAT") == "" && !*cli.DebugMode {
-		tyklog.SetupFormatter(gwConfig.LogFormat)
-		mainLog.Debugf("Set log format to %q", gwConfig.LogFormat)
-	}
-
-	// if TYK_LOGLEVEL is not set, config will be read here.
-	if os.Getenv("TYK_LOGLEVEL") == "" && !*cli.DebugMode {
-		level := strings.ToLower(gwConfig.LogLevel)
-		switch level {
-		case "", "info":
-			// default, do nothing
-		case "error":
-			log.Level = logrus.ErrorLevel
-		case "warn":
-			log.Level = logrus.WarnLevel
-		case "debug":
-			log.Level = logrus.DebugLevel
-		default:
-			mainLog.Fatalf("Invalid log level %q specified in config, must be error, warn, debug or info. ", level)
-		}
-		mainLog.Debugf("Set log level to %q", log.Level)
-	}
-
-	if gw.isRunningTests() && os.Getenv("TYK_LOGLEVEL") == "" {
-		// `go test` without TYK_LOGLEVEL set defaults to no log
-		// output
-		log.SetLevel(logrus.ErrorLevel)
-		log.SetOutput(ioutil.Discard)
-		gorpc.SetErrorLogger(func(string, ...interface{}) {})
-		stdlog.SetOutput(ioutil.Discard)
-	} else if *cli.DebugMode {
-		log.Level = logrus.DebugLevel
-		mainLog.Debug("Enabling debug-level output")
 	}
 
 	if *cli.Conf != "" {
@@ -1783,7 +1873,6 @@ func (gw *Gateway) initSystem() error {
 	}
 
 	// suply rpc client globals to join it main loging and instrumentation sub systems
-	rpc.Log = log
 	rpc.Instrument = instrument
 
 	gw.setupGlobals()
@@ -1799,8 +1888,8 @@ func (gw *Gateway) initSystem() error {
 		}
 	}
 
-	// Enable all the loggers
-	gw.setupLogger()
+	log.Setup(gw.setupLogger)
+
 	mainLog.Info("PIDFile location set to: ", gwConfig.PIDFileLocation)
 
 	if err := writePIDFile(gw.GetConfig().PIDFileLocation); err != nil {
