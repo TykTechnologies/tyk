@@ -1571,6 +1571,9 @@ func TestHashKeyListingDisabled(t *testing.T) {
 	myKey := uuid.New()
 	myKeyHash := storage.HashKey(ts.Gw.generateToken("default", myKey), ts.Gw.GetConfig().HashKeys)
 
+	// BodyMatch is a regex: the text names the product, the setting and its env var (TT-1790).
+	const listingDisabledMsg = `Hashed key listing is disabled in the Gateway config: set enable_hashed_keys_listing to true in tyk\.conf \(or TYK_GW_ENABLEHASHEDKEYSLISTING\)`
+
 	t.Run("Create, get and delete key with key hashing", func(t *testing.T) {
 		_, _ = ts.Run(t, []test.TestCase{
 			// create key
@@ -1638,6 +1641,7 @@ func TestHashKeyListingDisabled(t *testing.T) {
 				Data:      string(withAccessJSON),
 				AdminAuth: true,
 				Code:      404,
+				BodyMatch: listingDisabledMsg,
 			},
 			// get list of keys' hashes, API specified
 			{
@@ -1646,6 +1650,7 @@ func TestHashKeyListingDisabled(t *testing.T) {
 				Data:      string(withAccessJSON),
 				AdminAuth: true,
 				Code:      404,
+				BodyMatch: listingDisabledMsg,
 			},
 			// delete one key by hash value with specifying hashed=true
 			{
