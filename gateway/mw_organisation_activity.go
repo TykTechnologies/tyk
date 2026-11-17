@@ -58,6 +58,14 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 		return nil, http.StatusOK
 	}
 
+	// The aggregator has already charged its organisation, which is also the
+	// aggregated proxy's. The origin is set in-process by the aggregator's
+	// dispatcher only, and a hop whose loop trust does not validate is refused
+	// before it reaches the proxy's upstream.
+	if mcpAggregatorOriginOf(r, k.Spec.APIID) != "" {
+		return nil, http.StatusOK
+	}
+
 	// short path for specs which have organization limiter enabled but organization has no session
 	if k.getOrgHasNoSession() {
 		return nil, http.StatusOK
