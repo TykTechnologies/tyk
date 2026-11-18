@@ -127,6 +127,13 @@ func GetJWKWithClient(jwlUrl string, client *http.Client, parseJWK func([]byte) 
 		_ = resp.Body.Close()
 	}()
 
+	// A non-2xx body (for example a JSON error page from a proxy or IdP) must
+	// not be handed to the parser: any JSON object parses as a key set with no
+	// keys, which callers then cache as if it were a valid JWKS.
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return nil, fmt.Errorf("JWKS endpoint returned HTTP status %d", resp.StatusCode)
+	}
+
 	buf, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err

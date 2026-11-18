@@ -2,6 +2,8 @@ package gateway
 
 import (
 	"crypto/md5"
+	"crypto/rand"
+	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -11,6 +13,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -5146,6 +5149,56 @@ func TestJWTMiddleware_ErrorLogging(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A JWKS endpoint error (for example a 502 from a proxy with a JSON body) must
+// not be cached: the next request retries the fetch instead of serving an
+// empty key set until the cache entry expires.
+// See: https://github.com/TykTechnologies/tyk/issues/8880
+func TestGetSecretFromURL_DoesNotCacheErrorResponse(t *testing.T) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	require.NoError(t, err)
+
+	var calls int32
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if atomic.AddInt32(&calls, 1) == 1 {
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = w.Write([]byte(`{"errorCode":"unknown","errorMessage":"Bad Gateway"}`))
+			return
+		}
+		_, _ = w.Write(jwksJSON(t, rsaJWK("test-key", key.N, false)))
+	}))
+	defer ts.Close()
+
+	gw := &Gateway{}
+	gw.SetConfig(config.Config{JWTSSLInsecureSkipVerify: true})
+
+	// JWTSource must decode to the URL under test, otherwise the cache entry
+	// is treated as outdated and every call refetches, which would hide the bug.
+	m := JWTMiddleware{BaseMiddleware: &BaseMiddleware{
+		Spec: &APISpec{
+			APIDefinition: &apidef.APIDefinition{
+				APIID:     "test-api-8880",
+				OrgID:     "test-org",
+				JWTSource: base64.StdEncoding.EncodeToString([]byte(ts.URL)),
+			},
+		},
+		Gw: gw,
+	}}
+
+	// First fetch hits the 502: the request fails and nothing is cached.
+	_, err = m.getSecretFromURL(ts.URL, "test-key", "rsa")
+	require.Error(t, err)
+	attemptsAfterFirst := atomic.LoadInt32(&calls)
+	require.GreaterOrEqual(t, attemptsAfterFirst, int32(1), "first call should reach the endpoint")
+
+	// The second fetch must hit the endpoint again and succeed, instead of
+	// serving the cached empty key set for the remaining cache TTL.
+	secret, err := m.getSecretFromURL(ts.URL, "test-key", "rsa")
+	require.NoError(t, err)
+	assert.Equal(t, &key.PublicKey, secret)
+	assert.Greater(t, atomic.LoadInt32(&calls), attemptsAfterFirst,
+		"second call must retry the endpoint instead of serving a cached error response")
 }
 
 func Test_buildJWKSCache(t *testing.T) {
