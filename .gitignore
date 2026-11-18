@@ -92,3 +92,8 @@ ci/tests/specs/policies
 # unknown json files
 /gateway/test.json
 /gateway/child-v1.json
+
+local-apps
+tyk-local
+# openapi-generator-cli npm wrapper state
+openapitools.json
