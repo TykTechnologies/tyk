@@ -1,0 +1,3 @@
+generatorName: java
+nameMappings:
+  _id: MongoId
