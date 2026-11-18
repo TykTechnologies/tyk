@@ -73,7 +73,7 @@ func NewSlidingLog(client any, smoothingFn SmoothingFn, opts ...Option) (*Slidin
 func NewSlidingLogRedis(conn redis.UniversalClient, smoothingFn SmoothingFn, opts ...Option) *SlidingLog {
 	r := &SlidingLog{
 		conn:        conn,
-		logger:      discardLogger(),
+		logger:      defaultLogger,
 		smoothingFn: smoothingFn,
 	}
 
@@ -84,10 +84,8 @@ func NewSlidingLogRedis(conn redis.UniversalClient, smoothingFn SmoothingFn, opt
 	return r
 }
 
-// Do returns two three values first is the stats, the second indicates if a request should be blocked
-// and an error if any occurred. In case an error occurs, the first value will be `true`.
-// If there are issues with storage availability for example, requests will be blocked rather
-// than let through, as no rate limit can be enforced without storage.
+// Do returns the window stats, whether the request should be blocked, and an error.
+// On error the request is blocked: no rate limit can be enforced without storage.
 func (r *SlidingLog) Do(ctx context.Context, key string, maxAllowed, per int64) (Stats, bool, error) {
 	stats, err := r.invokeSlidingLogAdd(ctx, key, maxAllowed, per)
 
@@ -188,6 +186,10 @@ func (r *SlidingLog) statsFromReply(res []any, key string, maxAllowed, per int64
 		Reset:     reset,
 	}, nil
 }
+
+// defaultLogger is shared by every SlidingLog built without WithLogger;
+// NewSlidingLogRedis runs per request, so it must not allocate a logger.
+var defaultLogger = discardLogger()
 
 func discardLogger() logrus.FieldLogger {
 	logger := logrus.New()
