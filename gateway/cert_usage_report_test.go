@@ -130,6 +130,23 @@ func TestCertUsageReport_GatewayConfig(t *testing.T) {
 			used:    false,
 		},
 		{
+			name:    "client CA for all APIs with an https client mTLS API on the Gateway's port and use_ssl off",
+			conf:    func(c *config.Config) { c.Security.Certificates.API = []string{testCert} },
+			specs:   []*APISpec{mtlsAPI("https", 8080)},
+			setting: certSettingAPIs,
+			used:    false,
+		},
+		{
+			name: "client CA for all APIs with an https client mTLS API on the Gateway's port and use_ssl on",
+			conf: func(c *config.Config) {
+				c.HttpServerOptions.UseSSL = true
+				c.Security.Certificates.API = []string{testCert}
+			},
+			specs:   []*APISpec{mtlsAPI("https", 8080)},
+			setting: certSettingAPIs,
+			used:    true,
+		},
+		{
 			name:    "client CA for all APIs with a client mTLS API served over plain HTTP",
 			conf:    func(c *config.Config) { c.Security.Certificates.API = []string{testCert} },
 			specs:   []*APISpec{mtlsAPI("", 0)},
@@ -324,7 +341,6 @@ func TestCertUsageReport_APIs(t *testing.T) {
 	for name, mutate := range uses {
 		t.Run(name+" active", func(t *testing.T) {
 			conf := config.Config{}
-			conf.HttpServerOptions.UseSSL = true // custom domain certificates need a TLS listener
 			got := findReported(reportOf(conf, classic(true, mutate)), testCert)
 			require.NotNil(t, got)
 			assert.Equal(t, []string{"classic"}, got.APIIDs)
@@ -340,20 +356,11 @@ func TestCertUsageReport_APIs(t *testing.T) {
 		})
 	}
 
-	t.Run("custom domain certificates are only used by a TLS listener", func(t *testing.T) {
+	t.Run("custom domain certificates count whatever the listener", func(t *testing.T) {
+		// API uses follow the shared apidef rule, so the Dashboard's APIs view and this report agree.
 		spec := classic(true, uses["custom domain"])
-		assert.Empty(t, reportOf(config.Config{}, spec), "the API is served over plain HTTP")
-
-		conf := config.Config{}
-		conf.HttpServerOptions.UseSSL = true
-		assert.Equal(t, []string{testCert}, reportedIDs(reportOf(conf, spec)))
-
-		spec.Protocol = "https"
-		spec.ListenPort = 9443
-		assert.Equal(t, []string{testCert}, reportedIDs(reportOf(config.Config{}, spec)), "the API listens with https on its own port")
-
-		assert.Contains(t, collectCertUsage(&config.Config{}, []*APISpec{classic(true, uses["custom domain"])}).references, testCert,
-			"selective sync still downloads them")
+		spec.Protocol = "http"
+		assert.Equal(t, []string{testCert}, reportedIDs(reportOf(config.Config{}, spec)), "the API is served over plain HTTP")
 	})
 
 	t.Run("loaded API whose active flag is off", func(t *testing.T) {

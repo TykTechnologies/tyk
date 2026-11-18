@@ -261,12 +261,18 @@ func specCertificateReferences(spec *APISpec) apidef.CertificateReferences {
 	return spec.CertificateReferences()
 }
 
+// onOwnPort reports whether the API listens on a port of its own rather than the Gateway's.
+func onOwnPort(conf *config.Config, spec *APISpec) bool {
+	return spec.ListenPort != 0 && spec.ListenPort != conf.ListenPort
+}
+
 // specServesTLS reports whether the API's listener serves TLS. An API without a protocol takes the
-// Gateway's, which is https only when use_ssl is on.
+// Gateway's, which is https only when use_ssl is on. The Gateway's port only serves its own protocol,
+// so an https API there is served over TLS only when use_ssl is on.
 func specServesTLS(conf *config.Config, spec *APISpec) bool {
 	switch spec.Protocol {
 	case "https", "tls":
-		return true
+		return conf.HttpServerOptions.UseSSL || onOwnPort(conf, spec)
 	case "":
 		return conf.HttpServerOptions.UseSSL
 	default:
@@ -280,7 +286,7 @@ func servesTLS(conf *config.Config, specs []*APISpec) bool {
 		return true
 	}
 	return slices.ContainsFunc(specs, func(spec *APISpec) bool {
-		return (spec.Protocol == "https" || spec.Protocol == "tls") && spec.ListenPort != 0 && spec.ListenPort != conf.ListenPort
+		return (spec.Protocol == "https" || spec.Protocol == "tls") && onOwnPort(conf, spec)
 	})
 }
 
@@ -304,8 +310,7 @@ func collectAPICertUsage(u *certUsage, conf *config.Config, specs []*APISpec) {
 			u.reference(ref.CertID, spec.APIID)
 			// The Gateway serves every API it loads, whatever its active flag says
 			// (the Dashboard only sends active APIs), so only the use's own switch matters.
-			// An API's server certificates are only read by a TLS listener.
-			if ref.Active(true) && (ref.Type != apidef.CertificateUseServer || specServesTLS(conf, spec)) {
+			if ref.Active(true) {
 				u.useByAPI(ref.CertID, spec.APIID, ref.Type == apidef.CertificateUsePinned)
 			}
 		}
