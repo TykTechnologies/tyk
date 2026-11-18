@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/go-jose/go-jose/v3"
+	"github.com/go-jose/go-jose/v4"
 	"github.com/golang-jwt/jwt/v4"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -40,6 +40,11 @@ func (f *fakeRPCLoader) GetClientIdPs(orgID string, tags []string) string {
 	f.gotOrgID = orgID
 	f.gotTags = tags
 	return f.payload
+}
+
+// specInOrg is a loaded API owned by orgID, as the registry sees it.
+func specInOrg(orgID string) *APISpec {
+	return &APISpec{APIDefinition: &apidef.APIDefinition{OrgID: orgID}}
 }
 
 // mustWriteJSON writes a mock HTTP response body, failing the test on error.
@@ -191,8 +196,8 @@ func TestScopeToPolicyMapForRequest_BindingOnly(t *testing.T) {
 func TestIdPRegistry_RebuildSegmentBackstop(t *testing.T) {
 	gw := &Gateway{
 		apisByID: map[string]*APISpec{
-			"api-a": {},
-			"api-b": {},
+			"api-a": specInOrg("org-1"),
+			"api-b": specInOrg("org-1"),
 		},
 	}
 	r := newIdPRegistry(gw)
@@ -200,6 +205,7 @@ func TestIdPRegistry_RebuildSegmentBackstop(t *testing.T) {
 	idps := []IdP{
 		{
 			ID:     "idp-1",
+			OrgID:  "org-1",
 			Issuer: "https://i1",
 			APIMappings: map[string]ScopeMapping{
 				"api-a": {ScopeToPolicy: map[string]string{"read": "pol-read"}}, // loaded
@@ -208,6 +214,7 @@ func TestIdPRegistry_RebuildSegmentBackstop(t *testing.T) {
 		},
 		{
 			ID:     "idp-2",
+			OrgID:  "org-1",
 			Issuer: "https://i2",
 			APIMappings: map[string]ScopeMapping{
 				"api-z": {ScopeToPolicy: map[string]string{"y": "pol-y"}}, // NOT loaded -> idp omitted
@@ -239,10 +246,10 @@ func TestIdPRegistry_RebuildSegmentBackstop(t *testing.T) {
 	}
 
 	// idp-1 retained a mapping -> present. idp-2 had zero surviving -> omitted.
-	if _, ok := r.IdP("idp-1"); !ok {
+	if _, ok := r.IdP("org-1", "idp-1"); !ok {
 		t.Errorf("idp-1 should be retained")
 	}
-	if _, ok := r.IdP("idp-2"); ok {
+	if _, ok := r.IdP("org-1", "idp-2"); ok {
 		t.Errorf("idp-2 had zero surviving mappings and must be omitted")
 	}
 }
@@ -250,11 +257,13 @@ func TestIdPRegistry_RebuildSegmentBackstop(t *testing.T) {
 // rebuild denormalises the IdP's scope_claim_name into each binding so the JWT
 // hot path can resolve it without a second registry lookup.
 func TestIdPRegistry_RebuildCarriesScopeClaimName(t *testing.T) {
-	gw := &Gateway{apisByID: map[string]*APISpec{"api-a": {}}}
+	gw := &Gateway{apisByID: map[string]*APISpec{"api-a": specInOrg("org-1")}}
 	r := newIdPRegistry(gw)
 
 	r.rebuild([]IdP{{
 		ID:             "idp-1",
+		OrgID:          "org-1",
+		Issuer:         "https://i1",
 		ScopeClaimName: "scp",
 		APIMappings: map[string]ScopeMapping{
 			"api-a": {ScopeToPolicy: map[string]string{"read": "pol-read"}},
@@ -272,16 +281,17 @@ func TestIdPRegistry_RebuildCarriesScopeClaimName(t *testing.T) {
 
 // rebuild is build-then-swap: a previous snapshot must be fully replaced.
 func TestIdPRegistry_RebuildReplacesSnapshot(t *testing.T) {
-	gw := &Gateway{apisByID: map[string]*APISpec{"api-a": {}}}
+	gw := &Gateway{apisByID: map[string]*APISpec{"api-a": specInOrg("org-1")}}
 	r := newIdPRegistry(gw)
 
-	r.rebuild([]IdP{{ID: "old", APIMappings: map[string]ScopeMapping{"api-a": {}}}})
-	r.rebuild([]IdP{{ID: "new", APIMappings: map[string]ScopeMapping{"api-a": {}}}})
+	mappings := map[string]ScopeMapping{"api-a": {}}
+	r.rebuild([]IdP{{ID: "old", OrgID: "org-1", Issuer: "https://i1", APIMappings: mappings}})
+	r.rebuild([]IdP{{ID: "new", OrgID: "org-1", Issuer: "https://i1", APIMappings: mappings}})
 
-	if _, ok := r.IdP("old"); ok {
+	if _, ok := r.IdP("org-1", "old"); ok {
 		t.Errorf("old IdP must be gone after rebuild")
 	}
-	if _, ok := r.IdP("new"); !ok {
+	if _, ok := r.IdP("org-1", "new"); !ok {
 		t.Errorf("new IdP must be present after rebuild")
 	}
 	if b := r.BindingsForAPI("api-a"); len(b) != 1 || b[0].IdPID != "new" {
@@ -440,7 +450,7 @@ func TestFetchJWKSKey_RejectsNonHTTPScheme(t *testing.T) {
 
 // doRefresh fetches and rebuilds end-to-end (RPC mode via injected loader).
 func TestIdPRegistry_DoRefresh(t *testing.T) {
-	gw := &Gateway{apisByID: map[string]*APISpec{"api-a": {}}}
+	gw := &Gateway{apisByID: map[string]*APISpec{"api-a": specInOrg("org-1")}}
 	conf := config.Config{}
 	conf.SlaveOptions.UseRPC = true
 	conf.SlaveOptions.RPCKey = "org-1"
@@ -448,7 +458,7 @@ func TestIdPRegistry_DoRefresh(t *testing.T) {
 
 	r := newIdPRegistry(gw)
 	r.rpcLoaderFn = func() RPCDataLoader {
-		return &fakeRPCLoader{payload: `[{"client_idp_id":"idp-1","issuer":"https://i1",` +
+		return &fakeRPCLoader{payload: `[{"client_idp_id":"idp-1","org_id":"org-1","issuer":"https://i1",` +
 			`"api_mappings":{"api-a":{"scope_to_policy":{"read":"pol-read"}}}}]`}
 	}
 
@@ -466,7 +476,7 @@ func TestIdPRegistry_DoRefresh(t *testing.T) {
 func TestIdPRegistry_DoRefresh_ShutdownNoOp(t *testing.T) {
 	cancelledCtx, cancel := context.WithCancel(context.Background())
 	cancel()
-	gw := &Gateway{apisByID: map[string]*APISpec{"api-a": {}}, ctx: cancelledCtx}
+	gw := &Gateway{apisByID: map[string]*APISpec{"api-a": specInOrg("org-1")}, ctx: cancelledCtx}
 	conf := config.Config{}
 	conf.SlaveOptions.UseRPC = true
 	gw.SetConfig(conf)
@@ -589,6 +599,7 @@ func TestIdPRegistry_JWT_ResolvesKeyAndScope(t *testing.T) {
 	// drops the binding).
 	ts.Gw.idpRegistry.rebuild([]IdP{{
 		ID:      "idp-1",
+		OrgID:   "default",
 		Issuer:  "my-issuer",
 		JWKSURI: testHttpJWK,
 		APIMappings: map[string]ScopeMapping{
@@ -640,6 +651,8 @@ func TestIdPRegistry_JWT_ManualSourceWins(t *testing.T) {
 	// fail; manual must win so this is never consulted.
 	ts.Gw.idpRegistry.rebuild([]IdP{{
 		ID:      "idp-bogus",
+		OrgID:   "default",
+		Issuer:  "my-issuer",
 		JWKSURI: "http://127.0.0.1:1/nope.json",
 		APIMappings: map[string]ScopeMapping{
 			apiID: {ScopeToPolicy: map[string]string{"read": "nonexistent-policy"}},
@@ -691,6 +704,7 @@ func TestIdPRegistry_JWT_ResolvesScopeClaimNameFromRegistry(t *testing.T) {
 	// rebuild AFTER load so apisByID contains apiID (segment backstop).
 	ts.Gw.idpRegistry.rebuild([]IdP{{
 		ID:             "idp-scp",
+		OrgID:          "default",
 		Issuer:         "my-issuer",
 		JWKSURI:        testHttpJWK,
 		ScopeClaimName: "scp", // Entra/Azure AD style claim
@@ -744,6 +758,7 @@ func TestIdPRegistry_JWT_NoScopeClaimNameRejects(t *testing.T) {
 
 	ts.Gw.idpRegistry.rebuild([]IdP{{
 		ID:      "idp-noscp",
+		OrgID:   "default",
 		Issuer:  "my-issuer",
 		JWKSURI: testHttpJWK,
 		// ScopeClaimName intentionally empty -> gateway defaults to "scope".
@@ -773,7 +788,7 @@ func newTestJWTMiddleware(apiID string) *JWTMiddleware {
 	gw := &Gateway{apisByID: map[string]*APISpec{}}
 	gw.SetConfig(config.Config{})
 	gw.idpRegistry = newIdPRegistry(gw)
-	spec := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: apiID}}
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: apiID, OrgID: "org-1"}}
 	return &JWTMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: gw}}
 }
 
@@ -814,6 +829,13 @@ func TestUnverifiedIssuerHint(t *testing.T) {
 	if got := unverifiedIssuerHint(noIss); got != "" {
 		t.Errorf("no iss claim: want empty, got %q", got)
 	}
+	for name, iss := range map[string]interface{}{
+		"empty": "", "null": nil, "number": 123, "array": []interface{}{"https://issuer"},
+	} {
+		if got := unverifiedIssuerHint(&jwt.Token{Claims: jwt.MapClaims{ISS: iss}}); got != "" {
+			t.Errorf("%s iss: want empty, got %q", name, got)
+		}
+	}
 	notMap := &jwt.Token{Claims: jwt.RegisteredClaims{}}
 	if got := unverifiedIssuerHint(notMap); got != "" {
 		t.Errorf("non-MapClaims: want empty, got %q", got)
@@ -850,7 +872,7 @@ func TestCachedJWKSet(t *testing.T) {
 }
 
 func TestSecretFromIdPRegistry_EarlyReturns(t *testing.T) {
-	tok := &jwt.Token{Header: map[string]interface{}{KID: "kid-1"}, Claims: jwt.MapClaims{}}
+	tok := &jwt.Token{Header: map[string]interface{}{KID: "kid-1"}, Claims: jwt.MapClaims{ISS: "https://i1"}}
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 
 	// Gw nil.
@@ -873,39 +895,69 @@ func TestSecretFromIdPRegistry_EarlyReturns(t *testing.T) {
 		t.Errorf("no bindings must return nil, got %v", got)
 	}
 
-	// Binding exists but the token has no kid.
 	k.Gw.apisMu.Lock()
-	k.Gw.apisByID["api-a"] = &APISpec{}
+	k.Gw.apisByID["api-a"] = k.Spec
 	k.Gw.apisMu.Unlock()
 	k.Gw.idpRegistry.rebuild([]IdP{{
-		ID: "idp-1", JWKSURI: "https://i1/jwks",
+		ID: "idp-1", OrgID: "org-1", Issuer: "https://i1", JWKSURI: "https://i1/jwks",
 		APIMappings: map[string]ScopeMapping{"api-a": {}},
 	}})
-	noKid := &jwt.Token{Header: map[string]interface{}{}, Claims: jwt.MapClaims{}}
+	if len(k.Gw.idpRegistry.BindingsForAPI("api-a")) != 1 {
+		t.Fatal("fixture must bind api-a")
+	}
+
+	noKid := &jwt.Token{Header: map[string]interface{}{}, Claims: jwt.MapClaims{ISS: "https://i1"}}
 	if got := k.secretFromIdPRegistry(r, noKid); got != nil {
 		t.Errorf("missing kid must return nil, got %v", got)
 	}
+
+	noIss := &jwt.Token{Header: map[string]interface{}{KID: "kid-1"}, Claims: jwt.MapClaims{}}
+	if got := k.secretFromIdPRegistry(r, noIss); got != nil {
+		t.Errorf("missing iss must return nil, got %v", got)
+	}
+	if ctxGetMatchedBinding(r) != nil {
+		t.Error("no binding may be matched without a key")
+	}
 }
 
+// keyForBinding skips a binding before any JWKS fetch unless Organisation and
+// issuer both match exactly; empty values never match.
 func TestKeyForBinding_SkipBranches(t *testing.T) {
 	k := newTestJWTMiddleware("api-a")
-	k.Gw.idpRegistry.rebuild([]IdP{}) // empty registry
+	set := &jose.JSONWebKeySet{Keys: []jose.JSONWebKey{{Key: []byte("secret"), KeyID: "kid"}}}
+	k.loadOrCreateJWKCache().Set("https://i1/jwks", set, cache.DefaultExpiration)
 
-	// Unknown IdP id -> nil (no fetch).
-	if got := k.keyForBinding(Binding{IdPID: "missing"}, "", "kid"); got != nil {
-		t.Errorf("unknown IdP must return nil, got %v", got)
+	valid := Binding{OrgID: "org-1", IdPID: "idp-1", Issuer: "https://real", JWKSURI: "https://i1/jwks"}
+	if got := k.keyForBinding(valid, "https://real", "kid", false); got == nil {
+		t.Fatal("matching Organisation and issuer must resolve the key")
 	}
 
-	// Known IdP but issuer hint mismatches -> nil (no fetch).
-	k.Gw.apisMu.Lock()
-	k.Gw.apisByID["api-a"] = &APISpec{}
-	k.Gw.apisMu.Unlock()
-	k.Gw.idpRegistry.rebuild([]IdP{{
-		ID: "idp-1", Issuer: "https://real", JWKSURI: "https://i1/jwks",
-		APIMappings: map[string]ScopeMapping{"api-a": {}},
-	}})
-	if got := k.keyForBinding(Binding{IdPID: "idp-1"}, "https://other", "kid"); got != nil {
-		t.Errorf("issuer mismatch must return nil, got %v", got)
+	foreign, noOrg, noIssuer := valid, valid, valid
+	foreign.OrgID = "org-2"
+	noOrg.OrgID = ""
+	noIssuer.Issuer = ""
+
+	cases := []struct {
+		name    string
+		binding Binding
+		iss     string
+	}{
+		{"issuer mismatch", valid, "https://other"},
+		{"token without issuer", valid, ""},
+		{"IdP without issuer", noIssuer, ""},
+		{"IdP without issuer, token with one", noIssuer, "https://real"},
+		{"foreign Organisation", foreign, "https://real"},
+		{"binding without Organisation", noOrg, "https://real"},
+	}
+	for _, tc := range cases {
+		if got := k.keyForBinding(tc.binding, tc.iss, "kid", false); got != nil {
+			t.Errorf("%s: must return nil, got %v", tc.name, got)
+		}
+	}
+
+	k.Spec.OrgID = ""
+	if got := k.keyForBinding(noOrg, "https://real", "kid", false); got != nil {
+		t.Errorf("empty Organisation on both sides must not match, got %v", got)
 	}
 }
 
@@ -976,14 +1028,14 @@ func TestIdPRegistry_FetchFromRPC_DefaultLoader(t *testing.T) {
 
 // Refresh debounces and then rebuilds via doRefresh on the timer.
 func TestIdPRegistry_Refresh_DebouncedRebuild(t *testing.T) {
-	gw := &Gateway{apisByID: map[string]*APISpec{"api-a": {}}}
+	gw := &Gateway{apisByID: map[string]*APISpec{"api-a": specInOrg("org-1")}}
 	conf := config.Config{}
 	conf.SlaveOptions.UseRPC = true
 	gw.SetConfig(conf)
 
 	r := newIdPRegistry(gw)
 	r.rpcLoaderFn = func() RPCDataLoader {
-		return &fakeRPCLoader{payload: `[{"client_idp_id":"idp-1",` +
+		return &fakeRPCLoader{payload: `[{"client_idp_id":"idp-1","org_id":"org-1","issuer":"https://i1",` +
 			`"api_mappings":{"api-a":{"scope_to_policy":{"read":"pol-read"}}}}]`}
 	}
 

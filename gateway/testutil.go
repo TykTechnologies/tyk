@@ -1038,7 +1038,14 @@ type SlaveDataCenter struct {
 	Redis        config.StorageOptionsConf
 }
 
+// logSetupMu serialises Reset and Setup of the global logger; parallel tests start gateways concurrently.
+var logSetupMu sync.Mutex
+
 func StartTest(genConf func(globalConf *config.Config), testConfig ...TestConfig) *Test {
+	logSetupMu.Lock()
+	defer logSetupMu.Unlock()
+	defer log.Reset()()
+
 	t := &Test{
 		dynamicHandlers: make(map[string]http.HandlerFunc),
 	}

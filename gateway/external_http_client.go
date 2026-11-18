@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/TykTechnologies/tyk/internal/httpclient"
-	"github.com/go-jose/go-jose/v3"
+	"github.com/go-jose/go-jose/v4"
 )
 
 // ExternalHTTPClientFactory creates HTTP clients for external service interactions

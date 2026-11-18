@@ -1,6 +1,11 @@
 package log
 
-import "github.com/sirupsen/logrus"
+import (
+	"encoding/json"
+	"maps"
+
+	"github.com/sirupsen/logrus"
+)
 
 type FieldMap struct {
 	fields map[string]string
@@ -16,7 +21,7 @@ func NewFieldMap(fMap logrus.FieldMap) FieldMap {
 	return FieldMap{fields: m}
 }
 
-func (f FieldMap) Resolve(field string) string {
+func (f *FieldMap) Resolve(field string) string {
 	if len(f.fields) == 0 {
 		return field
 	}
@@ -26,4 +31,25 @@ func (f FieldMap) Resolve(field string) string {
 	}
 
 	return field
+}
+
+func (f *FieldMap) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		return nil
+	}
+
+	m := maps.Clone(f.fields)
+	if err := json.Unmarshal(data, &m); err != nil {
+		return err
+	}
+
+	f.fields = m
+	return nil
+}
+
+func (f FieldMap) MarshalJSON() ([]byte, error) {
+	if len(f.fields) == 0 {
+		return []byte("null"), nil
+	}
+	return json.Marshal(f.fields)
 }

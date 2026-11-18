@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/go-jose/go-jose/v3"
+	"github.com/go-jose/go-jose/v4"
 	"github.com/golang-jwt/jwt/v4"
 
 	"github.com/TykTechnologies/tyk/apidef"
