@@ -25,18 +25,27 @@ local count = redis.call("ZCARD", key)
 -- The branch below covers a redis clock stepped backwards (clock_settime,
 -- chrony makestep; slewed NTP corrections via adjtimex stay monotonic) and an
 -- older gateway writing a nanosecond member here during a rolling upgrade.
--- Every hit of a microsecond is scored with that microsecond, so counting
--- entries with this exact score gives the next free nanosecond suffix.
+-- Hits of a microsecond written by this script are scored with that
+-- microsecond and numbered from 000, so counting entries with this exact
+-- score is a good first guess for a free suffix. It is only a guess: a
+-- nanosecond member from an older gateway rounds onto the same score (a
+-- double is precise to about 256 ns here) with an arbitrary suffix, so
+-- probe upwards until a member is free.
 local member = now_str
 local seq = 0
 if redis.call("ZADD", key, "NX", now_str, member) == 0 then
 	local prefix = now_str:sub(1, -4)
 	seq = redis.call("ZCOUNT", key, now_str, now_str)
-	member = prefix .. string.format("%03d", seq)
-
-	if seq > 999 or redis.call("ZADD", key, "NX", now_str, member) == 0 then
-		redis.log(redis.LOG_WARNING, "sliding log " .. key .. ": no free member at " .. now_str)
-		return redis.error_reply("sliding log full at " .. now_str)
+	while true do
+		if seq > 999 then
+			redis.log(redis.LOG_WARNING, "sliding log " .. key .. ": no free member at " .. now_str)
+			return redis.error_reply("sliding log full at " .. now_str)
+		end
+		member = prefix .. string.format("%03d", seq)
+		if redis.call("ZADD", key, "NX", now_str, member) == 1 then
+			break
+		end
+		seq = seq + 1
 	end
 end
 

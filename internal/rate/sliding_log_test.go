@@ -215,9 +215,15 @@ local member = now_str
 if redis.call("ZADD", key, "NX", now_str, member) == 0 then
 	local prefix = now_str:sub(1, -4)
 	local seq = redis.call("ZCOUNT", key, now_str, now_str)
-	member = prefix .. string.format("%03d", seq)
-	if seq > 999 or redis.call("ZADD", key, "NX", now_str, member) == 0 then
-		return redis.error_reply("sliding log full at " .. now_str)
+	while true do
+		if seq > 999 then
+			return redis.error_reply("sliding log full at " .. now_str)
+		end
+		member = prefix .. string.format("%03d", seq)
+		if redis.call("ZADD", key, "NX", now_str, member) == 1 then
+			break
+		end
+		seq = seq + 1
 	end
 end
 return member
@@ -263,6 +269,35 @@ func (s *SlidingLogSuite) TestMemberCollisionJump() {
 	count, err := s.db.ZCard(s.ctx(), s.key).Result()
 	s.Require().NoError(err)
 	s.Equal(int64(9), count)
+}
+
+// TestMemberCollisionOldGatewaySuffix covers a rolling upgrade: an older gateway
+// wrote a real nanosecond member whose score rounds onto this microsecond, so
+// the ZCOUNT guess names a member that is already taken and the script has to
+// move on to the next suffix instead of rejecting the hit.
+func (s *SlidingLogSuite) TestMemberCollisionOldGatewaySuffix() {
+	now := time.Now().UnixMicro() * 1000
+	// scores are doubles; pick a microsecond where now+2 lands on the same one
+	for float64(now+2) != float64(now) {
+		now += 1000
+	}
+	nowStr := strconv.FormatInt(now, 10)
+	prefix := nowStr[:len(nowStr)-3]
+	add := func(score int64, member string) {
+		s.Require().NoError(s.db.ZAdd(s.ctx(), s.key, redis.Z{Score: float64(score), Member: member}).Err())
+	}
+
+	add(now, prefix+"000")                   // this script
+	add(now+2, strconv.FormatInt(now+2, 10)) // older gateway, suffix 002
+
+	// ZCOUNT says 2, member 002 is taken, 003 is the first free one
+	member, err := memberCollision.Run(s.ctx(), s.db, []string{s.key}, nowStr).Text()
+	s.Require().NoError(err)
+	s.Equal(prefix+"003", member)
+
+	count, err := s.db.ZCard(s.ctx(), s.key).Result()
+	s.Require().NoError(err)
+	s.Equal(int64(3), count)
 }
 
 func (s *SlidingLogSuite) TestParseSlidingLogAddReply() {
