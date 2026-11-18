@@ -192,8 +192,32 @@ func TestGoPluginMWs(t *testing.T) {
 	t.Run("Run Go-plugin auth failed", func(t *testing.T) {
 		ts.Run(t, []test.TestCase{
 			{
-				Path:    "/goplugin/plugin_hit",
-				Headers: map[string]string{"Authorization": "invalid_token"},
+				Path: "/goplugin/plugin_hit",
+				Headers: map[string]string{
+					"Authorization": "unauthorized_token",
+				},
+				HeadersMatch: map[string]string{
+					"X-Auth-Result": "failed",
+				},
+				Code:      http.StatusUnauthorized,
+				BodyMatch: "auth failed",
+			},
+			{
+				Path: "/goplugin-custom-plugin-auth/plugin_hit",
+				Headers: map[string]string{
+					"Authorization": "unauthorized_token",
+				},
+				HeadersMatch: map[string]string{
+					"X-Auth-Result": "failed",
+				},
+				Code:      http.StatusUnauthorized,
+				BodyMatch: "auth failed",
+			},
+			{
+				Path: "/goplugin/plugin_hit",
+				Headers: map[string]string{
+					"Authorization": "invalid_token",
+				},
 				HeadersMatch: map[string]string{
 					"X-Auth-Result": "failed",
 				},
@@ -201,8 +225,10 @@ func TestGoPluginMWs(t *testing.T) {
 				BodyMatch: "auth failed",
 			},
 			{
-				Path:    "/goplugin-custom-plugin-auth/plugin_hit",
-				Headers: map[string]string{"Authorization": "invalid_token"},
+				Path: "/goplugin-custom-plugin-auth/plugin_hit",
+				Headers: map[string]string{
+					"Authorization": "invalid_token",
+				},
 				HeadersMatch: map[string]string{
 					"X-Auth-Result": "failed",
 				},
