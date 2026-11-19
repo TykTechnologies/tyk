@@ -195,9 +195,9 @@ func (d mcpAggregatorDispatcher) probeVersion(parent *http.Request, spec *APISpe
 		if isMCPAggregatorVersionMismatch(listErr) {
 			return listErr
 		}
-		return fmt.Errorf("server/discover: %v; tools/list: %w", err, listErr)
+		return fmt.Errorf("server/discover: %w; tools/list: %w", err, listErr)
 	}
-	return fmt.Errorf("%w: %v; tools/list answered without declaring a version", errMCPAggregatorVersionUnconfirmed, err)
+	return fmt.Errorf("%w: %w; tools/list answered without declaring a version", errMCPAggregatorVersionUnconfirmed, err)
 }
 
 var errMCPAggregatorVersionUnconfirmed = errors.New("2026-07-28 support not confirmed")

@@ -9,6 +9,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/rpc"
 )
@@ -47,12 +50,30 @@ type idpFeedEnvelope struct {
 
 // Binding is the reverse-index value: the registry maps an api_id to the set of
 // IdPs bound to it, each carrying that API's scope_to_policy overrides.
+//
+// A binding is self-contained: the owning Organisation, issuer and JWKS URI are
+// copied from the one IdP record it was built from, so the key, issuer and
+// scope mapping used for a request can never come from different records, even
+// when two Organisations share a client_idp_id.
 type Binding struct {
 	ScopeToPolicy map[string]string
-	IdPID         string
+	// OrgID is the Organisation owning both the IdP and the bound API.
+	OrgID   string
+	IdPID   string
+	Issuer  string
+	JWKSURI string
 	// ScopeClaimName is denormalised from the bound IdP at rebuild time so the
 	// JWT hot path resolves the scope claim without a second registry lookup.
 	ScopeClaimName string
+	// matchedWithoutIssuer is set on the per-request copy when the token named
+	// no issuer and was matched by kid (allow_unsafe_idp_missing_issuer).
+	matchedWithoutIssuer bool
+}
+
+// idpKey identifies an IdP: client_idp_id is unique per Organisation only.
+type idpKey struct {
+	orgID string
+	id    string
 }
 
 // IdPRegistry is an in-memory, request-time join of APIs to their client IdPs.
@@ -63,8 +84,13 @@ type IdPRegistry struct {
 	gw *Gateway
 
 	mu            sync.RWMutex // OWN mutex — never apisMu
-	idpsByID      map[string]IdP
+	idps          map[idpKey]IdP
 	bindingsByAPI map[string][]Binding // only index the JWT path reads
+
+	warnedMu sync.Mutex
+	// warnedMissingIssuer limits the accepted-without-issuer warning to once
+	// per binding per rebuild.
+	warnedMissingIssuer map[string]struct{}
 
 	debounceMu    sync.Mutex
 	debounceTimer *time.Timer
@@ -76,7 +102,7 @@ type IdPRegistry struct {
 func newIdPRegistry(gw *Gateway) *IdPRegistry {
 	return &IdPRegistry{
 		gw:            gw,
-		idpsByID:      map[string]IdP{},
+		idps:          map[idpKey]IdP{},
 		bindingsByAPI: map[string][]Binding{},
 		rpcLoaderFn:   func() RPCDataLoader { return &RPCStorageHandler{Gw: gw} },
 	}
@@ -89,53 +115,150 @@ func (r *IdPRegistry) BindingsForAPI(apiID string) []Binding {
 	return r.bindingsByAPI[apiID]
 }
 
-func (r *IdPRegistry) IdP(idpID string) (IdP, bool) {
+// IdP returns the IdP owned by orgID with the given client_idp_id. An empty
+// orgID never matches.
+func (r *IdPRegistry) IdP(orgID, idpID string) (IdP, bool) {
+	if orgID == "" {
+		return IdP{}, false
+	}
 	r.mu.RLock()
 	defer r.mu.RUnlock()
-	idp, ok := r.idpsByID[idpID]
+	idp, ok := r.idps[idpKey{orgID: orgID, id: idpID}]
 	return idp, ok
 }
 
+// allowMissingIssuer reports allow_unsafe_idp_missing_issuer; false while the
+// gateway has no config loaded.
+func (r *IdPRegistry) allowMissingIssuer() bool {
+	conf, ok := r.gw.config.Load().(config.Config)
+	return ok && conf.AllowUnsafeIDPMissingIssuer
+}
+
 // rebuild builds the reverse index, then swaps it in (build-then-swap).
-//  1. Snapshot apisByID keys under a brief apisMu RLock, then RELEASE apisMu
-//     before iterating idps — the hold time is O(len(apisByID)), not the full
-//     rebuild cost, so it never blocks a concurrent loadApps swap or reader.
-//  2. Segment-aware backstop: drop bindings whose api_id is not in the loaded
-//     set, making stale/renamed api_ids inert and keeping other segments' IdP
-//     detail out of memory (IdPs with zero surviving mappings are omitted).
+//  1. Snapshot each loaded API's Organisation under a brief apisMu RLock, then
+//     RELEASE apisMu before iterating idps — the hold time is
+//     O(len(apisByID)), not the full rebuild cost, so it never blocks a
+//     concurrent loadApps swap or reader.
+//  2. Trust boundary: an IdP is bound only to loaded APIs of its own, non-empty
+//     Organisation, and only when it has an issuer (unless
+//     allow_unsafe_idp_missing_issuer is set). Everything else is dropped,
+//     which also keeps other segments' IdP detail out of memory (IdPs with zero
+//     surviving mappings are omitted). The feed is not trusted to have done
+//     this: a multi-Org gateway legitimately receives every Organisation's
+//     records.
 //  3. Swap both maps under r.mu.Lock() — mirrors loadApps swapping apisByID.
 func (r *IdPRegistry) rebuild(idps []IdP) {
 	r.gw.apisMu.RLock()
-	loaded := make(map[string]struct{}, len(r.gw.apisByID))
-	for id := range r.gw.apisByID {
-		loaded[id] = struct{}{}
+	loaded := make(map[string]string, len(r.gw.apisByID))
+	for id, spec := range r.gw.apisByID {
+		if spec != nil && spec.APIDefinition != nil {
+			loaded[id] = spec.OrgID
+		} else {
+			loaded[id] = ""
+		}
 	}
 	r.gw.apisMu.RUnlock()
 
-	idpsByID := make(map[string]IdP, len(idps))
+	allowMissingIssuer := r.allowMissingIssuer()
+
+	byKey := make(map[idpKey]IdP, len(idps))
 	bindingsByAPI := make(map[string][]Binding, len(loaded))
 
 	for _, idp := range idps {
+		if reason := idp.unusableReason(allowMissingIssuer); reason != "" {
+			idpSkipLog(idp, "").Warnf("Ignoring client IdP: %s", reason)
+			continue
+		}
+		key := idpKey{orgID: idp.OrgID, id: idp.ID}
+		if _, dup := byKey[key]; dup {
+			idpSkipLog(idp, "").Warn("Ignoring client IdP: duplicate ID within the Organisation")
+			continue
+		}
+
 		var indexed bool
 		for apiID, sm := range idp.APIMappings {
-			if _, ok := loaded[apiID]; !ok {
+			apiOrgID, ok := loaded[apiID]
+			if !ok {
+				// Routine on segmented nodes, and how stale api_ids go inert.
+				idpSkipLog(idp, apiID).Debug("Ignoring client IdP mapping: API not loaded")
+				continue
+			}
+			if apiOrgID != idp.OrgID {
+				idpSkipLog(idp, apiID).Warn("Ignoring client IdP mapping: API is not owned by the IdP's Organisation")
 				continue
 			}
 			bindingsByAPI[apiID] = append(bindingsByAPI[apiID], Binding{
+				OrgID:          idp.OrgID,
 				IdPID:          idp.ID,
+				Issuer:         idp.Issuer,
+				JWKSURI:        idp.JWKSURI,
 				ScopeToPolicy:  sm.ScopeToPolicy,
 				ScopeClaimName: idp.ScopeClaimName,
 			})
 			indexed = true
 		}
 		if indexed {
-			idpsByID[idp.ID] = idp
+			byKey[key] = idp
 		}
 	}
 
 	r.mu.Lock()
-	r.idpsByID, r.bindingsByAPI = idpsByID, bindingsByAPI
+	r.idps, r.bindingsByAPI = byKey, bindingsByAPI
 	r.mu.Unlock()
+
+	r.warnedMu.Lock()
+	r.warnedMissingIssuer = nil
+	r.warnedMu.Unlock()
+}
+
+// warnMissingIssuerAccepted logs, once per binding per rebuild, that a request
+// was authenticated without an issuer check.
+func (r *IdPRegistry) warnMissingIssuerAccepted(apiID string, b *Binding) {
+	key := apiID + "\x00" + b.OrgID + "\x00" + b.IdPID
+
+	r.warnedMu.Lock()
+	_, warned := r.warnedMissingIssuer[key]
+	if !warned {
+		if r.warnedMissingIssuer == nil {
+			r.warnedMissingIssuer = map[string]struct{}{}
+		}
+		r.warnedMissingIssuer[key] = struct{}{}
+	}
+	r.warnedMu.Unlock()
+
+	if warned {
+		return
+	}
+	idpSkipLog(IdP{ID: b.IdPID, OrgID: b.OrgID}, apiID).
+		Warn("allow_unsafe_idp_missing_issuer: accepted a JWT without an iss claim, matched to the client IdP by key ID alone")
+}
+
+// unusableReason says why the record can never be a trust source, or returns ""
+// when it can. An empty Organisation is not a wildcard, and an empty issuer
+// would match tokens that name no issuer; only the latter is tolerated under
+// allow_unsafe_idp_missing_issuer.
+func (i IdP) unusableReason(allowMissingIssuer bool) string {
+	switch {
+	case i.OrgID == "":
+		return "no owning Organisation"
+	case i.Issuer == "" && !allowMissingIssuer:
+		return "no issuer"
+	default:
+		return ""
+	}
+}
+
+// idpSkipLog builds a registry log entry. It names records only: never tokens, JWKS URIs or key material.
+func idpSkipLog(idp IdP, apiID string) *logrus.Entry {
+	fields := logrus.Fields{
+		"prefix":        "idp-registry",
+		"client_idp_id": idp.ID,
+		"org_id":        idp.OrgID,
+	}
+	if apiID != "" {
+		fields["api_id"] = apiID
+	}
+	return log.WithFields(fields)
 }
 
 // refreshIdPRegistry triggers a debounced client-IdP registry refresh, guarding
