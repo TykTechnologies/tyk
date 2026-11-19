@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/model"
 )
 
@@ -337,12 +338,32 @@ func (h *HTTPDashboardHandler) sendCertificateReport() error {
 	return err
 }
 
+// certificateReportBody is the body of a certificate report. The report is sorted, so the same
+// certificate use always gives the same bytes and the same hash.
+func (h *HTTPDashboardHandler) certificateReportBody() ([]byte, error) {
+	return json.Marshal(model.CertificateReport{Certificates: h.Gw.certificateReport()})
+}
+
+// certificateReportHash is the SHA-256 of the report the Gateway would send now, or empty when the
+// Dashboard doesn't take reports. The Dashboard only treats its stored report as current when the
+// hash a heartbeat carries matches it, so a change that hasn't reached it never looks confirmed.
+func (h *HTTPDashboardHandler) certificateReportHash() string {
+	if h.certReportUnsupported.Load() || h.CertificatesEndpoint == "" {
+		return ""
+	}
+	body, err := h.certificateReportBody()
+	if err != nil {
+		return ""
+	}
+	return crypto.HexSHA256(body)
+}
+
 func (h *HTTPDashboardHandler) doSendCertificateReport() error {
 	if h.certReportUnsupported.Load() || h.CertificatesEndpoint == "" {
 		return nil
 	}
 
-	body, err := json.Marshal(model.CertificateReport{Certificates: h.Gw.certificateReport()})
+	body, err := h.certificateReportBody()
 	if err != nil {
 		return err
 	}
@@ -487,6 +508,11 @@ func (h *HTTPDashboardHandler) doHeartBeat(req *http.Request, client *http.Clien
 	h.Gw.ServiceNonceMutex.RUnlock()
 	// Refreshed on every send: StartBeating reuses req across heartbeats.
 	h.Gw.nodeMetadata().setHeaders(req.Header)
+	if hash := h.certificateReportHash(); hash != "" {
+		req.Header.Set(header.XTykCertReportHash, hash)
+	} else {
+		req.Header.Del(header.XTykCertReportHash)
+	}
 
 	resp, err := client.Do(req)
 	if err != nil {

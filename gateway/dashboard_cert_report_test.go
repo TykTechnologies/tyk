@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -14,6 +15,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/header"
+	"github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/internal/model"
 )
 
@@ -227,4 +229,63 @@ func TestQueueCertificateReport_Coalesces(t *testing.T) {
 func TestReportCertificates_NoEndpoint(t *testing.T) {
 	h := &HTTPDashboardHandler{}
 	assert.NoError(t, h.ReportCertificates(), "a handler without the endpoint sends nothing")
+}
+
+// TestHeartBeat_CertificateReportHash checks that each heartbeat carries the hash of the report the
+// Gateway would send now, so the Dashboard can tell a current report from one that never arrived.
+func TestHeartBeat_CertificateReportHash(t *testing.T) {
+	const upstreamCertID = "5f0c1a2b3c4d5e6f708192a3" + "1111111111111111111111111111111111111111111111111111111111111111"
+
+	var (
+		mu         sync.Mutex
+		pingHashes []string
+		reportBody []byte
+	)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		mu.Lock()
+		defer mu.Unlock()
+		switch r.URL.Path {
+		case "/register/ping":
+			pingHashes = append(pingHashes, r.Header.Get(header.XTykCertReportHash))
+		case "/system/node/certificates":
+			body, err := io.ReadAll(r.Body)
+			assert.NoError(t, err)
+			reportBody = body
+		}
+		writeJSON(t, w, okResponse("node-1", "nonce"))
+	}))
+	defer srv.Close()
+
+	h, ts := newTestDashboardFixture(t, srv.URL, func(c *config.Config) {
+		c.Security.Certificates.Upstream = map[string]string{"*": upstreamCertID}
+	})
+	defer ts.Close()
+	h.CertificatesEndpoint = srv.URL + "/system/node/certificates"
+	ts.Gw.updateCertUsage(nil)
+
+	heartBeat := func() string {
+		t.Helper()
+		require.NoError(t, h.doHeartBeat(h.newRequest(http.MethodGet, h.HeartBeatEndpoint), h.Gw.initialiseClient()))
+		mu.Lock()
+		defer mu.Unlock()
+		return pingHashes[len(pingHashes)-1]
+	}
+
+	require.NoError(t, h.ReportCertificates())
+	mu.Lock()
+	sent := crypto.HexSHA256(reportBody)
+	mu.Unlock()
+
+	assert.Equal(t, sent, heartBeat(), "the hash matches the bytes of the report the Dashboard received")
+	assert.Equal(t, sent, heartBeat(), "the same use gives the same hash")
+
+	conf := ts.Gw.GetConfig()
+	conf.Security.Certificates.Upstream = nil
+	ts.Gw.SetConfig(conf, true)
+	ts.Gw.updateCertUsage(nil)
+	assert.NotEqual(t, sent, heartBeat(), "a change that hasn't been reported gives another hash")
+
+	h.certReportUnsupported.Store(true)
+	assert.Empty(t, heartBeat(), "no hash is sent to a Dashboard that doesn't take reports")
 }

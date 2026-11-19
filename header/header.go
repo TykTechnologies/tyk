@@ -43,6 +43,7 @@ const (
 	XTykSessionID         = "x-tyk-session-id"
 	XTykNonce             = "x-tyk-nonce"
 	XTykHostname          = "x-tyk-hostname"
+	XTykCertReportHash    = "x-tyk-cert-report-hash"
 	XGenerator            = "X-Generator"
 	XTykAuthorization     = "X-Tyk-Authorization"
 	XTykAcceptExampleName = "X-Tyk-Accept-Example-Name"
