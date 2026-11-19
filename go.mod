@@ -118,7 +118,7 @@ require (
 	github.com/nats-io/nats.go v1.49.0
 	github.com/newrelic/go-agent/v3 v3.35.1
 	github.com/newrelic/go-agent/v3/integrations/nrgorilla v1.2.2
-	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037
+	github.com/oasdiff/yaml v0.1.1
 	github.com/ohler55/ojg v1.26.9
 	github.com/rabbitmq/amqp091-go v1.15.0
 	github.com/samber/lo v1.50.0
@@ -487,7 +487,7 @@ require (
 	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/neo4j/neo4j-go-driver/v5 v5.24.0 // indirect
 	github.com/nsqio/go-nsq v1.1.0 // indirect
-	github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90 // indirect
+	github.com/oasdiff/yaml3 v0.0.14 // indirect
 	github.com/oklog/ulid/v2 v2.1.1 // indirect
 	github.com/olivere/elastic/v7 v7.0.32 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
@@ -528,7 +528,7 @@ require (
 	github.com/ryanuber/go-glob v1.0.0 // indirect
 	github.com/s2-streamstore/s2-sdk-go v0.13.3 // indirect
 	github.com/santhosh-tekuri/jsonschema/v5 v5.3.1 // indirect
-	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
+	github.com/santhosh-tekuri/jsonschema/v6 v6.0.3 // indirect
 	github.com/schollz/progressbar/v2 v2.15.0 // indirect
 	github.com/segmentio/asm v1.2.1 // indirect
 	github.com/segmentio/encoding v0.5.4 // indirect
@@ -645,6 +645,20 @@ require (
 replace go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.54.0 => go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.49.0
 
 replace github.com/getkin/kin-openapi => github.com/TykTechnologies/kin-openapi v0.512.1-0.20260921123310-5d76ff536981
+
+// The kin-openapi fork calls yaml.UnmarshalWithOrigin, which oasdiff/yaml v0.1.x
+// removed. Plugin builds (go get tyk@sha) pull in upstream kin-openapi v0.149.0,
+// which requires oasdiff/yaml v0.1.1 and wins MVS, breaking the plugin compiler.
+// Pin both modules to the versions the fork is built against.
+//
+// The require versions above (yaml v0.1.1, yaml3 v0.0.14) intentionally match
+// upstream kin-openapi v0.149.0 so the gateway and Go plugins select the same
+// module versions; otherwise plugin.Open fails with "plugin was built with a
+// different version of package github.com/oasdiff/yaml3".
+replace (
+	github.com/oasdiff/yaml => github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037
+	github.com/oasdiff/yaml3 => github.com/oasdiff/yaml3 v0.0.0-20250309153720-d2182401db90
+)
 
 // SECURITY: GO-2026-5048, CVE-2026-46384, CVE-2026-46385, GHSA-mx64-mj3q-7prj in
 // the Avro decoder. github.com/hamba/avro is archived and will not be patched, so
