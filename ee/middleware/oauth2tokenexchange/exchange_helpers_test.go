@@ -75,7 +75,7 @@ func TestParseExchangeResponse(t *testing.T) {
 			{"id_token rejected for an access-token request", accessType, idType, true},
 			{"configured type must match exactly", jwtType, accessType, true},
 			{"configured type exact match", idType, idType, false},
-			{"not checked when nothing was requested (jwt-bearer)", "", idType, false},
+			{"not checked when nothing was requested", "", idType, false},
 		}
 		for _, tc := range cases {
 			t.Run(tc.name, func(t *testing.T) {
@@ -110,10 +110,15 @@ func TestBuildExchangeForm(t *testing.T) {
 		assert.Equal(t, oas.OAuth2GrantTypeTokenExchange, form.Get(oas.OAuth2FormGrantType))
 		assert.Equal(t, "subject-token", form.Get(oas.OAuth2FormSubjectToken))
 		assert.Equal(t, oas.OAuth2TokenTypeAccessToken, form.Get(oas.OAuth2FormSubjectTokenType))
-		assert.Equal(t, oas.OAuth2TokenTypeAccessToken, form.Get(oas.OAuth2FormRequestedTokenType))
 	})
 
-	t.Run("requestedTokenType overrides the access-token default", func(t *testing.T) {
+	t.Run("requested_token_type is omitted unless configured", func(t *testing.T) {
+		form := buildExchangeForm(provider, "s", target, oas.OAuth2ClientAuthBasic)
+		_, has := form[oas.OAuth2FormRequestedTokenType]
+		assert.False(t, has, "unconfigured providers must keep the pre-existing wire shape")
+	})
+
+	t.Run("configured requestedTokenType is sent", func(t *testing.T) {
 		p := *provider
 		p.RequestedTokenType = oas.OAuth2TokenTypeJWT
 		form := buildExchangeForm(&p, "s", target, oas.OAuth2ClientAuthBasic)
@@ -356,7 +361,8 @@ func TestExchangeWouldFire_ProviderDefault(t *testing.T) {
 }
 
 // TestExchangeAtIdP_RequestedTokenType drives the full call against a fake IdP:
-// the configured type goes out on the wire, and the response's
+// an unconfigured provider keeps the pre-existing wire shape and response
+// handling; a configured type goes out on the wire and the response's
 // issued_token_type is checked against it (RFC 8693 only).
 func TestExchangeAtIdP_RequestedTokenType(t *testing.T) {
 	target := &oauth2common.Target{Audience: "https://upstream", Scopes: []string{"read"}}
@@ -391,9 +397,10 @@ func TestExchangeAtIdP_RequestedTokenType(t *testing.T) {
 		wantWire                       string // "" with wantField=false means absent
 		wantField, wantErr             bool
 	}{
-		{"default sends access_token and accepts it", "", "", oas.OAuth2TokenTypeAccessToken, oas.OAuth2TokenTypeAccessToken, true, false},
-		{"default rejects an id_token", "", "", idType, oas.OAuth2TokenTypeAccessToken, true, true},
-		{"default tolerates a missing issued_token_type", "", "", "", oas.OAuth2TokenTypeAccessToken, true, false},
+		{"unconfigured sends nothing and accepts any issued type", "", "", idType, "", false, false},
+		{"access_token sent and accepted", "", oas.OAuth2TokenTypeAccessToken, oas.OAuth2TokenTypeAccessToken, oas.OAuth2TokenTypeAccessToken, true, false},
+		{"access_token request rejects an id_token", "", oas.OAuth2TokenTypeAccessToken, idType, oas.OAuth2TokenTypeAccessToken, true, true},
+		{"access_token request tolerates a missing issued_token_type", "", oas.OAuth2TokenTypeAccessToken, "", oas.OAuth2TokenTypeAccessToken, true, false},
 		{"configured type is sent and enforced", "", oas.OAuth2TokenTypeJWT, oas.OAuth2TokenTypeAccessToken, oas.OAuth2TokenTypeJWT, true, true},
 		{"configured type exact match passes", "", idType, idType, idType, true, false},
 		{"jwt-bearer sends no field and skips the check", oas.OAuth2ProviderGrantJWTBearer, "", idType, "", false, false},

@@ -22,7 +22,7 @@ type CacheKeyInput struct {
 	// keys the cache per tenant for IdPs whose tenants share one issuer.
 	TenantEndpoint string
 	// RequestedTokenType is the provider's configured requested_token_type,
-	// empty when it uses the access-token default. It keeps a cached token of
+	// empty when none is configured. It keeps a cached token of
 	// one type from being served after the provider is reconfigured to ask for
 	// another.
 	RequestedTokenType string
@@ -42,7 +42,7 @@ func (k CacheKeyInput) Build() string {
 	if k.TenantEndpoint != "" {
 		raw += "|" + k.TenantEndpoint
 	}
-	// Same rule: providers on the default type keep their existing keys. The
+	// Same rule: providers without one keep their existing keys. The
 	// "rtt=" tag keeps it distinct from a TenantEndpoint in the same slot.
 	if k.RequestedTokenType != "" {
 		raw += "|rtt=" + k.RequestedTokenType

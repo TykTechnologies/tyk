@@ -313,17 +313,20 @@ func (m *Middleware) exchangeAtIdP(ctx context.Context, provider *oas.OAuth2Toke
 		}
 	}
 
-	requested := ""
-	if !provider.IsJWTBearer() {
-		requested = provider.EffectiveRequestedTokenType()
+	// Only an explicitly configured type is verified; providers without one
+	// keep the pre-existing behaviour of accepting the response as is.
+	requested := provider.RequestedTokenType
+	if provider.IsJWTBearer() {
+		requested = ""
 	}
 	return parseExchangeResponse(body, requested)
 }
 
 // buildExchangeForm builds the exchange request form for the provider's grant.
 // RFC 8693 (the default) sends the inbound token as subject_token, the
-// provider's requested_token_type (access token unless configured), and the
-// target as separate audience/resource/scope parameters; jwt-bearer (RFC 7523)
+// provider's requested_token_type when one is configured (omitted otherwise,
+// leaving the IdP default), and the target as separate audience/resource/scope
+// parameters; jwt-bearer (RFC 7523)
 // sends it as `assertion` with the target rendered into `scope`. When the
 // client-auth method is client_secret_post, credentials are injected into the
 // form here (basic-auth credentials are set on the request header instead).
@@ -336,7 +339,9 @@ func buildExchangeForm(provider *oas.OAuth2TokenExchangeProvider, subjectToken s
 	form.Set(oas.OAuth2FormGrantType, oas.OAuth2GrantTypeTokenExchange)
 	form.Set(oas.OAuth2FormSubjectToken, subjectToken)
 	form.Set(oas.OAuth2FormSubjectTokenType, oas.OAuth2TokenTypeAccessToken)
-	form.Set(oas.OAuth2FormRequestedTokenType, provider.EffectiveRequestedTokenType())
+	if provider.RequestedTokenType != "" {
+		form.Set(oas.OAuth2FormRequestedTokenType, provider.RequestedTokenType)
+	}
 	if target.Audience != "" {
 		form.Set(oas.OAuth2FormAudience, target.Audience)
 		form.Set(oas.OAuth2FormResource, target.Audience)
@@ -407,8 +412,8 @@ func applyClientAuth(req *http.Request, provider *oas.OAuth2TokenExchangeProvide
 
 // parseExchangeResponse decodes a successful IdP exchange response into the
 // exchanged access token and its lifetime (0 when expires_in is absent).
-// requested is the RFC 8693 requested_token_type sent on the call, or "" for
-// grants without one (jwt-bearer); when set, a present issued_token_type must
+// requested is the requested_token_type sent on the call, or "" when none was
+// (unconfigured providers, jwt-bearer); when set, a present issued_token_type must
 // satisfy it (see issuedTokenTypeMatches). An absent issued_token_type is
 // tolerated: RFC 8693 requires it, but IdPs commonly omit it.
 func parseExchangeResponse(body []byte, requested string) (string, time.Duration, error) {

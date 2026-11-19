@@ -185,8 +185,3 @@ func TestValidateOAuth2Schemes_RequestedTokenType(t *testing.T) {
 		assert.Contains(t, err.Error(), "requestedTokenType is only valid")
 	})
 }
-
-func TestOAuth2TokenExchangeProvider_EffectiveRequestedTokenType(t *testing.T) {
-	assert.Equal(t, OAuth2TokenTypeAccessToken, (&OAuth2TokenExchangeProvider{}).EffectiveRequestedTokenType())
-	assert.Equal(t, OAuth2TokenTypeJWT, (&OAuth2TokenExchangeProvider{RequestedTokenType: OAuth2TokenTypeJWT}).EffectiveRequestedTokenType())
-}

@@ -224,9 +224,10 @@ type OAuth2TokenExchangeProvider struct {
 
 	// RequestedTokenType is the RFC 8693 requested_token_type sent on the
 	// exchange request: an absolute URI naming the token type Tyk asks the IdP
-	// to issue. Defaults to urn:ietf:params:oauth:token-type:access_token when
-	// unset. Only valid with the token-exchange grant; the response's
-	// issued_token_type, when present, must match it.
+	// to issue, e.g. urn:ietf:params:oauth:token-type:access_token. Opt-in:
+	// when unset nothing is sent and the response is not checked, so existing
+	// providers are unaffected. When set, the response's issued_token_type, if
+	// present, must match it. Only valid with the token-exchange grant.
 	RequestedTokenType string `bson:"requestedTokenType,omitempty" json:"requestedTokenType,omitempty"`
 
 	// CustomParams are extra form parameters appended to the exchange request.
@@ -243,15 +244,6 @@ type OAuth2TokenExchangeProvider struct {
 // grant. An empty GrantType defaults to RFC 8693 token-exchange.
 func (p *OAuth2TokenExchangeProvider) IsJWTBearer() bool {
 	return p != nil && p.GrantType == OAuth2ProviderGrantJWTBearer
-}
-
-// EffectiveRequestedTokenType returns the requested_token_type Tyk sends for
-// this provider: RequestedTokenType, or the access-token URN when unset.
-func (p *OAuth2TokenExchangeProvider) EffectiveRequestedTokenType() string {
-	if p == nil || p.RequestedTokenType == "" {
-		return OAuth2TokenTypeAccessToken
-	}
-	return p.RequestedTokenType
 }
 
 // OAuth2ExchangeCache controls caching of exchanged tokens per provider.

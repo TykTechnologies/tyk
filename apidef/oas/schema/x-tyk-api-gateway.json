@@ -2225,7 +2225,7 @@
         "requestedTokenType": {
           "type": "string",
           "minLength": 1,
-          "description": "RFC 8693 requested_token_type sent on the exchange request: an absolute URI naming the token type to request. Defaults to urn:ietf:params:oauth:token-type:access_token. Only valid with the token-exchange grant. When the IdP response carries issued_token_type it must match (a jwt-typed token also satisfies an access-token request)."
+          "description": "RFC 8693 requested_token_type sent on the exchange request: an absolute URI naming the token type to request, e.g. urn:ietf:params:oauth:token-type:access_token. Optional: when unset the parameter is not sent and the IdP response is not checked. When set, an issued_token_type in the IdP response must match it (a jwt-typed token also satisfies an access-token request). Only valid with the token-exchange grant."
         },
         "customParams": {
           "type": "object",
