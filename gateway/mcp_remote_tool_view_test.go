@@ -411,7 +411,11 @@ func TestRemoteMCPToolView_CatalogueCheckOnLoad(t *testing.T) {
 		// straight to tools/list, so blocking initialize blocks only the check.
 		release := make(chan struct{})
 		upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			body, _ := io.ReadAll(r.Body)
+			body, err := io.ReadAll(r.Body)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusBadRequest)
+				return
+			}
 			if strings.Contains(string(body), `"method":"initialize"`) {
 				select {
 				case <-release:
