@@ -1514,6 +1514,11 @@ type Config struct {
 
 	// AllowUnsafeBodyTransformTemplatePaths disables body transform template path validation. This is provided for compatibility with legacy API definitions containing potentially unsafe template paths (default: false).
 	AllowUnsafeBodyTransformTemplatePaths bool `json:"allow_unsafe_body_transform_template_paths"`
+
+	// AllowUnsafeIDPMissingIssuer allows the Gateway to trust client IdP records that omit the issuer field (default: false).
+	// A token with no iss claim is matched by key ID (kid) alone.
+	// It exists for compatibility with legacy records that predate issuer becoming mandatory. Not recommended for production use: without the issuer check, an identity provider that shares signing keys across tenants cannot be distinguished by tenant.
+	AllowUnsafeIDPMissingIssuer bool `json:"allow_unsafe_idp_missing_issuer"`
 }
 
 // LabsConfig include config for streaming

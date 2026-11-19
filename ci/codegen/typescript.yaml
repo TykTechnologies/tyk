@@ -1,0 +1,3 @@
+generatorName: typescript-axios
+nameMappings:
+  _id: MongoId
