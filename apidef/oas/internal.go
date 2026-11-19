@@ -19,9 +19,13 @@ func (i *Internal) ExtractTo(meta *apidef.InternalMeta) {
 	meta.Disabled = !i.Enabled
 }
 
-func (s *OAS) fillInternal(metas []apidef.InternalMeta) {
+func (s *OAS) fillInternal(metas []apidef.InternalMeta, m pathMapper) {
 	for _, meta := range metas {
-		operationID := s.getOperationID(meta.Path, meta.Method)
+		operationID, ok := m.mapEndpoint(s, meta.Path, meta.Method)
+		if !ok {
+			continue
+		}
+
 		operation := s.GetTykExtension().getOperation(operationID)
 
 		if operation.Internal == nil {
