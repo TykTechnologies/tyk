@@ -4,11 +4,14 @@ import (
 	"encoding/base64"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/tyk/apidef"
+	"github.com/TykTechnologies/tyk/config"
 	"github.com/TykTechnologies/tyk/storage"
 	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
@@ -49,7 +52,9 @@ func TestBasicAuth(t *testing.T) {
 
 	validPassword := map[string]string{"Authorization": genAuthHeader("user", "password")}
 	wrongPassword := map[string]string{"Authorization": genAuthHeader("user", "wrong")}
-	wrongFormat := map[string]string{"Authorization": genAuthHeader("user", "password:more")}
+	// RFC 7617 allows ':' in the password; wrong password yields 401, not 400 malformed.
+	passwordWithColon := map[string]string{"Authorization": genAuthHeader("user", "password:more")}
+	missingColon := map[string]string{"Authorization": "Basic " + base64.StdEncoding.EncodeToString([]byte("usernocolon"))}
 	malformed := map[string]string{"Authorization": "not base64"}
 
 	ts.Run(t, []test.TestCase{
@@ -58,9 +63,43 @@ func TestBasicAuth(t *testing.T) {
 		{Method: "GET", Path: "/", Code: 401, BodyMatch: `Authorization field missing`},
 		{Method: "GET", Path: "/", Headers: validPassword, Code: 200},
 		{Method: "GET", Path: "/", Headers: wrongPassword, Code: 401},
-		{Method: "GET", Path: "/", Headers: wrongFormat, Code: 400, BodyMatch: `Attempted access with malformed header, values not in basic auth format`},
+		{Method: "GET", Path: "/", Headers: passwordWithColon, Code: 401},
+		{Method: "GET", Path: "/", Headers: missingColon, Code: 400, BodyMatch: `Attempted access with malformed header, values not in basic auth format`},
 		{Method: "GET", Path: "/", Headers: malformed, Code: 400, BodyMatch: `Attempted access with malformed header, auth data not encoded correctly`},
 	}...)
+}
+
+func TestBasicAuthHeaderCredentials_RFC7617PasswordColon(t *testing.T) {
+	gw := &Gateway{}
+	gw.SetConfig(config.Config{})
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{
+		AuthConfigs: map[string]apidef.AuthConfig{
+			apidef.BasicType: {},
+		},
+	}}
+	k := &BasicAuthKeyIsValid{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: gw}}
+
+	t.Run("password containing colon is valid", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("Authorization", genAuthHeader("user", "p@ss:word:extra"))
+
+		username, password, err, code := k.basicAuthHeaderCredentials(rec, req)
+		assert.NoError(t, err)
+		assert.Equal(t, 0, code)
+		assert.Equal(t, "user", username)
+		assert.Equal(t, "p@ss:word:extra", password)
+	})
+
+	t.Run("missing colon is malformed", func(t *testing.T) {
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte("usernocolon")))
+
+		_, _, err, code := k.basicAuthHeaderCredentials(rec, req)
+		assert.Error(t, err)
+		assert.Equal(t, http.StatusBadRequest, code)
+	})
 }
 
 func TestBasicAuthFromBody(t *testing.T) {
