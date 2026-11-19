@@ -14,6 +14,8 @@ import (
 	_ "github.com/TykTechnologies/tyk/internal/portal"
 	_ "github.com/warpstreamlabs/bento/public/components/all"
 	"github.com/warpstreamlabs/bento/public/service"
+
+	_ "github.com/TykTechnologies/tyk/ee/middleware/streams/kafka"
 )
 
 // Stream is a wrapper around stream
@@ -34,6 +36,27 @@ func NewStream(allowUnsafe []string, logger *logrus.Entry) *Stream {
 		logger:        logger,
 		allowedUnsafe: allowUnsafe,
 	}
+}
+
+// Validate parses and builds a stream without running it. Bento component
+// constructors may validate configuration, but Connect is never invoked.
+func (s *Stream) Validate(config map[string]interface{}, mux service.HTTPMultiplexer) error {
+	configPayload, err := yaml.Marshal(config)
+	if err != nil {
+		return err
+	}
+	configPayload = s.removeUnsafe(configPayload)
+	builder := service.NewStreamBuilder()
+	handler := slog.NewJSONHandler(newBentoLogAdapter(s.logger), nil)
+	builder.SetLogger(slog.New(handler))
+	if err := builder.SetYAML(string(configPayload)); err != nil {
+		return err
+	}
+	if mux != nil {
+		builder.SetHTTPMux(mux)
+	}
+	_, err = builder.Build()
+	return err
 }
 
 // Start loads up the configuration and starts the stream. Non-blocking

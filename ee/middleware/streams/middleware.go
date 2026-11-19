@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -15,9 +16,13 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
 
+	tykctx "github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/middleware"
 	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/user"
 )
+
+const kafkaPermissionsMetadataKey = "kafka_permissions"
 
 // Middleware implements a streaming middleware.
 type Middleware struct {
@@ -41,6 +46,9 @@ var _ model.Middleware = &Middleware{}
 
 // NewMiddleware returns a new instance of Middleware.
 func NewMiddleware(gw Gateway, mw BaseMiddleware, spec *APISpec, analyticsFactory StreamAnalyticsFactory) *Middleware {
+	if analyticsFactory == nil {
+		analyticsFactory = &NoopStreamAnalyticsFactory{}
+	}
 	return &Middleware{
 		base:             mw,
 		Gw:               gw,
@@ -87,6 +95,15 @@ func (s *Middleware) Init() {
 	s.Logger().Debug("Initializing Middleware")
 	s.ctx, s.cancel = context.WithCancel(context.Background())
 
+	// Build every stream once without running it. This keeps schema validation
+	// network-free; the default manager below remains the sole owner of
+	// background Kafka-to-HTTP connectors.
+	validator := &Manager{
+		muxer: mux.NewRouter(), mw: s, validateOnly: true,
+		analyticsFactory: &NoopStreamAnalyticsFactory{},
+	}
+	validator.initStreams(nil, s.getStreamsConfig(nil))
+
 	s.Logger().Debug("Initializing default stream manager")
 	s.defaultManager = s.CreateStreamManager(nil)
 
@@ -132,9 +149,9 @@ func (s *Middleware) CreateStreamManager(r *http.Request) *Manager {
 	newManager := &Manager{
 		muxer:            mux.NewRouter(),
 		mw:               s,
-		dryRun:           r == nil,
+		background:       r == nil,
 		activityCounter:  atomic.Int32{},
-		analyticsFactory: &NoopStreamAnalyticsFactory{},
+		analyticsFactory: s.analyticsFactory,
 	}
 	newManager.initStreams(r, streamsConfig)
 
@@ -238,8 +255,27 @@ func (s *Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 	}
 
 	var match mux.RouteMatch
+	if s.defaultManager.isControlPath(strippedPath) {
+		permission := "kafka:ack"
+		if strings.Contains(strippedPath, "/offset/reset/") {
+			permission = "kafka:offset-reset"
+		} else if strings.HasSuffix(strippedPath, "/kafka/status") || strings.Contains(strippedPath, "/kafka/") && strings.HasSuffix(strippedPath, "/status") {
+			permission = "kafka:status"
+		}
+		if !hasKafkaControlPermission(tykctx.GetSession(r), permission) {
+			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			return nil, middleware.StatusRespond
+		}
+		s.defaultManager.routeLock.Lock()
+		s.defaultManager.muxer.Match(newRequest, &match)
+		s.defaultManager.routeLock.Unlock()
+		if match.Handler == nil {
+			return errors.New("control handler unavailable"), http.StatusServiceUnavailable
+		}
+		match.Handler.ServeHTTP(w, r)
+		return nil, middleware.StatusRespond
+	}
 	streamManager := s.CreateStreamManager(r)
-	streamManager.SetAnalyticsFactory(s.analyticsFactory)
 	streamManager.routeLock.Lock()
 	streamManager.muxer.Match(newRequest, &match)
 	streamManager.routeLock.Unlock()
@@ -256,6 +292,34 @@ func (s *Middleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _ in
 	handler.ServeHTTP(w, r)
 
 	return nil, middleware.StatusRespond
+}
+
+func hasKafkaControlPermission(session *user.SessionState, required string) bool {
+	if session == nil || session.MetaData == nil {
+		return false
+	}
+	value, ok := session.MetaData[kafkaPermissionsMetadataKey]
+	if !ok {
+		return false
+	}
+	has := func(permission string) bool { return permission == required || permission == "kafka:*" }
+	switch permissions := value.(type) {
+	case string:
+		return has(permissions)
+	case []string:
+		for _, permission := range permissions {
+			if has(permission) {
+				return true
+			}
+		}
+	case []interface{}:
+		for _, raw := range permissions {
+			if permission, ok := raw.(string); ok && has(permission) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (s *Middleware) resetStream(streamValue any) {
@@ -293,6 +357,7 @@ func (s *Middleware) Unload() {
 		s.resetStream(streamValue)
 		return true // continue iterating
 	})
+	s.defaultManager.closeTransportRegistrations()
 
 	GlobalStreamCounter.Add(-int64(totalStreams))
 	s.StreamManagerCache = sync.Map{}

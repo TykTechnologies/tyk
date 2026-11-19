@@ -1,0 +1,22 @@
+{
+  "annotations": {"list": []},
+  "editable": true,
+  "panels": [
+    {"type":"timeseries","title":"Delivery and acknowledgment rate","gridPos":{"h":8,"w":12,"x":0,"y":0},"targets":[{"expr":"sum by (kind) (rate(tyk_streams_kafka_events_total{api=~\"$api\",stream=~\"$stream\",component=~\"$component\",kind=~\"delivered|ack_applied\"}[5m]))","legendFormat":"{{kind}}","refId":"A"}]},
+    {"type":"timeseries","title":"Commit attempts and failures","gridPos":{"h":8,"w":12,"x":12,"y":0},"targets":[{"expr":"sum by (kind) (rate(tyk_streams_kafka_events_total{api=~\"$api\",stream=~\"$stream\",component=~\"$component\",kind=~\"commit_attempts|commit_failures\"}[5m]))","legendFormat":"{{kind}}","refId":"A"}]},
+    {"type":"timeseries","title":"In-flight and pending commits","gridPos":{"h":8,"w":12,"x":0,"y":8},"targets":[{"expr":"sum by (kind) (tyk_streams_kafka_state{api=~\"$api\",stream=~\"$stream\",component=~\"$component\",kind=~\"in_flight|pending_commits|paused_partitions\"})","legendFormat":"{{kind}}","refId":"A"}]},
+    {"type":"timeseries","title":"Distributed router state","gridPos":{"h":8,"w":12,"x":12,"y":8},"targets":[{"expr":"sum by (kind) (tyk_streams_kafka_state{api=~\"$api\",stream=~\"$stream\",component=~\"$component\",kind=~\"router_backlog|router_pending|router_dead_letters\"})","legendFormat":"{{kind}}","refId":"A"}]},
+    {"type":"timeseries","title":"Reset executions and failures","gridPos":{"h":8,"w":24,"x":0,"y":16},"targets":[{"expr":"sum by (kind) (increase(tyk_streams_kafka_events_total{api=~\"$api\",stream=~\"$stream\",component=~\"$component\",kind=~\"reset_executions|reset_failures\"}[5m]))","legendFormat":"{{kind}}","refId":"A"}]}
+  ],
+  "schemaVersion": 39,
+  "tags": ["tyk", "kafka", "external-acknowledgment"],
+  "templating": {"list": [
+    {"name":"api","label":"API","type":"query","datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"query":{"query":"label_values(tyk_streams_kafka_state, api)","refId":"api"},"includeAll":true,"allValue":".*","refresh":1},
+    {"name":"stream","label":"Stream","type":"query","datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"query":{"query":"label_values(tyk_streams_kafka_state{api=~\"$api\"}, stream)","refId":"stream"},"includeAll":true,"allValue":".*","refresh":1},
+    {"name":"component","label":"Component","type":"query","datasource":{"type":"prometheus","uid":"${DS_PROMETHEUS}"},"query":{"query":"label_values(tyk_streams_kafka_state{api=~\"$api\",stream=~\"$stream\"}, component)","refId":"component"},"includeAll":true,"allValue":".*","refresh":1}
+  ]},
+  "time": {"from":"now-6h","to":"now"},
+  "title": "Tyk Kafka Manual Acknowledgment",
+  "uid": "tyk-kafka-manual-ack",
+  "version": 1
+}

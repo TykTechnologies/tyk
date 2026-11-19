@@ -64,6 +64,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/netutil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/rate"
+	internalredis "github.com/TykTechnologies/tyk/internal/redis"
 	"github.com/TykTechnologies/tyk/internal/scheduler"
 	"github.com/TykTechnologies/tyk/internal/service/newrelic"
 	"github.com/TykTechnologies/tyk/internal/uuid"
@@ -931,6 +932,7 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 	gw.loadConfigInspectionEndpoints(muxer)
 
 	r.MethodNotAllowedHandler = MethodNotAllowedHandler{}
+	registerStreamingControlEndpoints(r, gw)
 
 	mainLog.Info("Initialising Tyk REST API Endpoints")
 
@@ -1002,6 +1004,8 @@ func (gw *Gateway) loadControlAPIEndpoints(muxer *mux.Router) {
 
 	mainLog.Debug("Loaded API Endpoints")
 }
+
+var registerStreamingControlEndpoints = func(*mux.Router, *Gateway) {}
 
 // checkIsAPIOwner will ensure that the accessor of the tyk API has the
 // correct security credentials - this is a shared secret between the
@@ -2615,6 +2619,13 @@ func (gw *Gateway) startServer() {
 
 func (gw *Gateway) GetConfig() config.Config {
 	return gw.config.Load().(config.Config)
+}
+
+// StreamingRedisClient exposes the Gateway-managed Redis connection to Streams.
+// The caller must not close the returned client.
+func (gw *Gateway) StreamingRedisClient() (internalredis.UniversalClient, error) {
+	store := &storage.RedisCluster{ConnectionHandler: gw.StorageConnectionHandler}
+	return store.Client()
 }
 
 func (gw *Gateway) GetCertificateManager() certs.CertificateManager {
