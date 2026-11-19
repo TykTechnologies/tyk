@@ -39,13 +39,15 @@ type certUsageTracker struct {
 
 	apis map[string]map[string]struct{} // certID -> set of API IDs referencing this cert, whether the use is active or not
 
-	report []model.CertificateUsage // certificates in active use, as reported to the control plane
+	// report holds the certificates in active use, as reported to the control plane. It is nil until
+	// the first API load builds it, so a Gateway that hasn't loaded its APIs yet isn't reported as
+	// using no certificates.
+	report []model.CertificateUsage
 }
 
 func newUsageTracker() *certUsageTracker {
 	return &certUsageTracker{
-		apis:   make(map[string]map[string]struct{}),
-		report: []model.CertificateUsage{},
+		apis: make(map[string]map[string]struct{}),
 	}
 }
 
@@ -75,8 +77,8 @@ func (cr *certUsageTracker) APIs(certID string) []string {
 	return result
 }
 
-// Report returns the certificates in active use, as reported to the control plane.
-// It is never nil, and must not be modified.
+// Report returns the certificates in active use, as reported to the control plane. It is nil until
+// the first API load, and an empty list once loaded when none is used. It must not be modified.
 func (cr *certUsageTracker) Report() []model.CertificateUsage {
 	cr.mu.RLock()
 	defer cr.mu.RUnlock()
@@ -414,7 +416,7 @@ func (gw *Gateway) updateCertUsage(specs []*APISpec) {
 // certificateReport returns the certificates the Gateway uses, as reported to the control plane.
 func (gw *Gateway) certificateReport() []model.CertificateUsage {
 	if gw.certUsageTracker == nil {
-		return []model.CertificateUsage{}
+		return nil
 	}
 	return gw.certUsageTracker.Report()
 }

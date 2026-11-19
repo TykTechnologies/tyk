@@ -358,7 +358,12 @@ func (h *HTTPDashboardHandler) sendCertificateReport() error {
 // certificateReportBody is the body of a certificate report. The report is sorted, so the same
 // certificate use always gives the same bytes and the same hash.
 func (h *HTTPDashboardHandler) certificateReportBody() ([]byte, error) {
-	return json.Marshal(model.CertificateReport{Certificates: h.Gw.certificateReport()})
+	report := h.Gw.certificateReport()
+	if report == nil {
+		// The APIs haven't loaded yet. The report sent after they load replaces this one.
+		report = []model.CertificateUsage{}
+	}
+	return json.Marshal(model.CertificateReport{Certificates: report})
 }
 
 // certificateReportHash is the SHA-256 of the report the Gateway would send now, or empty when the

@@ -36,7 +36,11 @@ func TestNewUsageTracker(t *testing.T) {
 	assert.NotNil(t, cr)
 	assert.NotNil(t, cr.apis)
 	assert.Equal(t, 0, cr.Len())
-	assert.NotNil(t, cr.Report(), "an empty report must be sent as an empty list")
+	assert.Nil(t, cr.Report(), "before the first API load there is no report, so MDCB records the Gateway as not reporting")
+
+	cr.replace(newCertUsage())
+	assert.NotNil(t, cr.Report(), "once loaded, an empty report must be sent as an empty list")
+	assert.Empty(t, cr.Report())
 }
 
 func TestCollectCertReferences(t *testing.T) {

@@ -60,7 +60,8 @@ type GWStats struct {
 	LoadedPolicies []LoadedPolicyInfo `json:"loaded_policies,omitempty"`
 	// Certificates lists the certificates the Gateway uses. Unlike LoadedAPIs it is always sent,
 	// as an empty list when the Gateway uses none, so the control plane can tell such a Gateway
-	// apart from one on an older version that doesn't report certificates.
+	// apart from one on an older version that doesn't report certificates. It is null until the
+	// Gateway first loads its APIs, so a starting Gateway counts as not reporting yet.
 	Certificates []CertificateUsage `json:"certificates"`
 }
 

@@ -1445,3 +1445,20 @@ func TestRPCStorageHandler_BuildNodeInfo_GoldenWireShape(t *testing.T) {
 	assert.Equal(t, []any{}, got["stats"].(map[string]any)["certificates"])
 	assert.ElementsMatch(t, []string{"Hostname", "PID", "Address"}, keysOf(got["host_details"]))
 }
+
+// TestRPCStorageHandler_BuildNodeInfo_CertificatesBeforeFirstLoad checks that a Gateway that hasn't
+// loaded its APIs yet sends certificates as null, so MDCB and the Dashboard count it as not
+// reporting rather than as using no certificates.
+func TestRPCStorageHandler_BuildNodeInfo_CertificatesBeforeFirstLoad(t *testing.T) {
+	ts := StartTest(withoutDRLNotifier)
+	defer ts.Close()
+
+	ts.Gw.certUsageTracker = newUsageTracker()
+
+	var got struct {
+		Stats map[string]json.RawMessage `json:"stats"`
+	}
+	require.NoError(t, json.Unmarshal((&RPCStorageHandler{Gw: ts.Gw}).buildNodeInfo(), &got))
+	require.Contains(t, got.Stats, "certificates")
+	assert.JSONEq(t, `null`, string(got.Stats["certificates"]))
+}
