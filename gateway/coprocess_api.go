@@ -1,10 +1,14 @@
 package gateway
 
+/*
+#include <stdlib.h>
+*/
 import "C"
 
 import (
 	"context"
 	"time"
+	"unsafe"
 
 	"github.com/sirupsen/logrus"
 
@@ -118,4 +122,11 @@ func cgoGoString(in *C.char) string {
 
 func cgoCint(in int) C.int {
 	return C.int(in)
+}
+
+// TykFreeMemory frees memory allocated by C.CString.
+//
+//export TykFreeMemory
+func TykFreeMemory(ptr unsafe.Pointer) {
+	C.free(ptr)
 }
