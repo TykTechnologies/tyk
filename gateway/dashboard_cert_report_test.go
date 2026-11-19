@@ -125,7 +125,7 @@ func TestReportCertificates(t *testing.T) {
 		defer ts.Close()
 
 		require.NoError(t, h.ReportCertificates(), "a 404 isn't an error")
-		assert.True(t, h.certReportUnsupported.Load())
+		assert.True(t, h.certReportUnsupported())
 
 		dash.mu.Lock()
 		dash.status = http.StatusOK
@@ -137,7 +137,44 @@ func TestReportCertificates(t *testing.T) {
 		require.NoError(t, h.Register(context.Background()))
 		assert.Eventually(t, func() bool { return dash.count() == 1 }, 2*time.Second, 10*time.Millisecond,
 			"registering clears the flag and sends a report")
-		assert.False(t, h.certReportUnsupported.Load())
+		assert.False(t, h.certReportUnsupported())
+	})
+
+	t.Run("older Dashboard upgraded: the next heartbeat after the wait reports again", func(t *testing.T) {
+		dash := newCertReportStub(t, http.StatusNotFound)
+		h, ts := newCertReportFixture(t, dash, nil)
+		defer ts.Close()
+
+		require.NoError(t, h.ReportCertificates())
+		require.True(t, h.certReportUnsupported())
+
+		// The Dashboard is upgraded. It keeps the Gateway's session, so the Gateway doesn't register again.
+		dash.mu.Lock()
+		dash.status = http.StatusOK
+		dash.mu.Unlock()
+
+		req := h.newRequest(http.MethodGet, h.HeartBeatEndpoint)
+		client := h.Gw.initialiseClient()
+		require.NoError(t, h.doHeartBeat(req, client))
+		assert.Never(t, func() bool { return dash.count() > 0 }, 200*time.Millisecond, 10*time.Millisecond,
+			"a heartbeat before the wait sends nothing")
+
+		h.certReportUnsupportedAt.Store(time.Now().Add(-certReportUnsupportedRetry).UnixNano())
+		require.NoError(t, h.doHeartBeat(req, client))
+		assert.Eventually(t, func() bool { return dash.count() == 1 }, 2*time.Second, 10*time.Millisecond,
+			"a heartbeat after the wait sends a report")
+		assert.Eventually(t, func() bool { return h.certReportUnsupportedAt.Load() == 0 }, 2*time.Second, 10*time.Millisecond,
+			"a report the Dashboard accepts clears the flag")
+	})
+
+	t.Run("older Dashboard not yet upgraded: a retry after the wait waits again", func(t *testing.T) {
+		dash := newCertReportStub(t, http.StatusNotFound)
+		h, ts := newCertReportFixture(t, dash, nil)
+		defer ts.Close()
+
+		h.certReportUnsupportedAt.Store(time.Now().Add(-certReportUnsupportedRetry).UnixNano())
+		require.NoError(t, h.ReportCertificates())
+		assert.True(t, h.certReportUnsupported(), "another 404 starts the wait again")
 	})
 
 	t.Run("other errors are returned", func(t *testing.T) {
@@ -146,7 +183,7 @@ func TestReportCertificates(t *testing.T) {
 		defer ts.Close()
 
 		assert.Error(t, h.ReportCertificates())
-		assert.False(t, h.certReportUnsupported.Load())
+		assert.False(t, h.certReportUnsupported())
 	})
 }
 
@@ -286,6 +323,6 @@ func TestHeartBeat_CertificateReportHash(t *testing.T) {
 	ts.Gw.updateCertUsage(nil)
 	assert.NotEqual(t, sent, heartBeat(), "a change that hasn't been reported gives another hash")
 
-	h.certReportUnsupported.Store(true)
+	h.certReportUnsupportedAt.Store(time.Now().UnixNano())
 	assert.Empty(t, heartBeat(), "no hash is sent to a Dashboard that doesn't take reports")
 }

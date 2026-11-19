@@ -66,9 +66,10 @@ type HTTPDashboardHandler struct {
 	// certReportFailed is set when a report couldn't be delivered. The next successful heartbeat
 	// sends it again, so the Dashboard doesn't count a working Gateway as not reporting.
 	certReportFailed atomic.Bool
-	// certReportUnsupported is set when the Dashboard is too old to accept certificate reports,
-	// and cleared when the Gateway registers again.
-	certReportUnsupported atomic.Bool
+	// certReportUnsupportedAt is when the Dashboard last answered that it doesn't accept certificate
+	// reports (Unix nanoseconds), or 0. The Gateway tries again after certReportUnsupportedRetry,
+	// because an upgraded Dashboard keeps the Gateway's session and doesn't make it register again.
+	certReportUnsupportedAt atomic.Int64
 
 	Gw *Gateway `json:"-"`
 }
@@ -287,7 +288,7 @@ func (h *HTTPDashboardHandler) attemptRegistration(ctx context.Context) (registe
 
 	// The Dashboard drops the report of a node ID it gives to a newly registering Gateway,
 	// and it may have been upgraded since the last registration.
-	h.certReportUnsupported.Store(false)
+	h.certReportUnsupportedAt.Store(0)
 	h.queueCertificateReport()
 
 	return true, nil
@@ -324,8 +325,24 @@ func (h *HTTPDashboardHandler) queueCertificateReport() {
 	}()
 }
 
+// certReportUnsupportedRetry is how long the Gateway waits before reporting again to a Dashboard
+// that answered 404, in case it has been upgraded since.
+var certReportUnsupportedRetry = 10 * time.Minute
+
+// certReportUnsupported reports whether the Dashboard answered 404 less than
+// certReportUnsupportedRetry ago.
+func (h *HTTPDashboardHandler) certReportUnsupported() bool {
+	at := h.certReportUnsupportedAt.Load()
+	return at != 0 && time.Since(time.Unix(0, at)) < certReportUnsupportedRetry
+}
+
+// certReportRetryDue reports whether the Dashboard answered 404 and it's time to try again.
+func (h *HTTPDashboardHandler) certReportRetryDue() bool {
+	return h.certReportUnsupportedAt.Load() != 0 && !h.certReportUnsupported()
+}
+
 // ReportCertificates sends the certificates the Gateway uses to POST /system/node/certificates.
-// An older Dashboard answers 404, and the Gateway doesn't try again until it next registers.
+// An older Dashboard answers 404, and the Gateway tries again after certReportUnsupportedRetry.
 func (h *HTTPDashboardHandler) ReportCertificates() error {
 	h.certReportMu.Lock()
 	defer h.certReportMu.Unlock()
@@ -348,7 +365,7 @@ func (h *HTTPDashboardHandler) certificateReportBody() ([]byte, error) {
 // Dashboard doesn't take reports. The Dashboard only treats its stored report as current when the
 // hash a heartbeat carries matches it, so a change that hasn't reached it never looks confirmed.
 func (h *HTTPDashboardHandler) certificateReportHash() string {
-	if h.certReportUnsupported.Load() || h.CertificatesEndpoint == "" {
+	if h.certReportUnsupported() || h.CertificatesEndpoint == "" {
 		return ""
 	}
 	body, err := h.certificateReportBody()
@@ -359,7 +376,7 @@ func (h *HTTPDashboardHandler) certificateReportHash() string {
 }
 
 func (h *HTTPDashboardHandler) doSendCertificateReport() error {
-	if h.certReportUnsupported.Load() || h.CertificatesEndpoint == "" {
+	if h.certReportUnsupported() || h.CertificatesEndpoint == "" {
 		return nil
 	}
 
@@ -391,9 +408,11 @@ func (h *HTTPDashboardHandler) doSendCertificateReport() error {
 
 	switch resp.StatusCode {
 	case http.StatusOK:
+		h.certReportUnsupportedAt.Store(0)
 	case http.StatusNotFound:
-		h.certReportUnsupported.Store(true)
-		dashLog.Info("The Dashboard doesn't accept reports of the certificates in use. Upgrade it to see which Gateways use each certificate.")
+		if h.certReportUnsupportedAt.Swap(time.Now().UnixNano()) == 0 {
+			dashLog.Info("The Dashboard doesn't accept reports of the certificates in use. Upgrade it to see which Gateways use each certificate.")
+		}
 		return nil
 	default:
 		return fmt.Errorf("certificate report failed with status %d", resp.StatusCode)
@@ -539,7 +558,7 @@ func (h *HTTPDashboardHandler) doHeartBeat(req *http.Request, client *http.Clien
 	h.Gw.ServiceNonceMutex.Unlock()
 	//log.Debug("Heartbeat Finished: Nonce Set: ", h.Gw.ServiceNonce)
 
-	if h.certReportFailed.CompareAndSwap(true, false) {
+	if h.certReportFailed.CompareAndSwap(true, false) || h.certReportRetryDue() {
 		h.queueCertificateReport()
 	}
 
