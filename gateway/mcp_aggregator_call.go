@@ -220,9 +220,7 @@ func (d mcpAggregatorDispatcher) callTool(parent *http.Request, upstream mcpaggr
 	if err != nil {
 		return nil, errMCPAggregatorAmbiguousName
 	}
-	body := make([]byte, 0, len(forwarded)+64)
-	body = append(body, `{"jsonrpc":"2.0","id":1,"method":"tools/call","params":`...)
-	body = append(body, forwarded...)
+	body := append([]byte(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":`), forwarded...)
 	body = append(body, '}')
 
 	extra := http.Header{}
