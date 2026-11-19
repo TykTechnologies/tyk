@@ -298,13 +298,13 @@ func servesTLS(conf *config.Config, specs []*APISpec) bool {
 // security.certificates.dashboard_api and security.certificates.mdcb_api are never read.
 func collectCertUsage(conf *config.Config, specs []*APISpec) *certUsage {
 	u := newCertUsage()
-	collectAPICertUsage(u, conf, specs)
+	collectAPICertUsage(u, specs)
 	collectConfigCertUsage(u, conf, specs)
 	return u
 }
 
 // collectAPICertUsage collects the certificates named by the API specs.
-func collectAPICertUsage(u *certUsage, conf *config.Config, specs []*APISpec) {
+func collectAPICertUsage(u *certUsage, specs []*APISpec) {
 	for _, spec := range specs {
 		for _, ref := range specCertificateReferences(spec) {
 			u.reference(ref.CertID, spec.APIID)
