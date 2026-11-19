@@ -204,7 +204,7 @@ func TestMCPListFilterResponseHandler_RewriteFailureIsAWarning(t *testing.T) {
 	view, err := tooloverride.Compile(&oas.TykMCPServer{Primitives: githubToolOverrides()})
 	require.NoError(t, err)
 	h := buildMCPListFilterHandler(apiID, true)
-	h.Spec.APIDefinition.Name = "rewrite-failure"
+	h.Spec.Name = "rewrite-failure"
 	h.Spec.mcpToolView.Store(view)
 
 	const malformed = `{"jsonrpc":"2.0","id":1,"result":{"tools":"not-a-list"}}`
