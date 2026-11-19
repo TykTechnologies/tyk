@@ -137,6 +137,50 @@ func TestOAS_fillForMigration_overlappingRegexEndpoints(t *testing.T) {
 	assert.Equal(t, "user/[a-zA-Z]+GET", alpha.Get.OperationID)
 }
 
+// TestOAS_fillForMigration_validateJSONOnRegexEndpoints pins that request validation
+// lands on each regex endpoint's own operation, and survives a save.
+func TestOAS_fillForMigration_validateJSONOnRegexEndpoints(t *testing.T) {
+	t.Parallel()
+
+	requiring := func(field string) map[string]interface{} {
+		return map[string]interface{}{"type": "object", "required": []interface{}{field}}
+	}
+
+	var api apidef.APIDefinition
+	api.VersionData.Versions = map[string]apidef.VersionInfo{
+		Main: {ExtendedPaths: apidef.ExtendedPathsSet{ValidateJSON: []apidef.ValidatePathMeta{
+			{Path: "/users/[a-z]+", Method: http.MethodPost, Schema: requiring("name")},
+			{Path: "/users/[0-9]+", Method: http.MethodPost, Schema: requiring("age")},
+		}}},
+	}
+
+	var s OAS
+	require.NoError(t, s.fillForMigration(api))
+
+	var saved apidef.APIDefinition
+	s.ExtractTo(&saved)
+	s.Fill(saved)
+
+	assert.Equal(t, []string{"/users/{customRegex1}", "/users/{customRegex2}"}, pathKeysOf(s.Paths))
+
+	for path, want := range map[string]struct{ operationID, required string }{
+		"/users/{customRegex1}": {"users/[a-z]+POST", "name"},
+		"/users/{customRegex2}": {"users/[0-9]+POST", "age"},
+	} {
+		operation := s.Paths.Value(path).Post
+		require.NotNil(t, operation, path)
+		assert.Equal(t, want.operationID, operation.OperationID)
+
+		body := operation.RequestBody.Value.Content.Get("application/json")
+		require.NotNil(t, body, path)
+		assert.Equal(t, []string{want.required}, body.Schema.Value.Required)
+
+		validate := s.GetTykExtension().Middleware.Operations[want.operationID].ValidateRequest
+		require.NotNil(t, validate, path)
+		assert.True(t, validate.Enabled)
+	}
+}
+
 // TestOAS_fillForMigration_sameRegexAcrossMethods pins that endpoints differing
 // only by method keep sharing one path item.
 func TestOAS_fillForMigration_sameRegexAcrossMethods(t *testing.T) {

@@ -232,14 +232,7 @@ func (s *OAS) fillMockResponsePaths(paths *openapi3.Paths, ep apidef.ExtendedPat
 			continue
 		}
 
-		var operation *openapi3.Operation
-
-		for _, item := range paths.Map() {
-			if op := item.GetOperation(mock.Method); op != nil && op.OperationID == operationID {
-				operation = op
-				break
-			}
-		}
+		operation := operationByID(paths, mock.Method, operationID)
 
 		if operation.Responses == nil {
 			operation.Responses = openapi3.NewResponses()
@@ -894,6 +887,17 @@ func convertSchema(mapSchema map[string]interface{}) (*openapi3.Schema, error) {
 	return schema, nil
 }
 
+// operationByID returns the operation for method that carries operationID, nil when there is none.
+func operationByID(paths *openapi3.Paths, method, operationID string) *openapi3.Operation {
+	for _, item := range paths.Map() {
+		if op := item.GetOperation(method); op != nil && op.OperationID == operationID {
+			return op
+		}
+	}
+
+	return nil
+}
+
 func (s *OAS) fillOASValidateRequest(metas []apidef.ValidatePathMeta, m pathMapper) {
 	for _, meta := range metas {
 		operationID, ok := m.mapEndpoint(s, meta.Path, meta.Method)
@@ -901,7 +905,13 @@ func (s *OAS) fillOASValidateRequest(metas []apidef.ValidatePathMeta, m pathMapp
 			continue
 		}
 
-		operation := s.Paths.Find(meta.Path).GetOperation(meta.Method)
+		var operation *openapi3.Operation
+		if pathItem := s.Paths.Find(meta.Path); pathItem != nil {
+			operation = pathItem.GetOperation(meta.Method)
+		} else {
+			operation = operationByID(s.Paths, meta.Method, operationID)
+		}
+
 		requestBodyRef := operation.RequestBody
 		if operation.RequestBody == nil {
 			requestBodyRef = &openapi3.RequestBodyRef{}
