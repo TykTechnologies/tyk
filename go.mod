@@ -1,139 +1,120 @@
 module github.com/TykTechnologies/tyk
 
-go 1.26.5
+go 1.27.4
 
-godebug (
-	tls10server=1
-
-	tls3des=1
-
-	tlsrsakex=1
-
-	tlsunsafeekm=1
-
-	x509keypairleaf=0
-
-	x509negativeserial=1
-)
+godebug x509negativeserial=1
 
 require (
+	github.com/Azure/go-amqp v1.4.0
+	github.com/IBM/sarama v1.46.3
+	github.com/Jeffail/gabs/v2 v2.7.0
 	github.com/Jeffail/tunny v0.1.4
 	github.com/Masterminds/sprig/v3 v3.3.0
 	github.com/TykTechnologies/again v0.0.0-20260702122454-93dd864dd1d9
 	github.com/TykTechnologies/circuitbreaker v2.2.2+incompatible
 	github.com/TykTechnologies/drl v0.0.0-20231218155806-88e4363884a2
+	github.com/TykTechnologies/exp/pkg/limiters v0.0.0-20231219151617-0c4f9315fe5c
 	github.com/TykTechnologies/goautosocket v0.0.0-20190430121222-97bfa5e7e481
 	github.com/TykTechnologies/gorpc v0.0.0-20250214161245-e9f3f088e8c6
 	github.com/TykTechnologies/goverify v0.0.0-20260203113354-7a104729566e
 	github.com/TykTechnologies/graphql-go-tools v1.6.2-0.20260928094956-ae4125cd2fb5
+	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20260928094956-ae4125cd2fb5
 	github.com/TykTechnologies/graphql-translator v0.0.0-20250602105400-41c2e7514a36
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.3
+	github.com/TykTechnologies/opentelemetry v0.0.26
 	github.com/TykTechnologies/storage v1.5.0
+	github.com/TykTechnologies/structviewer v1.2.0
 	github.com/TykTechnologies/tyk-pump v1.17.0-rc2
 	github.com/akutz/memconn v0.1.0
+	github.com/alecthomas/kingpin/v2 v2.4.0
 	github.com/bshuster-repo/logrus-logstash-hook v1.1.0
 	github.com/buger/jsonparser v1.1.2
 	github.com/cenk/backoff v2.2.1+incompatible
 	github.com/cenkalti/backoff/v4 v4.3.0
 	github.com/clbanning/mxj v1.8.4
+	github.com/coder/websocket v1.8.13
+	github.com/eclipse/paho.mqtt.golang v1.5.1
 	github.com/evalphobia/logrus_sentry v0.8.2
 	github.com/gemnasium/logrus-graylog-hook v2.0.7+incompatible
+	github.com/getkin/kin-openapi v0.149.0
+	github.com/go-jose/go-jose/v4 v4.1.6
+	github.com/go-playground/validator/v10 v10.30.1
+	github.com/go-redis/redismock/v9 v9.2.0
+	github.com/go-redsync/redsync/v4 v4.13.0
+	github.com/goccy/go-json v0.10.5
+	github.com/goccy/go-yaml v1.17.1
 	github.com/gocraft/health v0.0.0-20170925182251-8675af27fef0
 	github.com/gofrs/uuid v4.4.0+incompatible
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/golang/protobuf v1.5.4
+	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/hashicorp/consul/api v1.31.2
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/hashicorp/go-version v1.8.0
+	github.com/hashicorp/golang-lru/v2 v2.0.7
 	github.com/hashicorp/vault/api v1.23.0
+	github.com/huandu/go-clone/generic v1.7.2
 	github.com/jensneuse/abstractlogger v0.0.4
 	github.com/justinas/alice v1.2.0
 	github.com/kelseyhightower/envconfig v1.4.0
+	github.com/klauspost/compress v1.18.7
 	github.com/lonelycode/osin v0.0.0-20160423095202-da239c9dacb6
 	github.com/mavricknz/ldap v0.0.0-20160227184754-f5a958005e43
+	github.com/mccutchen/go-httpbin/v2 v2.18.2
 	github.com/miekg/dns v1.1.62
-	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0
+	github.com/nats-io/nats.go v1.49.0
+	github.com/newrelic/go-agent/v3 v3.35.1
+	github.com/newrelic/go-agent/v3/integrations/nrgorilla v1.2.2
 	github.com/nsf/jsondiff v0.0.0-20230430225905-43f6cf3098c1 // test
+	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037
+	github.com/ohler55/ojg v1.26.9
 	github.com/opentracing/opentracing-go v1.2.0
 	github.com/openzipkin/zipkin-go v0.4.3
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/paulbellamy/ratecounter v0.2.0
 	github.com/pires/go-proxyproto v0.8.0
+	github.com/rabbitmq/amqp091-go v1.15.0
+	github.com/redis/go-redis/v9 v9.18.0
 	github.com/robertkrimen/otto v0.5.1
 	github.com/rs/cors v1.11.1
+	github.com/samber/lo v1.50.0
+	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/sirupsen/logrus v1.9.4
 	github.com/spf13/afero v1.15.0
 	github.com/stretchr/testify v1.12.1 // test
+	github.com/testcontainers/testcontainers-go v0.40.0
+	github.com/testcontainers/testcontainers-go/modules/kafka v0.37.0
+	github.com/testcontainers/testcontainers-go/modules/nats v0.37.0
+	github.com/testcontainers/testcontainers-go/modules/rabbitmq v0.36.0
+	github.com/tidwall/gjson v1.18.0
 	github.com/uber/jaeger-client-go v2.30.1-0.20220110192849-8d8e8fcfd04d+incompatible
 	github.com/valyala/fasthttp v1.58.0 // test
 	github.com/vmihailenco/msgpack v4.0.4+incompatible
+	github.com/warpstreamlabs/bento v1.16.2
 	github.com/xeipuuv/gojsonschema v1.2.0
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.70.0
+	go.opentelemetry.io/contrib/instrumentation/runtime v0.67.0
+	go.opentelemetry.io/otel v1.46.0
+	go.opentelemetry.io/otel/trace v1.46.0
 	go.uber.org/automaxprocs v1.6.0
+	go.uber.org/mock v0.5.0
 	golang.org/x/crypto v0.58.0
+	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
 	golang.org/x/net v0.62.0
+	golang.org/x/oauth2 v0.36.0
 	golang.org/x/sync v0.24.0
 	google.golang.org/grpc v1.84.0
 	google.golang.org/grpc/examples v0.0.0-20250407062114-b368379ef8f6 // test
 	google.golang.org/protobuf v1.36.12
 	gopkg.in/vmihailenco/msgpack.v2 v2.9.2
 	gopkg.in/xmlpath.v2 v2.0.0-20150820204837-860cbeca3ebc
-	gopkg.in/yaml.v3 v3.0.1
-)
-
-require (
-	github.com/TykTechnologies/exp/pkg/limiters v0.0.0-20231219151617-0c4f9315fe5c
-	github.com/go-redsync/redsync/v4 v4.13.0
-	github.com/redis/go-redis/v9 v9.18.0
-)
-
-require (
-	github.com/Azure/go-amqp v1.4.0
-	github.com/IBM/sarama v1.46.3
-	github.com/Jeffail/gabs/v2 v2.7.0
-	github.com/TykTechnologies/graphql-go-tools/v2 v2.0.0-20260928094956-ae4125cd2fb5
-	github.com/TykTechnologies/opentelemetry v0.0.26
-	github.com/TykTechnologies/structviewer v1.2.0
-	github.com/alecthomas/kingpin/v2 v2.4.0
-	github.com/coder/websocket v1.8.13
-	github.com/eclipse/paho.mqtt.golang v1.5.1
-	github.com/getkin/kin-openapi v0.149.0
-	github.com/go-jose/go-jose/v4 v4.1.6
-	github.com/go-playground/validator/v10 v10.30.1
-	github.com/go-redis/redismock/v9 v9.2.0
-	github.com/goccy/go-json v0.10.5
-	github.com/goccy/go-yaml v1.17.1
-	github.com/google/go-cmp v0.7.0
-	github.com/hashicorp/golang-lru/v2 v2.0.7
-	github.com/huandu/go-clone/generic v1.7.2
-	github.com/klauspost/compress v1.18.7
-	github.com/mccutchen/go-httpbin/v2 v2.18.2
-	github.com/nats-io/nats.go v1.49.0
-	github.com/newrelic/go-agent/v3 v3.35.1
-	github.com/newrelic/go-agent/v3/integrations/nrgorilla v1.2.2
-	github.com/oasdiff/yaml v0.0.0-20250309154309-f31be36b4037
-	github.com/ohler55/ojg v1.26.9
-	github.com/rabbitmq/amqp091-go v1.15.0
-	github.com/samber/lo v1.50.0
-	github.com/shirou/gopsutil v3.21.11+incompatible
-	github.com/testcontainers/testcontainers-go v0.40.0
-	github.com/testcontainers/testcontainers-go/modules/kafka v0.37.0
-	github.com/testcontainers/testcontainers-go/modules/nats v0.37.0
-	github.com/testcontainers/testcontainers-go/modules/rabbitmq v0.36.0
-	github.com/tidwall/gjson v1.18.0
-	github.com/warpstreamlabs/bento v1.16.2
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.70.0
-	go.opentelemetry.io/contrib/instrumentation/runtime v0.67.0
-	go.opentelemetry.io/otel v1.46.0
-	go.opentelemetry.io/otel/trace v1.46.0
-	go.uber.org/mock v0.5.0
-	golang.org/x/exp v0.0.0-20260218203240-3dfff04db8fa
-	golang.org/x/oauth2 v0.36.0
 	gopkg.in/yaml.v2 v2.4.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -452,6 +433,7 @@ require (
 	github.com/minio/c2goasm v0.0.0-20190812172519-36a3d3bbc4f3 // indirect
 	github.com/minio/highwayhash v1.0.3 // indirect
 	github.com/mitchellh/colorstring v0.0.0-20190213212951-d06e56a500db // indirect
+	github.com/mitchellh/copystructure v1.2.0 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/mitchellh/reflectwalk v1.0.2 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
