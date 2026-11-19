@@ -2321,12 +2321,17 @@
           "type": "string",
           "description": "Per-call timeout for the RFC 8693 exchange request, Tyk ReadableDuration (e.g. \"100ms\", \"5s\"). Defaults to 15s when zero/unset."
         },
+        "requestedTokenType": {
+          "type": "string",
+          "minLength": 1,
+          "description": "RFC 8693 requested_token_type sent on the exchange request: an absolute URI naming the token type to request. Defaults to urn:ietf:params:oauth:token-type:access_token. Only valid with the token-exchange grant. When the IdP response carries issued_token_type it must match (a jwt-typed token also satisfies an access-token request)."
+        },
         "customParams": {
           "type": "object",
           "additionalProperties": {
             "type": "string"
           },
-          "description": "Operator-supplied form parameters appended to every RFC 8693 exchange request. Reserved RFC 8693 / OAuth2 wire keys (grant_type, subject_token, audience, scope, actor_token, client_id, ...) are rejected at API-load time."
+          "description": "Operator-supplied form parameters appended to every RFC 8693 exchange request. Reserved RFC 8693 / OAuth2 wire keys (grant_type, subject_token, requested_token_type, audience, scope, actor_token, client_id, ...) are rejected at API-load time; set requestedTokenType instead of passing requested_token_type here."
         },
         "cache": {
           "$ref": "#/definitions/X-Tyk-OAuth2-ExchangeCache"

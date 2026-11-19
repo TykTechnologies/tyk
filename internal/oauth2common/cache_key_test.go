@@ -82,3 +82,30 @@ func TestCacheKey_TenantEndpoint(t *testing.T) {
 		assert.Equal(t, base.Build(), withField.Build())
 	})
 }
+
+func TestCacheKey_RequestedTokenType(t *testing.T) {
+	base := CacheKeyInput{
+		Issuer: "https://idp", SubjectID: "user-1", APIID: "api",
+		Audience: "api://orders", Scopes: []string{"read"}, ProviderName: "p",
+	}
+
+	t.Run("a configured type changes the key", func(t *testing.T) {
+		jwt := base
+		jwt.RequestedTokenType = "urn:ietf:params:oauth:token-type:jwt"
+		assert.NotEqual(t, base.Build(), jwt.Build())
+	})
+
+	t.Run("different configured types yield different keys", func(t *testing.T) {
+		a, b := base, base
+		a.RequestedTokenType = "urn:ietf:params:oauth:token-type:jwt"
+		b.RequestedTokenType = "urn:ietf:params:oauth:token-type:id_token"
+		assert.NotEqual(t, a.Build(), b.Build())
+	})
+
+	t.Run("does not collide with a tenant endpoint of the same value", func(t *testing.T) {
+		a, b := base, base
+		a.RequestedTokenType = "x"
+		b.TenantEndpoint = "x"
+		assert.NotEqual(t, a.Build(), b.Build())
+	})
+}

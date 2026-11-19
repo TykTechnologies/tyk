@@ -138,6 +138,8 @@ func (m *Middleware) fetchExchangedToken(r *http.Request, st *oauth2common.State
 		Scopes:         target.Scopes,
 		ProviderName:   provider.Name,
 		TenantEndpoint: tenantEndpoint,
+		// Only the explicit setting: an unset field keeps pre-existing keys.
+		RequestedTokenType: provider.RequestedTokenType,
 	}.Build()
 
 	log := m.Logger()
@@ -311,11 +313,16 @@ func (m *Middleware) exchangeAtIdP(ctx context.Context, provider *oas.OAuth2Toke
 		}
 	}
 
-	return parseExchangeResponse(body)
+	requested := ""
+	if !provider.IsJWTBearer() {
+		requested = provider.EffectiveRequestedTokenType()
+	}
+	return parseExchangeResponse(body, requested)
 }
 
 // buildExchangeForm builds the exchange request form for the provider's grant.
-// RFC 8693 (the default) sends the inbound token as subject_token with the
+// RFC 8693 (the default) sends the inbound token as subject_token, the
+// provider's requested_token_type (access token unless configured), and the
 // target as separate audience/resource/scope parameters; jwt-bearer (RFC 7523)
 // sends it as `assertion` with the target rendered into `scope`. When the
 // client-auth method is client_secret_post, credentials are injected into the
@@ -329,7 +336,7 @@ func buildExchangeForm(provider *oas.OAuth2TokenExchangeProvider, subjectToken s
 	form.Set(oas.OAuth2FormGrantType, oas.OAuth2GrantTypeTokenExchange)
 	form.Set(oas.OAuth2FormSubjectToken, subjectToken)
 	form.Set(oas.OAuth2FormSubjectTokenType, oas.OAuth2TokenTypeAccessToken)
-	form.Set(oas.OAuth2FormRequestedTokenType, oas.OAuth2TokenTypeAccessToken)
+	form.Set(oas.OAuth2FormRequestedTokenType, provider.EffectiveRequestedTokenType())
 	if target.Audience != "" {
 		form.Set(oas.OAuth2FormAudience, target.Audience)
 		form.Set(oas.OAuth2FormResource, target.Audience)
@@ -400,10 +407,15 @@ func applyClientAuth(req *http.Request, provider *oas.OAuth2TokenExchangeProvide
 
 // parseExchangeResponse decodes a successful IdP exchange response into the
 // exchanged access token and its lifetime (0 when expires_in is absent).
-func parseExchangeResponse(body []byte) (string, time.Duration, error) {
+// requested is the RFC 8693 requested_token_type sent on the call, or "" for
+// grants without one (jwt-bearer); when set, a present issued_token_type must
+// satisfy it (see issuedTokenTypeMatches). An absent issued_token_type is
+// tolerated: RFC 8693 requires it, but IdPs commonly omit it.
+func parseExchangeResponse(body []byte, requested string) (string, time.Duration, error) {
 	var parsed struct {
-		AccessToken string `json:"access_token"`
-		ExpiresIn   int64  `json:"expires_in"`
+		AccessToken     string `json:"access_token"`
+		IssuedTokenType string `json:"issued_token_type"`
+		ExpiresIn       int64  `json:"expires_in"`
 	}
 	if err := json.Unmarshal(body, &parsed); err != nil {
 		return "", 0, fmt.Errorf("decoding exchange response: %w", err)
@@ -411,11 +423,27 @@ func parseExchangeResponse(body []byte) (string, time.Duration, error) {
 	if parsed.AccessToken == "" {
 		return "", 0, errors.New("exchange response missing access_token")
 	}
+	if requested != "" && parsed.IssuedTokenType != "" && !issuedTokenTypeMatches(requested, parsed.IssuedTokenType) {
+		return "", 0, fmt.Errorf("exchange response issued_token_type %q does not match requested_token_type %q",
+			parsed.IssuedTokenType, requested)
+	}
 	var expiresIn time.Duration
 	if parsed.ExpiresIn > 0 {
 		expiresIn = time.Duration(parsed.ExpiresIn) * time.Second
 	}
 	return parsed.AccessToken, expiresIn, nil
+}
+
+// issuedTokenTypeMatches reports whether the IdP's issued_token_type satisfies
+// the requested type. Exact matches pass; a jwt-typed token also satisfies an
+// access-token request, since JWT-formatted access tokens are routinely
+// labelled that way. Anything else (id_token, refresh_token, SAML) is rejected
+// so it is never forwarded upstream as a Bearer access token.
+func issuedTokenTypeMatches(requested, issued string) bool {
+	if issued == requested {
+		return true
+	}
+	return requested == oas.OAuth2TokenTypeAccessToken && issued == oas.OAuth2TokenTypeJWT
 }
 
 // writeJSONError writes a JSON error response with the given status and Bearer challenge.
