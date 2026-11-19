@@ -21,12 +21,15 @@ var ipHeaderTests = []struct {
 	{remoteAddr: "10.0.1.4:8080", expected: "10.0.1.4", comment: "RemoteAddr"},
 	{remoteAddr: "10.0.1.4:8080", key: "X-Forwarded-For", value: "bob", expected: "10.0.1.4", comment: "invalid X-Forwarded-For"},
 	{remoteAddr: "10.0.1.4:8080", key: "X-Real-IP", value: "bob", expected: "10.0.1.4", comment: "invalid X-Real-IP"},
+	{remoteAddr: "203.0.113.9:8080", key: "X-Real-IP", value: "127.0.0.1", expected: "203.0.113.9", comment: "untrusted peer, X-Real-IP ignored"},
+	{remoteAddr: "203.0.113.9:8080", key: "X-Forwarded-For", value: "127.0.0.1", expected: "203.0.113.9", comment: "untrusted peer, X-Forwarded-For ignored"},
 }
 
 func TestRealIP(t *testing.T) {
 	// Initialize the Global function with a mock config that has XFFDepth set to 0 (first IP in chain)
 	mockConfig := config.Config{}
 	mockConfig.HttpServerOptions.XFFDepth = 0
+	mockConfig.HttpServerOptions.TrustedProxyCIDRs = []string{"10.0.0.0/8"}
 	Global = func() config.Config {
 		return mockConfig
 	}
@@ -70,6 +73,7 @@ func TestRealIP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	r.RemoteAddr = "10.0.1.4:8080"
 	r.Header.Set("X-Forwarded-For", "10.0.0.3, 10.0.0.2, 10.0.0.1")
 
 	ip = RealIP(r)
@@ -85,6 +89,7 @@ func TestRealIP(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	r.RemoteAddr = "10.0.1.4:8080"
 	r.Header.Set("X-Forwarded-For", "10.0.0.3, 10.0.0.2, 10.0.0.1")
 
 	ip = RealIP(r)
@@ -123,6 +128,7 @@ func BenchmarkRealIP_ForwardedFor(b *testing.B) {
 	// Initialize the Global function for benchmark
 	mockConfig := config.Config{}
 	mockConfig.HttpServerOptions.XFFDepth = 0
+	mockConfig.HttpServerOptions.TrustedProxyCIDRs = []string{"10.0.0.0/8"}
 	Global = func() config.Config {
 		return mockConfig
 	}
@@ -131,6 +137,7 @@ func BenchmarkRealIP_ForwardedFor(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
+	r.RemoteAddr = "10.0.1.4:8080"
 	r.Header.Set("X-Forwarded-For", "10.0.0.3, 10.0.0.2, 10.0.0.1")
 
 	for n := 0; n < b.N; n++ {
@@ -147,6 +154,7 @@ func BenchmarkRealIP_RealIP(b *testing.B) {
 	// Initialize the Global function for benchmark
 	mockConfig := config.Config{}
 	mockConfig.HttpServerOptions.XFFDepth = 0
+	mockConfig.HttpServerOptions.TrustedProxyCIDRs = []string{"10.0.0.0/8"}
 	Global = func() config.Config {
 		return mockConfig
 	}
@@ -155,6 +163,7 @@ func BenchmarkRealIP_RealIP(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
+	r.RemoteAddr = "10.0.1.4:8080"
 	r.Header.Set("X-Real-IP", "10.0.0.1")
 
 	for n := 0; n < b.N; n++ {
@@ -269,6 +278,7 @@ func TestXFFDepth(t *testing.T) {
 
 	// Initialize mock config for tests
 	mockConfig := config.Config{}
+	mockConfig.HttpServerOptions.TrustedProxyCIDRs = []string{"192.168.1.0/24"}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
