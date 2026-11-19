@@ -176,12 +176,25 @@ func (k *ValidateRequest) ProcessRequest(w http.ResponseWriter, r *http.Request,
 //
 // This prevents a catch-all type:string candidate from stealing requests that belong to
 // a more restrictive type:number candidate.
+//
+// Candidates migration generated are picked by their own regex, matched as the router
+// matches it. When several of them match, the request passes if any of them accepts it.
 func (k *ValidateRequest) processRequestWithCandidates(r *http.Request, urlSpec *URLSpec) (int, error) {
 	normalizeHeaders(r.Header)
 	strippedPath := k.Spec.StripListenPath(r.URL.Path)
+	matchPath, _ := k.Spec.getMatchPathAndMethod(r, OASValidateRequest)
+
+	var (
+		rejectedCode int
+		rejectedErr  error
+	)
 
 	for _, candidate := range urlSpec.OASValidateRequestCandidates {
 		if candidate.OASValidateRequestMeta == nil || !candidate.OASValidateRequestMeta.Enabled {
+			continue
+		}
+
+		if candidate.classicMatcher != nil && !pathMatches(candidate.classicMatcher, matchPath, k.Spec) {
 			continue
 		}
 
@@ -190,8 +203,18 @@ func (k *ValidateRequest) processRequestWithCandidates(r *http.Request, urlSpec 
 			continue
 		}
 
-		// Path params matched — commit to this candidate and return regardless of outcome.
-		return k.validateRoute(r, route, pathParams, candidate.OASValidateRequestMeta)
+		code, err := k.validateRoute(r, route, pathParams, candidate.OASValidateRequestMeta)
+		if err == nil || candidate.classicMatcher == nil {
+			return code, err
+		}
+
+		if rejectedErr == nil {
+			rejectedCode, rejectedErr = code, err
+		}
+	}
+
+	if rejectedErr != nil {
+		return rejectedCode, rejectedErr
 	}
 
 	return candidatesErrorResponseCode(urlSpec.OASValidateRequestCandidates),

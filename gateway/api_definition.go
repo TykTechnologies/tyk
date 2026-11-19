@@ -1609,6 +1609,13 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 		}
 
 		a.generateRegex(path, &newSpec, OASValidateRequest, conf)
+
+		if classicPath := classicPathOf(apiSpec.OAS.Paths, path); classicPath != path {
+			var classic URLSpec
+			a.generateRegex(classicPath, &classic, OASValidateRequest, conf)
+			newSpec.classicMatcher = classic.spec
+		}
+
 		urlSpec = append(urlSpec, newSpec)
 	}
 
@@ -1736,6 +1743,7 @@ func mergeGroupIntoPrimary(indices []int, specs []URLSpec, toRemove map[int]bool
 			OASValidateRequestMeta: specs[idx].OASValidateRequestMeta,
 			OASMethod:              specs[idx].OASMethod,
 			OASPath:                specs[idx].OASPath,
+			classicMatcher:         specs[idx].classicMatcher,
 		}
 		if idx != primary {
 			toRemove[idx] = true
@@ -1924,7 +1932,7 @@ func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, co
 			OASPath:             path,
 		}
 
-		a.generateRegex(a.matcherPathFor(apiSpec, path), &newSpec, OASMockResponse, conf)
+		a.generateRegex(classicPathOf(apiSpec.OAS.Paths, path), &newSpec, OASMockResponse, conf)
 		urlSpec = append(urlSpec, newSpec)
 	}
 
@@ -2016,19 +2024,16 @@ func (a APIDefinitionLoader) findPathAndMethodForOperation(apiSpec *APISpec, ope
 	return "", ""
 }
 
-// matcherPathFor returns the path a URLSpec's matcher should be compiled from.
+// classicPathOf takes an OAS path and converts it to the Tyk Classic path it was migrated from.
 //
-// An OAS path key carries placeholders, and PreparePathRegexp compiles every
-// placeholder to ([^/]+). Two endpoints told apart only by their regex —
-// /users/[a-z]+ and /users/[0-9]+, as a Classic migration leaves them — would
-// therefore collapse onto one matcher and stop being distinguishable. Where the
-// placeholder is one migration generated, the regex it stands for goes back into
-// the path, so the two compile to matchers of their own.
+//	/users/{customRegex1}, customRegex1 has pattern [a-z]+  ->  /users/[a-z]+
+//	/users/{id}, id has pattern [0-9]+                      ->  /users/{id}
+//	/users/{id}                                             ->  /users/{id}
+//	/users                                                  ->  /users
 //
-// A parameter the user named is left as it is, because Tyk Classic never applied
-// a regex written inside one either.
-func (a APIDefinitionLoader) matcherPathFor(apiSpec *APISpec, oasPath string) string {
-	pathItem := apiSpec.OAS.Paths.Value(oasPath)
+// Only the customRegexN placeholders migration generates are converted.
+func classicPathOf(paths *openapi3.Paths, oasPath string) string {
+	pathItem := paths.Value(oasPath)
 	if pathItem == nil {
 		return oasPath
 	}
