@@ -647,11 +647,11 @@ type HttpServerOptionsConfig struct {
 	ServerName string `json:"server_name"`
 
 	// Minimum TLS version is inherited from Go library, but can be overridden here.
-	// For details see: https://tyk.io/docs/api-management/implement-tls#controlling-tls-version-&-cipher-suites
+	// For details see: https://tyk.io/docs/api-management/implement-tls#controlling-tls-version-and-cipher-suites
 	MinVersion uint16 `json:"min_version"`
 
 	// Maximum TLS version is inherited from Go library, but can be overridden here.
-	// For details see: https://tyk.io/docs/api-management/implement-tls#controlling-tls-version-&-cipher-suites
+	// For details see: https://tyk.io/docs/api-management/implement-tls#controlling-tls-version-and-cipher-suites
 	MaxVersion uint16 `json:"max_version"`
 
 	// When mTLS enabled, this option allows to skip client CA announcement in the TLS handshake.
@@ -670,7 +670,7 @@ type HttpServerOptionsConfig struct {
 	// Disable automatic character escaping, allowing to path original URL data to the upstream.
 	SkipTargetPathEscaping bool `json:"skip_target_path_escaping"`
 
-	// Custom SSL ciphers applicable when using TLS version 1.2. See the list of ciphers here https://tyk.io/docs/api-management/certificates#supported-tls-cipher-suites
+	// Custom SSL ciphers applicable when using TLS version 1.2. For the supported ciphers, see https://tyk.io/docs/api-management/implement-tls#controlling-tls-version-and-cipher-suites
 	Ciphers []string `json:"ssl_ciphers"`
 
 	// MaxRequestBodySize configures a maximum size limit for request body size (in bytes) for all APIs on the Gateway.
@@ -684,7 +684,7 @@ type HttpServerOptionsConfig struct {
 	// A value of zero (default) means that no maximum is set and API requests will not be tested.
 	//
 	// See more information about setting request size limits here:
-	// https://tyk.io/docs/api-management/traffic-transformation/#request-size-limits
+	// https://tyk.io/docs/api-management/traffic-transformation#request-size-limit
 	MaxRequestBodySize int64 `json:"max_request_body_size"`
 
 	// XFFDepth controls which position in the X-Forwarded-For chain to use for determining client IP address.
@@ -931,7 +931,7 @@ type Config struct {
 	// Custom hostname for the Control API
 	ControlAPIHostname string `json:"control_api_hostname"`
 
-	// Set this to expose the Tyk Gateway API on a separate port. You can protect it behind a firewall if needed. Please make sure you follow this guide when setting the control port https://tyk.io/docs/tyk-self-managed/#change-your-control-port.
+	// Set this to expose the Tyk Gateway API on a separate port. You can protect it behind a firewall if needed. Please make sure you follow this guide when setting the control port https://tyk.io/docs/planning-for-production#change-your-control-port.
 	ControlAPIPort int `json:"control_api_port"`
 
 	// This should be changed as soon as Tyk is installed on your system.
@@ -1013,7 +1013,7 @@ type Config struct {
 	Policies PoliciesConfig `json:"policies"`
 
 	// Defines the ports that will be available for the API services to bind to in the format
-	// documented here https://tyk.io/docs/api-management/non-http-protocols/#allowing-specific-ports.
+	// documented here https://tyk.io/docs/key-concepts/tcp-proxy#allowing-specific-ports.
 	// Ports can be configured per protocol, e.g. https, tls etc.
 	// If configuring via environment variable `TYK_GW_PORTWHITELIST` then remember to escape
 	// JSON strings.
@@ -1408,7 +1408,7 @@ type Config struct {
 
 	// Configure the Key-Value stores for secure storage of secrets and other configuration values.
 	// From Tyk 5.15.0 the dedicated Consul, Vault and File methods are deprecated in favour of the more flexible Stores approach.
-	// See more details https://tyk.io/docs/tyk-self-managed/#store-configuration-with-key-value-store
+	// See more details https://tyk.io/docs/tyk-configuration-reference/kv-store
 	KV struct {
 		Consul ConsulConfig `json:"consul"`
 		Vault  VaultConfig  `json:"vault"`
@@ -1426,7 +1426,7 @@ type Config struct {
 	// The secret value may be used as `secrets://key1` from the API definition.
 	// In versions before gateway 5.3, only `listen_path` and `target_url` fields
 	// have had the secrets replaced.
-	// See more details https://tyk.io/docs/tyk-self-managed/#how-to-access-the-externally-stored-data
+	// See more details https://tyk.io/docs/tyk-configuration-reference/kv-store-legacy#local-secrets
 	Secrets map[string]string `json:"secrets" structviewer:"obfuscate"`
 
 	// Override the default error code and or message returned by middleware.
