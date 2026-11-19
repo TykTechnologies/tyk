@@ -48,8 +48,8 @@ func assertAdmitsTenThenLimits(t *testing.T, send func() mcpTestResponse) {
 	assert.Equal(t, jsonrpcerrors.CodeModernRateLimitExceeded, res.rpc.Error.Code, res.body)
 }
 
-func withAPIRateLimit(spec *APISpec, rate, per float64) *APISpec {
-	spec.GlobalRateLimit = apidef.GlobalRateLimit{Rate: rate, Per: per}
+func withAPIRateLimit(spec *APISpec, limit, per float64) *APISpec {
+	spec.GlobalRateLimit = apidef.GlobalRateLimit{Rate: limit, Per: per}
 	return spec
 }
 

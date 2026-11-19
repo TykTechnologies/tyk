@@ -236,7 +236,7 @@ func TestMCPAggregatorListOmitsAProxyThatExceedsTheTimeout(t *testing.T) {
 	github := newMCPRoutingUpstream(t, namedTools("list_issues")...)
 	ts := StartTest(nil)
 	t.Cleanup(ts.Close)
-	slow := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	slow := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		select {
 		case <-time.After(10 * time.Second):
 		case <-r.Context().Done():
