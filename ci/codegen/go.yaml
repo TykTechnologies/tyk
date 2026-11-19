@@ -1,0 +1,5 @@
+generatorName: go
+nameMappings:
+  _id: MongoId
+modelNameMappings:
+  ServerVariable: OASServerVariable
