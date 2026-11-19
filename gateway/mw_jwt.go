@@ -392,10 +392,15 @@ func (k *JWTMiddleware) getSecretToVerifySignature(r *http.Request, token *jwt.T
 }
 
 // secretFromIdPRegistry resolves the signing key from the client-IdP registry.
-// It probes the per-API reverse index, picks a candidate IdP by the (unverified)
-// iss hint, and fetches the matching JWKS key by kid. On a match it records the
-// binding on the request context (never on the shared middleware struct) so the
-// scope-resolution branch can apply the binding's overrides.
+// The token must name an issuer, and only a binding of this API's Organisation
+// whose IdP has exactly that issuer is a candidate. The token's iss is read
+// before verification, but the key returned is that same IdP's, so a verified
+// signature proves the issuer. The binding is recorded on the request context
+// (never on the shared middleware struct) so scope resolution uses the mapping
+// of the IdP that supplied the key.
+//
+// With allow_unsafe_idp_missing_issuer a token without a usable iss is matched
+// by kid alone, among this API's bindings only.
 func (k *JWTMiddleware) secretFromIdPRegistry(r *http.Request, token *jwt.Token) interface{} {
 	if k.Gw == nil || k.Gw.idpRegistry == nil {
 		return nil
@@ -410,10 +415,16 @@ func (k *JWTMiddleware) secretFromIdPRegistry(r *http.Request, token *jwt.Token)
 		return nil // JWKS lookup needs a kid
 	}
 	iss := unverifiedIssuerHint(token)
+	allowMissingIssuer := k.Gw.idpRegistry.allowMissingIssuer()
+	if iss == "" && !allowMissingIssuer {
+		k.Logger().Debug("Client-IdP registry: token has no usable iss claim")
+		return nil
+	}
 
 	for i := range bindings {
 		b := bindings[i]
-		if key := k.keyForBinding(b, iss, kid); key != nil {
+		if key := k.keyForBinding(b, iss, kid, allowMissingIssuer); key != nil {
+			b.matchedWithoutIssuer = iss == ""
 			ctxSetMatchedBinding(r, &b) // request context — never k
 			return key
 		}
@@ -421,9 +432,10 @@ func (k *JWTMiddleware) secretFromIdPRegistry(r *http.Request, token *jwt.Token)
 	return nil
 }
 
-// unverifiedIssuerHint reads the iss claim WITHOUT verification — used only to
-// choose which IdP's JWKS to try; signature verification + validateIssuer run
-// afterwards. Returns "" when there's no usable iss (then all IdPs are tried).
+// unverifiedIssuerHint reads the iss claim WITHOUT verification, to choose the
+// IdP whose JWKS verifies the token. Returns "" when iss is absent, empty or
+// not a string; the registry path rejects such tokens unless
+// allow_unsafe_idp_missing_issuer is set.
 func unverifiedIssuerHint(token *jwt.Token) string {
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok {
@@ -436,16 +448,23 @@ func unverifiedIssuerHint(token *jwt.Token) string {
 }
 
 // keyForBinding resolves the JWKS key for a single registry binding, or nil to
-// skip it: unknown IdP, iss mismatch (empty iss walks all), or no matching kid.
-func (k *JWTMiddleware) keyForBinding(b Binding, iss, kid string) interface{} {
-	idp, ok := k.Gw.idpRegistry.IdP(b.IdPID)
-	if !ok {
+// skip it: not this API's Organisation, no exact issuer match, or no matching
+// kid. An empty Organisation never matches. A token without an issuer matches
+// only when allowMissingIssuer is set, and then any of the API's bindings; a
+// token with one always needs the exact match.
+func (k *JWTMiddleware) keyForBinding(b Binding, iss, kid string, allowMissingIssuer bool) interface{} {
+	// rebuild already enforces ownership; this holds if the API is reloaded
+	// under another Organisation before the registry is rebuilt.
+	if b.OrgID == "" || b.OrgID != k.Spec.OrgID {
 		return nil
 	}
-	if iss != "" && idp.Issuer != iss {
+	if iss == "" && !allowMissingIssuer {
 		return nil
 	}
-	return k.fetchJWKSKey(idp.JWKSURI, kid)
+	if iss != "" && b.Issuer != iss {
+		return nil
+	}
+	return k.fetchJWKSKey(b.JWKSURI, kid)
 }
 
 // fetchJWKSKey resolves a JWKS key by kid, keyed purely on the URL. It is
@@ -1367,7 +1386,11 @@ func (k *JWTMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Request, _
 		// without this third condition a registry-only API would fall to
 		// processOneToOneTokenMap and the binding's scope→policy overrides would
 		// never apply.
-		hasRegistryBinding := ctxGetMatchedBinding(r) != nil
+		binding := ctxGetMatchedBinding(r)
+		hasRegistryBinding := binding != nil
+		if hasRegistryBinding && binding.matchedWithoutIssuer {
+			k.Gw.idpRegistry.warnMissingIssuerAccepted(k.Spec.APIID, binding)
+		}
 
 		if hasJWTSource || hasJwksURIs || hasRegistryBinding {
 			return k.processCentralisedJWT(r, token)
