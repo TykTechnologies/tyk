@@ -135,3 +135,21 @@ func TestJWTSessionRSAWithJWK_KeySetGoJoseV4Rejects(t *testing.T) {
 		Headers: map[string]string{"authorization": signed}, Code: http.StatusOK,
 	})
 }
+
+func TestParseJWK_RejectsEmptyKeySet(t *testing.T) {
+	tests := []struct {
+		name string
+		body []byte
+	}{
+		{"empty keys array", []byte(`{"keys":[]}`)},
+		{"JSON error object without a keys field", []byte(`{"errorCode":"unknown","errorMessage":"Bad Gateway"}`)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			set, err := parseJWK(tt.body)
+			assert.Nil(t, set)
+			assert.EqualError(t, err, "JWKS response contains no keys")
+		})
+	}
+}

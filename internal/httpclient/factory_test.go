@@ -324,6 +324,21 @@ func TestGetJWKWithClient(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, jwkSet)
 	})
+
+	t.Run("non-2xx response returns error instead of body", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusBadGateway)
+			_, _ = w.Write([]byte(`{"errorCode":"unknown","errorMessage":"Bad Gateway"}`))
+		}))
+		defer server.Close()
+
+		client := &http.Client{}
+		jwkSet, err := GetJWKWithClient(server.URL, client, parseJWK)
+
+		assert.Error(t, err)
+		assert.Nil(t, jwkSet)
+		assert.Contains(t, err.Error(), "502")
+	})
 }
 
 func TestExternalHTTPClientFactory_CertificateStore(t *testing.T) {
