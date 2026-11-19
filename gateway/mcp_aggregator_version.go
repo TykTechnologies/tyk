@@ -222,7 +222,7 @@ func (d mcpAggregatorDispatcher) probeUpstream(parent *http.Request, spec *APISp
 		return mcpAggregatorProbe{ToolsErr: fmt.Errorf("tools/list: %w", listErr)}
 	case listErr != nil:
 		return mcpAggregatorProbe{
-			Version:  fmt.Errorf("server/discover: %v; tools/list: %w", err, listErr),
+			Version:  fmt.Errorf("server/discover: %w; tools/list: %w", err, listErr),
 			ToolsErr: fmt.Errorf("tools/list: %w", listErr),
 		}
 	}
@@ -231,7 +231,7 @@ func (d mcpAggregatorDispatcher) probeUpstream(parent *http.Request, spec *APISp
 		probe.Tools = append(probe.Tools, tool.Name)
 	}
 	if !confirmed {
-		probe.Version = fmt.Errorf("%w: %v; tools/list answered without declaring a version", errMCPAggregatorVersionUnconfirmed, err)
+		probe.Version = fmt.Errorf("%w: %w; tools/list answered without declaring a version", errMCPAggregatorVersionUnconfirmed, err)
 	}
 	return probe
 }
