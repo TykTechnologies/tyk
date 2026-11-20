@@ -3,10 +3,15 @@ package gateway
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
+	"sync"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/sanitize"
 )
 
 // validateMCPAggregatorUpstreams checks every aggregated MCP proxy of an
@@ -40,11 +45,25 @@ func (gw *Gateway) validateMCPAggregatorUpstreams(r *http.Request, mcpObj *oas.O
 	gw.apisMu.RUnlock()
 
 	for i, ref := range ext.Upstreams {
-		if msg, code := classifyMCPAggregatorUpstream(incoming.OrgID, upstreams[i]).admissionError(ref.APIID); msg != "" {
+		status := classifyMCPAggregatorUpstream(incoming.OrgID, upstreams[i])
+		if status == mcpAggregatorUpstreamNotLoaded && gw.apiDefinitionAwaitsReload(ref.APIID) {
+			return fmt.Sprintf("aggregated MCP proxy %q is not loaded yet: reload the gateway, then retry", ref.APIID), http.StatusBadRequest
+		}
+		if msg, code := status.admissionError(ref.APIID); msg != "" {
 			return msg, code
 		}
 	}
 	return gw.validateMCPAggregatorUpstreamViews(r, &APISpec{APIDefinition: &incoming}, ext, upstreams)
+}
+
+// apiDefinitionAwaitsReload reports whether the Gateway API has written a
+// definition for apiID to this gateway's app path that it has not loaded yet.
+func (gw *Gateway) apiDefinitionAwaitsReload(apiID string) bool {
+	if sanitize.ValidatePathComponent(apiID) != nil {
+		return false
+	}
+	_, err := os.Stat(filepath.Join(gw.GetConfig().AppPath, apiID+".json"))
+	return err == nil
 }
 
 // mcpAggregatorUpstreamStatus says whether an API can serve as an aggregated
@@ -112,12 +131,65 @@ func (gw *Gateway) validateMCPProxyReferences(r *http.Request, mcpObj *oas.OAS) 
 	return gw.validateMCPAggregatorUpstreams(r, mcpObj)
 }
 
-// mcpAggregatorDeleteConflict rejects deleting an MCP proxy that loaded
-// aggregators still reference, which would silently drop their tools.
+// mcpAggregatorDeleteConflict rejects deleting an MCP proxy that aggregators
+// still reference, which would silently drop their tools. An aggregator the
+// Gateway API has written since the last reload is judged by that write.
 func (gw *Gateway) mcpAggregatorDeleteConflict(apiID string) (interface{}, int) {
-	aggregatorIDs := gw.mcpAggregatorIndex.AggregatorsReferencing(apiID)
+	aggregatorIDs := gw.mcpAggregatorWrites.referencing(apiID, gw.mcpAggregatorIndex.AggregatorsReferencing(apiID))
 	if len(aggregatorIDs) == 0 {
 		return nil, 0
 	}
 	return apiError(fmt.Sprintf("API %q is referenced by MCP aggregators: %s", apiID, strings.Join(aggregatorIDs, ", "))), http.StatusConflict
+}
+
+// mcpAggregatorWrites records, per API ID, the aggregated MCP proxies each MCP
+// proxy definition written through the Gateway API since the last reload
+// references: none for a deleted API or one that is not an aggregator.
+type mcpAggregatorWrites struct {
+	mu   sync.Mutex
+	refs map[string][]string
+}
+
+func (w *mcpAggregatorWrites) written(apiID string, doc *oas.OAS) {
+	var refs []string
+	if doc != nil {
+		if ext := doc.GetTykMCPAggregatorExtension(); ext != nil {
+			for _, ref := range ext.Upstreams {
+				refs = append(refs, ref.APIID)
+			}
+		}
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	if w.refs == nil {
+		w.refs = make(map[string][]string)
+	}
+	w.refs[apiID] = refs
+}
+
+func (w *mcpAggregatorWrites) reset() {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.refs = nil
+}
+
+// referencing returns the sorted IDs of aggregators referencing upstreamID,
+// taking loaded, the IDs from the loaded aggregators, and replacing what it
+// says about any aggregator written since.
+func (w *mcpAggregatorWrites) referencing(upstreamID string, loaded []string) []string {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	var ids []string
+	for _, id := range loaded {
+		if _, rewritten := w.refs[id]; !rewritten {
+			ids = append(ids, id)
+		}
+	}
+	for id, refs := range w.refs {
+		if slices.Contains(refs, upstreamID) {
+			ids = append(ids, id)
+		}
+	}
+	slices.Sort(ids)
+	return ids
 }

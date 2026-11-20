@@ -23,6 +23,12 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+// mcpAggregatorListTimeout bounds how long one tools/list waits for an
+// aggregated MCP proxy's tool listing; a proxy that misses it is omitted. The
+// aggregator's enforced timeout still applies when it is shorter, and
+// tools/call is not bounded by it. It is a variable so tests can shorten it.
+var mcpAggregatorListTimeout = 5 * time.Second
+
 const (
 	// mcpAggregatorMaxListPages bounds how many tools/list pages are read from
 	// one aggregated MCP proxy; a proxy that needs more is omitted.
@@ -36,9 +42,14 @@ const (
 
 	// mcpAggregatorMaxCatalogueBytes bounds the JSON size of the tool
 	// definitions in one aggregator's merged tools/list: 10000 tools at about
-	// 3 KiB each. It is also the budget for the tools/list responses buffered
-	// for one tools/list, shared equally between the aggregated proxies.
+	// 3 KiB each.
 	mcpAggregatorMaxCatalogueBytes = 32 << 20
+
+	// mcpAggregatorMaxUpstreamListBytes bounds the tools/list responses
+	// buffered from one aggregated MCP proxy for one tools/list: about 2700
+	// tools at 3 KiB each. It is the same for every proxy, so whether a
+	// proxy's listing fits never depends on how many others are aggregated.
+	mcpAggregatorMaxUpstreamListBytes = 8 << 20
 
 	mcpAggregatorUnnamedToolMsg = "MCP aggregator skips aggregated tool without a name"
 
@@ -193,8 +204,9 @@ func (m *MCPAggregatorMiddleware) toolsListResult(catalogue mcpAggregatorCatalog
 	return result
 }
 
-// toolsCatalogue lists the tools of every aggregated MCP proxy concurrently.
-// A proxy that is not loaded or fails is left out with a warning.
+// toolsCatalogue lists the tools of every aggregated MCP proxy concurrently,
+// each within mcpAggregatorListTimeout. A proxy that is not loaded, fails or
+// misses that deadline is left out with a warning.
 func (d mcpAggregatorDispatcher) toolsCatalogue(parent *http.Request) mcpAggregatorCatalogue {
 	ext := d.aggregator.OAS.GetTykMCPAggregatorExtension()
 	if ext == nil {
@@ -202,10 +214,6 @@ func (d mcpAggregatorDispatcher) toolsCatalogue(parent *http.Request) mcpAggrega
 	}
 
 	results := make([][]mcpAggregatorTool, len(ext.Upstreams))
-	// Every configured proxy gets the same share of the byte budget, so the
-	// responses buffered at once stay within it however the reads interleave,
-	// and whether a proxy fits never depends on the others.
-	share := mcpAggregatorMaxCatalogueBytes / max(len(ext.Upstreams), 1)
 	var wg sync.WaitGroup
 	for i, ref := range ext.Upstreams {
 		upstream := mcpaggregator.Upstream{APIID: ref.APIID, Alias: ref.Alias, Tools: ref.Tools}
@@ -216,9 +224,11 @@ func (d mcpAggregatorDispatcher) toolsCatalogue(parent *http.Request) mcpAggrega
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
+			ctx, cancel := context.WithTimeout(parent.Context(), mcpAggregatorListTimeout)
+			defer cancel()
 			budgeted := d
-			budgeted.budget = &mcpAggregatorByteBudget{share: share}
-			tools, err := budgeted.listUpstreamTools(parent, upstream)
+			budgeted.budget = &mcpAggregatorByteBudget{limit: mcpAggregatorMaxUpstreamListBytes}
+			tools, err := budgeted.listUpstreamTools(parent.WithContext(ctx), upstream)
 			var mismatch *mcpAggregatorVersionMismatchError
 			switch {
 			case errors.As(err, &mismatch):

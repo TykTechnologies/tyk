@@ -156,7 +156,7 @@ func endMCPAggregatorLoopSession(r *http.Request) {
 // isMCPAggregatorCatalogueHop reports whether r is an aggregator listing the
 // tools of spec, one of its aggregated MCP proxies, or discovering it.
 func isMCPAggregatorCatalogueHop(spec *APISpec, r *http.Request) bool {
-	if mcpAggregatorOriginOf(r, spec.APIID) == "" {
+	if _, ok := mcpAggregatorOriginOf(r, spec.APIID); !ok {
 		return false
 	}
 	method := ctxGetMCPMethod(r)
