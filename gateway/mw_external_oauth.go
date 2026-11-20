@@ -144,7 +144,8 @@ func (k *ExternalOAuthMiddleware) jwt(accessToken string) (bool, string, error) 
 
 	if err := timeValidateJWTClaims(token.Claims.(jwt.MapClaims), jwtValidation.ExpiresAtValidationSkew,
 		jwtValidation.IssuedAtValidationSkew, jwtValidation.NotBeforeValidationSkew); err != nil {
-		return false, "", fmt.Errorf("key not authorized: %w", err)
+		// error(err): go vet (Go 1.27) refuses %w of a *jwt.ValidationError; the wrapped value, and its Is and Unwrap, stay the same.
+		return false, "", fmt.Errorf("key not authorized: %w", error(err))
 	}
 
 	var userID string
