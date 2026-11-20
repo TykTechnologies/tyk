@@ -1,11 +1,15 @@
 package gateway
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -16,6 +20,7 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/httputil"
+	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/mcp/tooloverride"
 )
@@ -101,9 +106,10 @@ func (s *APISpec) isLatestRemoteMCPToolViewCheck(generation uint64) bool {
 //
 // The upstream catalogue is then checked in the background, only to report
 // problems; the check never changes the admitted view and never blocks
-// loading. It warns when an override sets the name of an upstream tool that
-// has no override, when an override's source tool is not in the catalogue,
-// and when the catalogue cannot be listed.
+// loading. It warns when an override takes the name of an upstream tool that
+// has no override (the override wins and the upstream tool is hidden, the
+// same rule the tools/list rewrite applies), when an override's source tool
+// is not in the catalogue, and when the catalogue cannot be listed.
 //
 // Fetch scope: the check calls Proxy.TargetURL directly, sending only static
 // upstream basic auth (see remoteMCPCatalogueHeader). It does not use load
@@ -151,7 +157,7 @@ func (gw *Gateway) loadRemoteMCPToolView(spec *APISpec, logger *logrus.Entry) {
 		missing, collisions := oas.InspectRemoteMCPToolCatalogue(ext, names)
 		for _, collision := range collisions {
 			logger.WithFields(logrus.Fields{"exposed_name": collision.Name, "source_tool": collision.Source}).
-				Warning("MCP tool override sets a name that an upstream tool without an override already has")
+				Warning("MCP tool override takes the name of an upstream tool that has no override; the override wins and the upstream tool is hidden")
 		}
 		for _, source := range missing {
 			logger.WithField("source_tool", source).Warning("MCP tool override source tool is not in the upstream tool list; it is not exposed")
@@ -214,7 +220,7 @@ func remoteMCPToolsListView(spec *APISpec, state *httpctx.JSONRPCRoutingState) *
 // body that cannot be rewritten is passed through unchanged.
 func rewriteRemoteMCPToolsList(spec *APISpec, view *tooloverride.View, state *httpctx.JSONRPCRoutingState, body []byte, logger *logrus.Entry) ([]byte, bool) {
 	logger = logger.WithFields(logrus.Fields{"api_id": spec.APIID, "api_name": spec.Name})
-	out, changed, missing, err := view.RewriteToolsList(body, isFirstToolsListPage(state))
+	out, changed, drift, err := view.RewriteToolsList(body, isFirstToolsListPage(state))
 	now := time.Now()
 	if err != nil {
 		if spec.mcpResponseWarnings.due("rewrite", now) {
@@ -222,9 +228,14 @@ func rewriteRemoteMCPToolsList(spec *APISpec, view *tooloverride.View, state *ht
 		}
 		return body, false
 	}
-	for _, source := range missing {
+	for _, source := range drift.Missing {
 		if view.ShouldWarnMissing(source, now) {
 			logger.WithField("source_tool", source).Warning("MCP tool override source tool is not in the upstream tool list; it is not exposed")
+		}
+	}
+	for _, name := range drift.Hidden {
+		if view.ShouldWarnHidden(name, now) {
+			logger.WithField("upstream_tool", name).Warning("Upstream MCP tool has the name of a tool override and is hidden; the override is exposed under that name")
 		}
 	}
 	return out, changed
@@ -249,4 +260,68 @@ func remoteMCPToolViewBypassesCache(spec *APISpec, r *http.Request) bool {
 	}
 	state := httpctx.GetJSONRPCRoutingState(r)
 	return state != nil && (state.Method == mcp.MethodToolsList || state.Method == mcp.MethodToolsCall)
+}
+
+// dispatchRemoteMCPToolsCall maps a tools/call for an exposed tool name back
+// to the upstream tool on a remote MCP proxy with a tool view. It runs at
+// final dispatch, after authentication, access rules and rate limits have
+// been applied to the exposed name, and leaves the routing state, analytics
+// and the response untouched.
+//
+// A call naming an upstream tool that an override renamed away, and that is
+// not bound to another override, is answered with the JSON-RPC error the MCP
+// SDK returns for an unknown tool and never reaches the upstream. It reports
+// whether it wrote a response.
+func dispatchRemoteMCPToolsCall(w http.ResponseWriter, r *http.Request, spec *APISpec, state *httpctx.JSONRPCRoutingState) (bool, error) {
+	if state.Method != mcp.MethodToolsCall {
+		return false, nil
+	}
+	view := spec.MCPToolView()
+	if view == nil {
+		return false, nil
+	}
+
+	exposed := state.PrimitiveName
+	upstream, known := view.ResolveCall(exposed)
+	if !known {
+		writeMCPUnknownTool(w, r, state, exposed)
+		return true, nil
+	}
+
+	// Mcp-Name mirrors params.name. A legacy request may send one that does
+	// not match its body, so every allowed call carries the name of the tool
+	// it is dispatched to, in the encoding the client chose.
+	if values := r.Header.Values(mcp.HeaderName); len(values) > 0 {
+		mirrored := make([]string, len(values))
+		for i, value := range values {
+			mirrored[i] = mcp.EncodeMirroredHeaderLike(value, upstream)
+		}
+		r.Header[http.CanonicalHeaderKey(mcp.HeaderName)] = mirrored
+	}
+	if upstream == exposed {
+		return false, nil
+	}
+
+	body, err := io.ReadAll(r.Body)
+	_ = r.Body.Close()
+	if err != nil {
+		return false, err
+	}
+	body, err = tooloverride.TranslateToolsCall(body, exposed, upstream)
+	if err != nil {
+		return false, err
+	}
+	r.Body = io.NopCloser(bytes.NewReader(body))
+	r.ContentLength = int64(len(body))
+	r.Header.Set(httpHeaderContentLength, strconv.Itoa(len(body)))
+	return false, nil
+}
+
+func writeMCPUnknownTool(w http.ResponseWriter, r *http.Request, state *httpctx.JSONRPCRoutingState, name string) {
+	message := fmt.Sprintf("unknown tool %q", name)
+	ctxSetJSONRPCErrorCode(r, int64(mcp.JSONRPCInvalidParams))
+	if ingress := httpctx.GetMCPProtocolContext(r); ingress != nil {
+		ingress.Validation = mcp.ProtocolValidation{Checked: true, Code: mcp.JSONRPCInvalidParams, Message: message, HTTPStatus: http.StatusBadRequest}
+	}
+	jsonrpcerrors.WriteJSONRPCErrorWithCode(w, state.ID, http.StatusBadRequest, mcp.JSONRPCInvalidParams, message)
 }
