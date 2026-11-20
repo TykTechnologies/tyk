@@ -98,7 +98,7 @@ type CertificateExpiryCheckBatcher struct {
 	flushTicker           *time.Ticker
 	fireEvent             FireEventFunc
 	certificateRole       string            // Role of certificate: "client" or "upstream"
-	certUsage             certusage.Tracker // can be nil in non-RPC mode
+	certUsage             certusage.Tracker // only consulted in RPC mode with sync_used_certs_only
 	gwConfig              *config.Config    // can be nil
 }
 
@@ -445,7 +445,7 @@ func (c *CertificateExpiryCheckBatcher) setFireEventCooldown(certInfo CertInfo) 
 	}
 }
 
-func (c *CertificateExpiryCheckBatcher) composeSoonToExpireMessage(certInfo CertInfo, daysUntilExpiry int, remainingHours int) string {
+func (c *CertificateExpiryCheckBatcher) composeSoonToExpireMessage(certInfo CertInfo, daysUntilExpiry, remainingHours int) string {
 	if daysUntilExpiry > 0 {
 		if remainingHours > 0 {
 			return fmt.Sprintf("Certificate %s is expiring in %d days and %d hours", certInfo.CommonName, daysUntilExpiry, remainingHours)
@@ -456,7 +456,7 @@ func (c *CertificateExpiryCheckBatcher) composeSoonToExpireMessage(certInfo Cert
 	return fmt.Sprintf("Certificate %s is expiring in %d hours", certInfo.CommonName, remainingHours)
 }
 
-func (c *CertificateExpiryCheckBatcher) composeExpiredMessage(certInfo CertInfo, daysSinceExpiry int, hoursSinceExpiry int) string {
+func (c *CertificateExpiryCheckBatcher) composeExpiredMessage(certInfo CertInfo, daysSinceExpiry, hoursSinceExpiry int) string {
 	if daysSinceExpiry > 0 {
 		if hoursSinceExpiry > 0 {
 			return fmt.Sprintf("Certificate %s is expired since %d days and %d hours", certInfo.CommonName, daysSinceExpiry, hoursSinceExpiry)

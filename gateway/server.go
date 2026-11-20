@@ -188,8 +188,8 @@ type Gateway struct {
 
 	policies *model.Policies
 
-	certUsageTracker *certUsageTracker // nil in non-RPC mode
-	pendingCerts     sync.Map          // certID -> struct{}, certs skipped due to tracker miss
+	certUsageTracker *certUsageTracker
+	pendingCerts     sync.Map // certID -> struct{}, certs skipped due to tracker miss
 
 	dnsCacheManager dnscache.IDnsCacheManager
 
@@ -334,10 +334,7 @@ func NewGateway(config config.Config, ctx context.Context) *Gateway {
 	gw.SessionID = uuid.New()
 	gw.limitHeaderFactory = rate.NewSenderFactory(config.RateLimitResponseHeaders)
 
-	// Only create registry in RPC mode
-	if config.SlaveOptions.UseRPC {
-		gw.certUsageTracker = newUsageTracker()
-	}
+	gw.certUsageTracker = newUsageTracker()
 
 	gw.jwkCache = buildJWKSCache(config)
 	gw.idpRegistry = newIdPRegistry(gw)
@@ -1359,6 +1356,9 @@ func (gw *Gateway) DoReloadWithError() error {
 		// and current registry had 0 APIs
 		if count == 0 && gw.apisByIDLen() == 0 {
 			mainLog.Warning("No API Definitions found, not reloading")
+			// The Gateway configuration can still use certificates.
+			gw.updateCertUsage(nil)
+			gw.reportCertificatesToDashboard()
 			gw.performedSuccessfulReload = true
 			return nil
 		}
@@ -1379,6 +1379,8 @@ func (gw *Gateway) DoReloadWithError() error {
 	}
 
 	gw.MetricInstruments.RecordReload(gw.ctx, time.Since(start))
+
+	gw.reportCertificatesToDashboard()
 
 	gw.performedSuccessfulReload = true
 	mainLog.Info("API reload complete")
