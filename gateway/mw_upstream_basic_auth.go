@@ -6,6 +6,10 @@ import (
 	"net/http"
 )
 
+// upstreamAuthAvailable reports whether this build includes the upstream
+// basic auth and upstream OAuth middleware (Enterprise Edition).
+const upstreamAuthAvailable = false
+
 func getUpstreamBasicAuthMw(base *BaseMiddleware) TykMiddleware {
 	return &noopUpstreamBasicAuth{base}
 }
