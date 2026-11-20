@@ -23,6 +23,12 @@ import (
 	"github.com/TykTechnologies/tyk/user"
 )
 
+// mcpAggregatorListTimeout bounds how long one tools/list waits for an
+// aggregated MCP proxy's tool listing; a proxy that misses it is omitted. The
+// aggregator's enforced timeout still applies when it is shorter, and
+// tools/call is not bounded by it. It is a variable so tests can shorten it.
+var mcpAggregatorListTimeout = 5 * time.Second
+
 const (
 	// mcpAggregatorMaxListPages bounds how many tools/list pages are read from
 	// one aggregated MCP proxy; a proxy that needs more is omitted.
@@ -193,8 +199,9 @@ func (m *MCPAggregatorMiddleware) toolsListResult(catalogue mcpAggregatorCatalog
 	return result
 }
 
-// toolsCatalogue lists the tools of every aggregated MCP proxy concurrently.
-// A proxy that is not loaded or fails is left out with a warning.
+// toolsCatalogue lists the tools of every aggregated MCP proxy concurrently,
+// each within mcpAggregatorListTimeout. A proxy that is not loaded, fails or
+// misses that deadline is left out with a warning.
 func (d mcpAggregatorDispatcher) toolsCatalogue(parent *http.Request) mcpAggregatorCatalogue {
 	ext := d.aggregator.OAS.GetTykMCPAggregatorExtension()
 	if ext == nil {
@@ -216,9 +223,11 @@ func (d mcpAggregatorDispatcher) toolsCatalogue(parent *http.Request) mcpAggrega
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
+			ctx, cancel := context.WithTimeout(parent.Context(), mcpAggregatorListTimeout)
+			defer cancel()
 			budgeted := d
 			budgeted.budget = &mcpAggregatorByteBudget{share: share}
-			tools, err := budgeted.listUpstreamTools(parent, upstream)
+			tools, err := budgeted.listUpstreamTools(parent.WithContext(ctx), upstream)
 			var mismatch *mcpAggregatorVersionMismatchError
 			switch {
 			case errors.As(err, &mismatch):
