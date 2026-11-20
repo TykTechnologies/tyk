@@ -164,8 +164,7 @@ func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls
 var errPublicKeyPinning = errors.New("Certificate public key pinning error. Public keys do not match.") //nolint:staticcheck // ST1005: existing message, kept unchanged
 
 func (gw *Gateway) verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tls.Config) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-	if (spec == nil || spec.CertificatePinningDisabled || len(spec.PinnedPublicKeys) == 0) &&
-		len(gw.GetConfig().Security.PinnedPublicKeys) == 0 {
+	if !pinningEnabled(spec, gw.GetConfig()) {
 		return nil
 	}
 
@@ -242,6 +241,19 @@ func validatePublicKeys(host string, conn *tls.Conn, whitelist []string) bool {
 	return isValid
 }
 
+// pinningEnabled reports whether any pins apply to spec, from the API
+// definition or from the gateway configuration.
+func pinningEnabled(spec *APISpec, conf config.Config) bool {
+	apiPins := spec != nil && !spec.CertificatePinningDisabled && len(spec.PinnedPublicKeys) != 0
+	return apiPins || len(conf.Security.PinnedPublicKeys) != 0
+}
+
+// commonNameCheckEnabled reports whether the upstream certificate's common
+// name must match the upstream host.
+func commonNameCheckEnabled(spec *APISpec, conf config.Config) bool {
+	return (spec != nil && spec.Proxy.Transport.SSLForceCommonNameCheck) || conf.SSLForceCommonNameCheck
+}
+
 // hostPinningError is the error returned when a directly dialed upstream fails
 // the pin check.
 func hostPinningError(host string) error {
@@ -270,15 +282,9 @@ func validateCommonName(host string, cert *x509.Certificate) error {
 }
 
 func (gw *Gateway) customDialTLSCheck(spec *APISpec, tc *tls.Config) func(network, addr string) (net.Conn, error) {
-	var checkPinnedKeys, checkCommonName bool
 	gwConfig := gw.GetConfig()
-	if (spec != nil && !spec.CertificatePinningDisabled && len(spec.PinnedPublicKeys) != 0) || len(gwConfig.Security.PinnedPublicKeys) != 0 {
-		checkPinnedKeys = true
-	}
-
-	if (spec != nil && spec.Proxy.Transport.SSLForceCommonNameCheck) || gwConfig.SSLForceCommonNameCheck {
-		checkCommonName = true
-	}
+	checkPinnedKeys := pinningEnabled(spec, gwConfig)
+	checkCommonName := commonNameCheckEnabled(spec, gwConfig)
 
 	if !checkCommonName && !checkPinnedKeys {
 		return nil
