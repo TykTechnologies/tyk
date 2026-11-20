@@ -13,7 +13,10 @@ import (
 // incoming aggregator against the APIs loaded on this gateway. Aggregators
 // call their aggregated proxies in-process, so an API this gateway has not
 // loaded cannot be told apart from one that does not exist.
-func (gw *Gateway) validateMCPAggregatorUpstreams(mcpObj *oas.OAS) (string, int) {
+//
+// Every aggregated MCP proxy must also serve MCP 2026-07-28, the only version
+// an aggregator uses to call it.
+func (gw *Gateway) validateMCPAggregatorUpstreams(r *http.Request, mcpObj *oas.OAS) (string, int) {
 	if mcpObj == nil || mcpObj.GetTykExtension() == nil {
 		return "", 0
 	}
@@ -40,7 +43,7 @@ func (gw *Gateway) validateMCPAggregatorUpstreams(mcpObj *oas.OAS) (string, int)
 			return msg, code
 		}
 	}
-	return "", 0
+	return gw.validateMCPAggregatorUpstreamVersions(r, &APISpec{APIDefinition: &incoming}, ext, upstreams)
 }
 
 // mcpAggregatorUpstreamStatus says whether an API can serve as an aggregated
@@ -105,7 +108,7 @@ func (gw *Gateway) validateMCPProxyReferences(r *http.Request, mcpObj *oas.OAS) 
 	if msg, code := gw.validatePairedMCPAdapterUpstream(r, mcpObj); msg != "" {
 		return msg, code
 	}
-	return gw.validateMCPAggregatorUpstreams(mcpObj)
+	return gw.validateMCPAggregatorUpstreams(r, mcpObj)
 }
 
 // mcpAggregatorDeleteConflict rejects deleting an MCP proxy that loaded

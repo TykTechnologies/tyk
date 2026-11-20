@@ -7,6 +7,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/ctx"
 	"github.com/TykTechnologies/tyk/internal/httpctx"
+	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -20,10 +21,14 @@ const (
 // mcpAggregatorLoopTrust marks an in-process call from an aggregator to one of
 // its aggregated MCP proxies. The aggregator has already authenticated the
 // caller, so the aggregated proxy's own client authentication is skipped.
+//
+// A probe is the admission-time version check of an aggregator that may not
+// be loaded yet; it is trusted for read-only discovery methods only.
 type mcpAggregatorLoopTrust struct {
 	OrgID           string
 	AggregatorAPIID string
 	UpstreamAPIID   string
+	Probe           bool
 }
 
 var errMCPAggregatorLoopTrustMismatch = errors.New("MCP aggregator loop trust descriptor does not match an admitted aggregated MCP proxy")
@@ -74,7 +79,7 @@ func (m *MCPAggregatorLoopAuthBypassMiddleware) ProcessRequest(_ http.ResponseWr
 	// The trust applies to this hop only; a further loop must authenticate.
 	ctxSetMCPAggregatorLoopTrust(r, nil)
 
-	if !m.validLoopTrust(trust) {
+	if !m.validLoopTrust(r, trust) {
 		m.Logger().WithFields(map[string]interface{}{
 			"api_id":            m.Spec.APIID,
 			"aggregator_api_id": trust.AggregatorAPIID,
@@ -101,9 +106,13 @@ func (m *MCPAggregatorLoopAuthBypassMiddleware) ProcessRequest(_ http.ResponseWr
 	return nil, http.StatusOK
 }
 
-func (m *MCPAggregatorLoopAuthBypassMiddleware) validLoopTrust(trust *mcpAggregatorLoopTrust) bool {
+func (m *MCPAggregatorLoopAuthBypassMiddleware) validLoopTrust(r *http.Request, trust *mcpAggregatorLoopTrust) bool {
 	if m.Gw == nil || trust.UpstreamAPIID != m.Spec.APIID || trust.OrgID != m.Spec.OrgID {
 		return false
+	}
+	if trust.Probe {
+		method := ctxGetMCPMethod(r)
+		return method == mcp.MethodServerDiscover || method == mcp.MethodToolsList
 	}
 	agg, ok := m.Gw.mcpAggregatorIndex.Lookup(trust.AggregatorAPIID)
 	return ok && agg.OrgID == trust.OrgID && m.Gw.mcpAggregatorIndex.Allows(trust.AggregatorAPIID, trust.UpstreamAPIID)
