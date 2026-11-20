@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -159,9 +160,44 @@ func TestGetPinnedPublicKeys(t *testing.T) {
 	})
 }
 
+// storePublicKey stores cert's public key in the certificate store and returns
+// its ID. Every httptest server shares one built-in certificate, so another
+// test may already have stored it.
+func storePublicKey(t *testing.T, gw *Gateway, cert *x509.Certificate) string {
+	t.Helper()
+
+	pubDER, err := x509.MarshalPKIXPublicKey(cert.PublicKey)
+	require.NoError(t, err)
+
+	if _, err := gw.CertificateManager.Add(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubDER}), ""); err != nil {
+		require.Contains(t, err.Error(), "already exists")
+	}
+
+	keyID := tykcrypto.HexSHA256(pubDER)
+	require.Equal(t, []string{keyID}, gw.CertificateManager.ListPublicKeys([]string{keyID}))
+
+	return keyID
+}
+
+// assertConnResult closes conn when the connection succeeded and checks err
+// against wantErr.
+func assertConnResult(t *testing.T, conn io.Closer, err error, wantErr bool) {
+	t.Helper()
+
+	if err == nil {
+		_ = conn.Close()
+	}
+
+	if wantErr {
+		assert.Error(t, err)
+	} else {
+		assert.NoError(t, err)
+	}
+}
+
 // TestUpstreamCertificatePinning covers TT-18123: configuring certificate
 // pinning must never weaken TLS verification for an upstream host that the
-// pins do not cover, and a pin that has no usable key must reject.
+// pins do not cover, and a pin entry with an empty value must reject.
 func TestUpstreamCertificatePinning(t *testing.T) {
 	ts := StartTest(nil)
 	defer ts.Close()
@@ -177,16 +213,7 @@ func TestUpstreamCertificatePinning(t *testing.T) {
 	trusted := x509.NewCertPool()
 	trusted.AddCert(upstream.Certificate())
 
-	// Every httptest server shares one built-in certificate, so another test
-	// may already have stored its public key. Store it if needed and use the
-	// fingerprint, which is the ID the certificate manager assigns.
-	upstreamPubDER, err := x509.MarshalPKIXPublicKey(upstream.Certificate().PublicKey)
-	require.NoError(t, err)
-	upstreamKeyID := tykcrypto.HexSHA256(upstreamPubDER)
-	if _, err := ts.Gw.CertificateManager.Add(pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: upstreamPubDER}), ""); err != nil {
-		require.Contains(t, err.Error(), "already exists")
-	}
-	require.Equal(t, []string{upstreamKeyID}, ts.Gw.CertificateManager.ListPublicKeys([]string{upstreamKeyID}))
+	upstreamKeyID := storePublicKey(t, ts.Gw, upstream.Certificate())
 
 	_, _, _, otherCert := certs.GenServerCertificate()
 	otherKeyID, err := ts.Gw.uploadCertPublicKey(otherCert)
@@ -267,15 +294,7 @@ func TestUpstreamCertificatePinning(t *testing.T) {
 				require.NotNil(t, dial, "pinning is configured, so a custom dialer is expected")
 
 				conn, err := dial("tcp", upstreamAddr)
-				if conn != nil {
-					_ = conn.Close()
-				}
-
-				if tc.wantErr {
-					assert.Error(t, err)
-				} else {
-					assert.NoError(t, err)
-				}
+				assertConnResult(t, conn, err, tc.wantErr)
 			})
 		}
 
@@ -339,15 +358,7 @@ func TestUpstreamCertificatePinning(t *testing.T) {
 				cfg.VerifyPeerCertificate = ts.Gw.verifyPeerCertificatePinnedCheck(pinningSpec(tc.apiPins), cfg)
 
 				conn, err := tls.Dial("tcp", upstreamAddr, cfg)
-				if conn != nil {
-					_ = conn.Close()
-				}
-
-				if tc.wantErr {
-					assert.Error(t, err)
-				} else {
-					assert.NoError(t, err)
-				}
+				assertConnResult(t, conn, err, tc.wantErr)
 			})
 		}
 	})
