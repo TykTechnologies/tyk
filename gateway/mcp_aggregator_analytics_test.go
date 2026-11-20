@@ -243,32 +243,44 @@ func TestMCPProxyDirectCallHasNoAggregatorOrigin(t *testing.T) {
 	}
 }
 
-func TestMCPAggregatorMarksToolsListFanOutRecordsWithItsOrigin(t *testing.T) {
+func TestMCPAggregatorToolsListWritesOnlyTheAggregatorRecord(t *testing.T) {
 	ts, records := startMCPAggregatorAnalyticsTest(t, nil, nil)
 	key := companyToolsKey(t, ts)
-	// The first call may also run the admission probes; only the second is
-	// a plain catalogue fan-out.
+
+	// The first call also runs the admission probes; the second is a plain
+	// catalogue fan-out. Neither writes a record for an aggregated proxy.
+	for _, call := range []string{"first", "second"} {
+		records.reset()
+		res := postModernToolsList(t, ts, "/company-tools/", key)
+		require.Equal(t, http.StatusOK, res.status, res.body)
+		require.Contains(t, res.tools, "orders__list_orders", call)
+		require.Contains(t, res.tools, "github__list_issues", call)
+
+		agg := singleRecord(t, records.forAPI("company-tools"), "company-tools")
+		assert.Equal(t, mcp.MethodToolsList, agg.MCPStats.JSONRPCMethod, call)
+		records.mu.Lock()
+		assert.Len(t, records.records, 1, "%s tools/list writes only the aggregator's record", call)
+		records.mu.Unlock()
+	}
+}
+
+func TestMCPAggregatorToolCallStillWritesTheRoutedProxyRecord(t *testing.T) {
+	ts, records := startMCPAggregatorAnalyticsTest(t, nil, nil)
+	key := companyToolsKey(t, ts)
 	require.Equal(t, http.StatusOK, postModernToolsList(t, ts, "/company-tools/", key).status)
 	records.reset()
 
-	res := postModernToolsList(t, ts, "/company-tools/", key)
+	res := postMCPToolsCall(t, ts, key, toolCallParams("github__list_issues", `{}`, ""))
 	require.Equal(t, http.StatusOK, res.status, res.body)
-	require.Contains(t, res.tools, "orders__list_orders")
-	require.Contains(t, res.tools, "github__list_issues")
+	require.Nil(t, res.rpc.Error, res.body)
 
-	agg := singleRecord(t, records.forAPI("company-tools"), "company-tools")
-	assert.Equal(t, mcp.MethodToolsList, agg.MCPStats.JSONRPCMethod)
-	assert.Empty(t, agg.MCPStats.AggregatorAPIID)
-
-	for _, apiID := range []string{"orders-mcp", "github-mcp"} {
-		source := records.forAPI(apiID)
-		require.NotEmpty(t, source, apiID)
-		for _, record := range source {
-			assert.Equal(t, mcp.MethodToolsList, record.MCPStats.JSONRPCMethod, apiID)
-			assert.Equal(t, "company-tools", record.MCPStats.AggregatorAPIID, apiID)
-			assert.Contains(t, record.Tags, "mcp-aggregator-company-tools", apiID)
-		}
-	}
+	singleRecord(t, records.forAPI("company-tools"), "company-tools")
+	github := singleRecord(t, records.forAPI("github-mcp"), "github-mcp")
+	assert.Equal(t, mcp.MethodToolsCall, github.MCPStats.JSONRPCMethod)
+	assert.Equal(t, "company-tools", github.MCPStats.AggregatorAPIID)
+	records.mu.Lock()
+	assert.Len(t, records.records, 2)
+	records.mu.Unlock()
 }
 
 // recordingTracerProvider is a gateway tracer provider over an SDK provider
