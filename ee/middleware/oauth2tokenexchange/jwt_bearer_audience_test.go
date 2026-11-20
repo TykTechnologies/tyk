@@ -113,7 +113,7 @@ func TestExchangeAtIdP_JWTBearer_NoAudience(t *testing.T) {
 	provider.ClientAuth.Method = oas.OAuth2ClientAuthPost
 
 	target := &oauth2common.Target{Scopes: []string{"Orders.Read", "Orders.Write"}}
-	tok, _, err := mwWithoutTykOps().exchangeAtIdP(context.Background(), provider, "inbound-user-token", target)
+	tok, _, err := mwWithoutTykOps().exchangeAtIdP(context.Background(), provider, "inbound-user-token", "", target)
 	require.NoError(t, err)
 	assert.Equal(t, "downstream-token", tok)
 	assert.True(t, got.scopePresent)
@@ -140,7 +140,7 @@ func TestExchangeAtIdP_JWTBearer_EmptyTarget(t *testing.T) {
 	provider.TokenEndpoint = idp.URL
 	provider.ClientAuth.Method = oas.OAuth2ClientAuthPost
 
-	tok, _, err := mwWithoutTykOps().exchangeAtIdP(context.Background(), provider, "inbound-user-token", &oauth2common.Target{})
+	tok, _, err := mwWithoutTykOps().exchangeAtIdP(context.Background(), provider, "inbound-user-token", "", &oauth2common.Target{})
 	require.NoError(t, err)
 	assert.Equal(t, "downstream-token", tok)
 	assert.Equal(t, "inbound-user-token", assertion)
