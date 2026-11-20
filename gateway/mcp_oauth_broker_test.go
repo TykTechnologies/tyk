@@ -2139,3 +2139,93 @@ func TestMCPOAuthBrokerConcurrentRefreshIsRetryableUntilCommittedReplay(t *testi
 		require.Equal(t, http.StatusUnauthorized, status, "reuse after commit must revoke only this family")
 	}
 }
+
+// TestMCPOAuthBrokerAcceptsTLSTerminatedPublicOrigin covers a broker whose
+// publicOrigin is HTTPS while TLS ends at a proxy the Gateway does not trust
+// (Tyk Cloud, or any load balancer without trusted_proxy_cidrs). The host must
+// still match exactly; only the scheme is taken from X-Forwarded-Proto.
+func TestMCPOAuthBrokerAcceptsTLSTerminatedPublicOrigin(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+	t.Cleanup(upstream.Close)
+	upstreamResource := upstream.URL + "/v1/mcp"
+	upstream.Config.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/.well-known/oauth-protected-resource/v1/mcp":
+			_, _ = fmt.Fprintf(w, `{"resource":%q,"authorization_servers":[%q]}`, upstreamResource, upstream.URL)
+		case "/.well-known/oauth-authorization-server":
+			_, _ = fmt.Fprintf(w, `{"issuer":%q,"authorization_endpoint":%q,"token_endpoint":%q,"registration_endpoint":%q,"scopes_supported":["mcp"]}`,
+				upstream.URL, upstream.URL+"/authorize", upstream.URL+"/token", upstream.URL+"/register")
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	})
+
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+	const listenPath = "/mcp/"
+	doc := oas.OAS{T: openapi3.T{OpenAPI: "3.0.3", Info: &openapi3.Info{Title: "broker", Version: "1"}, Paths: openapi3.NewPaths()}}
+	doc.SetTykExtension(&oas.XTykAPIGateway{
+		Info:     oas.Info{Name: "broker", State: oas.State{Active: true}},
+		Upstream: oas.Upstream{URL: upstreamResource},
+		Server: oas.Server{
+			ListenPath:     oas.ListenPath{Value: listenPath, Strip: true},
+			Authentication: &oas.Authentication{ProtectedResourceMetadata: &oas.ProtectedResourceMetadata{Enabled: true}},
+		},
+	})
+	ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.UseKeylessAccess = true
+		spec.MarkAsMCP()
+		spec.Proxy.ListenPath = listenPath
+		spec.Proxy.TargetURL = upstreamResource
+		spec.Proxy.StripListenPath = true
+		spec.IsOAS = true
+		spec.OAS = doc
+		spec.MCP = &apidef.MCPConfig{OAuthBroker: &apidef.MCPOAuthBrokerConfig{
+			Enabled: true, PublicOrigin: "https://gw.example", PublicResource: "https://gw.example" + listenPath,
+			UpstreamResource: upstreamResource, AllowInsecureLoopback: true,
+		}}
+	})
+	ts.Gw.PRMCache().Invalidate(upstream.URL + "/.well-known/oauth-protected-resource/v1/mcp")
+
+	tests := []struct {
+		name    string
+		host    string
+		headers map[string]string
+		want    int
+	}{
+		{name: "terminated TLS with matching host", host: "gw.example", headers: map[string]string{"X-Forwarded-Proto": "https"}, want: http.StatusOK},
+		{name: "default port in Host", host: "gw.example:443", headers: map[string]string{"X-Forwarded-Proto": "https"}, want: http.StatusOK},
+		{name: "untrusted forwarded host is ignored", host: "gw.example", headers: map[string]string{"X-Forwarded-Proto": "https", "X-Forwarded-Host": "evil.example"}, want: http.StatusOK},
+		{name: "no TLS evidence", host: "gw.example", want: http.StatusBadRequest},
+		{name: "forwarded http", host: "gw.example", headers: map[string]string{"X-Forwarded-Proto": "http"}, want: http.StatusBadRequest},
+		{name: "different host", host: "evil.example", headers: map[string]string{"X-Forwarded-Proto": "https"}, want: http.StatusBadRequest},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			for _, path := range []string{
+				"/.well-known/oauth-authorization-server/__tyk-as/test",
+				"/__tyk-as/test/.well-known/oauth-authorization-server",
+			} {
+				request, err := http.NewRequestWithContext(context.Background(), http.MethodGet, ts.URL+path, nil)
+				require.NoError(t, err)
+				request.Host = tc.host
+				for name, value := range tc.headers {
+					request.Header.Set(name, value)
+				}
+				response, err := http.DefaultClient.Do(request)
+				require.NoError(t, err)
+				body, err := io.ReadAll(response.Body)
+				_ = response.Body.Close()
+				require.NoError(t, err)
+				require.Equal(t, tc.want, response.StatusCode, "%s: %s", path, body)
+				if tc.want == http.StatusOK {
+					var metadata map[string]any
+					require.NoError(t, json.Unmarshal(body, &metadata))
+					require.Equal(t, "https://gw.example/__tyk-as/test", metadata["issuer"])
+					require.Equal(t, "https://gw.example/__tyk-as/test/token", metadata["token_endpoint"])
+				}
+			}
+		})
+	}
+}

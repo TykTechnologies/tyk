@@ -1,6 +1,7 @@
 package httputil
 
 import (
+	"crypto/tls"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -74,6 +75,49 @@ func TestExternalOrigin_UsesRightmostXForwardedValues(t *testing.T) {
 	origin, err := ExternalOrigin(req, []string{"2001:db8::/64"})
 	require.NoError(t, err)
 	assert.Equal(t, "https://[2001:db8::1]", origin)
+}
+
+func TestTLSTerminatedOrigin(t *testing.T) {
+	t.Parallel()
+
+	trusted, err := ParseTrustedProxyCIDRs([]string{"10.0.0.0/8"})
+	require.NoError(t, err)
+
+	tests := []struct {
+		name       string
+		host       string
+		remoteAddr string
+		proto      string
+		tls        bool
+		want       string
+	}{
+		{name: "untrusted peer reports https", host: "gw.example", remoteAddr: "192.0.2.5:1234", proto: "https", want: "https://gw.example"},
+		{name: "explicit default port is dropped", host: "gw.example:443", remoteAddr: "192.0.2.5:1234", proto: "https", want: "https://gw.example"},
+		{name: "non-default port is kept", host: "gw.example:8443", remoteAddr: "192.0.2.5:1234", proto: "https", want: "https://gw.example:8443"},
+		{name: "no forwarded proto", host: "gw.example", remoteAddr: "192.0.2.5:1234"},
+		{name: "forwarded http", host: "gw.example", remoteAddr: "192.0.2.5:1234", proto: "http"},
+		{name: "direct TLS is already handled", host: "gw.example", remoteAddr: "192.0.2.5:1234", proto: "https", tls: true},
+		{name: "trusted peer is handled by ExternalOrigin", host: "gw.example", remoteAddr: "10.1.2.3:1234", proto: "https"},
+		{name: "invalid host", host: "gw.example:0", remoteAddr: "192.0.2.5:1234", proto: "https"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, "http://"+test.host+"/mcp", nil)
+			req.Host = test.host
+			req.RemoteAddr = test.remoteAddr
+			req.Header.Set("X-Forwarded-Host", "evil.example")
+			if test.proto != "" {
+				req.Header.Set("X-Forwarded-Proto", test.proto)
+			}
+			if test.tls {
+				req.TLS = &tls.ConnectionState{}
+			}
+			got, ok := TLSTerminatedOrigin(req, trusted)
+			assert.Equal(t, test.want != "", ok)
+			assert.Equal(t, test.want, got)
+		})
+	}
 }
 
 func TestTrustedProxyRejectsMalformedHeaders(t *testing.T) {

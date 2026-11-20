@@ -24,6 +24,7 @@ import (
 	"github.com/TykTechnologies/tyk/header"
 	internalhttputil "github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/gorilla/mux"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -768,7 +769,25 @@ func (b *mcpOAuthBroker) validPublicRequest(r *http.Request) bool {
 		return false
 	}
 	origin, err := internalhttputil.ExternalOriginWithTrustedProxies(r, b.spec.mcpTrustedProxyPrefixes)
-	return err == nil && origin == b.config.PublicOrigin
+	if err == nil && origin == b.config.PublicOrigin {
+		return true
+	}
+	// TLS often ends at a proxy the Gateway is not configured to trust (Tyk
+	// Cloud, most load balancers). Accept the HTTPS origin it reports only when
+	// the Host matches publicOrigin exactly.
+	terminated, ok := internalhttputil.TLSTerminatedOrigin(r, b.spec.mcpTrustedProxyPrefixes)
+	if ok && terminated == b.config.PublicOrigin {
+		return true
+	}
+	fields := logrus.Fields{"api_id": b.spec.APIID, "request_origin": origin, "public_origin": b.config.PublicOrigin}
+	if ok {
+		fields["tls_terminated_origin"] = terminated
+	}
+	if err != nil {
+		fields["error"] = err.Error()
+	}
+	log.WithFields(fields).Warn("MCP OAuth broker rejected a request whose origin does not match publicOrigin")
+	return false
 }
 
 func metadataSupportsMCPOAuthScope(metadata map[string]any, requested string) bool {

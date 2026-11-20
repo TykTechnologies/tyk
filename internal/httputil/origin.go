@@ -241,3 +241,21 @@ func splitHeaderList(value string, separator byte) []string {
 	parts = append(parts, value[start:])
 	return parts
 }
+
+// TLSTerminatedOrigin returns "https://<Host>" for a plain-HTTP request from a
+// peer outside trustedProxyPrefixes that reports X-Forwarded-Proto: https.
+// That is the origin the client saw when TLS ended at a proxy the Gateway is
+// not configured to trust, such as a cloud load balancer. Only the scheme is
+// taken from the proxy: the host always comes from the request's Host header,
+// and forwarded host headers are ignored. Requests over TLS or from trusted
+// peers are already handled by ExternalOriginWithTrustedProxies.
+func TLSTerminatedOrigin(r *http.Request, trustedProxyPrefixes []netip.Prefix) (string, bool) {
+	if r.TLS != nil || peerIsTrusted(r.RemoteAddr, trustedProxyPrefixes) || ForwardedScheme(r) != "https" {
+		return "", false
+	}
+	origin, err := CanonicalOrigin("https://" + strings.TrimSpace(r.Host))
+	if err != nil {
+		return "", false
+	}
+	return origin, true
+}
