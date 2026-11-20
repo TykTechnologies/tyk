@@ -98,7 +98,7 @@ func TestSyntheticJSONRPCMethod_UsesParsedIngressEnvelope(t *testing.T) {
 
 func TestJSONRPCMiddleware_ReadsAndParsesIngressOnce(t *testing.T) {
 	body := `{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{"_meta":{"io.modelcontextprotocol/protocolVersion":"2026-07-28"}}}`
-	req := httptest.NewRequest(http.MethodPost, "/mcp", strings.NewReader(body))
+	req := httptest.NewRequestWithContext(t.Context(), http.MethodPost, "/mcp", strings.NewReader(body))
 	req.Header.Set(headerContentType, contentTypeJSON)
 	req.Header.Set(mcp.HeaderProtocolVersion, "2026-07-28")
 	mw := &JSONRPCMiddleware{BaseMiddleware: &BaseMiddleware{}}
