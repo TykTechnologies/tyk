@@ -88,6 +88,13 @@ func TestBuildExchangeForm_JWTBearer(t *testing.T) {
 
 // TestExchangeAtIdP_JWTBearer pins the wire shape end-to-end against a
 // recording IdP, alongside the RFC 8693 shape from the same logical target.
+func TestBuildExchangeForm_JWTBearer_OmitsRequestedTokenType(t *testing.T) {
+	target := &oauth2common.Target{Audience: "api://upstream", Scopes: []string{"read"}}
+	form := buildExchangeForm(jwtBearerTestProvider(nil), "s", target, oas.OAuth2ClientAuthBasic)
+	_, has := form[oas.OAuth2FormRequestedTokenType]
+	assert.False(t, has, "jwt-bearer must not send the RFC 8693 requested_token_type")
+}
+
 func TestExchangeAtIdP_JWTBearer(t *testing.T) {
 	target := &oauth2common.Target{Audience: "api://orders-api", Scopes: []string{"Orders.Read"}}
 

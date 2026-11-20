@@ -151,3 +151,37 @@ func TestValidateOAuth2Schemes_CustomParams_PerGrant(t *testing.T) {
 		})
 	})
 }
+
+func TestValidateOAuth2Schemes_RequestedTokenType(t *testing.T) {
+	validate := func(t *testing.T, grantType, requested string) error {
+		t.Helper()
+		p := jwtBearerProvider(grantType, nil)
+		p.RequestedTokenType = requested
+		s := newOAuth2WithTokenExchange("corpOAuth", &OAuth2TokenExchange{
+			Enabled:   true,
+			Providers: []OAuth2TokenExchangeProvider{p},
+		})
+		return s.ValidateOAuth2Schemes()
+	}
+
+	t.Run("unset is valid", func(t *testing.T) {
+		assert.NoError(t, validate(t, "", ""))
+	})
+
+	t.Run("absolute URI is valid on token-exchange", func(t *testing.T) {
+		assert.NoError(t, validate(t, OAuth2ProviderGrantTokenExchange, OAuth2TokenTypeJWT))
+		assert.NoError(t, validate(t, "", "urn:ietf:params:oauth:token-type:id_token"))
+	})
+
+	t.Run("non-absolute value is rejected", func(t *testing.T) {
+		err := validate(t, "", "access_token")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "must be an absolute URI")
+	})
+
+	t.Run("rejected on jwt-bearer", func(t *testing.T) {
+		err := validate(t, OAuth2ProviderGrantJWTBearer, OAuth2TokenTypeAccessToken)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "requestedTokenType is only valid")
+	})
+}

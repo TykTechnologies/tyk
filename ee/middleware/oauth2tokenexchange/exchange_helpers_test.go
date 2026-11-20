@@ -29,35 +29,72 @@ func mwWithoutTykOps() *Middleware {
 
 func TestParseExchangeResponse(t *testing.T) {
 	t.Run("token with expires_in", func(t *testing.T) {
-		tok, ttl, err := parseExchangeResponse([]byte(`{"access_token":"abc","expires_in":300}`))
+		tok, ttl, err := parseExchangeResponse([]byte(`{"access_token":"abc","expires_in":300}`), "")
 		require.NoError(t, err)
 		assert.Equal(t, "abc", tok)
 		assert.Equal(t, 300*time.Second, ttl)
 	})
 
 	t.Run("token without expires_in yields zero lifetime", func(t *testing.T) {
-		tok, ttl, err := parseExchangeResponse([]byte(`{"access_token":"abc"}`))
+		tok, ttl, err := parseExchangeResponse([]byte(`{"access_token":"abc"}`), "")
 		require.NoError(t, err)
 		assert.Equal(t, "abc", tok)
 		assert.Equal(t, time.Duration(0), ttl)
 	})
 
 	t.Run("non-positive expires_in yields zero lifetime", func(t *testing.T) {
-		_, ttl, err := parseExchangeResponse([]byte(`{"access_token":"abc","expires_in":-5}`))
+		_, ttl, err := parseExchangeResponse([]byte(`{"access_token":"abc","expires_in":-5}`), "")
 		require.NoError(t, err)
 		assert.Equal(t, time.Duration(0), ttl)
 	})
 
 	t.Run("missing access_token is an error", func(t *testing.T) {
-		_, _, err := parseExchangeResponse([]byte(`{"expires_in":300}`))
+		_, _, err := parseExchangeResponse([]byte(`{"expires_in":300}`), "")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "missing access_token")
 	})
 
 	t.Run("invalid JSON is an error", func(t *testing.T) {
-		_, _, err := parseExchangeResponse([]byte(`not-json`))
+		_, _, err := parseExchangeResponse([]byte(`not-json`), "")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "decoding exchange response")
+	})
+
+	t.Run("issued_token_type", func(t *testing.T) {
+		accessType, jwtType := oas.OAuth2TokenTypeAccessToken, oas.OAuth2TokenTypeJWT
+		idType := "urn:ietf:params:oauth:token-type:id_token"
+		body := func(issued string) []byte {
+			return []byte(`{"access_token":"abc","issued_token_type":"` + issued + `"}`)
+		}
+		cases := []struct {
+			name, requested, issued string
+			wantErr                 bool
+		}{
+			{"exact match", accessType, accessType, false},
+			{"jwt satisfies an access-token request", accessType, jwtType, false},
+			{"id_token rejected for an access-token request", accessType, idType, true},
+			{"configured type must match exactly", jwtType, accessType, true},
+			{"configured type exact match", idType, idType, false},
+			{"not checked when nothing was requested", "", idType, false},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				tok, _, err := parseExchangeResponse(body(tc.issued), tc.requested)
+				if tc.wantErr {
+					require.Error(t, err)
+					assert.Contains(t, err.Error(), "does not match requested_token_type")
+					return
+				}
+				require.NoError(t, err)
+				assert.Equal(t, "abc", tok)
+			})
+		}
+
+		t.Run("absent issued_token_type is tolerated", func(t *testing.T) {
+			tok, _, err := parseExchangeResponse([]byte(`{"access_token":"abc"}`), accessType)
+			require.NoError(t, err)
+			assert.Equal(t, "abc", tok)
+		})
 	})
 }
 
@@ -73,6 +110,19 @@ func TestBuildExchangeForm(t *testing.T) {
 		assert.Equal(t, oas.OAuth2GrantTypeTokenExchange, form.Get(oas.OAuth2FormGrantType))
 		assert.Equal(t, "subject-token", form.Get(oas.OAuth2FormSubjectToken))
 		assert.Equal(t, oas.OAuth2TokenTypeAccessToken, form.Get(oas.OAuth2FormSubjectTokenType))
+	})
+
+	t.Run("requested_token_type is omitted unless configured", func(t *testing.T) {
+		form := buildExchangeForm(provider, "s", target, oas.OAuth2ClientAuthBasic)
+		_, has := form[oas.OAuth2FormRequestedTokenType]
+		assert.False(t, has, "unconfigured providers must keep the pre-existing wire shape")
+	})
+
+	t.Run("configured requestedTokenType is sent", func(t *testing.T) {
+		p := *provider
+		p.RequestedTokenType = oas.OAuth2TokenTypeJWT
+		form := buildExchangeForm(&p, "s", target, oas.OAuth2ClientAuthBasic)
+		assert.Equal(t, oas.OAuth2TokenTypeJWT, form.Get(oas.OAuth2FormRequestedTokenType))
 	})
 
 	t.Run("audience populates both audience and resource", func(t *testing.T) {
@@ -308,4 +358,70 @@ func TestExchangeWouldFire_ProviderDefault(t *testing.T) {
 		}}
 		assert.False(t, m.exchangeWouldFire(st, cfg))
 	})
+}
+
+// TestExchangeAtIdP_RequestedTokenType drives the full call against a fake IdP:
+// an unconfigured provider keeps the pre-existing wire shape and response
+// handling; a configured type goes out on the wire and the response's
+// issued_token_type is checked against it (RFC 8693 only).
+func TestExchangeAtIdP_RequestedTokenType(t *testing.T) {
+	target := &oauth2common.Target{Audience: "https://upstream", Scopes: []string{"read"}}
+	idType := "urn:ietf:params:oauth:token-type:id_token"
+
+	// fakeIdP records the requested_token_type it receives and answers with
+	// the given issued_token_type ("" omits it).
+	fakeIdP := func(t *testing.T, issued string, gotRequested *string, sawField *bool) *httptest.Server {
+		t.Helper()
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			_ = r.ParseForm()
+			*gotRequested = r.PostForm.Get(oas.OAuth2FormRequestedTokenType)
+			_, *sawField = r.PostForm[oas.OAuth2FormRequestedTokenType]
+			resp := map[string]interface{}{"access_token": "exchanged", "expires_in": 60}
+			if issued != "" {
+				resp["issued_token_type"] = issued
+			}
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(resp)
+		}))
+		t.Cleanup(srv.Close)
+		return srv
+	}
+	provider := func(endpoint, grant, requested string) *oas.OAuth2TokenExchangeProvider {
+		return &oas.OAuth2TokenExchangeProvider{
+			Name: "p", GrantType: grant, TokenEndpoint: endpoint, RequestedTokenType: requested,
+			ClientAuth: &oas.OAuth2ClientAuth{Method: oas.OAuth2ClientAuthBasic, ClientID: "cid", ClientSecret: "secret"},
+		}
+	}
+	cases := []struct {
+		name, grant, requested, issued string
+		wantWire                       string // "" with wantField=false means absent
+		wantField, wantErr             bool
+	}{
+		{"unconfigured sends nothing and accepts any issued type", "", "", idType, "", false, false},
+		{"access_token sent and accepted", "", oas.OAuth2TokenTypeAccessToken, oas.OAuth2TokenTypeAccessToken, oas.OAuth2TokenTypeAccessToken, true, false},
+		{"access_token request rejects an id_token", "", oas.OAuth2TokenTypeAccessToken, idType, oas.OAuth2TokenTypeAccessToken, true, true},
+		{"access_token request tolerates a missing issued_token_type", "", oas.OAuth2TokenTypeAccessToken, "", oas.OAuth2TokenTypeAccessToken, true, false},
+		{"configured type is sent and enforced", "", oas.OAuth2TokenTypeJWT, oas.OAuth2TokenTypeAccessToken, oas.OAuth2TokenTypeJWT, true, true},
+		{"configured type exact match passes", "", idType, idType, idType, true, false},
+		{"jwt-bearer sends no field and skips the check", oas.OAuth2ProviderGrantJWTBearer, "", idType, "", false, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var gotRequested string
+			var sawField bool
+			idp := fakeIdP(t, tc.issued, &gotRequested, &sawField)
+
+			tok, _, err := mwWithoutTykOps().exchangeAtIdP(context.Background(), provider(idp.URL, tc.grant, tc.requested), "inbound", target)
+
+			assert.Equal(t, tc.wantField, sawField)
+			assert.Equal(t, tc.wantWire, gotRequested)
+			if tc.wantErr {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "does not match requested_token_type")
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, "exchanged", tok)
+		})
+	}
 }
