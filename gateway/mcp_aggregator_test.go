@@ -234,6 +234,28 @@ func TestMCPAggregatorRejectsAggregatedProxyNotLoadedOnThisGateway(t *testing.T)
 	assert.False(t, res.nextCalled)
 }
 
+func TestMCPAggregatorAsksForReloadWhenAggregatedProxyIsCreatedButNotLoaded(t *testing.T) {
+	gw := newMCPTestGateway(t)
+
+	upstream, err := json.Marshal(mcpRuntimeDoc("orders-mcp", "http://upstream.url"))
+	require.NoError(t, err)
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/tyk/mcps", bytes.NewReader(upstream))
+	req.Header.Set("Content-Type", "application/json")
+	gw.validateMCP(gw.mcpCreateHandler).ServeHTTP(w, req)
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	// The gateway has not reloaded, so "orders-mcp" is written but not loaded.
+	res := postMCPAggregatorThroughValidateMCP(t, gw, http.MethodPost, mcpAggregatorOAS("all-tools", mcpAggregatorRuntimeOrg,
+		aggregated("orders-mcp", "orders"),
+	))
+
+	assert.Equal(t, http.StatusBadRequest, res.code)
+	assert.Contains(t, res.body, `aggregated MCP proxy \"orders-mcp\" is not loaded yet: reload the gateway, then retry`)
+	assert.NotContains(t, res.body, "must be deployed to the same gateway")
+	assert.False(t, res.nextCalled)
+}
+
 func TestMCPAggregatorRejectsAggregatedProxyFromAnotherOrg(t *testing.T) {
 	gw := mcpAggregatorAdmissionGateway(t)
 

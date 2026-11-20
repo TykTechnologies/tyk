@@ -183,6 +183,9 @@ type Gateway struct {
 	mcpPairingIndex pairing.Index
 
 	mcpAggregatorIndex mcpaggregator.Index
+	// mcpAggregatorWrites holds the MCP proxy definitions the Gateway API has
+	// written since the last reload, which mcpAggregatorIndex does not show yet.
+	mcpAggregatorWrites mcpAggregatorWrites
 
 	// prmCache memoises upstream Protected Resource Metadata (RFC 9728) docs
 	// for MCP APIs running in mirror mode. Lazily initialised on first use.

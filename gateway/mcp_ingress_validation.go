@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/mcp"
@@ -42,6 +43,10 @@ func (m *JSONRPCMiddleware) validateMCPIngress(w http.ResponseWriter, r *http.Re
 		err = mcp.ValidateModernMirroredHeaders(r.Header, ingress.Envelope)
 	}
 	if err != nil {
+		if err.Code == mcp.CodeUnsupportedProtocolVersion && m.Spec.IsMCPAggregator() {
+			// Clients such as Claude Desktop show only the message, not data.supported.
+			err.Message = "unsupported protocol version: this MCP aggregator supports only " + strings.Join(m.Spec.SupportedProtocolVersions(), ", ")
+		}
 		m.writeMCPIngressError(w, r, err)
 		return false
 	}

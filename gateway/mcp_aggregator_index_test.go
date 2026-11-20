@@ -1,6 +1,8 @@
 package gateway
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -146,4 +148,85 @@ func TestDeleteMCPProxyReferencedByAggregatorIsRejected(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
 		assert.NoFileExists(t, filepath.Join(appPath, "github-mcp.json"))
 	})
+}
+
+// mcpAggregatorDeleteGuardGateway loads MCP proxies "github" and "orders" and
+// aggregator "company-tools" over both, with their files in the app path, as
+// if the Gateway API had created them and the gateway had reloaded since.
+func mcpAggregatorDeleteGuardGateway(t *testing.T) (*Gateway, string) {
+	t.Helper()
+
+	appPath := t.TempDir()
+	gw := newMCPTestGateway(t, appPath)
+	github := mcpManagedTestSpec("github")
+	github.OrgID = "acme"
+	orders := mcpManagedTestSpec("orders")
+	orders.OrgID = "acme"
+	companyTools := mcpAggregatorSpec("company-tools", "acme", aggregated("github", "github"), aggregated("orders", "orders"))
+	specs := []*APISpec{github, orders, companyTools}
+	fs := afero.NewOsFs()
+	for _, spec := range specs {
+		gw.apisByID[spec.APIID] = spec
+		require.NoError(t, afero.WriteFile(fs, filepath.Join(appPath, spec.APIID+".json"), []byte("{}"), 0644))
+		require.NoError(t, afero.WriteFile(fs, filepath.Join(appPath, spec.APIID+"-mcp.json"), []byte("{}"), 0644))
+	}
+	gw.mcpAggregatorIndex.Set(computeMCPAggregation(specs))
+	return gw, appPath
+}
+
+func deleteMCPProxyThroughAPI(gw *Gateway, apiID string) *httptest.ResponseRecorder {
+	req := mux.SetURLVars(httptest.NewRequest(http.MethodDelete, "/tyk/mcps/"+apiID, nil), map[string]string{"apiID": apiID})
+	w := httptest.NewRecorder()
+	gw.mcpDeleteHandler(w, req)
+	return w
+}
+
+func writeMCPAggregatorThroughAPI(t *testing.T, gw *Gateway, method string, doc *oas.OAS) {
+	t.Helper()
+
+	body, err := json.Marshal(doc)
+	require.NoError(t, err)
+	apiID := doc.GetTykExtension().Info.ID
+	req := mux.SetURLVars(httptest.NewRequest(method, "/tyk/mcps/"+apiID, bytes.NewReader(body)), map[string]string{"apiID": apiID})
+	w := httptest.NewRecorder()
+	if method == http.MethodPost {
+		gw.mcpCreateHandler(w, req)
+	} else {
+		gw.mcpUpdateHandler(w, req)
+	}
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+}
+
+func TestDeleteMCPProxyAllowedOnceItsAggregatorIsDeletedBeforeReload(t *testing.T) {
+	gw, _ := mcpAggregatorDeleteGuardGateway(t)
+
+	w := deleteMCPProxyThroughAPI(gw, "company-tools")
+	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	w = deleteMCPProxyThroughAPI(gw, "orders")
+	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+}
+
+func TestDeleteMCPProxyAllowedOnceItsAggregatorNoLongerReferencesItBeforeReload(t *testing.T) {
+	gw, _ := mcpAggregatorDeleteGuardGateway(t)
+
+	writeMCPAggregatorThroughAPI(t, gw, http.MethodPut, mcpAggregatorOAS("company-tools", "acme", aggregated("github", "github")))
+
+	w := deleteMCPProxyThroughAPI(gw, "orders")
+	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	w = deleteMCPProxyThroughAPI(gw, "github")
+	assert.Equal(t, http.StatusConflict, w.Code, w.Body.String())
+	assert.Contains(t, w.Body.String(), `API \"github\" is referenced by MCP aggregators: company-tools`)
+}
+
+func TestDeleteMCPProxyRejectedWhileAnAggregatorCreatedBeforeReloadReferencesIt(t *testing.T) {
+	gw, _ := mcpAggregatorDeleteGuardGateway(t)
+
+	writeMCPAggregatorThroughAPI(t, gw, http.MethodPost, mcpAggregatorOAS("all-tools", "acme", aggregated("github", "github")))
+	writeMCPAggregatorThroughAPI(t, gw, http.MethodPut, mcpAggregatorOAS("company-tools", "acme", aggregated("orders", "orders")))
+
+	w := deleteMCPProxyThroughAPI(gw, "github")
+	assert.Equal(t, http.StatusConflict, w.Code, w.Body.String())
+	assert.Contains(t, w.Body.String(), `API \"github\" is referenced by MCP aggregators: all-tools`)
 }
