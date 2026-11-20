@@ -157,6 +157,13 @@ func ValidateTykMCPAggregator(ext *TykMCPAggregator) error {
 		if upstream.Tools != nil && len(upstream.Tools) == 0 {
 			return fmt.Errorf("%s.tools: select at least one tool or omit the field", field)
 		}
+		tools := make(map[string]struct{}, len(upstream.Tools))
+		for toolIdx, tool := range upstream.Tools {
+			if _, duplicate := tools[tool]; duplicate {
+				return fmt.Errorf("%s.tools[%d] %q is duplicated: each tool may be selected only once", field, toolIdx, tool)
+			}
+			tools[tool] = struct{}{}
+		}
 	}
 
 	return nil

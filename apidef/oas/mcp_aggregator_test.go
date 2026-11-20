@@ -201,6 +201,21 @@ func TestValidateTykMCPAggregator(t *testing.T) {
 			}},
 			wantErr: "x-tyk-mcp-aggregator.upstreams[0].tools: select at least one tool or omit the field",
 		},
+		{
+			name: "tool selected twice",
+			ext: TykMCPAggregator{Upstreams: []TykMCPAggregatorUpstream{
+				upstream("orders-mcp", "orders", "list_orders"),
+				upstream("github-mcp", "github", "list_issues", "search", "list_issues"),
+			}},
+			wantErr: `x-tyk-mcp-aggregator.upstreams[1].tools[2] "list_issues" is duplicated: each tool may be selected only once`,
+		},
+		{
+			name: "same tool name selected on different aggregated proxies",
+			ext: TykMCPAggregator{Upstreams: []TykMCPAggregatorUpstream{
+				upstream("orders-mcp", "orders", "search"),
+				upstream("github-mcp", "github", "search"),
+			}},
+		},
 	}
 
 	for _, tt := range tests {

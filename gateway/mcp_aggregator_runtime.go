@@ -10,6 +10,7 @@ import (
 	"sort"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/sirupsen/logrus"
@@ -40,6 +41,9 @@ const (
 	mcpAggregatorMaxCatalogueBytes = 32 << 20
 
 	mcpAggregatorUnnamedToolMsg = "MCP aggregator skips aggregated tool without a name"
+
+	mcpAggregatorSelectedToolMissingMsg = "MCP aggregator omits selected tool the aggregated MCP proxy does not expose"
+	mcpAggregatorToolNameTooLongMsg     = "MCP aggregator omits aggregated tool whose name exceeds the MCP tool name limit"
 )
 
 // MCPAggregatorMiddleware serves an MCP aggregator's JSON-RPC methods after the
@@ -282,8 +286,67 @@ func mcpAggregatorFailureReason(err error) string {
 	return "tools/list failed: " + err.Error()
 }
 
+// listUpstreamTools lists the tools an aggregated MCP proxy exposes now and
+// keeps the ones the aggregator selects. A selected tool the proxy no longer
+// exposes is left out with a warning, so the aggregator keeps serving the rest.
 func (d mcpAggregatorDispatcher) listUpstreamTools(parent *http.Request, upstream mcpaggregator.Upstream) ([]mcpAggregatorTool, error) {
+	spec, err := d.upstreamSpec(upstream.APIID)
+	if err != nil {
+		return nil, err
+	}
+	exposed, err := d.exposedTools(parent, spec, upstream.Alias, d.loopTrust(spec))
+	if err != nil {
+		return nil, err
+	}
 	var tools []mcpAggregatorTool
+	names := make(map[string]struct{}, len(exposed))
+	selection := newMCPAggregatorToolSelection(upstream)
+	for _, tool := range exposed {
+		names[tool.Name] = struct{}{}
+		if !selection.selects(tool.Name) {
+			continue
+		}
+		aggregatedName := mcpaggregator.ToolName(upstream.Alias, tool.Name)
+		if !mcpAggregatorNameFits(aggregatedName) {
+			log.WithFields(logrus.Fields{
+				"aggregator_api_id": d.aggregator.APIID,
+				"upstream_api_id":   upstream.APIID,
+				"alias":             upstream.Alias,
+				"tool":              tool.Name,
+				"reason":            fmt.Sprintf("%q plus the tool name is %d characters, over the %d character limit for MCP tool names", upstream.Alias+mcpaggregator.NamespaceSeparator, utf8.RuneCountInString(aggregatedName), mcpaggregator.MaxToolNameLength),
+			}).Warn(mcpAggregatorToolNameTooLongMsg)
+			continue
+		}
+		encodedName, err := json.Marshal(aggregatedName)
+		if err != nil {
+			return nil, err
+		}
+		tool.Definition["name"] = encodedName
+		tools = append(tools, mcpAggregatorTool{
+			Name:             aggregatedName,
+			Alias:            upstream.Alias,
+			UpstreamAPIID:    upstream.APIID,
+			UpstreamToolName: tool.Name,
+			Definition:       tool.Definition,
+		})
+	}
+	d.warnSelectedToolsMissing(upstream, names)
+	return tools, nil
+}
+
+// mcpAggregatorExposedTool is one tool as an aggregated MCP proxy lists it,
+// under the proxy's own name.
+type mcpAggregatorExposedTool struct {
+	Name       string
+	Definition map[string]json.RawMessage
+}
+
+// exposedTools reads every tools/list page of an aggregated MCP proxy under
+// the given loop trust: the proxy's complete current tool view, after its own
+// renames and restrictions. Admission and the runtime share it, so a selection
+// is checked against the same view the aggregator serves from.
+func (d mcpAggregatorDispatcher) exposedTools(parent *http.Request, spec *APISpec, alias string, trust *mcpAggregatorLoopTrust) ([]mcpAggregatorExposedTool, error) {
+	var tools []mcpAggregatorExposedTool
 	params := map[string]any{}
 	seenCursors := map[string]struct{}{}
 	var listedBytes int
@@ -291,12 +354,14 @@ func (d mcpAggregatorDispatcher) listUpstreamTools(parent *http.Request, upstrea
 		if page == mcpAggregatorMaxListPages {
 			return nil, fmt.Errorf("returned more than %d pages", mcpAggregatorMaxListPages)
 		}
-		raw, err := d.call(parent, upstream, mcp.MethodToolsList, params)
+		raw, err := d.send(parent, spec, mcp.MethodToolsList, params, trust)
 		if err != nil {
 			return nil, err
 		}
-		// A proxy that lists more than the whole catalogue may hold can never
-		// be served, so its pages stop being read and buffered here.
+		// Reading stops once a proxy lists more than the whole catalogue may
+		// hold, so one proxy cannot make the aggregator buffer more than that.
+		// Such a proxy is left out even when only some of its tools are
+		// selected.
 		if listedBytes += len(raw); listedBytes > mcpAggregatorMaxCatalogueBytes {
 			return nil, fmt.Errorf("returned more than %d bytes of tools", mcpAggregatorMaxCatalogueBytes)
 		}
@@ -312,24 +377,12 @@ func (d mcpAggregatorDispatcher) listUpstreamTools(parent *http.Request, upstrea
 			if json.Unmarshal(definition["name"], &name) != nil || name == "" {
 				log.WithFields(logrus.Fields{
 					"aggregator_api_id": d.aggregator.APIID,
-					"upstream_api_id":   upstream.APIID,
-					"alias":             upstream.Alias,
+					"upstream_api_id":   spec.APIID,
+					"alias":             alias,
 				}).Warn(mcpAggregatorUnnamedToolMsg)
 				continue
 			}
-			aggregatedName := mcpaggregator.ToolName(upstream.Alias, name)
-			encodedName, err := json.Marshal(aggregatedName)
-			if err != nil {
-				return nil, err
-			}
-			definition["name"] = encodedName
-			tools = append(tools, mcpAggregatorTool{
-				Name:             aggregatedName,
-				Alias:            upstream.Alias,
-				UpstreamAPIID:    upstream.APIID,
-				UpstreamToolName: name,
-				Definition:       definition,
-			})
+			tools = append(tools, mcpAggregatorExposedTool{Name: name, Definition: definition})
 		}
 		if len(tools) > mcpAggregatorMaxCatalogueTools {
 			return nil, fmt.Errorf("returned more than %d tools", mcpAggregatorMaxCatalogueTools)
@@ -342,6 +395,19 @@ func (d mcpAggregatorDispatcher) listUpstreamTools(parent *http.Request, upstrea
 		}
 		seenCursors[result.NextCursor] = struct{}{}
 		params = map[string]any{"cursor": result.NextCursor}
+	}
+}
+
+func (d mcpAggregatorDispatcher) warnSelectedToolsMissing(upstream mcpaggregator.Upstream, exposed map[string]struct{}) {
+	for _, tool := range upstream.Tools {
+		if _, ok := exposed[tool]; !ok {
+			log.WithFields(logrus.Fields{
+				"aggregator_api_id": d.aggregator.APIID,
+				"upstream_api_id":   upstream.APIID,
+				"alias":             upstream.Alias,
+				"tool":              tool,
+			}).Warn(mcpAggregatorSelectedToolMissingMsg)
+		}
 	}
 }
 

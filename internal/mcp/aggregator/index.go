@@ -10,6 +10,10 @@ import (
 // NamespaceSeparator joins an upstream alias and an upstream tool name.
 const NamespaceSeparator = "__"
 
+// MaxToolNameLength is the longest tool name MCP allows, in characters. It
+// bounds the aggregated name, alias and separator included.
+const MaxToolNameLength = 128
+
 // ToolName returns the aggregated name of an upstream tool.
 func ToolName(alias, tool string) string {
 	return alias + NamespaceSeparator + tool
