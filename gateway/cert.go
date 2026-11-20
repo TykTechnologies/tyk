@@ -171,6 +171,10 @@ func (gw *Gateway) verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tl
 
 	// Only the "*" pin can apply here: the callback is not told which host
 	// it is verifying. Without one, keep standard verification.
+	if hasHostPins(spec, gw.GetConfig()) {
+		certLog.Warning("Certificate pinning: the upstream is reached through an HTTP proxy, so only the \"*\" pin is checked. Pins for specific domains are ignored.")
+	}
+
 	whitelist, pinned := gw.getPinnedPublicKeys("*", spec, gw.GetConfig())
 	if !pinned {
 		return nil
@@ -238,6 +242,23 @@ func validatePublicKeys(host string, conn *tls.Conn, whitelist []string) bool {
 	return isValid
 }
 
+// hostPinningError is the error returned when a directly dialed upstream fails
+// the pin check.
+func hostPinningError(host string) error {
+	return errors.New("https://" + host + " certificate public key pinning error. Public keys do not match.")
+}
+
+// hostPins returns the fingerprints pinned for host. It returns none when host
+// is not pinned, and an error when host is pinned with an empty value.
+func (gw *Gateway) hostPins(host string, spec *APISpec) ([]string, error) {
+	whitelist, pinned := gw.getPinnedPublicKeys(host, spec, gw.GetConfig())
+	if pinned && len(whitelist) == 0 {
+		return nil, hostPinningError(host)
+	}
+
+	return whitelist, nil
+}
+
 func validateCommonName(host string, cert *x509.Certificate) error {
 	certLog.Debug("Checking certificate CommonName for host :", host)
 
@@ -269,16 +290,10 @@ func (gw *Gateway) customDialTLSCheck(spec *APISpec, tc *tls.Config) func(networ
 			return nil, err
 		}
 
-		pinningErr := errors.New("https://" + host + " certificate public key pinning error. Public keys do not match.")
-
 		var whitelist []string
 		if checkPinnedKeys {
-			var pinned bool
-			whitelist, pinned = gw.getPinnedPublicKeys(host, spec, gw.GetConfig())
-
-			// A pin entry with an empty value pins the host to nothing.
-			if pinned && len(whitelist) == 0 {
-				return nil, pinningErr
+			if whitelist, err = gw.hostPins(host, spec); err != nil {
+				return nil, err
 			}
 		}
 
@@ -287,13 +302,9 @@ func (gw *Gateway) customDialTLSCheck(spec *APISpec, tc *tls.Config) func(networ
 		// A pinned host is verified by its public key instead of its
 		// certificate chain, so pinned self-signed upstreams keep working.
 		// A host with no pin keeps the caller's verification setting.
-		if len(whitelist) > 0 {
-			clone.InsecureSkipVerify = true
-		}
-
 		// The forced common name check still skips chain verification. That
 		// is a separate issue, listed as out of scope in TT-18123.
-		if checkCommonName {
+		if len(whitelist) > 0 || checkCommonName {
 			clone.InsecureSkipVerify = true
 		}
 
@@ -305,14 +316,11 @@ func (gw *Gateway) customDialTLSCheck(spec *APISpec, tc *tls.Config) func(networ
 
 		if len(whitelist) > 0 && !validatePublicKeys(host, c, whitelist) {
 			_ = c.Close()
-			return nil, pinningErr
+			return nil, hostPinningError(host)
 		}
 
 		if checkCommonName {
-			state := c.ConnectionState()
-			leafCert := state.PeerCertificates[0]
-			err := validateCommonName(host, leafCert)
-			if err != nil {
+			if err := validateCommonName(host, c.ConnectionState().PeerCertificates[0]); err != nil {
 				return nil, err
 			}
 		}
