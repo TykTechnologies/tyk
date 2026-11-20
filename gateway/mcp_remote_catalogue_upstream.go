@@ -40,7 +40,8 @@ func (gw *Gateway) remoteMCPCatalogueClient(spec *APISpec, logger *logrus.Entry)
 			}
 		}
 		if spec.Proxy.Transport.SSLForceCommonNameCheck || gw.GetConfig().SSLForceCommonNameCheck {
-			if proxyURL, _ := transport.Proxy(target); proxyURL != nil {
+			// A proxy lookup error fails the check's request itself, in the transport.
+			if proxyURL, proxyErr := transport.Proxy(target); proxyErr == nil && proxyURL != nil {
 				host, _, splitErr := net.SplitHostPort(target.URL.Host)
 				if splitErr != nil {
 					host = target.URL.Host
