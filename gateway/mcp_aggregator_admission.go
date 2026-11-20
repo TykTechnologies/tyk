@@ -3,12 +3,15 @@ package gateway
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/sanitize"
 )
 
 // validateMCPAggregatorUpstreams checks every aggregated MCP proxy of an
@@ -42,11 +45,25 @@ func (gw *Gateway) validateMCPAggregatorUpstreams(r *http.Request, mcpObj *oas.O
 	gw.apisMu.RUnlock()
 
 	for i, ref := range ext.Upstreams {
-		if msg, code := classifyMCPAggregatorUpstream(incoming.OrgID, upstreams[i]).admissionError(ref.APIID); msg != "" {
+		status := classifyMCPAggregatorUpstream(incoming.OrgID, upstreams[i])
+		if status == mcpAggregatorUpstreamNotLoaded && gw.apiDefinitionAwaitsReload(ref.APIID) {
+			return fmt.Sprintf("aggregated MCP proxy %q is not loaded yet: reload the gateway, then retry", ref.APIID), http.StatusBadRequest
+		}
+		if msg, code := status.admissionError(ref.APIID); msg != "" {
 			return msg, code
 		}
 	}
 	return gw.validateMCPAggregatorUpstreamViews(r, &APISpec{APIDefinition: &incoming}, ext, upstreams)
+}
+
+// apiDefinitionAwaitsReload reports whether the Gateway API has written a
+// definition for apiID to this gateway's app path that it has not loaded yet.
+func (gw *Gateway) apiDefinitionAwaitsReload(apiID string) bool {
+	if sanitize.ValidatePathComponent(apiID) != nil {
+		return false
+	}
+	_, err := os.Stat(filepath.Join(gw.GetConfig().AppPath, apiID+".json"))
+	return err == nil
 }
 
 // mcpAggregatorUpstreamStatus says whether an API can serve as an aggregated
