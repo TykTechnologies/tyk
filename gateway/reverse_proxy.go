@@ -880,6 +880,10 @@ func (p *ReverseProxy) httpTransport(dialTimeout float64, req *http.Request, out
 		p.logger.Debug("Detected proxy: " + proxyURL.String())
 		transport.TLSClientConfig.VerifyPeerCertificate = p.Gw.verifyPeerCertificatePinnedCheck(p.TykAPISpec, transport.TLSClientConfig)
 
+		if hasHostPins(p.TykAPISpec, p.Gw.GetConfig()) {
+			p.logger.Warning("Certificate pinning: the upstream is reached through an HTTP proxy, so only the \"*\" pin is checked. Pins for specific domains are ignored.")
+		}
+
 		if transport.TLSClientConfig.VerifyPeerCertificate != nil {
 			p.logger.Debug("Certificate pinning check is enabled")
 		}
