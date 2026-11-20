@@ -158,18 +158,32 @@ func (gw *Gateway) getUpstreamCertificate(host string, spec *APISpec) (cert *tls
 	return certs[0]
 }
 
+// errPublicKeyPinning is the error returned when an upstream certificate fails
+// the pin check on the upstream-proxy path. The wording predates the linter rule
+// and is kept so that existing log matching keeps working.
+var errPublicKeyPinning = errors.New("Certificate public key pinning error. Public keys do not match.") //nolint:staticcheck // ST1005: existing message, kept unchanged
+
 func (gw *Gateway) verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tls.Config) func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 	if (spec == nil || spec.CertificatePinningDisabled || len(spec.PinnedPublicKeys) == 0) &&
 		len(gw.GetConfig().Security.PinnedPublicKeys) == 0 {
 		return nil
 	}
 
-	tlsConfig.InsecureSkipVerify = true
-
-	whitelist := gw.getPinnedPublicKeys("*", spec, gw.GetConfig())
-	if len(whitelist) == 0 {
+	// Only the "*" pin can apply here: the callback is not told which host
+	// it is verifying. Without one, keep standard verification.
+	whitelist, pinned := gw.getPinnedPublicKeys("*", spec, gw.GetConfig())
+	if !pinned {
 		return nil
 	}
+
+	// A "*" pin with an empty value pins every host to nothing.
+	if len(whitelist) == 0 {
+		return func([][]byte, [][]*x509.Certificate) error {
+			return errPublicKeyPinning
+		}
+	}
+
+	tlsConfig.InsecureSkipVerify = true
 
 	return func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
 		certLog.Debug("Checking certificate public key")
@@ -190,17 +204,17 @@ func (gw *Gateway) verifyPeerCertificatePinnedCheck(spec *APISpec, tlsConfig *tl
 			}
 		}
 
-		return errors.New("Certificate public key pinning error. Public keys do not match.")
+		return errPublicKeyPinning
 	}
 }
 
-func (gw *Gateway) validatePublicKeys(host string, conn *tls.Conn, spec *APISpec) bool {
-	gwConf := gw.GetConfig()
+// validatePublicKeys reports whether any certificate presented on conn has a
+// public key in whitelist. An empty whitelist never matches.
+func validatePublicKeys(host string, conn *tls.Conn, whitelist []string) bool {
 	certLog.Debug("Checking certificate public key for host:", host)
 
-	whitelist := gw.getPinnedPublicKeys(host, spec, gwConf)
 	if len(whitelist) == 0 {
-		return true
+		return false
 	}
 
 	isValid := false
@@ -250,21 +264,48 @@ func (gw *Gateway) customDialTLSCheck(spec *APISpec, tc *tls.Config) func(networ
 	}
 
 	return func(network, addr string) (net.Conn, error) {
+		host, _, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, err
+		}
+
+		pinningErr := errors.New("https://" + host + " certificate public key pinning error. Public keys do not match.")
+
+		var whitelist []string
+		if checkPinnedKeys {
+			var pinned bool
+			whitelist, pinned = gw.getPinnedPublicKeys(host, spec, gw.GetConfig())
+
+			// A pin entry with an empty value pins the host to nothing.
+			if pinned && len(whitelist) == 0 {
+				return nil, pinningErr
+			}
+		}
+
 		clone := tc.Clone()
-		clone.InsecureSkipVerify = true
+
+		// A pinned host is verified by its public key instead of its
+		// certificate chain, so pinned self-signed upstreams keep working.
+		// A host with no pin keeps the caller's verification setting.
+		if len(whitelist) > 0 {
+			clone.InsecureSkipVerify = true
+		}
+
+		// The forced common name check still skips chain verification. That
+		// is a separate issue, listed as out of scope in TT-18123.
+		if checkCommonName {
+			clone.InsecureSkipVerify = true
+		}
 
 		c, err := tls.Dial(network, addr, clone)
 		if err != nil {
-			return c, err
+			// Return a nil interface, not a nil *tls.Conn wrapped in one.
+			return nil, err
 		}
 
-		host, _, _ := net.SplitHostPort(addr)
-
-		if checkPinnedKeys {
-			isValid := gw.validatePublicKeys(host, c, spec)
-			if !isValid {
-				return nil, errors.New("https://" + host + " certificate public key pinning error. Public keys do not match.")
-			}
+		if len(whitelist) > 0 && !validatePublicKeys(host, c, whitelist) {
+			_ = c.Close()
+			return nil, pinningErr
 		}
 
 		if checkCommonName {
@@ -280,7 +321,15 @@ func (gw *Gateway) customDialTLSCheck(spec *APISpec, tc *tls.Config) func(networ
 	}
 }
 
-func (gw *Gateway) getPinnedPublicKeys(host string, spec *APISpec, conf config.Config) (fingerprint []string) {
+// getPinnedPublicKeys returns the public key fingerprints pinned for host and
+// whether any pin entry matched host at all. A pin entry matches by exact host,
+// by "*.<parent domain>", or by "*"; the API's pins take precedence over the
+// gateway-wide pins, and an exact host over a wildcard over "*".
+//
+// configured is true when an entry matched, even if its value is empty or its
+// key IDs resolve to no usable fingerprint. Callers use it to tell "this host
+// is not pinned" apart from "this host is pinned but no key is available".
+func (gw *Gateway) getPinnedPublicKeys(host string, spec *APISpec, conf config.Config) (fingerprints []string, configured bool) {
 	var keyIDs string
 
 	pinMaps := []map[string]string{conf.Security.PinnedPublicKeys}
@@ -295,7 +344,7 @@ func (gw *Gateway) getPinnedPublicKeys(host string, spec *APISpec, conf config.C
 		}
 
 		if id, ok := m["*"]; ok {
-			keyIDs = id
+			keyIDs, configured = id, true
 		}
 
 		hostParts := strings.SplitN(host, ".", 2)
@@ -303,20 +352,40 @@ func (gw *Gateway) getPinnedPublicKeys(host string, spec *APISpec, conf config.C
 			hostPattern := "*." + hostParts[1]
 
 			if id, ok := m[hostPattern]; ok {
-				keyIDs = id
+				keyIDs, configured = id, true
 			}
 		}
 
 		if id, ok := m[host]; ok {
-			keyIDs = id
+			keyIDs, configured = id, true
 		}
 	}
 
 	if keyIDs == "" {
-		return nil
+		return nil, configured
 	}
 
-	return gw.CertificateManager.ListPublicKeys(strings.Split(keyIDs, ","))
+	return gw.CertificateManager.ListPublicKeys(strings.Split(keyIDs, ",")), configured
+}
+
+// hasHostPins reports whether pinning applies to spec through a pin entry other
+// than "*". Those entries are not checked when the upstream is reached through
+// an HTTP proxy.
+func hasHostPins(spec *APISpec, conf config.Config) bool {
+	pinMaps := []map[string]string{conf.Security.PinnedPublicKeys}
+	if spec != nil && !spec.CertificatePinningDisabled {
+		pinMaps = append(pinMaps, spec.PinnedPublicKeys)
+	}
+
+	for _, m := range pinMaps {
+		for domain := range m {
+			if domain != "*" {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 // dummyGetCertificate needed because TLSConfig require setting Certificates array or GetCertificate function from start, even if it get overridden by `getTLSConfigForClient`
