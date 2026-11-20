@@ -747,6 +747,12 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 	session, found = t.Spec.AuthManager.SessionDetail(t.Spec.OrgID, key, false)
 	if found {
 		key = session.KeyID
+		if t.Spec.GlobalConfig.HashKeys {
+			// Hash the same way as the local session store path above, so that the
+			// raw key never ends up in session.keyHash (used for OTel span attributes,
+			// rate limiter keys and the in-memory session cache).
+			keyHash = storage.HashStr(session.KeyID)
+		}
 		session := session.Clone()
 		session.SetKeyHash(keyHash)
 		// If not in Session, and got it from AuthHandler, create a session with a new TTL
