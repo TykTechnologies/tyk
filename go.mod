@@ -30,7 +30,7 @@ require (
 	github.com/TykTechnologies/murmur3 v0.0.0-20230310161213-aad17efd5632
 	github.com/TykTechnologies/openid2go v0.1.3
 	github.com/TykTechnologies/storage v1.5.0
-	github.com/TykTechnologies/tyk-pump v1.18.0-rc1.0.20261029095747-fcfeadd159a0
+	github.com/TykTechnologies/tyk-pump v1.18.0-rc2.0.20261112075813-cca573bdf1da
 	github.com/akutz/memconn v0.1.0
 	github.com/bshuster-repo/logrus-logstash-hook v1.1.0
 	github.com/buger/jsonparser v1.1.2
