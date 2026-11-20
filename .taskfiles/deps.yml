@@ -46,7 +46,7 @@ tasks:
     status:
       - type golangci-lint
     cmds:
-      - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@ff63786c30d6c2926f99d677ab2ecf089e9390ad  # v2.5.0
+      - go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@25c5369a93aacb8cccea0d46e1569ca4a194564d  # v2.15.0
 
   lefthook:
     internal: true
