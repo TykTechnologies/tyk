@@ -111,7 +111,9 @@ func TestRemoteMCPCatalogue_UpstreamTransport(t *testing.T) {
 		logs := recordRemoteMCPLogs(t, apiID)
 
 		_, _, combinedClientPEM, clientCert := crypto.GenCertificate(&x509.Certificate{}, false)
-		clientCert.Leaf, _ = x509.ParseCertificate(clientCert.Certificate[0])
+		leaf, err := x509.ParseCertificate(clientCert.Certificate[0])
+		require.NoError(t, err)
+		clientCert.Leaf = leaf
 		clientCertID, err := ts.Gw.CertificateManager.Add(combinedClientPEM, "")
 		require.NoError(t, err)
 		t.Cleanup(func() { ts.Gw.CertificateManager.Delete(clientCertID, "") })
