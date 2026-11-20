@@ -2,11 +2,15 @@ package gateway
 
 import (
 	"bytes"
+	"encoding/base64"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -1699,4 +1703,227 @@ func TestURLRewriteMiddleware_CheckHostRewrite(t *testing.T) {
 			assert.Equal(t, tt.retainHostVal, r.Context().Value(ctx.RetainHost))
 		})
 	}
+}
+
+// TestReplaceTykVariables_EscapeBySource checks which values are query-escaped
+// when escaping is requested. A $tyk_context value can come from the request,
+// so it is always escaped. A $tyk_meta value is set by the operator, so it is
+// inserted as is when it is an absolute http or https URL with a host.
+func TestReplaceTykVariables_EscapeBySource(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	tests := []struct {
+		name   string
+		input  string
+		value  string
+		escape bool
+		want   string
+	}{
+		{"context value with http prefix and query", "/seg/$tyk_context.val", "http-evil?admin=true", true, "/seg/http-evil%3Fadmin%3Dtrue"},
+		{"context absolute http URL", "$tyk_context.val", "http://evil.example/x", true, "http%3A%2F%2Fevil.example%2Fx"},
+		{"context absolute https URL", "$tyk_context.val", "https://evil.example", true, "https%3A%2F%2Fevil.example"},
+		{"context value without http prefix", "/seg/$tyk_context.val", "x-evil?admin=true", true, "/seg/x-evil%3Fadmin%3Dtrue"},
+		{"context value when escaping is off", "$tyk_context.val", "http://evil.example/?a=b", false, "http://evil.example/?a=b"},
+		{"meta absolute http URL with query", "$tyk_meta.val", "http://backend:8080/v1?tenant=acme", true, "http://backend:8080/v1?tenant=acme"},
+		{"meta absolute https URL", "$tyk_meta.val/path", "https://backend", true, "https://backend/path"},
+		{"meta absolute URL with upper-case scheme", "$tyk_meta.val", "HTTP://backend:8080", true, "HTTP://backend:8080"},
+		{"meta value with http prefix and query", "/seg/$tyk_meta.val", "http-evil?admin=true", true, "/seg/http-evil%3Fadmin%3Dtrue"},
+		{"meta http URL without host", "$tyk_meta.val", "http:/no-host", true, "http%3A%2Fno-host"},
+		{"meta URL with another scheme", "$tyk_meta.val", "ftp://backend/file", true, "ftp%3A%2F%2Fbackend%2Ffile"},
+		{"meta scheme-relative URL", "$tyk_meta.val", "//backend/v1", true, "%2F%2Fbackend%2Fv1"},
+		{"meta plain value", "/seg/$tyk_meta.val", "acme corp", true, "/seg/acme+corp"},
+		{"meta value when escaping is off", "$tyk_meta.val", "http-evil?admin=true", false, "http-evil?admin=true"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			ctxSetData(req, map[string]interface{}{"val": tt.value})
+			ctxSetSession(req, &user.SessionState{
+				MetaData: map[string]interface{}{"val": tt.value},
+			}, false, ts.Gw.GetConfig().HashKeys)
+
+			assert.Equal(t, tt.want, ts.Gw.ReplaceTykVariables(req, tt.input, tt.escape))
+		})
+	}
+}
+
+// TestURLRewrite_EscapeBySource sends real requests through the Gateway. It
+// checks that a client can't add a query string or pick the upstream host
+// through a trigger capture, and that a full URL in key metadata still routes.
+func TestURLRewrite_EscapeBySource(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	var otherHostHits int32
+	otherHost := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt32(&otherHostHits, 1)
+		_, _ = w.Write([]byte(`{"other_host":true}`))
+	}))
+	defer otherHost.Close()
+
+	// upstreamURL reads the URL that the default test upstream received.
+	upstreamURL := func(t *testing.T, body []byte) *url.URL {
+		t.Helper()
+		var resp TestHttpResponse
+		require.NoError(t, json.Unmarshal(body, &resp), "response did not come from the API's upstream: %s", body)
+		u, err := url.Parse(resp.Url)
+		require.NoError(t, err)
+		return u
+	}
+
+	triggerAPI := func(rewriteTo string) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.UseKeylessAccess = true
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{
+					Path:         "/inject",
+					Method:       http.MethodGet,
+					MatchPattern: "/inject",
+					RewriteTo:    "/no-trigger",
+					Triggers: []apidef.RoutingTrigger{{
+						On: apidef.Any,
+						Options: apidef.RoutingTriggerOptions{
+							HeaderMatches: map[string]apidef.StringRegexMap{
+								"x-test": {MatchPattern: ".+"},
+							},
+						},
+						RewriteTo: rewriteTo,
+					}},
+				}}
+			})
+		})
+	}
+
+	t.Run("trigger capture with http prefix adds no query parameter", func(t *testing.T) {
+		triggerAPI("/seg/$tyk_context.trigger-0-X-Test-0")
+
+		_, _ = ts.Run(t, test.TestCase{
+			Path:    "/inject",
+			Headers: map[string]string{"x-test": "http-evil?admin=true"},
+			Code:    http.StatusOK,
+			BodyMatchFunc: func(body []byte) bool {
+				u := upstreamURL(t, body)
+				assert.Empty(t, u.RawQuery, "upstream received a query string")
+				assert.Contains(t, u.String(), "http-evil%3Fadmin%3Dtrue")
+				return true
+			},
+		})
+	})
+
+	t.Run("trigger capture without http prefix is escaped as before", func(t *testing.T) {
+		triggerAPI("/seg/$tyk_context.trigger-0-X-Test-0")
+
+		_, _ = ts.Run(t, test.TestCase{
+			Path:    "/inject",
+			Headers: map[string]string{"x-test": "x-evil?admin=true"},
+			Code:    http.StatusOK,
+			BodyMatchFunc: func(body []byte) bool {
+				u := upstreamURL(t, body)
+				assert.Empty(t, u.RawQuery, "upstream received a query string")
+				assert.Contains(t, u.String(), "x-evil%3Fadmin%3Dtrue")
+				return true
+			},
+		})
+	})
+
+	t.Run("trigger capture with a full URL does not change the upstream host", func(t *testing.T) {
+		triggerAPI("$tyk_context.trigger-0-X-Test-0")
+		atomic.StoreInt32(&otherHostHits, 0)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Path:      "/inject",
+			Headers:   map[string]string{"x-test": otherHost.URL},
+			BodyMatch: `"Url":`,
+		})
+		assert.Zero(t, atomic.LoadInt32(&otherHostHits), "request reached the host named in the header")
+	})
+
+	metaAPI := func(rewriteTo, target string) string {
+		spec := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.UseKeylessAccess = false
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.ExtendedPaths.URLRewrite = []apidef.URLRewriteMeta{{
+					Path:         "/meta",
+					Method:       http.MethodGet,
+					MatchPattern: "/meta",
+					RewriteTo:    rewriteTo,
+				}}
+			})
+		})[0]
+
+		_, key := ts.CreateSession(func(s *user.SessionState) {
+			s.AccessRights = map[string]user.AccessDefinition{
+				spec.APIID: {APIName: spec.Name, APIID: spec.APIID, Versions: []string{"v1"}},
+			}
+			s.OrgID = spec.OrgID
+			s.MetaData = map[string]interface{}{"target": target}
+		})
+		return key
+	}
+
+	t.Run("metadata with an absolute URL still rewrites the host", func(t *testing.T) {
+		key := metaAPI("$tyk_meta.target/meta", otherHost.URL)
+		atomic.StoreInt32(&otherHostHits, 0)
+
+		_, _ = ts.Run(t, test.TestCase{
+			Path:      "/meta",
+			Headers:   map[string]string{"Authorization": key},
+			Code:      http.StatusOK,
+			BodyMatch: `"other_host":true`,
+		})
+		assert.Equal(t, int32(1), atomic.LoadInt32(&otherHostHits))
+	})
+
+	t.Run("metadata with http prefix but no host is escaped", func(t *testing.T) {
+		key := metaAPI("/seg/$tyk_meta.target", "http-evil?admin=true")
+
+		_, _ = ts.Run(t, test.TestCase{
+			Path:    "/meta",
+			Headers: map[string]string{"Authorization": key},
+			Code:    http.StatusOK,
+			BodyMatchFunc: func(body []byte) bool {
+				u := upstreamURL(t, body)
+				assert.Empty(t, u.RawQuery, "upstream received a query string")
+				assert.Contains(t, u.String(), "http-evil%3Fadmin%3Dtrue")
+				return true
+			},
+		})
+	})
+
+	t.Run("body transform escapes context values with http prefix", func(t *testing.T) {
+		ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+			spec.Proxy.ListenPath = "/"
+			spec.UseKeylessAccess = true
+			spec.EnableContextVars = true
+			UpdateAPIVersion(spec, "v1", func(v *apidef.VersionInfo) {
+				v.ExtendedPaths.Transform = []apidef.TemplateMeta{{
+					Path:   "/transform",
+					Method: http.MethodPost,
+					TemplateData: apidef.TemplateData{
+						Input:          apidef.RequestJSON,
+						Mode:           apidef.UseBlob,
+						TemplateSource: base64.StdEncoding.EncodeToString([]byte(`{"value":"$tyk_context.headers_X_Test"}`)),
+					},
+				}}
+			})
+		})
+
+		_, _ = ts.Run(t, test.TestCase{
+			Method:  http.MethodPost,
+			Path:    "/transform",
+			Data:    `{}`,
+			Headers: map[string]string{"x-test": "http-evil?admin=true"},
+			Code:    http.StatusOK,
+			BodyMatchFunc: func(body []byte) bool {
+				var resp TestHttpResponse
+				require.NoError(t, json.Unmarshal(body, &resp))
+				assert.Equal(t, `{"value":"http-evil%3Fadmin%3Dtrue"}`, resp.Body)
+				return true
+			},
+		})
+	})
 }

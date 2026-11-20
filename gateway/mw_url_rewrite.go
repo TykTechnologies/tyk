@@ -220,8 +220,7 @@ func (gw *Gateway) replaceVariables(
 			val, ok := vals[key]
 			if ok {
 				valStr := valToStr(val)
-				// If contains url with domain
-				if escape && !strings.HasPrefix(valStr, "http") {
+				if escape && !(label == metaLabel && isAbsoluteHTTPURL(valStr)) {
 					valStr = url.QueryEscape(valStr)
 				}
 				in = strings.ReplaceAll(in, v, valStr)
@@ -233,6 +232,19 @@ func (gw *Gateway) replaceVariables(
 	}
 
 	return in
+}
+
+// isAbsoluteHTTPURL reports whether s is an absolute http or https URL with a
+// host. replaceVariables inserts such a value unescaped only when it comes
+// from session metadata, which the operator sets, so that metadata can route a
+// request to a full upstream URL. Request context values are always escaped,
+// because a client can control them.
+func isAbsoluteHTTPURL(s string) bool {
+	u, err := url.Parse(s)
+	if err != nil {
+		return false
+	}
+	return (u.Scheme == "http" || u.Scheme == "https") && u.Host != ""
 }
 
 func valToStr(v interface{}) string {
