@@ -89,7 +89,9 @@ func TestTykMCPServerExtension_ValidatePlacement(t *testing.T) {
 		Info:     Info{Name: "orders"},
 		Upstream: Upstream{URL: "https://example.com/mcp"},
 	})
-	doc.SetTykMCPServerExtension(&TykMCPServer{})
+	doc.SetTykMCPServerExtension(&TykMCPServer{Primitives: []TykMCPServerPrimitive{{
+		Source: TykMCPServerSource{OperationID: "create_order"},
+	}}})
 
 	err := doc.ValidateForMCP(context.Background())
 	require.Error(t, err)
