@@ -107,6 +107,9 @@ func ValidateProtocolDeclarations(protocolContext *ProtocolContext, endpoints ..
 		if isInitializeHandshakeMethod(method) && len(endpoints) > 0 && servesModernInitialize(endpoints[0]) {
 			return true, nil
 		}
+		if method == MethodPing && len(endpoints) > 0 && servesModernPing(endpoints[0]) {
+			return true, nil
+		}
 		switch method {
 		case "initialize", "ping", "notifications/initialized", "notifications/roots/list_changed", "logging/setLevel", "resources/subscribe", "resources/unsubscribe":
 			return true, &IngressError{Code: JSONRPCMethodNotFound, Message: "method removed in the modern protocol"}
@@ -137,6 +140,11 @@ func isInitializeHandshakeMethod(method string) bool {
 func servesModernInitialize(endpoint ProtocolSupport) bool {
 	support, ok := endpoint.(ModernInitializeSupport)
 	return ok && support.ServesModernInitialize()
+}
+
+func servesModernPing(endpoint ProtocolSupport) bool {
+	support, ok := endpoint.(ModernPingSupport)
+	return ok && support.ServesModernPing()
 }
 
 func unsupportedProtocol(version string, supported []string) *IngressError {
@@ -213,6 +221,24 @@ func ValidateModernMirroredHeaders(header http.Header, envelope *RequestEnvelope
 	// Their upstream schema, not Gateway, defines their values and multiplicity.
 
 	return nil
+}
+
+// EncodeMirroredHeader encodes a value for a mirrored MCP header: printable
+// ASCII is sent as is, anything else in the SEP-2243 Base64 wrapper.
+func EncodeMirroredHeader(value string) string {
+	const prefix = "=?base64?"
+	const suffix = "?="
+	plain := !strings.HasPrefix(value, prefix) && !strings.HasSuffix(value, suffix)
+	for _, char := range value {
+		if char < 0x20 || char > 0x7e {
+			plain = false
+			break
+		}
+	}
+	if plain {
+		return value
+	}
+	return prefix + base64.StdEncoding.EncodeToString([]byte(value)) + suffix
 }
 
 // DecodeMirroredHeader decodes the SEP-2243 Base64 wrapper. Partial wrappers

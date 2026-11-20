@@ -23,6 +23,10 @@ const (
 
 	// MethodNotificationsInitialized completes the initialize handshake.
 	MethodNotificationsInitialized = "notifications/initialized"
+	// MethodNotificationsCancelled asks the receiver to stop a request.
+	MethodNotificationsCancelled = "notifications/cancelled"
+	// MethodPing checks that the other party is still responsive.
+	MethodPing = "ping"
 
 	// Tool methods
 	MethodToolsCall = "tools/call"
