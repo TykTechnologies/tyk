@@ -81,6 +81,14 @@ func TestMergeTargetForProvider_PerOpAudienceWins(t *testing.T) {
 	assert.Equal(t, []string{"x"}, got.Scopes)
 }
 
+func TestMergeTargetForProvider_FullOverrideIgnoresDefaults(t *testing.T) {
+	ex := &oas.OAuth2Exchange{Audience: "https://override", Scopes: []string{"x"}, Resources: []string{"https://r"}}
+	prov := providerFixture("p", "https://idp", "https://idp/token", &oas.OAuth2DefaultTarget{Audience: "https://default", Scopes: []string{"def"}, Resources: []string{"https://def"}})
+	got := MergeTargetForProvider(ex, &prov, []string{"inferred"})
+	require.NotNil(t, got)
+	assert.Equal(t, &Target{Audience: "https://override", Scopes: []string{"x"}, Resources: []string{"https://r"}}, got)
+}
+
 func TestMergeTargetForProvider_DefaultsFallback(t *testing.T) {
 	ex := &oas.OAuth2Exchange{}
 	prov := providerFixture("p", "https://idp", "https://idp/token", &oas.OAuth2DefaultTarget{Audience: "https://default", Scopes: []string{"def"}})
@@ -195,4 +203,39 @@ func TestNewIdPHTTPClient_HonoursTimeout(t *testing.T) {
 	client := NewIdPHTTPClient(7)
 	assert.Equal(t, 7, int(client.Timeout))
 	assert.NotNil(t, client.Transport)
+}
+
+func TestMergeTargetForProvider_Resources(t *testing.T) {
+	enabled := true
+	defaults := &oas.OAuth2DefaultTarget{Audience: "abc123", Resources: []string{"https://default"}}
+	tests := []struct {
+		name      string
+		ex        *oas.OAuth2Exchange
+		grantType string
+		defaults  *oas.OAuth2DefaultTarget
+		want      []string
+	}{
+		{name: "provider default applies with no override", defaults: defaults, want: []string{"https://default"}},
+		{name: "operation list wins over the default", ex: &oas.OAuth2Exchange{Enabled: &enabled, Resources: []string{"https://op-a", "https://op-b"}}, defaults: defaults, want: []string{"https://op-a", "https://op-b"}},
+		{name: "empty operation list falls back to the default", ex: &oas.OAuth2Exchange{Enabled: &enabled, Audience: "other"}, defaults: defaults, want: []string{"https://default"}},
+		{name: "MCP primitive override wins over the default", ex: (&oas.MCPPrimitive{Operation: oas.Operation{Exchange: &oas.OAuth2Exchange{Enabled: &enabled, Resources: []string{"https://tool"}}}}).Exchange, defaults: defaults, want: []string{"https://tool"}},
+		{name: "nothing configured stays nil", defaults: &oas.OAuth2DefaultTarget{Audience: "abc123"}},
+		{name: "jwt-bearer clears an override list", ex: &oas.OAuth2Exchange{Enabled: &enabled, Resources: []string{"https://op"}}, grantType: oas.OAuth2ProviderGrantJWTBearer},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			prov := providerFixture("p", "https://idp", "https://idp/token", tc.defaults)
+			prov.GrantType = tc.grantType
+			got := MergeTargetForProvider(tc.ex, &prov, nil)
+			require.NotNil(t, got)
+			assert.Equal(t, tc.want, got.Resources)
+		})
+	}
+
+	t.Run("merge copies, never aliases, the configured list", func(t *testing.T) {
+		prov := providerFixture("p", "https://idp", "https://idp/token", &oas.OAuth2DefaultTarget{Audience: "abc123", Resources: []string{"https://default"}})
+		got := MergeTargetForProvider(nil, &prov, nil)
+		got.Resources[0] = "mutated"
+		assert.Equal(t, "https://default", prov.DefaultTarget.Resources[0])
+	})
 }
