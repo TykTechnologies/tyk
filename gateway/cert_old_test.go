@@ -262,6 +262,15 @@ func TestPublicKeyPinning(t *testing.T) {
 	})
 }
 
+// proxyTransportTestCiphers are the TLS 1.2 cipher suites the upstream and the proxy of TestProxyTransport accept: the
+// ones the subtests set on the gateway. TLS_RSA_WITH_AES_128_CBC_SHA (RSA key exchange) is not in Go's default list
+// since Go 1.22, and from Go 1.27 GODEBUG=tlsrsakex=1 (setGODEBUG) no longer puts it back, so the servers list it.
+var proxyTransportTestCiphers = []uint16{
+	tls.TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+	tls.TLS_ECDHE_RSA_WITH_AES_128_CBC_SHA,
+	tls.TLS_RSA_WITH_AES_128_CBC_SHA,
+}
+
 func TestProxyTransport(t *testing.T) {
 	setGODEBUG(t)
 
@@ -270,7 +279,8 @@ func TestProxyTransport(t *testing.T) {
 
 	upstream := httptest.NewUnstartedServer(handlerEcho("test"))
 	upstream.TLS = &tls.Config{
-		MaxVersion: tls.VersionTLS12,
+		MaxVersion:   tls.VersionTLS12,
+		CipherSuites: proxyTransportTestCiphers,
 	}
 	upstream.StartTLS()
 
@@ -375,6 +385,7 @@ func TestProxyTransport(t *testing.T) {
 		proxy := initProxy("https", &tls.Config{
 			Certificates: []tls.Certificate{proxyCert},
 			MaxVersion:   tls.VersionTLS12,
+			CipherSuites: proxyTransportTestCiphers,
 		})
 		defer func() {
 			proxyErr := proxy.Stop(ts)
