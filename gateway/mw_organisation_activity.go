@@ -62,7 +62,7 @@ func (k *OrganizationMonitor) ProcessRequest(w http.ResponseWriter, r *http.Requ
 	// aggregated proxy's. The origin is set in-process by the aggregator's
 	// dispatcher only, and a hop whose loop trust does not validate is refused
 	// before it reaches the proxy's upstream.
-	if mcpAggregatorOriginOf(r, k.Spec.APIID) != "" {
+	if _, ok := mcpAggregatorOriginOf(r, k.Spec.APIID); ok {
 		return nil, http.StatusOK
 	}
 

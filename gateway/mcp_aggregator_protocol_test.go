@@ -293,7 +293,7 @@ func assertUnsupportedMCPVersion(t *testing.T, res mcpTestResponse, requested st
 	assert.Equal(t, http.StatusBadRequest, res.status, res.body)
 	require.NotNil(t, res.rpc.Error, res.body)
 	assert.Equal(t, mcp.CodeUnsupportedProtocolVersion, res.rpc.Error.Code, res.body)
-	assert.Equal(t, "unsupported protocol version", res.rpc.Error.Message)
+	assert.Equal(t, "unsupported protocol version: this MCP aggregator supports only "+mcp.ModernProtocolVersion, res.rpc.Error.Message)
 	assert.Equal(t, requested, res.rpc.Error.Data.Requested)
 	assert.Equal(t, []string{mcp.ModernProtocolVersion}, res.rpc.Error.Data.Supported)
 	assert.NotContains(t, res.body, "__", "a rejected request carries no aggregated tool")
@@ -354,6 +354,29 @@ func TestMCPAggregatorRejectsLegacyHeaderlessRequests(t *testing.T) {
 			assertUnsupportedMCPVersion(t, postMCPTestCall(t, ts, "/company-tools/", call), mcp.LegacyFallbackProtocolVersion)
 		})
 	}
+}
+
+func TestMCPAggregatorNamesTheSupportedVersionWhenRejectingAnInitializeOffer(t *testing.T) {
+	ts, key := startMCPAggregatorProtocolTest(t, newDualMCPUpstream(t, "list_issues"))
+
+	res := postMCPTestCall(t, ts, "/company-tools/", mcpTestCall{method: mcp.MethodInitialize, version: "2025-06-18", initializeVersion: "2025-06-18", key: key})
+
+	assertUnsupportedMCPVersion(t, res, "2025-06-18")
+}
+
+func TestUnsupportedVersionMessageOfOtherMCPProxiesIsUnchanged(t *testing.T) {
+	ts, _ := startMCPAggregatorProtocolTest(t, newDualMCPUpstream(t, "list_issues"))
+	_, key := ts.CreateSession(func(s *user.SessionState) {
+		s.OrgID = mcpAggregatorRuntimeOrg
+		s.AccessRights = map[string]user.AccessDefinition{"github-mcp": {APIID: "github-mcp", APIName: "github-mcp"}}
+	})
+
+	res := postMCPTestCall(t, ts, "/github-mcp/", mcpTestCall{method: mcp.MethodToolsList, version: "2099-01-01", metaVersion: "2099-01-01", key: key})
+
+	assert.Equal(t, http.StatusBadRequest, res.status, res.body)
+	require.NotNil(t, res.rpc.Error, res.body)
+	assert.Equal(t, mcp.CodeUnsupportedProtocolVersion, res.rpc.Error.Code)
+	assert.Equal(t, "unsupported protocol version", res.rpc.Error.Message)
 }
 
 func TestMCPAggregatorVersionRestrictionLeavesOtherMCPProxiesAlone(t *testing.T) {

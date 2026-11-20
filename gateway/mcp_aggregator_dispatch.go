@@ -34,20 +34,20 @@ type mcpAggregatorDispatcher struct {
 	budget *mcpAggregatorByteBudget
 }
 
-// mcpAggregatorByteBudget is one aggregated MCP proxy's share of the
-// catalogue byte budget for one tools/list.
+// mcpAggregatorByteBudget bounds the bytes buffered from one aggregated MCP
+// proxy's tools/list responses for one tools/list.
 type mcpAggregatorByteBudget struct {
-	share int
+	limit int
 	used  int
 }
 
 // newResponseRecorder buffers one response up to the gateway's response size
 // limit, or up to what is left of the budget when that is less, so the
-// response being read and those already read together stay within the share.
+// response being read and those already read together stay within the budget.
 func (d mcpAggregatorDispatcher) newResponseRecorder() *mcpAggregatorResponseRecorder {
 	rec := &mcpAggregatorResponseRecorder{bufferedResponseWriter: newBufferedResponseWriter(), limit: d.maxResponseBytes()}
-	if d.budget != nil && d.budget.share-d.budget.used < rec.limit {
-		rec.limit = d.budget.share - d.budget.used
+	if d.budget != nil && d.budget.limit-d.budget.used < rec.limit {
+		rec.limit = d.budget.limit - d.budget.used
 		rec.budgeted = true
 	}
 	return rec
@@ -58,7 +58,7 @@ func (d mcpAggregatorDispatcher) newResponseRecorder() *mcpAggregatorResponseRec
 func (d mcpAggregatorDispatcher) recorded(rec *mcpAggregatorResponseRecorder) error {
 	if rec.exceeded {
 		if rec.budgeted {
-			return fmt.Errorf("responses exceed the %d byte share of the catalogue byte budget", d.budget.share)
+			return fmt.Errorf("responses exceed the %d byte listing budget of one aggregated proxy", d.budget.limit)
 		}
 		return fmt.Errorf("response exceeds %d bytes", rec.limit)
 	}
@@ -140,7 +140,13 @@ func (d mcpAggregatorDispatcher) exchange(parent *http.Request, spec *APISpec, m
 	ctxSetMCPAggregatorLoopTrust(req, trust)
 	sink := &mcpAggregatorErrorSink{}
 	setCtxValue(req, mcpAggregatorErrorSinkKey, sink)
-	ctxSetMCPAggregatorOrigin(req, trust)
+	ctxSetMCPAggregatorOrigin(req, parent, trust)
+	// Catalogue hops (tools/list pages, server/discover probes) repeat on
+	// every agent connect and are already counted in the aggregator's own
+	// record; only a routed tools/call is recorded on the proxy.
+	if method != mcp.MethodToolsCall {
+		ctxSetDoNotTrack(req, true)
+	}
 
 	rec := d.newResponseRecorder()
 	// The chain runs apart from this goroutine so that the caller's
