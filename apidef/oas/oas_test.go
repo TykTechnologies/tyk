@@ -1836,7 +1836,7 @@ func TestOAS_ValidateSecurity(t *testing.T) {
 		createSecurityReq(oas, oauth2, []string{"read", "write"})
 	}
 
-	expectedErrorForNoComponentOrSchemes := "No components or security schemes present in OAS"
+	expectedErrorForNoComponentOrSchemes := "No components or security schemes present in OAS - SOME CHANGE ..."
 	expectedErrorForMissingSchema := func(s string) string {
 		return fmt.Sprintf("Missing required Security Scheme '%s' in Components.SecuritySchemes", s)
 	}
