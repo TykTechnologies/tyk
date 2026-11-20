@@ -117,6 +117,8 @@ func (t *Service) Apply(session *user.SessionState) error {
 		sessionInactiveState = false
 	}
 
+	var appliedPoliciesCount int
+
 	for _, polID := range policyIDs {
 		policy, ok := storage.PolicyByID(polID)
 
@@ -129,6 +131,7 @@ func (t *Service) Apply(session *user.SessionState) error {
 
 			return err
 		}
+		appliedPoliciesCount++
 		// Check ownership, policy org owner must be the same as API,
 		// otherwise you could overwrite a session key with a policy from a different org!
 		if t.orgID != nil && policy.OrgID != *t.orgID {
@@ -206,8 +209,44 @@ func (t *Service) Apply(session *user.SessionState) error {
 	}
 
 	// If some APIs had only ACL partitions, inherit rest from session level
+	updatedExistingRights := false
 	for k, v := range rights {
 		if !applyState.didAcl[k] {
+			if existingAR, ok := session.AccessRights[k]; ok {
+				updatedExistingRights = true
+				// An empty per-API limit meant "use the session limits"; once the policy
+				// fills part of it the rest must come from the session, or quota is lost.
+				inheritSessionLimits := existingAR.Limit.IsEmpty()
+				if applyState.didRateLimit[k] {
+					existingAR.Limit.Rate = v.Limit.Rate
+					existingAR.Limit.Per = v.Limit.Per
+					existingAR.Limit.Smoothing = v.Limit.Smoothing
+					existingAR.Limit.ThrottleInterval = v.Limit.ThrottleInterval
+					existingAR.Limit.ThrottleRetryLimit = v.Limit.ThrottleRetryLimit
+					existingAR.Endpoints = v.Endpoints
+				} else if inheritSessionLimits {
+					existingAR.Limit.Rate = session.Rate
+					existingAR.Limit.Per = session.Per
+					existingAR.Limit.Smoothing = session.Smoothing
+					existingAR.Limit.ThrottleInterval = session.ThrottleInterval
+					existingAR.Limit.ThrottleRetryLimit = session.ThrottleRetryLimit
+				}
+				if applyState.didQuota[k] {
+					existingAR.Limit.QuotaMax = v.Limit.QuotaMax
+					existingAR.Limit.QuotaRenewalRate = v.Limit.QuotaRenewalRate
+					existingAR.Limit.QuotaRenews = v.Limit.QuotaRenews
+				} else if inheritSessionLimits {
+					existingAR.Limit.QuotaMax = session.QuotaMax
+					existingAR.Limit.QuotaRenewalRate = session.QuotaRenewalRate
+					existingAR.Limit.QuotaRenews = session.QuotaRenews
+				}
+				if applyState.didComplexity[k] {
+					existingAR.Limit.MaxQueryDepth = v.Limit.MaxQueryDepth
+				} else if inheritSessionLimits {
+					existingAR.Limit.MaxQueryDepth = session.MaxQueryDepth
+				}
+				session.AccessRights[k] = existingAR
+			}
 			delete(rights, k)
 			continue
 		}
@@ -251,7 +290,9 @@ func (t *Service) Apply(session *user.SessionState) error {
 		session.AccessRights = rights
 	}
 
-	if len(rights) == 0 && policyIDs != nil {
+	// A key needs either ACL from a policy or limits merged into rights it already
+	// holds; a found policy that grants neither leaves it with no valid policies (TT-12710).
+	if policyIDs != nil && (appliedPoliciesCount == 0 || (len(rights) == 0 && !updatedExistingRights)) {
 		return errors.New("key has no valid policies to be applied")
 	}
 
