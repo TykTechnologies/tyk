@@ -34,6 +34,7 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 
 	ignoreCanonical := t.Gw.GetConfig().IgnoreCanonicalMIMEHeaderKey
 	logger := t.Logger()
+	var added []string
 
 	// Manage global headers first - remove
 	if !vInfo.GlobalHeadersDisabled {
@@ -46,6 +47,7 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 		for nKey, nVal := range vInfo.GlobalHeaders {
 			logger.Debugf("Adding global: %s: %s", nKey, nVal)
 			setCustomHeader(r.Header, nKey, t.Gw.ReplaceTykVariables(r, nVal, false), ignoreCanonical)
+			added = append(added, nKey)
 		}
 	}
 
@@ -60,7 +62,12 @@ func (t *TransformHeaders) ProcessRequest(w http.ResponseWriter, r *http.Request
 		for nKey, nVal := range hmeta.AddHeaders {
 			setCustomHeader(r.Header, nKey, t.Gw.ReplaceTykVariables(r, nVal, false), ignoreCanonical)
 			logger.Debugf("Adding: %s: %s", nKey, nVal)
+			added = append(added, nKey)
 		}
+	}
+
+	if t.Spec.IsMCPAggregator() {
+		ctxAddMCPAggregatorTransformedHeaders(r, added)
 	}
 
 	return nil, http.StatusOK

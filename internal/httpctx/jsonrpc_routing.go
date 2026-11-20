@@ -16,6 +16,9 @@ type JSONRPCRoutingState struct {
 	Params json.RawMessage // JSON-RPC params
 	ID     interface{}     // JSON-RPC ID
 
+	// APIID is the API whose chain planned this routing and owns its VEM hops.
+	APIID string
+
 	// Generic routing state - just follow the chain
 	NextVEM      string // Next VEM path to route to (empty = done)
 	OriginalPath string // Original request path (for telemetry)

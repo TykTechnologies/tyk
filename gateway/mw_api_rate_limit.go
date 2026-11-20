@@ -51,7 +51,9 @@ func (k *RateLimitForAPI) shouldEnable() bool {
 	return true
 }
 
-func (k *RateLimitForAPI) getSession(r *http.Request) *user.SessionState {
+// getSession returns the bucket the request is limited by: the matching
+// endpoint's, or the API-wide one. endpoint reports which.
+func (k *RateLimitForAPI) getSession(r *http.Request) (session *user.SessionState, endpoint bool) {
 	versionInfo, _ := k.Spec.Version(r)
 	versionPaths := k.Spec.RxPaths[versionInfo.Name]
 
@@ -68,11 +70,11 @@ func (k *RateLimitForAPI) getSession(r *http.Request) *user.SessionState {
 			}
 			session.SetKeyHash(storage.HashKey(keyname, k.Gw.GetConfig().HashKeys))
 
-			return session
+			return session, true
 		}
 	}
 
-	return k.apiSess
+	return k.apiSess, false
 }
 
 func (k *RateLimitForAPI) EnabledForSpec() bool {
@@ -103,7 +105,12 @@ func (k *RateLimitForAPI) ProcessRequest(rw http.ResponseWriter, r *http.Request
 		return nil, http.StatusOK
 	}
 
-	session := k.getSession(r)
+	session, endpoint := k.getSession(r)
+	// The listen path already spent the API-wide limit on this request. Its
+	// JSON-RPC VEM hops only enforce the endpoint limits that match them.
+	if !endpoint && isOwnMCPJSONRPCVirtualEndpointHop(k.Spec, r) {
+		return nil, http.StatusOK
+	}
 
 	limitHeaderSender := k.Gw.limitHeaderFactory(rw.Header())
 	// Only inject API-level rate limit headers if personal rate limit headers
