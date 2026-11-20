@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	tykcrypto "github.com/TykTechnologies/tyk/internal/crypto"
 	"github.com/TykTechnologies/tyk/storage"
@@ -225,6 +226,164 @@ func TestStorageIndex(t *testing.T) {
 	if len(storage.IndexList["orgid-1-index"]) != 0 {
 		t.Error("Storage index list should have 0 certificates after deleting a certificate")
 	}
+}
+
+type prefixScanStorage struct {
+	*storage.DummyStorage
+}
+
+func (s prefixScanStorage) GetKeys(pattern string) []string {
+	prefix := strings.TrimSuffix(pattern, "*")
+	keys := make([]string, 0)
+	for k := range s.Data {
+		if strings.HasPrefix(k, prefix) {
+			keys = append(keys, k)
+		}
+	}
+	return keys
+}
+
+// countingStorage counts calls to the storage methods listing relies on.
+type countingStorage struct {
+	prefixScanStorage
+	calls map[string]int
+}
+
+func newCountingStorage() countingStorage {
+	return countingStorage{prefixScanStorage{storage.NewDummyStorage()}, map[string]int{}}
+}
+
+func (s countingStorage) GetKeys(pattern string) []string {
+	s.calls["GetKeys"]++
+	return s.prefixScanStorage.GetKeys(pattern)
+}
+
+func (s countingStorage) SetKey(key, value string, ttl int64) error {
+	s.calls["SetKey "+key]++
+	return s.prefixScanStorage.SetKey(key, value, ttl)
+}
+
+func TestListAllIds_MigrationDisabled(t *testing.T) {
+	// Tyk Cloud gateways are created with migrateCertList=false and must never
+	// scan Redis.
+	store := newCountingStorage()
+	m := NewCertificateManager(store, "test", nil, false)
+
+	orgCert, _ := genCertificateFromCommonName("org-cert", false)
+	orgCertID, err := m.Add(orgCert, "orgid-1")
+	require.NoError(t, err)
+	noOrgCert, _ := genCertificateFromCommonName("no-org-cert", false)
+	_, err = m.Add(noOrgCert, "")
+	require.NoError(t, err)
+	store.Data["raw-orgid-2legacy"] = "legacy"
+
+	for i := 0; i < 3; i++ {
+		assert.Equal(t, []string{}, m.ListAllIds(""), "call %d", i+1)
+		assert.Equal(t, []string{orgCertID}, m.ListAllIds("orgid-1"), "call %d", i+1)
+		assert.Equal(t, []string{}, m.ListAllIds("orgid-2"), "legacy certificates are not migrated, call %d", i+1)
+	}
+
+	assert.Zero(t, store.calls["GetKeys"], "listing must not scan when migration is disabled")
+}
+
+func TestListAllIds_MigratedOrgWithoutCertificates(t *testing.T) {
+	store := newCountingStorage()
+	m := NewCertificateManager(store, "test", nil, true)
+
+	assert.Empty(t, m.ListAllIds("orgid-1"))
+	require.Equal(t, 1, store.calls["SetKey orgid-1-index-migrated"])
+	require.Equal(t, 1, store.calls["GetKeys"])
+
+	for i := 0; i < 3; i++ {
+		assert.Empty(t, m.ListAllIds("orgid-1"))
+	}
+
+	assert.Equal(t, 1, store.calls["GetKeys"], "an already migrated org must not be scanned again")
+	assert.Equal(t, 1, store.calls["SetKey orgid-1-index-migrated"], "an already migrated org must not rewrite its marker")
+}
+
+func TestListAllIds_MigrationMarker(t *testing.T) {
+	newMigratingManager := func() (*certificateManager, prefixScanStorage) {
+		store := prefixScanStorage{storage.NewDummyStorage()}
+		return NewCertificateManager(store, "test", nil, true), store
+	}
+
+	t.Run("listing without prefix returns all certificates on every call", func(t *testing.T) {
+		m, store := newMigratingManager()
+
+		certNoOrg, _ := genCertificateFromCommonName("no-org", false)
+		certOrg, _ := genCertificateFromCommonName("with-org", false)
+		idNoOrg, err := m.Add(certNoOrg, "")
+		assert.NoError(t, err)
+		idOrg, err := m.Add(certOrg, "orgid-1")
+		assert.NoError(t, err)
+
+		for i := 0; i < 3; i++ {
+			assert.ElementsMatch(t, []string{idNoOrg, idOrg}, m.ListAllIds(""), "call %d", i+1)
+		}
+
+		_, err = store.GetKey("-index-migrated")
+		assert.Error(t, err, "no migrated marker should be written for an empty prefix")
+	})
+
+	t.Run("stale marker for empty prefix is ignored", func(t *testing.T) {
+		m, store := newMigratingManager()
+
+		// Simulates a Redis populated by a gateway running the old code.
+		assert.NoError(t, store.SetKey("-index-migrated", "1", 0))
+
+		cert, _ := genCertificateFromCommonName("no-org", false)
+		id, err := m.Add(cert, "")
+		assert.NoError(t, err)
+
+		assert.Equal(t, []string{id}, m.ListAllIds(""))
+	})
+
+	t.Run("org with no certificates is not rescanned after migration", func(t *testing.T) {
+		m, store := newMigratingManager()
+
+		assert.Empty(t, m.ListAllIds("orgid-1"))
+		_, err := store.GetKey("orgid-1-index-migrated")
+		assert.NoError(t, err, "migrated marker should be set for an org-scoped listing")
+
+		// A record outside the index must stay invisible once migration is done.
+		store.Data["raw-orgid-1dummy"] = "test"
+		assert.Empty(t, m.ListAllIds("orgid-1"))
+	})
+
+	t.Run("duplicate index entries are returned once", func(t *testing.T) {
+		m, store := newMigratingManager()
+
+		certA, _ := genCertificateFromCommonName("a", false)
+		certB, _ := genCertificateFromCommonName("b", false)
+		idA, err := m.Add(certA, "orgid-1")
+		assert.NoError(t, err)
+		idB, err := m.Add(certB, "orgid-1")
+		assert.NoError(t, err)
+
+		// Duplicates written by older versions (e.g. data planes appending to
+		// the control plane's index).
+		store.AppendToSet("orgid-1-index", "raw-"+idA)
+		store.AppendToSet("orgid-1-index", "raw-"+idB)
+		store.AppendToSet("orgid-1-index", "raw-"+idA)
+
+		assert.Equal(t, []string{idA, idB}, m.ListAllIds("orgid-1"))
+
+		// Deleting removes every copy from the index.
+		m.Delete(idA, "orgid-1")
+		assert.Equal(t, []string{idB}, m.ListAllIds("orgid-1"))
+	})
+
+	t.Run("org listing migrates legacy certificates into the index", func(t *testing.T) {
+		m, store := newMigratingManager()
+
+		store.Data["raw-orgid-1legacy"] = "legacy"
+		store.Data["raw-orgid-2other"] = "other"
+
+		assert.Equal(t, []string{"orgid-1legacy"}, m.ListAllIds("orgid-1"))
+		assert.Equal(t, []string{"raw-orgid-1legacy"}, store.IndexList["orgid-1-index"])
+		assert.Equal(t, []string{"orgid-1legacy"}, m.ListAllIds("orgid-1"))
+	})
 }
 
 func TestListPublicKeys_EmbeddedPEM(t *testing.T) {
@@ -506,4 +665,137 @@ func TestList_EmbeddedPEM_SingleLineCombinedCertKey(t *testing.T) {
 	cert := requireSingleCert(t, certs)
 	assert.Equal(t, "single-line-priv", leafSubjectName(cert))
 	assert.False(t, isPrivateKeyEmpty(cert), "private key should survive normalization")
+}
+
+// rpcStorageStub mimics gateway.RPCStorageHandler as seen by a data plane:
+// GetKey, SetKey and AppendToSet reach the control plane (backed here by a
+// DummyStorage), while Exists, GetKeys, GetListRange and RemoveFromList are
+// not implemented and return empty results.
+type rpcStorageStub struct {
+	*storage.DummyStorage
+}
+
+func (rpcStorageStub) Exists(string) (bool, error)                         { return false, nil }
+func (rpcStorageStub) GetKeys(string) []string                             { return nil }
+func (rpcStorageStub) GetListRange(string, int64, int64) ([]string, error) { return nil, nil }
+func (rpcStorageStub) RemoveFromList(string, string) error                 { return nil }
+
+type mdcbFixture struct {
+	controlPlane *storage.DummyStorage
+	local        prefixScanStorage
+	dataPlane    *certificateManager
+	orgCertID    string
+	noOrgCertID  string
+}
+
+// newMdcbFixture stores two certificates on the control plane (one for org
+// "orgid-1", one without an org) and lets the data plane pull both into its
+// local Redis, which is what happens when an API that uses them is loaded.
+func newMdcbFixture(t *testing.T) *mdcbFixture {
+	t.Helper()
+
+	cp := storage.NewDummyStorage()
+	controlPlane := NewCertificateManager(prefixScanStorage{cp}, "test", nil, true)
+
+	orgCert, _ := genCertificateFromCommonName("org-cert", false)
+	noOrgCert, _ := genCertificateFromCommonName("no-org-cert", false)
+	orgCertID, err := controlPlane.Add(orgCert, "orgid-1")
+	require.NoError(t, err)
+	noOrgCertID, err := controlPlane.Add(noOrgCert, "")
+	require.NoError(t, err)
+
+	local := prefixScanStorage{storage.NewDummyStorage()}
+	dataPlane := NewSlaveCertManager(local, rpcStorageStub{cp}, "test", nil, true)
+
+	for _, id := range []string{orgCertID, noOrgCertID} {
+		_, err := dataPlane.GetRaw(id)
+		require.NoError(t, err)
+		_, err = local.GetKey("raw-" + id)
+		require.NoError(t, err, "certificate should be cached in the data plane's local storage")
+	}
+
+	return &mdcbFixture{
+		controlPlane: cp,
+		local:        local,
+		dataPlane:    dataPlane,
+		orgCertID:    orgCertID,
+		noOrgCertID:  noOrgCertID,
+	}
+}
+
+func TestListAllIds_MDCBDataPlane(t *testing.T) {
+	t.Run("org listing returns cached certificates on every call", func(t *testing.T) {
+		f := newMdcbFixture(t)
+		for i := 0; i < 3; i++ {
+			assert.Equal(t, []string{f.orgCertID}, f.dataPlane.ListAllIds("orgid-1"), "call %d", i+1)
+		}
+	})
+
+	t.Run("listing without org returns cached certificates on every call", func(t *testing.T) {
+		f := newMdcbFixture(t)
+		for i := 0; i < 3; i++ {
+			assert.ElementsMatch(t, []string{f.orgCertID, f.noOrgCertID}, f.dataPlane.ListAllIds(""), "call %d", i+1)
+		}
+	})
+
+	t.Run("control plane migration markers do not hide local certificates", func(t *testing.T) {
+		f := newMdcbFixture(t)
+		// Set by any control plane gateway that has listed certificates.
+		require.NoError(t, f.controlPlane.SetKey("orgid-1-index-migrated", "1", 0))
+		require.NoError(t, f.controlPlane.SetKey("-index-migrated", "1", 0))
+
+		assert.Equal(t, []string{f.orgCertID}, f.dataPlane.ListAllIds("orgid-1"))
+		assert.ElementsMatch(t, []string{f.orgCertID, f.noOrgCertID}, f.dataPlane.ListAllIds(""))
+	})
+
+	t.Run("listing does not write to the control plane", func(t *testing.T) {
+		f := newMdcbFixture(t)
+		before := append([]string(nil), f.controlPlane.IndexList["orgid-1-index"]...)
+		dataBefore := len(f.controlPlane.Data)
+
+		for i := 0; i < 3; i++ {
+			f.dataPlane.ListAllIds("orgid-1")
+			f.dataPlane.ListAllIds("")
+		}
+
+		assert.Equal(t, before, f.controlPlane.IndexList["orgid-1-index"])
+		assert.Equal(t, dataBefore, len(f.controlPlane.Data))
+	})
+
+	t.Run("adding on the data plane writes the index through the MDCB layer", func(t *testing.T) {
+		// Unchanged behaviour: index entries are written to both the local and
+		// the control plane index, only reads are local.
+		f := newMdcbFixture(t)
+
+		cert, _ := genCertificateFromCommonName("data-plane-cert", false)
+		id, err := f.dataPlane.Add(cert, "orgid-1")
+		require.NoError(t, err)
+
+		assert.Contains(t, f.local.IndexList["orgid-1-index"], "raw-"+id)
+		assert.Contains(t, f.controlPlane.IndexList["orgid-1-index"], "raw-"+id)
+		assert.Contains(t, f.dataPlane.ListAllIds("orgid-1"), id)
+
+		f.dataPlane.Delete(id, "orgid-1")
+		assert.NotContains(t, f.local.IndexList["orgid-1-index"], "raw-"+id)
+		assert.NotContains(t, f.dataPlane.ListAllIds("orgid-1"), id)
+	})
+
+	t.Run("duplicates left in the local index by older versions are returned once", func(t *testing.T) {
+		f := newMdcbFixture(t)
+		// Old code: Add appended on pull, then the first listing's migration
+		// scan appended the same key again before setting the marker.
+		f.local.AppendToSet("orgid-1-index", "raw-"+f.orgCertID)
+		require.NoError(t, f.local.SetKey("orgid-1-index-migrated", "1", 0))
+		require.Len(t, f.local.IndexList["orgid-1-index"], 2)
+
+		assert.Equal(t, []string{f.orgCertID}, f.dataPlane.ListAllIds("orgid-1"))
+	})
+
+	t.Run("org with no cached certificates stays empty without rescanning", func(t *testing.T) {
+		f := newMdcbFixture(t)
+		assert.Empty(t, f.dataPlane.ListAllIds("orgid-2"))
+		_, err := f.local.GetKey("orgid-2-index-migrated")
+		assert.NoError(t, err, "marker should be written to the data plane's local storage")
+		assert.Empty(t, f.dataPlane.ListAllIds("orgid-2"))
+	})
 }
