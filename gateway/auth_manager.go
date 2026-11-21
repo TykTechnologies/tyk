@@ -3,6 +3,7 @@ package gateway
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"strings"
 	"time"
 
@@ -172,6 +173,20 @@ func (b *DefaultSessionManager) RemoveSession(orgID string, keyName string, hash
 
 // SessionDetail returns the session detail using the storage engine (either in memory or Redis)
 func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool) {
+	session, found, err := b.sessionDetail(orgID, keyName, hashed)
+	if err != nil {
+		// SessionHandler cannot return the error; callers that need to tell a
+		// missing key from an unreachable store use sessionDetail.
+		return session, false
+	}
+	return session, found
+}
+
+// sessionDetail is SessionDetail that also tells a key that does not exist
+// from a key that could not be looked up. When the storage engine cannot be
+// reached it returns false and storage.ErrRedisIsDown; a key that is simply
+// not there is not an error.
+func (b *DefaultSessionManager) sessionDetail(orgID string, keyName string, hashed bool) (user.SessionState, bool, error) {
 	var jsonKeyVal string
 	var err error
 	keyId := keyName
@@ -217,16 +232,19 @@ func (b *DefaultSessionManager) SessionDetail(orgID string, keyName string, hash
 			"inbound-key": b.Gw.obfuscateKey(keyName),
 			"err":         err,
 		}).Debug("Could not get session detail, key not found")
-		return user.SessionState{}, false
+		if errors.Is(err, storage.ErrRedisIsDown) {
+			return user.SessionState{}, false, err
+		}
+		return user.SessionState{}, false, nil
 	}
 	session := &user.SessionState{}
 	if err := json.Unmarshal([]byte(jsonKeyVal), &session); err != nil {
 		log.Error("Couldn't unmarshal session object (may be cache miss): ", err)
-		return user.SessionState{}, false
+		return user.SessionState{}, false, nil
 	}
 	session.KeyID = keyId
 	session.MarkAsRestored()
-	return session.Clone(), true
+	return session.Clone(), true, nil
 }
 
 func (b *DefaultSessionManager) Stop() {}

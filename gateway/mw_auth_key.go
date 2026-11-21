@@ -33,11 +33,13 @@ const (
 	ErrAuthKeyIsInvalid              = "auth.key_is_invalid"
 	ErrAuthCertRequired              = "auth.cert_required"
 	ErrAuthCertMismatch              = "auth.cert_mismatch"
+	ErrAuthStoreUnavailable          = "auth.store_unavailable"
 
 	MsgNonExistentKey      = "Attempted access with non-existent key."
 	MsgNonExistentCert     = "Attempted access with non-existent cert."
 	MsgCertificateMismatch = "Attempted access with incorrect certificate."
 	MsgInvalidKey          = "Attempted access with invalid key."
+	MsgStoreUnavailable    = "Could not check the key: the session store is unavailable."
 )
 
 func initAuthKeyErrors() {
@@ -49,6 +51,13 @@ func initAuthKeyErrors() {
 	TykErrors[ErrAuthKeyNotFound] = config.TykError{
 		Message: MsgApiAccessDisallowed,
 		Code:    http.StatusForbidden,
+	}
+
+	// The key may be valid; it could not be checked. 503 tells the client to
+	// retry, where 403 would tell it that its credentials are not allowed.
+	TykErrors[ErrAuthStoreUnavailable] = config.TykError{
+		Message: http.StatusText(http.StatusServiceUnavailable),
+		Code:    http.StatusServiceUnavailable,
 	}
 
 	TykErrors[ErrAuthCertNotFound] = config.TykError{
@@ -132,13 +141,18 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 	var keyExists, updateSession bool
 	var certHash string
 	var session user.SessionState
+	var storeErr error
 
-	session, keyExists = k.CheckSessionAndIdentityForValidKey(key, r)
+	session, keyExists, storeErr = k.checkSessionAndIdentityForValidKey(key, r)
 	if !authConfig.UseCertificate {
 		if key == "" {
 			k.Logger().Info("Attempted access with malformed header, no auth header found.")
 			ctx.SetErrorClassification(r, tykerrors.ClassifyAuthError(tykerrors.ErrAuthAuthorizationFieldMissing, k.Name()))
 			return k.prmErrorAndStatusCode(w, r, ErrAuthAuthorizationFieldMissing)
+		}
+		if !keyExists && storeErr != nil {
+			k.Logger().WithField("key", k.Gw.obfuscateKey(key)).WithError(storeErr).Warning(MsgStoreUnavailable)
+			return errorAndStatusCode(ErrAuthStoreUnavailable)
 		}
 		if !keyExists {
 			err, code := k.reportInvalidKey(key, r, MsgNonExistentKey, ErrAuthKeyNotFound)

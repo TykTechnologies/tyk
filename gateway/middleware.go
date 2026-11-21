@@ -679,11 +679,36 @@ func effectiveMinTokenLength(configured int) int {
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
 // the Auth Handler, if not found it will fail
 func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r *http.Request) (user.SessionState, bool) {
+	session, found, err := t.checkSessionAndIdentityForValidKey(originalKey, r)
+	if err != nil {
+		// Callers that need to tell a missing key from an unreachable session
+		// store use checkSessionAndIdentityForValidKey.
+		return session, false
+	}
+	return session, found
+}
+
+// sessionDetail looks a key up in a session manager and, when the manager can
+// tell, reports that the lookup failed because the session store could not be
+// reached.
+func (t *BaseMiddleware) sessionDetail(manager SessionHandler, key string) (user.SessionState, bool, error) {
+	if m, ok := manager.(*DefaultSessionManager); ok {
+		return m.sessionDetail(t.Spec.OrgID, key, false)
+	}
+	session, found := manager.SessionDetail(t.Spec.OrgID, key, false)
+	return session, found, nil
+}
+
+// checkSessionAndIdentityForValidKey is CheckSessionAndIdentityForValidKey
+// that also returns storage.ErrRedisIsDown when the key was not found because
+// the session store could not be reached, so that the caller does not report
+// a valid key as one that does not exist.
+func (t *BaseMiddleware) checkSessionAndIdentityForValidKey(originalKey string, _ *http.Request) (user.SessionState, bool, error) {
 	key := originalKey
 	minLength := effectiveMinTokenLength(t.Spec.GlobalConfig.MinTokenLength)
 
 	if len(key) < minLength {
-		return user.SessionState{IsInactive: true}, false
+		return user.SessionState{IsInactive: true}, false, nil
 	}
 
 	// Try and get the session from the session store
@@ -703,16 +728,16 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 			session.MarkAsRestored()
 			if err := t.ApplyPolicies(&session); err != nil {
 				t.Logger().Error(err)
-				return session, false
+				return session, false, nil
 			}
 			NormalizeMCPEndpoints(&session)
-			return session, true
+			return session, true, nil
 		}
 	}
 
 	// Check session store
 	t.Logger().Debug("Querying keystore")
-	session, found := t.Gw.GlobalSessionManager.SessionDetail(t.Spec.OrgID, key, false)
+	session, found, storeErr := t.sessionDetail(t.Gw.GlobalSessionManager, key)
 
 	if found {
 		if t.Spec.GlobalConfig.HashKeys {
@@ -729,16 +754,16 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		if err := t.ApplyPolicies(&session); err != nil {
 			t.Logger().Error(err)
-			return session, false
+			return session, false, nil
 		}
 		NormalizeMCPEndpoints(&session)
 		t.Logger().Debug("Got key")
-		return session, true
+		return session, true, nil
 	}
 
 	if _, ok := t.Spec.AuthManager.Store().(*RPCStorageHandler); ok && rpc.IsEmergencyMode() {
 		session.KeyID = key
-		return session.Clone(), false
+		return session.Clone(), false, nil
 	}
 
 	// Only search in RPC if it's not in emergency mode
@@ -760,7 +785,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 			lifetime := clonedSession.Lifetime(t.Spec.GetSessionLifetimeRespectsKeyExpiration(), t.Spec.SessionLifetime, t.Gw.GetConfig().ForceGlobalSessionLifetime, t.Gw.GetConfig().GlobalSessionLifetime)
 			if err := t.Gw.GlobalSessionManager.UpdateSession(key, &clonedSession, lifetime, false); err != nil {
 				t.Logger().WithError(err).Error("Cant copy session from AuthManager into GlobalSessionManager")
-				return user.SessionState{}, false
+				return user.SessionState{}, false, nil
 			}
 		}
 
@@ -772,7 +797,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 		// Check for a policy, if there is a policy, pull it and overwrite the session values
 		if err := t.ApplyPolicies(&session); err != nil {
 			t.Logger().Error(err)
-			return session, false
+			return session, false, nil
 		}
 		NormalizeMCPEndpoints(&session)
 
@@ -780,13 +805,13 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 
 		session.Touch()
 
-		return session, found
+		return session, found, nil
 	}
 
 	// session not found
 	session.KeyID = key
 
-	return session, false
+	return session, false, storeErr
 }
 
 // FireEvent is added to the BaseMiddleware object so it is available across the entire stack

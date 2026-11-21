@@ -155,9 +155,9 @@ func TestSignatureValidation(t *testing.T) {
 		}
 		ts.Gw.StorageConnectionHandler.DisableStorage(true)
 		ts.Run(t, []test.TestCase{
-			{Headers: emptySigHeader, Code: http.StatusForbidden},
-			{Headers: invalidSigHeader, Code: http.StatusForbidden},
-			{Headers: validSigHeader, Code: http.StatusForbidden},
+			{Headers: emptySigHeader, Code: http.StatusServiceUnavailable},
+			{Headers: invalidSigHeader, Code: http.StatusServiceUnavailable},
+			{Headers: validSigHeader, Code: http.StatusServiceUnavailable},
 		}...)
 		ts.Gw.StorageConnectionHandler.DisableStorage(false)
 		ts.Run(t, []test.TestCase{
@@ -178,9 +178,9 @@ func TestSignatureValidation(t *testing.T) {
 
 		ts.Gw.StorageConnectionHandler.DisableStorage(true)
 		_, _ = ts.Run(t, []test.TestCase{
-			{Path: emptySigPath, Code: http.StatusForbidden},
-			{Path: invalidSigPath, Code: http.StatusForbidden},
-			{Path: validSigPath, Code: http.StatusForbidden},
+			{Path: emptySigPath, Code: http.StatusServiceUnavailable},
+			{Path: invalidSigPath, Code: http.StatusServiceUnavailable},
+			{Path: validSigPath, Code: http.StatusServiceUnavailable},
 		}...)
 		ts.Gw.StorageConnectionHandler.DisableStorage(false)
 		_, _ = ts.Run(t, []test.TestCase{
@@ -216,8 +216,8 @@ func TestSignatureValidation(t *testing.T) {
 		}
 		ts.Gw.StorageConnectionHandler.DisableStorage(true)
 		ts.Run(t, []test.TestCase{
-			{Headers: invalidSigHeader, Code: http.StatusForbidden},
-			{Headers: validSigHeader, Code: http.StatusForbidden},
+			{Headers: invalidSigHeader, Code: http.StatusServiceUnavailable},
+			{Headers: validSigHeader, Code: http.StatusServiceUnavailable},
 		}...)
 		ts.Gw.StorageConnectionHandler.DisableStorage(false)
 		ts.Run(t, []test.TestCase{
@@ -285,11 +285,11 @@ func TestSignatureValidation(t *testing.T) {
 		}
 		ts.Gw.StorageConnectionHandler.DisableStorage(true)
 		ts.Run(t, []test.TestCase{
-			{Headers: invalidSigHeader, Code: http.StatusForbidden},
-			{Headers: validSigHeader, Code: http.StatusForbidden},
-			{Headers: validSigHeader2, Code: http.StatusForbidden},
-			{Headers: validSigHeader3, Code: http.StatusForbidden},
-			{Headers: validSigHeader4, Code: http.StatusForbidden},
+			{Headers: invalidSigHeader, Code: http.StatusServiceUnavailable},
+			{Headers: validSigHeader, Code: http.StatusServiceUnavailable},
+			{Headers: validSigHeader2, Code: http.StatusServiceUnavailable},
+			{Headers: validSigHeader3, Code: http.StatusServiceUnavailable},
+			{Headers: validSigHeader4, Code: http.StatusServiceUnavailable},
 		}...)
 		ts.Gw.StorageConnectionHandler.DisableStorage(false)
 		ts.Run(t, []test.TestCase{
