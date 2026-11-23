@@ -177,6 +177,14 @@ func (w *mcpAggregatorWrites) reset() {
 // taking loaded, the IDs from the loaded aggregators, and replacing what it
 // says about any aggregator written since.
 func (w *mcpAggregatorWrites) referencing(upstreamID string, loaded []string) []string {
+	ids := w.collectReferencing(upstreamID, loaded)
+	slices.Sort(ids)
+	return ids
+}
+
+// collectReferencing gathers referencing's IDs under the lock, leaving the
+// sort to run without it.
+func (w *mcpAggregatorWrites) collectReferencing(upstreamID string, loaded []string) []string {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	var ids []string
@@ -190,6 +198,5 @@ func (w *mcpAggregatorWrites) referencing(upstreamID string, loaded []string) []
 			ids = append(ids, id)
 		}
 	}
-	slices.Sort(ids)
 	return ids
 }
