@@ -220,7 +220,8 @@ func (gw *Gateway) replaceVariables(
 			val, ok := vals[key]
 			if ok {
 				valStr := valToStr(val)
-				if escape && !(label == metaLabel && isAbsoluteHTTPURL(valStr)) {
+				operatorURL := label == metaLabel && isAbsoluteHTTPURL(valStr)
+				if escape && !operatorURL {
 					valStr = url.QueryEscape(valStr)
 				}
 				in = strings.ReplaceAll(in, v, valStr)

@@ -1759,7 +1759,9 @@ func TestURLRewrite_EscapeBySource(t *testing.T) {
 	var otherHostHits int32
 	otherHost := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		atomic.AddInt32(&otherHostHits, 1)
-		_, _ = w.Write([]byte(`{"other_host":true}`))
+		if _, err := w.Write([]byte(`{"other_host":true}`)); err != nil {
+			t.Errorf("other host could not write its response: %v", err)
+		}
 	}))
 	defer otherHost.Close()
 
