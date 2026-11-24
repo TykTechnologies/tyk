@@ -42,7 +42,16 @@ const (
 	oauth2ErrUnauthorizedClient    = "unauthorized_client"
 	oauth2ErrInvalidClientMetadata = "invalid_client_metadata"
 	oauth2ErrAccessDenied          = "access_denied"
+
+	// defaultJWTBearerHTTPTimeout matches the OAuth service timeout used by
+	// internal/httpclient.ExternalHTTPClientFactory.
+	defaultJWTBearerHTTPTimeout = 15 * time.Second
 )
+
+// defaultJWTBearerHTTPClient is used when no external-services OAuth client is
+// configured. Unlike http.DefaultClient it has a timeout, so an unresponsive
+// token endpoint cannot hang the request indefinitely.
+var defaultJWTBearerHTTPClient = &http.Client{Timeout: defaultJWTBearerHTTPTimeout}
 
 // JWTBearerSigningError is returned when the JWT assertion cannot be built:
 // the certificate is missing, has no (RSA) private key, or signing fails.
@@ -208,7 +217,7 @@ func (client *JWTBearerClient) ObtainToken(ctx context.Context) (*oauth2.Token, 
 
 	httpClient := createOAuthHTTPClient(client.mw)
 	if httpClient == nil {
-		httpClient = http.DefaultClient
+		httpClient = defaultJWTBearerHTTPClient
 	}
 
 	resp, err := httpClient.Do(req)

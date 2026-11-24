@@ -545,3 +545,9 @@ func TestGenerateJWTBearerCacheKey(t *testing.T) {
 	}
 	assert.NotEqual(t, key, generateJWTBearerCacheKey(base, "other-api"), "apiId")
 }
+
+func TestDefaultJWTBearerHTTPClient_HasTimeout(t *testing.T) {
+	require.NotNil(t, defaultJWTBearerHTTPClient)
+	assert.NotSame(t, http.DefaultClient, defaultJWTBearerHTTPClient)
+	assert.Equal(t, 15*time.Second, defaultJWTBearerHTTPClient.Timeout)
+}
