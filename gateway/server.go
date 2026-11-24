@@ -747,6 +747,7 @@ func (gw *Gateway) buildDashboardConnStr(resource string) string {
 
 func (gw *Gateway) syncAPISpecs() (int, error) {
 	loader := APIDefinitionLoader{Gw: gw}
+	gw.mcpAggregatorWrites.definitionsRead()
 
 	var s []*APISpec
 	if gw.GetConfig().UseDBAppConfigs {

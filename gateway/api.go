@@ -1419,6 +1419,7 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 			return apiError(err.Error()), errCode
 		}
 	}
+	gw.mcpAggregatorWrites.written(newDef.APIID, &newDef, &oasObj)
 
 	if !versionParams.IsEmpty(lib.BaseAPIID) {
 		baseAPIID := versionParams.Get(lib.BaseAPIID)
@@ -1514,6 +1515,7 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 			return apiError(err.Error()), errCode
 		}
 	}
+	gw.mcpAggregatorWrites.written(newDef.APIID, &newDef, &oasObj)
 
 	return buildSuccessResponse(newDef.APIID, "modified")
 }
@@ -1615,6 +1617,7 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 			return apiError("Delete failed"), http.StatusInternalServerError
 		}
 	}
+	gw.mcpAggregatorWrites.written(apiID, nil, nil)
 
 	handleBaseVersionCleanup(gw, spec, apiID, fs)
 	return buildSuccessResponse(apiID, "deleted")
