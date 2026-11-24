@@ -54,16 +54,12 @@ func (h *MCPListFilterResponseHandler) HandleResponse(_ http.ResponseWriter, res
 	discovery := state.Method == mcp.MethodServerDiscover
 	toolView := remoteMCPToolsListView(h.Spec, state)
 	var filter func([]byte) ([]byte, bool, error)
-	// enforcesAccess is true when the filter applies access rules, so a body
-	// it cannot read must not reach the client unfiltered.
-	enforcesAccess := false
 	switch {
 	case listCfg != nil:
 		ruleSets := effectiveMCPListRuleSets(h.Spec, ses, listCfg)
 		if len(ruleSets) == 0 && toolView == nil {
 			return nil
 		}
-		enforcesAccess = len(ruleSets) > 0
 		filter = func(body []byte) ([]byte, bool, error) {
 			edited := false
 			if toolView != nil {
@@ -79,7 +75,6 @@ func (h *MCPListFilterResponseHandler) HandleResponse(_ http.ResponseWriter, res
 		if len(ruleSets) == 0 {
 			return nil
 		}
-		enforcesAccess = true
 		filter = func(body []byte) ([]byte, bool, error) {
 			filtered, changed := mcp.FilterInitializeCapabilitiesBody(body, ruleSets)
 			return filtered, changed, nil
@@ -113,14 +108,11 @@ func (h *MCPListFilterResponseHandler) HandleResponse(_ http.ResponseWriter, res
 		return nil //nolint:nilerr // fail-open: pass through on read error
 	}
 	body, decoded := h.decodeBody(res, raw)
-	if !decoded && enforcesAccess {
-		// Access rules cannot be applied to a body the Gateway cannot read,
-		// so the response fails closed instead of passing through unfiltered.
-		replaceUndecodableResponse(res, req)
-		return nil
-	}
 	if !decoded && !discovery {
-		res.Body = io.NopCloser(bytes.NewReader(raw))
+		// Neither access rules nor tool overrides can be applied to a body
+		// the Gateway cannot read, so the response fails closed instead of
+		// passing through unfiltered.
+		replaceUndecodableResponse(res, req)
 		return nil
 	}
 	if discovery && (!decoded || !mcp.JSONRPCResponseIDMatches(body, state.ID)) {
@@ -160,8 +152,8 @@ func replaceInvalidDiscoveryResponse(res *http.Response, req *http.Request) {
 	replaceWithBadGatewayResponse(res, req, "upstream discovery response is invalid")
 }
 
-// replaceUndecodableResponse fails closed on an upstream response whose
-// encoding the Gateway cannot decode when access rules must be applied to it.
+// replaceUndecodableResponse fails closed on an upstream response the Gateway
+// must filter or rewrite but cannot decode.
 func replaceUndecodableResponse(res *http.Response, req *http.Request) {
 	ctx.SetErrorClassification(req, tykerrors.NewErrorClassification(tykerrors.UCF, "undecodable_mcp_response").WithSource("MCPListFilter"))
 	replaceWithBadGatewayResponse(res, req, "upstream response could not be decoded")
@@ -184,9 +176,7 @@ func replaceWithBadGatewayResponse(res *http.Response, req *http.Request, messag
 
 // decodeBody returns the decoded upstream body so it can be filtered and
 // rewritten. When the body cannot be decoded it reports false after a
-// rate-limited warning: responses that access rules apply to and discovery
-// fail closed, and list responses that only carry tool overrides pass
-// through unchanged.
+// rate-limited warning, and the response fails closed.
 func (h *MCPListFilterResponseHandler) decodeBody(res *http.Response, raw []byte) ([]byte, bool) {
 	encoding := mcpResponseContentEncoding(res.Header)
 	if encoding == "" {
