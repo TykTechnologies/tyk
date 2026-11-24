@@ -544,6 +544,22 @@ func TestGenerateJWTBearerCacheKey(t *testing.T) {
 		assert.NotEqual(t, key, generateJWTBearerCacheKey(cfg, "api"), name)
 	}
 	assert.NotEqual(t, key, generateJWTBearerCacheKey(base, "other-api"), "apiId")
+
+	t.Run("separator in values does not collide", func(t *testing.T) {
+		left := base
+		left.JWTBearer.Issuer = "A|B"
+		left.JWTBearer.Subject = "C"
+
+		right := base
+		right.JWTBearer.Issuer = "A"
+		right.JWTBearer.Subject = "B|C"
+
+		leftKey := generateJWTBearerCacheKey(left, "api")
+		rightKey := generateJWTBearerCacheKey(right, "api")
+		assert.NotEqual(t, leftKey, rightKey)
+		assert.Regexp(t, `^[0-9a-f]{64}$`, leftKey)
+		assert.Regexp(t, `^[0-9a-f]{64}$`, rightKey)
+	})
 }
 
 func TestDefaultJWTBearerHTTPClient_HasTimeout(t *testing.T) {

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -328,18 +329,25 @@ func newJWTBearerJTI() (string, error) {
 	return hex.EncodeToString(b), nil
 }
 
+// generateJWTBearerCacheKey derives the token cache key for the JWT Bearer grant.
+// Each field is length-prefixed before hashing so values containing separators
+// (such as '|', newlines or null bytes) cannot make two configs collide.
 func generateJWTBearerCacheKey(config apidef.UpstreamOAuth, apiId string) string {
 	jb := config.JWTBearer
-	key := fmt.Sprintf(
-		"jwt-%s|%s|%s|%s|%s|%s",
+	hash := sha256.New()
+	for _, field := range []string{
+		"jwt",
 		apiId,
 		jb.TokenURL,
 		jb.CertID,
 		jb.Issuer,
 		jb.Subject,
-		jb.Audience)
-
-	hash := sha256.New()
-	hash.Write([]byte(key))
+		jb.Audience,
+	} {
+		var length [8]byte
+		binary.BigEndian.PutUint64(length[:], uint64(len(field)))
+		hash.Write(length[:])
+		hash.Write([]byte(field))
+	}
 	return hex.EncodeToString(hash.Sum(nil))
 }
