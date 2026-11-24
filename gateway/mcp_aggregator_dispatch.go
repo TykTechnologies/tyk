@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	oteltrace "go.opentelemetry.io/otel/trace"
 
@@ -87,7 +88,9 @@ func (d mcpAggregatorDispatcher) call(parent *http.Request, upstream mcpaggregat
 	if err != nil {
 		return nil, err
 	}
-	req, err := http.NewRequestWithContext(mcpAggregatorUpstreamRequestContext(parent.Context(), request.RealIP(parent)), http.MethodPost, spec.Proxy.ListenPath, bytes.NewReader(body))
+	upstreamCtx, release := mcpAggregatorUpstreamRequestContext(parent.Context(), request.RealIP(parent))
+	defer release()
+	req, err := http.NewRequestWithContext(upstreamCtx, http.MethodPost, spec.Proxy.ListenPath, bytes.NewReader(body))
 	if err != nil {
 		return nil, err
 	}
@@ -148,28 +151,57 @@ func (w *mcpAggregatorResponseRecorder) Write(data []byte) (int, error) {
 // before any header or the remote address.
 const mcpAggregatorClientIPContextKey = "remote_addr"
 
-// mcpAggregatorUpstreamContext keeps the caller's cancellation and client IP
-// but none of its other request-scoped values, so the aggregated proxy's chain
-// starts clean.
-type mcpAggregatorUpstreamContext struct {
+// mcpAggregatorClientIPContext answers request.RealIP's context key with the
+// client IP and every other key from the context it wraps.
+type mcpAggregatorClientIPContext struct {
 	context.Context
 	clientIP string
 }
 
-func (c mcpAggregatorUpstreamContext) Value(key any) any {
+func (c mcpAggregatorClientIPContext) Value(key any) any {
 	if key == mcpAggregatorClientIPContextKey {
 		return c.clientIP
 	}
-	return nil
+	return c.Context.Value(key)
+}
+
+// mcpAggregatorUpstreamDeadlineContext reports the caller's deadline without
+// a timer of its own: the caller's context expiring is what cancels it, so
+// the aggregated proxy's context is never done before the caller's.
+type mcpAggregatorUpstreamDeadlineContext struct {
+	context.Context
+	deadline time.Time
+}
+
+func (c mcpAggregatorUpstreamDeadlineContext) Deadline() (time.Time, bool) {
+	return c.deadline, true
 }
 
 // mcpAggregatorUpstreamRequestContext keeps only the caller's cancellation,
-// trace span and client IP. Upstream spans join the aggregator's trace, and
-// request.RealIP in the aggregated proxy's chain returns clientIP, the address
-// the aggregator resolved for its caller, so the proxy's IP access control
-// sees the agent's address and not the load balancer's in front of it.
-func mcpAggregatorUpstreamRequestContext(parent context.Context, clientIP string) context.Context {
-	return oteltrace.ContextWithSpan(mcpAggregatorUpstreamContext{Context: parent, clientIP: clientIP}, oteltrace.SpanFromContext(parent))
+// deadline, trace span and client IP, so the aggregated proxy's chain starts
+// without the aggregator's other request-scoped values. Upstream spans join
+// the aggregator's trace, and request.RealIP in the aggregated proxy's chain
+// returns clientIP, the address the aggregator resolved for its caller, so the
+// proxy's IP access control sees the agent's address and not the load
+// balancer's in front of it.
+//
+// The context starts from context.Background rather than hiding the parent's
+// values, so contexts derived from it in the proxy chain find a standard
+// cancel context and need no goroutine of their own. It is cancelled when the
+// caller's context is done, with the caller's cause. The returned release
+// function must be called once the aggregated proxy has answered.
+func mcpAggregatorUpstreamRequestContext(parent context.Context, clientIP string) (context.Context, context.CancelFunc) {
+	base := oteltrace.ContextWithSpan(mcpAggregatorClientIPContext{Context: context.Background(), clientIP: clientIP}, oteltrace.SpanFromContext(parent))
+	cancelCtx, cancel := context.WithCancelCause(base)
+	ctx := cancelCtx
+	if deadline, ok := parent.Deadline(); ok {
+		ctx = mcpAggregatorUpstreamDeadlineContext{Context: cancelCtx, deadline: deadline}
+	}
+	stop := context.AfterFunc(parent, func() { cancel(context.Cause(parent)) })
+	return ctx, func() {
+		stop()
+		cancel(context.Canceled)
+	}
 }
 
 func mcpAggregatorRequestBody(method string, params map[string]any) ([]byte, error) {
