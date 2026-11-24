@@ -60,3 +60,29 @@ func TestIsGatewayJSONRPCError(t *testing.T) {
 	assert.False(t, isGatewayJSONRPCError(json.RawMessage(`{"code":-32603,"message":"db down"}`), http.StatusInternalServerError))
 	assert.False(t, isGatewayJSONRPCError(json.RawMessage(`{"code":-32603,"message":"db down","data":"trace"}`), http.StatusInternalServerError))
 }
+
+func TestMCPAggregatorToolsListFailsWhenNoAggregatedProxyAnswers(t *testing.T) {
+	orders := newMCPRoutingUpstream(t, namedTools("list_orders")...)
+	github := newMCPRoutingUpstream(t, namedTools("list_issues")...)
+	ts, key := startMCPAggregatorRoutingTest(t, orders, github)
+
+	orders.Close()
+	res := postModernToolsList(t, ts, "/company-tools/", key)
+	require.Equal(t, http.StatusOK, res.status, "one proxy answering is enough: %s", res.body)
+	assert.Equal(t, []string{"github__list_issues"}, res.tools)
+
+	github.Close()
+	res = postModernToolsList(t, ts, "/company-tools/", key)
+	assert.Equal(t, http.StatusServiceUnavailable, res.status, res.body)
+	assert.JSONEq(t, `{"jsonrpc":"2.0","id":7,"error":{"code":-33006,"message":"upstream unavailable: no aggregated MCP proxy answered tools/list"}}`, res.body)
+}
+
+func TestMCPAggregatorToolsListServesAnEmptyListWhenProxiesAnswerWithNoTools(t *testing.T) {
+	ts, key := startMCPAggregatorRoutingTest(t, newMCPRoutingUpstream(t), newMCPRoutingUpstream(t))
+
+	res := postModernToolsList(t, ts, "/company-tools/", key)
+
+	require.Equal(t, http.StatusOK, res.status, res.body)
+	assert.Empty(t, res.tools)
+	assert.Contains(t, res.body, `"tools":[]`)
+}
