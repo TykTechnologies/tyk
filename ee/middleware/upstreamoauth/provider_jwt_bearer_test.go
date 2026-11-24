@@ -143,19 +143,23 @@ func newMockIdP(t *testing.T, pub *rsa.PublicKey, handler func(w http.ResponseWr
 
 func (i *mockIdP) callCount() int { return int(atomic.LoadInt32(&i.calls)) }
 
-func writeTokenResponse(w http.ResponseWriter, accessToken string, expiresIn int) {
+func writeTokenResponse(t *testing.T, w http.ResponseWriter, accessToken string, expiresIn int) {
+	t.Helper()
 	w.Header().Set("Content-Type", "application/json")
 	resp := map[string]interface{}{"access_token": accessToken, "token_type": "Bearer"}
 	if expiresIn > 0 {
 		resp["expires_in"] = expiresIn
 	}
-	_ = json.NewEncoder(w).Encode(resp)
+	err := json.NewEncoder(w).Encode(resp)
+	assert.NoError(t, err)
 }
 
-func writeOAuthError(w http.ResponseWriter, status int, code string) {
+func writeOAuthError(t *testing.T, w http.ResponseWriter, status int, code string) {
+	t.Helper()
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]string{"error": code, "error_description": "rejected by test IdP"})
+	err := json.NewEncoder(w).Encode(map[string]string{"error": code, "error_description": "rejected by test IdP"})
+	assert.NoError(t, err)
 }
 
 func newJWTBearerMiddleware(tokenURL string, base *mockBaseMiddleware, store Storage, mutate func(*apidef.UpstreamOAuthJWTBearer)) *Middleware {
@@ -191,32 +195,32 @@ func newJWTBearerMiddleware(tokenURL string, base *mockBaseMiddleware, store Sto
 }
 
 // processAndFill runs the middleware and returns the headers the upstream request would carry.
-func processAndFill(t *testing.T, m *Middleware) (http.Header, error, int) {
+func processAndFill(t *testing.T, m *Middleware) (http.Header, int, error) {
 	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, "http://gateway/api", nil)
 	err, code := m.ProcessRequest(httptest.NewRecorder(), req, nil)
 	if err != nil {
-		return nil, err, code
+		return nil, code, err
 	}
 
 	provider := core.GetUpstreamAuth(req)
 	require.NotNil(t, provider)
 	upstreamReq := httptest.NewRequest(http.MethodGet, "http://upstream/api", nil)
 	provider.Fill(upstreamReq)
-	return upstreamReq.Header, nil, code
+	return upstreamReq.Header, code, nil
 }
 
 func TestJWTBearer_AuthenticatesAndSetsUpstreamHeader(t *testing.T) {
 	cert, pub := newTestRSACert(t)
 	idp := newMockIdP(t, pub, func(w http.ResponseWriter, _ int32) {
-		writeTokenResponse(w, "sf-access-token", 3600)
+		writeTokenResponse(t, w, "sf-access-token", 3600)
 	})
 
 	t.Run("default lifetime and Authorization header", func(t *testing.T) {
 		base := &mockBaseMiddleware{cert: cert}
 		m := newJWTBearerMiddleware(idp.URL, base, newMemStorage(), nil)
 
-		headers, err, code := processAndFill(t, m)
+		headers, code, err := processAndFill(t, m)
 		require.NoError(t, err)
 		assert.Equal(t, http.StatusOK, code)
 		assert.Equal(t, "Bearer sf-access-token", headers.Get("Authorization"))
@@ -239,7 +243,7 @@ func TestJWTBearer_AuthenticatesAndSetsUpstreamHeader(t *testing.T) {
 			jb.Header = apidef.AuthSource{Enabled: true, Name: "X-Upstream-Auth"}
 		})
 
-		headers, err, _ := processAndFill(t, m)
+		headers, _, err := processAndFill(t, m)
 		require.NoError(t, err)
 		assert.Equal(t, "Bearer sf-access-token", headers.Get("X-Upstream-Auth"))
 		assert.Empty(t, headers.Get("Authorization"))
@@ -252,14 +256,14 @@ func TestJWTBearer_AuthenticatesAndSetsUpstreamHeader(t *testing.T) {
 func TestJWTBearer_CacheReuseAndRenewal(t *testing.T) {
 	cert, pub := newTestRSACert(t)
 	idp := newMockIdP(t, pub, func(w http.ResponseWriter, call int32) {
-		writeTokenResponse(w, fmt.Sprintf("token-%d", call), 600)
+		writeTokenResponse(t, w, fmt.Sprintf("token-%d", call), 600)
 	})
 
 	store := newMemStorage()
 	m := newJWTBearerMiddleware(idp.URL, &mockBaseMiddleware{cert: cert}, store, nil)
 
 	for i := 0; i < 3; i++ {
-		headers, err, _ := processAndFill(t, m)
+		headers, _, err := processAndFill(t, m)
 		require.NoError(t, err)
 		assert.Equal(t, "Bearer token-1", headers.Get("Authorization"))
 	}
@@ -272,7 +276,7 @@ func TestJWTBearer_CacheReuseAndRenewal(t *testing.T) {
 
 	store.expire()
 
-	headers, err, _ := processAndFill(t, m)
+	headers, _, err := processAndFill(t, m)
 	require.NoError(t, err)
 	assert.Equal(t, "Bearer token-2", headers.Get("Authorization"), "new JWT is exchanged after expiry")
 	assert.Equal(t, 2, idp.callCount())
@@ -281,13 +285,13 @@ func TestJWTBearer_CacheReuseAndRenewal(t *testing.T) {
 func TestJWTBearer_TokenWithoutExpiresInUsesDefaultTTL(t *testing.T) {
 	cert, pub := newTestRSACert(t)
 	idp := newMockIdP(t, pub, func(w http.ResponseWriter, _ int32) {
-		writeTokenResponse(w, "salesforce-style-token", 0)
+		writeTokenResponse(t, w, "salesforce-style-token", 0)
 	})
 
 	store := newMemStorage()
 	m := newJWTBearerMiddleware(idp.URL, &mockBaseMiddleware{cert: cert}, store, nil)
 
-	_, err, _ := processAndFill(t, m)
+	_, _, err := processAndFill(t, m)
 	require.NoError(t, err)
 	require.Len(t, store.ttls, 1)
 	for _, ttl := range store.ttls {
@@ -314,7 +318,7 @@ func TestJWTBearer_SigningKeyUnavailable(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			idp := newMockIdP(t, nil, func(w http.ResponseWriter, _ int32) {
-				writeTokenResponse(w, "should-not-be-issued", 3600)
+				writeTokenResponse(t, w, "should-not-be-issued", 3600)
 			})
 
 			base := &mockBaseMiddleware{cert: tc.cert, certErr: tc.certErr}
@@ -322,7 +326,7 @@ func TestJWTBearer_SigningKeyUnavailable(t *testing.T) {
 			store := newMemStorage()
 			m := newJWTBearerMiddleware(idp.URL, base, store, nil)
 
-			_, err, code := processAndFill(t, m)
+			_, code, err := processAndFill(t, m)
 			require.Error(t, err)
 			assert.Equal(t, http.StatusInternalServerError, code)
 
@@ -342,66 +346,82 @@ func TestJWTBearer_IdPRejection(t *testing.T) {
 
 	testCases := []struct {
 		name       string
-		respond    func(w http.ResponseWriter)
+		respond    func(t *testing.T, w http.ResponseWriter)
 		wantStatus int
 		wantIdPErr string
 	}{
 		{
-			name:       "401 invalid_client",
-			respond:    func(w http.ResponseWriter) { writeOAuthError(w, http.StatusUnauthorized, "invalid_client") },
+			name: "401 invalid_client",
+			respond: func(t *testing.T, w http.ResponseWriter) {
+				writeOAuthError(t, w, http.StatusUnauthorized, "invalid_client")
+			},
 			wantStatus: http.StatusUnauthorized,
 			wantIdPErr: "invalid_client",
 		},
 		{
-			name:       "403 status wins over error code",
-			respond:    func(w http.ResponseWriter) { writeOAuthError(w, http.StatusForbidden, "invalid_grant") },
+			name: "403 status wins over error code",
+			respond: func(t *testing.T, w http.ResponseWriter) {
+				writeOAuthError(t, w, http.StatusForbidden, "invalid_grant")
+			},
 			wantStatus: http.StatusForbidden,
 			wantIdPErr: "invalid_grant",
 		},
 		{
-			name:       "400 invalid_grant maps to 401",
-			respond:    func(w http.ResponseWriter) { writeOAuthError(w, http.StatusBadRequest, "invalid_grant") },
+			name: "400 invalid_grant maps to 401",
+			respond: func(t *testing.T, w http.ResponseWriter) {
+				writeOAuthError(t, w, http.StatusBadRequest, "invalid_grant")
+			},
 			wantStatus: http.StatusUnauthorized,
 			wantIdPErr: "invalid_grant",
 		},
 		{
-			name:       "400 unauthorized_client",
-			respond:    func(w http.ResponseWriter) { writeOAuthError(w, http.StatusBadRequest, "unauthorized_client") },
+			name: "400 unauthorized_client",
+			respond: func(t *testing.T, w http.ResponseWriter) {
+				writeOAuthError(t, w, http.StatusBadRequest, "unauthorized_client")
+			},
 			wantStatus: http.StatusUnauthorized,
 			wantIdPErr: "unauthorized_client",
 		},
 		{
-			name:       "400 invalid_client_metadata",
-			respond:    func(w http.ResponseWriter) { writeOAuthError(w, http.StatusBadRequest, "invalid_client_metadata") },
+			name: "400 invalid_client_metadata",
+			respond: func(t *testing.T, w http.ResponseWriter) {
+				writeOAuthError(t, w, http.StatusBadRequest, "invalid_client_metadata")
+			},
 			wantStatus: http.StatusUnauthorized,
 			wantIdPErr: "invalid_client_metadata",
 		},
 		{
-			name:       "400 access_denied maps to 403",
-			respond:    func(w http.ResponseWriter) { writeOAuthError(w, http.StatusBadRequest, "access_denied") },
+			name: "400 access_denied maps to 403",
+			respond: func(t *testing.T, w http.ResponseWriter) {
+				writeOAuthError(t, w, http.StatusBadRequest, "access_denied")
+			},
 			wantStatus: http.StatusForbidden,
 			wantIdPErr: "access_denied",
 		},
 		{
-			name:       "unknown IdP error maps to 401",
-			respond:    func(w http.ResponseWriter) { writeOAuthError(w, http.StatusInternalServerError, "server_error") },
+			name: "unknown IdP error maps to 401",
+			respond: func(t *testing.T, w http.ResponseWriter) {
+				writeOAuthError(t, w, http.StatusInternalServerError, "server_error")
+			},
 			wantStatus: http.StatusUnauthorized,
 			wantIdPErr: "server_error",
 		},
 		{
 			name: "non JSON error body maps to 401",
-			respond: func(w http.ResponseWriter) {
+			respond: func(t *testing.T, w http.ResponseWriter) {
 				w.WriteHeader(http.StatusBadRequest)
-				_, _ = w.Write([]byte("bad request"))
+				_, err := w.Write([]byte("bad request"))
+				assert.NoError(t, err)
 			},
 			wantStatus: http.StatusUnauthorized,
 			wantIdPErr: "unknown",
 		},
 		{
 			name: "success without access_token maps to 401",
-			respond: func(w http.ResponseWriter) {
+			respond: func(t *testing.T, w http.ResponseWriter) {
 				w.Header().Set("Content-Type", "application/json")
-				_, _ = w.Write([]byte(`{"token_type":"Bearer"}`))
+				_, err := w.Write([]byte(`{"token_type":"Bearer"}`))
+				assert.NoError(t, err)
 			},
 			wantStatus: http.StatusUnauthorized,
 			wantIdPErr: "invalid_token_response",
@@ -410,14 +430,14 @@ func TestJWTBearer_IdPRejection(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			idp := newMockIdP(t, pub, func(w http.ResponseWriter, _ int32) { tc.respond(w) })
+			idp := newMockIdP(t, pub, func(w http.ResponseWriter, _ int32) { tc.respond(t, w) })
 
 			base := &mockBaseMiddleware{cert: cert}
 			base.On("FireEvent", event.UpstreamOAuthError, mock.Anything).Return()
 			store := newMemStorage()
 			m := newJWTBearerMiddleware(idp.URL, base, store, nil)
 
-			headers, err, code := processAndFill(t, m)
+			headers, code, err := processAndFill(t, m)
 			require.Error(t, err)
 			assert.Nil(t, headers, "upstream auth is not set")
 			assert.Equal(t, tc.wantStatus, code)
@@ -444,7 +464,7 @@ func TestJWTBearer_IdPUnreachableIsServerError(t *testing.T) {
 	store := newMemStorage()
 	m := newJWTBearerMiddleware(tokenURL, base, store, nil)
 
-	_, err, code := processAndFill(t, m)
+	_, code, err := processAndFill(t, m)
 	require.Error(t, err)
 	assert.Equal(t, http.StatusInternalServerError, code)
 	assert.Zero(t, store.setCalls)
@@ -452,7 +472,7 @@ func TestJWTBearer_IdPUnreachableIsServerError(t *testing.T) {
 
 func TestExistingGrantsKeepServerErrorOnTokenFailure(t *testing.T) {
 	idp := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		writeOAuthError(w, http.StatusUnauthorized, "invalid_client")
+		writeOAuthError(t, w, http.StatusUnauthorized, "invalid_client")
 	}))
 	defer idp.Close()
 

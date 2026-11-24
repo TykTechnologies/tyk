@@ -32,7 +32,7 @@ func (m *Middleware) Unload() {
 var _ model.Middleware = &Middleware{}
 
 // NewMiddleware returns a new instance of Middleware.
-func NewMiddleware(gw Gateway, mw BaseMiddleware, spec model.MergedAPI, ccStorageHandler Storage, pwStorageHandler Storage, jwtStorageHandler Storage) *Middleware {
+func NewMiddleware(gw Gateway, mw BaseMiddleware, spec model.MergedAPI, ccStorageHandler, pwStorageHandler, jwtStorageHandler Storage) *Middleware {
 	return &Middleware{
 		Base:                            mw,
 		Gw:                              gw,

@@ -88,8 +88,8 @@ func jwtBearerRejectionStatus(idpStatus int, idpErr string) int {
 	case oauth2ErrAccessDenied:
 		return http.StatusForbidden
 	case oauth2ErrInvalidClient, oauth2ErrInvalidGrant, oauth2ErrUnauthorizedClient, oauth2ErrInvalidClientMetadata:
-		// TODO(TT-16926): mapping HTTP 400 + invalid_grant (the usual answer to a
-		// bad assertion) to 401 is an open product question; revisit once confirmed.
+		// TT-16926: HTTP 400 + invalid_grant (the usual answer to a bad assertion)
+		// is intentionally mapped to 401. This may be revisited if product guidance changes.
 		return http.StatusUnauthorized
 	default:
 		// Unknown IdP errors are treated as an authentication failure rather
