@@ -39,7 +39,8 @@ func TestMCPAggregatorLoopTrustHandOverOnlyAppliesToTheBaseItWasIssuedFor(t *tes
 	child := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "github-mcp-v2"}}
 	other := &APISpec{APIDefinition: &apidef.APIDefinition{APIID: "payments-mcp"}}
 
-	req, _ := http.NewRequest(http.MethodPost, "/", nil)
+	req, err := http.NewRequest(http.MethodPost, "/", nil)
+	require.NoError(t, err)
 	trust := &mcpAggregatorLoopTrust{UpstreamAPIID: "github-mcp"}
 	ctxSetMCPAggregatorLoopTrust(req, trust)
 
