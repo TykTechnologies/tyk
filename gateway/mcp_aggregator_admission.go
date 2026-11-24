@@ -46,8 +46,13 @@ func (gw *Gateway) validateMCPAggregatorUpstreams(r *http.Request, mcpObj *oas.O
 
 	for i, ref := range ext.Upstreams {
 		status := classifyMCPAggregatorUpstream(incoming.OrgID, upstreams[i])
-		if status == mcpAggregatorUpstreamNotLoaded && gw.apiDefinitionAwaitsReload(ref.APIID) {
-			return fmt.Sprintf("aggregated MCP proxy %q is not loaded yet: reload the gateway, then retry", ref.APIID), http.StatusBadRequest
+		if status == mcpAggregatorUpstreamNotLoaded {
+			switch gw.apiDefinitionFileState(ref.APIID) {
+			case apiDefinitionAwaitsReload:
+				return fmt.Sprintf("aggregated MCP proxy %q is not loaded yet: reload the gateway, then retry", ref.APIID), http.StatusBadRequest
+			case apiDefinitionNotLoadedByReload:
+				return fmt.Sprintf("aggregated MCP proxy %q has a definition on this gateway that the last reload did not load: check the gateway log for why, fix the definition, then reload", ref.APIID), http.StatusBadRequest
+			}
 		}
 		if msg, code := status.admissionError(ref.APIID); msg != "" {
 			return msg, code
@@ -56,14 +61,38 @@ func (gw *Gateway) validateMCPAggregatorUpstreams(r *http.Request, mcpObj *oas.O
 	return gw.validateMCPAggregatorUpstreamViews(r, &APISpec{APIDefinition: &incoming}, ext, upstreams)
 }
 
-// apiDefinitionAwaitsReload reports whether the Gateway API has written a
-// definition for apiID to this gateway's app path that it has not loaded yet.
-func (gw *Gateway) apiDefinitionAwaitsReload(apiID string) bool {
+// apiDefinitionFileState says whether the Gateway API has written a
+// definition for an API that is not loaded, and whether a reload has read it.
+type apiDefinitionFileState int
+
+const (
+	// apiDefinitionNoFile: no definition for the API is in the app path.
+	apiDefinitionNoFile apiDefinitionFileState = iota
+	// apiDefinitionAwaitsReload: the definition was written after the last
+	// reload read the app path, so a reload loads it.
+	apiDefinitionAwaitsReload
+	// apiDefinitionNotLoadedByReload: the last reload read the definition and
+	// did not load it, for example because it is invalid; another reload
+	// will not change that.
+	apiDefinitionNotLoadedByReload
+)
+
+// apiDefinitionFileState reports the state of the definition the Gateway API
+// wrote for apiID to this gateway's app path. A definition modified before the
+// last reload started reading the app path was read by that reload.
+func (gw *Gateway) apiDefinitionFileState(apiID string) apiDefinitionFileState {
 	if sanitize.ValidatePathComponent(apiID) != nil {
-		return false
+		return apiDefinitionNoFile
 	}
-	_, err := os.Stat(filepath.Join(gw.GetConfig().AppPath, apiID+".json"))
-	return err == nil
+	info, err := os.Stat(filepath.Join(gw.GetConfig().AppPath, apiID+".json"))
+	if err != nil {
+		return apiDefinitionNoFile
+	}
+	readAt := gw.apiDefinitionsReadAt.Load()
+	if readAt != 0 && info.ModTime().UnixNano() < readAt {
+		return apiDefinitionNotLoadedByReload
+	}
+	return apiDefinitionAwaitsReload
 }
 
 // mcpAggregatorUpstreamStatus says whether an API can serve as an aggregated
@@ -199,4 +228,38 @@ func (w *mcpAggregatorWrites) collectReferencing(upstreamID string, loaded []str
 		}
 	}
 	return ids
+}
+
+// mcpAggregatorUpdateConflict rejects an update that would stop loaded
+// aggregators from serving an MCP proxy they currently admit: moving it to
+// another organisation, turning it into an aggregator, or making it a non-MCP
+// API. Like a delete, such an update would silently drop the proxy's tools
+// from those aggregators on the next reload.
+func (gw *Gateway) mcpAggregatorUpdateConflict(apiID string, updated *apidef.APIDefinition, updatedOAS *oas.OAS) (string, int) {
+	aggregatorIDs := gw.mcpAggregatorIndex.AggregatorsReferencing(apiID)
+	if len(aggregatorIDs) == 0 || updated == nil {
+		return "", 0
+	}
+
+	spec := &APISpec{APIDefinition: updated}
+	if updatedOAS != nil {
+		spec.OAS = *updatedOAS
+	}
+
+	var blocked []string
+	var reason mcpAggregatorUpstreamStatus
+	for _, aggregatorID := range aggregatorIDs {
+		agg, ok := gw.mcpAggregatorIndex.Lookup(aggregatorID)
+		if !ok || !gw.mcpAggregatorIndex.Allows(aggregatorID, apiID) {
+			continue
+		}
+		if status := classifyMCPAggregatorUpstream(agg.OrgID, spec); status != mcpAggregatorUpstreamAdmitted {
+			blocked = append(blocked, aggregatorID)
+			reason = status
+		}
+	}
+	if len(blocked) == 0 {
+		return "", 0
+	}
+	return fmt.Sprintf("API %q is referenced by MCP aggregators: %s; after this update it %s and could no longer be aggregated", apiID, strings.Join(blocked, ", "), reason), http.StatusConflict
 }
