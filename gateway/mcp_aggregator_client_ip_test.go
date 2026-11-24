@@ -56,13 +56,14 @@ func TestMCPAggregatorAppliesAggregatedProxyIPAccessControlToTheClientIP(t *test
 
 			res := postModernToolsListWithHeader(t, ts, "/company-tools/", companyToolsKey(t, ts), tc.header)
 
-			require.Equal(t, http.StatusOK, res.status, res.body)
 			warnings := mcpAggregatorOmissionWarnings(hook, "github-mcp")
 			if tc.allowed {
+				require.Equal(t, http.StatusOK, res.status, res.body)
 				assert.Equal(t, []string{"github__create_issue", "github__search_repos"}, res.tools)
 				assert.Empty(t, warnings)
 				return
 			}
+			assert.Equal(t, http.StatusServiceUnavailable, res.status, "the only aggregated proxy did not answer: %s", res.body)
 			assert.Empty(t, res.tools)
 			require.Len(t, warnings, 1)
 			assert.Equal(t, "tools/list failed: tools/list failed with HTTP 403", warnings[0].Data["reason"])

@@ -204,6 +204,28 @@ func isMCPUnknownToolError(raw json.RawMessage) bool {
 		strings.HasPrefix(strings.ToLower(rpcErr.Message), "unknown tool")
 }
 
+// isJSONRPCErrorObject reports whether raw is a JSON-RPC error object: an
+// object with an integer code and a string message.
+func isJSONRPCErrorObject(raw json.RawMessage) bool {
+	var rpcErr struct {
+		Code    *int    `json:"code"`
+		Message *string `json:"message"`
+	}
+	return len(raw) > 0 && json.Unmarshal(raw, &rpcErr) == nil && rpcErr.Code != nil && rpcErr.Message != nil
+}
+
+// isGatewayJSONRPCError reports whether raw is a JSON-RPC error written by
+// the gateway's own error handling, which records the HTTP status it answered
+// with in data.http_code.
+func isGatewayJSONRPCError(raw json.RawMessage, statusCode int) bool {
+	var rpcErr struct {
+		Data struct {
+			HTTPCode *int `json:"http_code"`
+		} `json:"data"`
+	}
+	return json.Unmarshal(raw, &rpcErr) == nil && rpcErr.Data.HTTPCode != nil && *rpcErr.Data.HTTPCode == statusCode
+}
+
 // callTool forwards a tools/call to an aggregated MCP proxy. Only the name in
 // params changes, to the proxy's own tool name; arguments, _meta and every
 // other field keep their bytes. Mcp-Name mirrors the new name, and the
@@ -240,21 +262,32 @@ func (d mcpAggregatorDispatcher) callTool(parent *http.Request, upstream mcpaggr
 	if detail := mcpAggregatorVersionMismatch(mcp.MethodToolsCall, rec.statusCode, rec.header, rec.body.Bytes()); detail != "" {
 		return nil, mcpAggregatorUnavailable("version mismatch: does not support MCP version %s: %s", mcp.ModernProtocolVersion, detail)
 	}
-	if rec.statusCode >= http.StatusInternalServerError {
-		return nil, mcpAggregatorUnavailable("tools/call failed with HTTP %d", rec.statusCode)
-	}
 
 	message := rec.body.Bytes()
+	var streamErr error
 	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(rec.header.Get(headerContentType))), "text/event-stream") {
-		if message, err = mcpAggregatorEventStreamResponse(message); err != nil {
-			return nil, mcpAggregatorUnavailable("tools/call failed: %s", err.Error())
-		}
+		message, streamErr = mcpAggregatorEventStreamResponse(message)
 	}
 	var resp struct {
 		Result json.RawMessage `json:"result"`
 		Error  json.RawMessage `json:"error"`
 	}
-	if json.Unmarshal(message, &resp) != nil {
+	decodeErr := streamErr
+	if decodeErr == nil {
+		decodeErr = json.Unmarshal(message, &resp)
+	}
+	// A server error is the proxy being unavailable unless it carries a
+	// JSON-RPC error from the MCP server behind the proxy, which is the
+	// server's own answer and reaches the agent. An error the proxy's gateway
+	// chain wrote itself, such as for an unreachable upstream, still means the
+	// proxy is unavailable.
+	if rec.statusCode >= http.StatusInternalServerError && (decodeErr != nil || !isJSONRPCErrorObject(resp.Error) || isGatewayJSONRPCError(resp.Error, rec.statusCode)) {
+		return nil, mcpAggregatorUnavailable("tools/call failed with HTTP %d", rec.statusCode)
+	}
+	if streamErr != nil {
+		return nil, mcpAggregatorUnavailable("tools/call failed: %s", streamErr.Error())
+	}
+	if decodeErr != nil {
 		return nil, mcpAggregatorUnavailable("tools/call failed with HTTP %d: invalid JSON-RPC response", rec.statusCode)
 	}
 	switch {
