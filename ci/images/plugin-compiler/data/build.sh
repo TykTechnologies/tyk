@@ -133,6 +133,13 @@ go work use ./$(basename $PLUGIN_BUILD_PATH)
 cd $PLUGIN_BUILD_PATH
 
 if [[ "$GO_GET" == "1" ]] ; then
+	# Go ignores replace directives of dependencies, so mirror the gateway's
+	# versioned replaces (e.g. the kin-openapi fork) into the plugin go.mod.
+	# Otherwise go get resolves the upstream module's requirements and the
+	# plugin build pulls in incompatible transitive versions.
+	go mod edit -json $TYK_GW_PATH/go.mod \
+		| jq -r '.Replace[]? | select(.New.Version != null) | "-replace=\(.Old.Path)\(if .Old.Version then "@"+.Old.Version else "" end)=\(.New.Path)@\(.New.Version)"' \
+		| xargs -r go mod edit
 	go get github.com/TykTechnologies/tyk@${GITHUB_SHA}
 fi
 
