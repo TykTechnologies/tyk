@@ -121,3 +121,37 @@ func (gw *Gateway) mcpAggregatorDeleteConflict(apiID string) (interface{}, int) 
 	}
 	return apiError(fmt.Sprintf("API %q is referenced by MCP aggregators: %s", apiID, strings.Join(aggregatorIDs, ", "))), http.StatusConflict
 }
+
+// mcpAggregatorUpdateConflict rejects an update that would stop loaded
+// aggregators from serving an MCP proxy they currently admit: moving it to
+// another organisation, turning it into an aggregator, or making it a non-MCP
+// API. Like a delete, such an update would silently drop the proxy's tools
+// from those aggregators on the next reload.
+func (gw *Gateway) mcpAggregatorUpdateConflict(apiID string, updated *apidef.APIDefinition, updatedOAS *oas.OAS) (string, int) {
+	aggregatorIDs := gw.mcpAggregatorIndex.AggregatorsReferencing(apiID)
+	if len(aggregatorIDs) == 0 || updated == nil {
+		return "", 0
+	}
+
+	spec := &APISpec{APIDefinition: updated}
+	if updatedOAS != nil {
+		spec.OAS = *updatedOAS
+	}
+
+	var blocked []string
+	var reason mcpAggregatorUpstreamStatus
+	for _, aggregatorID := range aggregatorIDs {
+		agg, ok := gw.mcpAggregatorIndex.Lookup(aggregatorID)
+		if !ok || !gw.mcpAggregatorIndex.Allows(aggregatorID, apiID) {
+			continue
+		}
+		if status := classifyMCPAggregatorUpstream(agg.OrgID, spec); status != mcpAggregatorUpstreamAdmitted {
+			blocked = append(blocked, aggregatorID)
+			reason = status
+		}
+	}
+	if len(blocked) == 0 {
+		return "", 0
+	}
+	return fmt.Sprintf("API %q is referenced by MCP aggregators: %s; after this update it %s and could no longer be aggregated", apiID, strings.Join(blocked, ", "), reason), http.StatusConflict
+}
