@@ -8,11 +8,13 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/sirupsen/logrus"
@@ -507,7 +509,7 @@ func TestMCPAggregatorLoopTrustDoesNotAuthenticateFurtherLoops(t *testing.T) {
 
 	res := postModernToolsList(t, ts, "/company-tools/", companyToolsKey(t, ts))
 
-	require.Equal(t, http.StatusOK, res.status, res.body)
+	require.Equal(t, http.StatusServiceUnavailable, res.status, "the only aggregated proxy did not answer: %s", res.body)
 	assert.Empty(t, res.tools, "the aggregator's per-hop trust must not reach secret-rest")
 	warnings := mcpAggregatorOmissionWarnings(hook, "github-mcp")
 	require.Len(t, warnings, 1)
@@ -587,7 +589,7 @@ func TestMCPAggregatorOmitsAggregatedProxyRepeatingACursor(t *testing.T) {
 
 	res := postModernToolsList(t, ts, "/company-tools/", companyToolsKey(t, ts))
 
-	require.Equal(t, http.StatusOK, res.status, res.body)
+	require.Equal(t, http.StatusServiceUnavailable, res.status, "the only aggregated proxy did not answer: %s", res.body)
 	assert.Empty(t, res.tools)
 	warnings := mcpAggregatorOmissionWarnings(hook, "github-mcp")
 	require.Len(t, warnings, 1)
@@ -606,7 +608,7 @@ func TestMCPAggregatorOmitsAggregatedProxyExceedingThePageLimit(t *testing.T) {
 
 	res := postModernToolsList(t, ts, "/company-tools/", companyToolsKey(t, ts))
 
-	require.Equal(t, http.StatusOK, res.status, res.body)
+	require.Equal(t, http.StatusServiceUnavailable, res.status, "the only aggregated proxy did not answer: %s", res.body)
 	assert.Empty(t, res.tools, "a partial list is not served")
 	assert.EqualValues(t, mcpAggregatorMaxListPages, pages.Load())
 	warnings := mcpAggregatorOmissionWarnings(hook, "github-mcp")
@@ -671,11 +673,74 @@ func TestMCPAggregatorUpstreamContextKeepsOnlyCancellationTraceSpanAndClientIP(t
 	})
 	parent, cancel := context.WithCancel(context.WithValue(oteltrace.ContextWithSpanContext(context.Background(), spanContext), otherKey{}, "leak"))
 
-	upstream := mcpAggregatorUpstreamRequestContext(parent, "203.0.113.7")
+	upstream, release := mcpAggregatorUpstreamRequestContext(parent, "203.0.113.7")
+	defer release()
 
 	assert.Equal(t, spanContext, oteltrace.SpanContextFromContext(upstream))
 	assert.Nil(t, upstream.Value(otherKey{}))
 	assert.Equal(t, "203.0.113.7", request.RealIP((&http.Request{RemoteAddr: "10.0.0.1:1234"}).WithContext(upstream)))
 	cancel()
+	<-upstream.Done()
 	assert.ErrorIs(t, upstream.Err(), context.Canceled)
+}
+
+func TestMCPAggregatorUpstreamContextKeepsTheCallerDeadline(t *testing.T) {
+	deadline := time.Now().Add(time.Hour)
+	parent, cancel := context.WithDeadline(context.Background(), deadline)
+	defer cancel()
+
+	upstream, release := mcpAggregatorUpstreamRequestContext(parent, "203.0.113.7")
+	defer release()
+
+	got, ok := upstream.Deadline()
+	assert.True(t, ok)
+	assert.Equal(t, deadline, got)
+
+	_, cancelDerived := context.WithCancel(upstream)
+	defer cancelDerived()
+	cancel()
+	<-upstream.Done()
+	assert.ErrorIs(t, parent.Err(), context.Canceled, "the caller's context is done before the upstream context")
+}
+
+func TestMCPAggregatorUpstreamContextIsReleasedWithoutCancellingTheCaller(t *testing.T) {
+	parent, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	upstream, release := mcpAggregatorUpstreamRequestContext(parent, "203.0.113.7")
+	release()
+
+	assert.ErrorIs(t, upstream.Err(), context.Canceled)
+	assert.NoError(t, parent.Err())
+}
+
+func TestMCPAggregatorUpstreamContextDerivedContextsNeedNoGoroutine(t *testing.T) {
+	withDeadline := func() (context.Context, context.CancelFunc) {
+		return context.WithTimeout(context.Background(), time.Hour)
+	}
+	withCancel := func() (context.Context, context.CancelFunc) {
+		return context.WithCancel(context.Background())
+	}
+	for name, newParent := range map[string]func() (context.Context, context.CancelFunc){"cancel": withCancel, "deadline": withDeadline} {
+		t.Run(name, func(t *testing.T) {
+			parent, cancel := newParent()
+			defer cancel()
+			upstream, release := mcpAggregatorUpstreamRequestContext(parent, "203.0.113.7")
+			defer release()
+
+			const derived = 200
+			before := runtime.NumGoroutine()
+			cancels := make([]context.CancelFunc, 0, derived)
+			for range derived {
+				_, cancelDerived := context.WithCancel(upstream)
+				cancels = append(cancels, cancelDerived)
+			}
+			after := runtime.NumGoroutine()
+			for _, cancelDerived := range cancels {
+				cancelDerived()
+			}
+
+			assert.Less(t, after-before, derived/4, "derived contexts must not each start a goroutine")
+		})
+	}
 }
