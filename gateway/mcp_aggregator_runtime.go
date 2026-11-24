@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"sort"
 	"sync"
 	"time"
@@ -120,6 +121,10 @@ func (m *MCPAggregatorMiddleware) ProcessRequest(w http.ResponseWriter, r *http.
 		if mcpAggregatorClientGone(r) {
 			break
 		}
+		if catalogue.Unavailable {
+			m.writeToolsListUnavailable(w, r, state)
+			break
+		}
 		writeMCPAggregatorResult(w, state.ID, m.toolsListResult(catalogue, ctxGetSession(r)))
 	case mcp.MethodToolsCall:
 		m.serveToolsCall(w, r, state)
@@ -169,6 +174,22 @@ type mcpAggregatorTool struct {
 // tool name so its order never depends on which proxy answered first.
 type mcpAggregatorCatalogue struct {
 	Tools []mcpAggregatorTool
+	// Unavailable is set when the aggregator has aggregated MCP proxies and
+	// none of them answered tools/list, which an empty list would hide.
+	Unavailable bool
+}
+
+// writeToolsListUnavailable answers a tools/list that no aggregated MCP proxy
+// answered with an error rather than an empty list, which would look the same
+// as an aggregator with no tools.
+func (m *MCPAggregatorMiddleware) writeToolsListUnavailable(w http.ResponseWriter, r *http.Request, state *httpctx.JSONRPCRoutingState) {
+	if errors.Is(r.Context().Err(), context.DeadlineExceeded) {
+		writeMCPAggregatorError(w, state.ID, http.StatusGatewayTimeout, mcpAggregatorUpstreamErrorCode,
+			fmt.Sprintf("upstream timeout: no aggregated MCP proxy answered tools/list within %s", mcpAggregatorTimeout(m.Spec, r)))
+		return
+	}
+	writeMCPAggregatorError(w, state.ID, http.StatusServiceUnavailable, mcpAggregatorUpstreamErrorCode,
+		"upstream unavailable: no aggregated MCP proxy answered tools/list")
 }
 
 // toolsListResult is the tools/list result for one consumer: the catalogue
@@ -202,6 +223,7 @@ func (d mcpAggregatorDispatcher) toolsCatalogue(parent *http.Request) mcpAggrega
 	}
 
 	results := make([][]mcpAggregatorTool, len(ext.Upstreams))
+	answered := make([]bool, len(ext.Upstreams))
 	// Every configured proxy gets the same share of the byte budget, so the
 	// responses buffered at once stay within it however the reads interleave,
 	// and whether a proxy fits never depends on the others.
@@ -229,11 +251,12 @@ func (d mcpAggregatorDispatcher) toolsCatalogue(parent *http.Request) mcpAggrega
 				return
 			}
 			results[i] = tools
+			answered[i] = true
 		}(i)
 	}
 	wg.Wait()
 
-	var catalogue mcpAggregatorCatalogue
+	catalogue := mcpAggregatorCatalogue{Unavailable: len(ext.Upstreams) > 0 && !slices.Contains(answered, true)}
 	var catalogueBytes int
 	for i, tools := range results {
 		size := mcpAggregatorToolsSize(tools)
