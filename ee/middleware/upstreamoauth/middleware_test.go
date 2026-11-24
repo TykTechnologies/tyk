@@ -1,6 +1,7 @@
 package upstreamoauth
 
 import (
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -34,6 +35,17 @@ func (m *mockGateway) GetCertificateManager() httpclient.CertificateManager {
 
 type mockBaseMiddleware struct {
 	mock.Mock
+
+	// cert and certErr are returned by GetClientCertificate.
+	cert    *tls.Certificate
+	certErr error
+	// certCalls records the certificate IDs requested.
+	certCalls []string
+}
+
+func (m *mockBaseMiddleware) GetClientCertificate(certID string) (*tls.Certificate, error) {
+	m.certCalls = append(m.certCalls, certID)
+	return m.cert, m.certErr
 }
 
 func (m *mockBaseMiddleware) Logger() *logrus.Entry {
@@ -77,8 +89,9 @@ func TestMiddleware_NewMiddleware(t *testing.T) {
 	spec := model.MergedAPI{}
 	ccStorage := &mockStorage{}
 	pwStorage := &mockStorage{}
+	jwtStorage := &mockStorage{}
 
-	middleware := NewMiddleware(gw, mw, spec, ccStorage, pwStorage)
+	middleware := NewMiddleware(gw, mw, spec, ccStorage, pwStorage, jwtStorage)
 
 	assert.NotNil(t, middleware)
 	assert.Equal(t, gw, middleware.Gw)
@@ -86,6 +99,7 @@ func TestMiddleware_NewMiddleware(t *testing.T) {
 	assert.Equal(t, spec, middleware.Spec)
 	assert.Equal(t, ccStorage, middleware.clientCredentialsStorageHandler)
 	assert.Equal(t, pwStorage, middleware.passwordStorageHandler)
+	assert.Equal(t, jwtStorage, middleware.jwtBearerStorageHandler)
 }
 
 func TestMiddleware_Name(t *testing.T) {
@@ -200,7 +214,7 @@ func TestMiddleware_ProcessRequest_ClientCredentials(t *testing.T) {
 	storage.On("Lock", mock.AnythingOfType("string"), mock.AnythingOfType("time.Duration")).Return(true, nil)
 	storage.On("SetKey", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("int64")).Return(nil)
 
-	middleware := NewMiddleware(gw, mw, spec, storage, storage)
+	middleware := NewMiddleware(gw, mw, spec, storage, storage, storage)
 
 	// Create test request
 	req := httptest.NewRequest("GET", "http://example.com", nil)
@@ -270,7 +284,7 @@ func TestMiddleware_ProcessRequest_PasswordAuth(t *testing.T) {
 	storage.On("Lock", mock.AnythingOfType("string"), mock.AnythingOfType("time.Duration")).Return(true, nil)
 	storage.On("SetKey", mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("int64")).Return(nil)
 
-	middleware := NewMiddleware(gw, mw, spec, storage, storage)
+	middleware := NewMiddleware(gw, mw, spec, storage, storage, storage)
 
 	// Create test request
 	req := httptest.NewRequest("GET", "http://example.com", nil)
@@ -304,7 +318,7 @@ func TestMiddleware_ProcessRequest_InvalidConfig(t *testing.T) {
 		},
 	}
 
-	middleware := NewMiddleware(gw, mw, spec, nil, nil)
+	middleware := NewMiddleware(gw, mw, spec, nil, nil, nil)
 
 	req := httptest.NewRequest("GET", "http://example.com", nil)
 	rw := httptest.NewRecorder()

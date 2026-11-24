@@ -133,6 +133,9 @@ const (
 	OAuthAuthorizationTypeClientCredentials = "clientCredentials"
 	// OAuthAuthorizationTypePassword is the authorization type for password flow.
 	OAuthAuthorizationTypePassword = "password"
+	// OAuthAuthorizationTypeJWTBearer is the authorization type for the OAuth 2.0 JWT Bearer grant (RFC 7523).
+	// It is available only for Tyk OAS APIs.
+	OAuthAuthorizationTypeJWTBearer = "jwtBearer"
 
 	// OAuth2ClientAuthBasic and OAuth2ClientAuthPost are the client authentication
 	// methods defined by RFC 6749 Section 2.3.1 (the `token_endpoint_auth_method`
@@ -972,6 +975,30 @@ type UpstreamOAuth struct {
 	ClientCredentials ClientCredentials `bson:"client_credentials" json:"client_credentials"`
 	// PasswordAuthentication holds the configuration for upstream OAauth password authentication flow.
 	PasswordAuthentication PasswordAuthentication `bson:"password,omitempty" json:"password,omitempty"`
+	// JWTBearer holds the configuration for the upstream OAuth2 JWT Bearer grant (RFC 7523).
+	// Supported only for Tyk OAS APIs.
+	JWTBearer UpstreamOAuthJWTBearer `bson:"jwt_bearer,omitempty" json:"jwt_bearer,omitempty"`
+}
+
+// UpstreamOAuthJWTBearer holds the configuration for the upstream OAuth2 JWT Bearer grant (RFC 7523).
+// Tyk mints a JWT signed (RS256) with the private key of the certificate CertID, and exchanges it
+// at TokenURL for an access token that is then sent to the upstream.
+type UpstreamOAuthJWTBearer struct {
+	// Header holds the configuration for the custom header to be used for OAuth authentication.
+	Header AuthSource `bson:"header" json:"header"`
+	// TokenURL is the token endpoint of the authorization server.
+	TokenURL string `bson:"token_url" json:"token_url"`
+	// CertID is the ID of the certificate in the Tyk certificate store whose RSA private key signs the JWT.
+	CertID string `bson:"cert_id" json:"cert_id"`
+	// Issuer is the `iss` claim of the JWT.
+	Issuer string `bson:"issuer" json:"issuer"`
+	// Subject is the `sub` claim of the JWT.
+	Subject string `bson:"subject" json:"subject"`
+	// Audience is the `aud` claim of the JWT.
+	Audience string `bson:"audience" json:"audience"`
+	// ExpiresIn is the lifetime of the signed JWT (`exp` = now + ExpiresIn).
+	// When zero/unset, the gateway uses a 2 minute default.
+	ExpiresIn tyktime.ReadableDuration `bson:"expires_in,omitempty" json:"expires_in,omitempty"`
 }
 
 // PasswordAuthentication holds the configuration for upstream OAuth2 password authentication flow.

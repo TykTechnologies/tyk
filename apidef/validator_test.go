@@ -492,6 +492,7 @@ func TestRuleUpstreamAuth_Validate(t *testing.T) {
 	testCases := []struct {
 		name         string
 		upstreamAuth UpstreamAuth
+		isOAS        bool
 		result       ValidationResult
 	}{
 		{
@@ -600,6 +601,70 @@ func TestRuleUpstreamAuth_Validate(t *testing.T) {
 			},
 		},
 		{
+			name:  "jwt bearer on OAS API",
+			isOAS: true,
+			upstreamAuth: UpstreamAuth{
+				Enabled: true,
+				OAuth: UpstreamOAuth{
+					Enabled:               true,
+					AllowedAuthorizeTypes: []string{OAuthAuthorizationTypeJWTBearer},
+					JWTBearer: UpstreamOAuthJWTBearer{
+						TokenURL:  "https://login.salesforce.com/services/oauth2/token",
+						CertID:    "cert-id",
+						Issuer:    "consumer-key",
+						Subject:   "user@example.com",
+						Audience:  "https://login.salesforce.com",
+						ExpiresIn: tyktime.ReadableDuration(2 * time.Minute),
+					},
+				},
+			},
+			result: ValidationResult{IsValid: true},
+		},
+		{
+			name:  "jwt bearer on OAS API with unset expiresIn uses default",
+			isOAS: true,
+			upstreamAuth: UpstreamAuth{
+				Enabled: true,
+				OAuth: UpstreamOAuth{
+					Enabled:               true,
+					AllowedAuthorizeTypes: []string{OAuthAuthorizationTypeJWTBearer},
+				},
+			},
+			result: ValidationResult{IsValid: true},
+		},
+		{
+			name:  "jwt bearer with negative expiresIn",
+			isOAS: true,
+			upstreamAuth: UpstreamAuth{
+				Enabled: true,
+				OAuth: UpstreamOAuth{
+					Enabled:               true,
+					AllowedAuthorizeTypes: []string{OAuthAuthorizationTypeJWTBearer},
+					JWTBearer: UpstreamOAuthJWTBearer{
+						ExpiresIn: tyktime.ReadableDuration(-time.Minute),
+					},
+				},
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrInvalidUpstreamOAuthJWTBearerExpiresIn},
+			},
+		},
+		{
+			name: "jwt bearer on classic API is rejected",
+			upstreamAuth: UpstreamAuth{
+				Enabled: true,
+				OAuth: UpstreamOAuth{
+					Enabled:               true,
+					AllowedAuthorizeTypes: []string{OAuthAuthorizationTypeJWTBearer},
+				},
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrUpstreamOAuthJWTBearerOASOnly},
+			},
+		},
+		{
 			name: "valid client authentication methods",
 			upstreamAuth: UpstreamAuth{
 				Enabled: true,
@@ -624,6 +689,7 @@ func TestRuleUpstreamAuth_Validate(t *testing.T) {
 	for _, tc := range testCases {
 		apiDef := &APIDefinition{
 			UpstreamAuth: tc.upstreamAuth,
+			IsOAS:        tc.isOAS,
 		}
 
 		t.Run(tc.name, runValidationTest(apiDef, ruleSet, tc.result))

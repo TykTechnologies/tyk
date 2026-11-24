@@ -60,6 +60,8 @@ func NewOAuthHeaderProvider(oauthConfig apidef.UpstreamOAuth) (OAuthHeaderProvid
 		return &ClientCredentialsOAuthProvider{}, nil
 	case oauthConfig.AllowedAuthorizeTypes[0] == PasswordAuthorizeType:
 		return &PasswordOAuthProvider{}, nil
+	case oauthConfig.AllowedAuthorizeTypes[0] == JWTBearerAuthorizeType:
+		return &JWTBearerOAuthProvider{}, nil
 	default:
 		return nil, fmt.Errorf("no valid OAuth configuration provided")
 	}

@@ -21,6 +21,7 @@ type Middleware struct {
 
 	clientCredentialsStorageHandler Storage
 	passwordStorageHandler          Storage
+	jwtBearerStorageHandler         Storage
 }
 
 func (m *Middleware) Unload() {
@@ -31,13 +32,14 @@ func (m *Middleware) Unload() {
 var _ model.Middleware = &Middleware{}
 
 // NewMiddleware returns a new instance of Middleware.
-func NewMiddleware(gw Gateway, mw BaseMiddleware, spec model.MergedAPI, ccStorageHandler Storage, pwStorageHandler Storage) *Middleware {
+func NewMiddleware(gw Gateway, mw BaseMiddleware, spec model.MergedAPI, ccStorageHandler Storage, pwStorageHandler Storage, jwtStorageHandler Storage) *Middleware {
 	return &Middleware{
 		Base:                            mw,
 		Gw:                              gw,
 		Spec:                            spec,
 		clientCredentialsStorageHandler: ccStorageHandler,
 		passwordStorageHandler:          pwStorageHandler,
+		jwtBearerStorageHandler:         jwtStorageHandler,
 	}
 }
 
@@ -78,7 +80,8 @@ func (m *Middleware) ProcessRequest(_ http.ResponseWriter, r *http.Request, _ in
 
 	payload, err := provider.getOAuthToken(r, m)
 	if err != nil {
-		return fmt.Errorf("failed to get OAuth token: %w", err), http.StatusInternalServerError
+		// HTTP 500, except JWT Bearer token endpoint rejections which map to 401/403.
+		return fmt.Errorf("failed to get OAuth token: %w", err), tokenErrorStatus(err)
 	}
 
 	upstreamOAuthProvider := Provider{

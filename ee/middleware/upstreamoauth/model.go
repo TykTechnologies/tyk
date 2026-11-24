@@ -1,6 +1,7 @@
 package upstreamoauth
 
 import (
+	"crypto/tls"
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -15,12 +16,16 @@ const (
 
 	ClientCredentialsAuthorizeType = "clientCredentials"
 	PasswordAuthorizeType          = "password"
+	JWTBearerAuthorizeType         = "jwtBearer"
 )
 
 // BaseMiddleware is the subset of BaseMiddleware APIs that the middleware uses.
 type BaseMiddleware interface {
 	model.LoggerProvider
 	FireEvent(name apidef.TykEvent, meta interface{})
+	// GetClientCertificate returns the certificate (with private key) stored
+	// under certID in the gateway certificate store.
+	GetClientCertificate(certID string) (*tls.Certificate, error)
 }
 
 // Gateway is the subset of Gateway APIs that the middleware uses.

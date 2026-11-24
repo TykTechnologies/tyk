@@ -2,6 +2,7 @@ package oas
 
 import (
 	"embed"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -452,6 +453,97 @@ func TestUpstreamEnforceTimeoutSchema(t *testing.T) {
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "duration")
 	})
+}
+
+func TestUpstreamOAuthJWTBearerSchema(t *testing.T) {
+	t.Parallel()
+
+	base := func(jwtBearer string) []byte {
+		return []byte(`{
+			"openapi": "3.0.3",
+			"info": {"title": "t", "version": "1"},
+			"paths": {},
+			"x-tyk-api-gateway": {
+				"info": {"name": "t", "state": {"active": true}},
+				"server": {"listenPath": {"value": "/t"}},
+				"upstream": {
+					"url": "http://upstream",
+					"authentication": {
+						"enabled": true,
+						"oauth": {
+							"enabled": true,
+							"allowedAuthorizeTypes": ["jwtBearer"],
+							"jwtBearer": ` + jwtBearer + `
+						}
+					}
+				}
+			}
+		}`)
+	}
+
+	valid := `{
+		"tokenUrl": "https://login.salesforce.com/services/oauth2/token",
+		"certId": "cert-id",
+		"issuer": "consumer-key",
+		"subject": "user@example.com",
+		"audience": "https://login.salesforce.com",
+		"expiresIn": "2m",
+		"header": {"enabled": true, "name": "X-Upstream-Auth"}
+	}`
+
+	t.Run("valid", func(t *testing.T) {
+		t.Parallel()
+		assert.NoError(t, ValidateOASObject(base(valid), "3.0.3"))
+	})
+
+	t.Run("valid without optional fields", func(t *testing.T) {
+		t.Parallel()
+		assert.NoError(t, ValidateOASObject(base(`{
+			"tokenUrl": "https://idp/token", "certId": "c", "issuer": "i", "subject": "s", "audience": "a"
+		}`), "3.0.3"))
+	})
+
+	for _, field := range []string{"tokenUrl", "certId", "issuer", "subject", "audience"} {
+		field := field
+		t.Run("missing "+field, func(t *testing.T) {
+			t.Parallel()
+			var m map[string]any
+			require.NoError(t, json.Unmarshal([]byte(valid), &m))
+			delete(m, field)
+			b, err := json.Marshal(m)
+			require.NoError(t, err)
+
+			err = ValidateOASObject(base(string(b)), "3.0.3")
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), field)
+		})
+
+		t.Run("empty "+field, func(t *testing.T) {
+			t.Parallel()
+			var m map[string]any
+			require.NoError(t, json.Unmarshal([]byte(valid), &m))
+			m[field] = ""
+			b, err := json.Marshal(m)
+			require.NoError(t, err)
+
+			err = ValidateOASObject(base(string(b)), "3.0.3")
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), field)
+		})
+	}
+
+	for _, expiresIn := range []string{`"2 minutes"`, `"-1m"`, `120`} {
+		expiresIn := expiresIn
+		t.Run("invalid expiresIn "+expiresIn, func(t *testing.T) {
+			t.Parallel()
+			err := ValidateOASObject(base(`{
+				"tokenUrl": "https://idp/token", "certId": "c", "issuer": "i", "subject": "s", "audience": "a",
+				"expiresIn": `+expiresIn+`
+			}`), "3.0.3")
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), "expiresIn")
+		})
+	}
 }
 
 func TestGetOASSchema(t *testing.T) {
