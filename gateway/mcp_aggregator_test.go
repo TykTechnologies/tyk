@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/spf13/afero"
@@ -356,4 +357,34 @@ func TestClassifyMCPAggregatorUpstream(t *testing.T) {
 		msg, _ := status.admissionError(tt.apiID)
 		assert.Equal(t, tt.want == mcpAggregatorUpstreamAdmitted, msg == "", tt.apiID)
 	}
+}
+
+func TestMCPAggregatorTellsAnAggregatedProxyTheLastReloadDidNotLoadFromOneAwaitingReload(t *testing.T) {
+	gw := newMCPTestGateway(t)
+	path := filepath.Join(gw.GetConfig().AppPath, "orders-mcp.json")
+	require.NoError(t, os.WriteFile(path, []byte(`{"invalid":`), 0o600))
+	aggregator := mcpAggregatorOAS("all-tools", mcpAggregatorRuntimeOrg, aggregated("orders-mcp", "orders"))
+
+	written := time.Now().Add(-time.Minute)
+	require.NoError(t, os.Chtimes(path, written, written))
+
+	t.Run("written after the last reload read the app path", func(t *testing.T) {
+		gw.apiDefinitionsReadAt.Store(written.Add(-time.Second).UnixNano())
+
+		res := postMCPAggregatorThroughValidateMCP(t, gw, http.MethodPost, aggregator)
+
+		assert.Equal(t, http.StatusBadRequest, res.code)
+		assert.Contains(t, res.body, `aggregated MCP proxy \"orders-mcp\" is not loaded yet: reload the gateway, then retry`)
+	})
+
+	t.Run("read by the last reload and not loaded", func(t *testing.T) {
+		gw.apiDefinitionsReadAt.Store(written.Add(time.Second).UnixNano())
+
+		res := postMCPAggregatorThroughValidateMCP(t, gw, http.MethodPost, aggregator)
+
+		assert.Equal(t, http.StatusBadRequest, res.code)
+		assert.Contains(t, res.body, `aggregated MCP proxy \"orders-mcp\" has a definition on this gateway that the last reload did not load`)
+		assert.NotContains(t, res.body, "reload the gateway, then retry")
+		assert.False(t, res.nextCalled)
+	})
 }

@@ -186,6 +186,9 @@ type Gateway struct {
 	// mcpAggregatorWrites holds the MCP proxy definitions the Gateway API has
 	// written since the last reload, which mcpAggregatorIndex does not show yet.
 	mcpAggregatorWrites mcpAggregatorWrites
+	// apiDefinitionsReadAt is when the last reload started reading API
+	// definitions from the app path, in Unix nanoseconds; zero until then.
+	apiDefinitionsReadAt atomic.Int64
 
 	// prmCache memoises upstream Protected Resource Metadata (RFC 9728) docs
 	// for MCP APIs running in mirror mode. Lazily initialised on first use.
@@ -744,6 +747,7 @@ func (gw *Gateway) buildDashboardConnStr(resource string) string {
 
 func (gw *Gateway) syncAPISpecs() (int, error) {
 	loader := APIDefinitionLoader{Gw: gw}
+	gw.mcpAggregatorWrites.definitionsRead()
 
 	var s []*APISpec
 	if gw.GetConfig().UseDBAppConfigs {
@@ -770,6 +774,7 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 			return 0, err
 		}
 	} else {
+		gw.apiDefinitionsReadAt.Store(time.Now().UnixNano())
 		s = loader.FromDir(gw.GetConfig().AppPath)
 	}
 

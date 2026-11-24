@@ -95,6 +95,7 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 
 		v.Spec.SanitizeProxyPaths(r)
 		handOverMCPRoutingState(r, v.Spec, target)
+		handOverMCPAggregatorLoopTrust(r, v.Spec, target)
 
 		handler.ServeHTTP(w, r)
 		return nil, middleware.StatusRespond
