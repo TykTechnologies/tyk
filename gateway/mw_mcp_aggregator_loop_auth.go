@@ -24,6 +24,9 @@ type mcpAggregatorLoopTrust struct {
 	OrgID           string
 	AggregatorAPIID string
 	UpstreamAPIID   string
+	// VersionAPIID is the child version of UpstreamAPIID that serves the
+	// call, set when the aggregated proxy's VersionCheck hands it over.
+	VersionAPIID string
 }
 
 var errMCPAggregatorLoopTrustMismatch = errors.New("MCP aggregator loop trust descriptor does not match an admitted aggregated MCP proxy")
@@ -35,6 +38,14 @@ func ctxSetMCPAggregatorLoopTrust(r *http.Request, trust *mcpAggregatorLoopTrust
 func ctxGetMCPAggregatorLoopTrust(r *http.Request) (*mcpAggregatorLoopTrust, bool) {
 	trust, ok := r.Context().Value(mcpAggregatorLoopTrustKey).(*mcpAggregatorLoopTrust)
 	return trust, ok && trust != nil
+}
+
+// handOverMCPAggregatorLoopTrust lets the child version that serves a call to
+// a versioned aggregated MCP proxy accept the loop trust issued for its base.
+func handOverMCPAggregatorLoopTrust(r *http.Request, base, child *APISpec) {
+	if trust, ok := ctxGetMCPAggregatorLoopTrust(r); ok && child != nil && child.APIDefinition != nil && trust.UpstreamAPIID == base.APIID {
+		trust.VersionAPIID = child.APIID
+	}
 }
 
 func isMCPAggregatorLoopRequest(r *http.Request) bool {
@@ -102,7 +113,11 @@ func (m *MCPAggregatorLoopAuthBypassMiddleware) ProcessRequest(_ http.ResponseWr
 }
 
 func (m *MCPAggregatorLoopAuthBypassMiddleware) validLoopTrust(trust *mcpAggregatorLoopTrust) bool {
-	if m.Gw == nil || trust.UpstreamAPIID != m.Spec.APIID || trust.OrgID != m.Spec.OrgID {
+	servedAPIID := trust.UpstreamAPIID
+	if trust.VersionAPIID != "" {
+		servedAPIID = trust.VersionAPIID
+	}
+	if m.Gw == nil || servedAPIID != m.Spec.APIID || trust.OrgID != m.Spec.OrgID {
 		return false
 	}
 	agg, ok := m.Gw.mcpAggregatorIndex.Lookup(trust.AggregatorAPIID)
