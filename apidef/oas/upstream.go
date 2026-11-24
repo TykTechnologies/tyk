@@ -1223,7 +1223,7 @@ type UpstreamOAuth struct {
 	// exchanges it at `tokenUrl` for an access token and sends that token to the upstream.
 	// Available only for Tyk OAS APIs.
 	//
-	// Tyk classic API definition: N/A
+	// Tyk classic API definition: N/A.
 	JWTBearer *UpstreamOAuthJWTBearer `bson:"jwtBearer,omitempty" json:"jwtBearer,omitempty"`
 }
 
