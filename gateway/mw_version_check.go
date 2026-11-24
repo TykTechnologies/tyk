@@ -70,7 +70,7 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 		}
 
 		subVersionID := v.Spec.VersionDefinition.Versions[targetVersion]
-		handler, _, found := v.Gw.findInternalHttpHandlerByNameOrID(subVersionID)
+		handler, target, found := v.Gw.findInternalHttpHandlerByNameOrID(subVersionID)
 		if !found {
 			if !v.Spec.VersionDefinition.FallbackToDefault {
 				return errors.New(string(VersionDoesNotExist)), http.StatusNotFound
@@ -86,7 +86,7 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 				return errors.New(http.StatusText(http.StatusInternalServerError)), http.StatusInternalServerError
 			}
 
-			handler, _, found = v.Gw.findInternalHttpHandlerByNameOrID(targetID)
+			handler, target, found = v.Gw.findInternalHttpHandlerByNameOrID(targetID)
 			if !found {
 				log.Errorf("fallback to default but there is no such API found with the id: %s", targetID)
 				return errors.New(http.StatusText(http.StatusInternalServerError)), http.StatusInternalServerError
@@ -94,6 +94,7 @@ func (v *VersionCheck) ProcessRequest(w http.ResponseWriter, r *http.Request, _ 
 		}
 
 		v.Spec.SanitizeProxyPaths(r)
+		handOverMCPAggregatorLoopTrust(r, v.Spec, target)
 
 		handler.ServeHTTP(w, r)
 		return nil, middleware.StatusRespond
