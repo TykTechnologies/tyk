@@ -152,7 +152,7 @@ func TestRemoteMCPToolView_CompressedUpstream(t *testing.T) {
 		assert.JSONEq(t, upstreamListRepos, string(tools["list_repos"]))
 	})
 
-	t.Run("an encoding the gateway cannot decode passes through with a rate-limited warning", func(t *testing.T) {
+	t.Run("an encoding the gateway cannot decode fails closed with a rate-limited warning", func(t *testing.T) {
 		const apiID = "remote-mcp-br"
 		ts, fake, _ := startRemoteMCPProxyWithView(t, apiID, false, githubToolOverrides(), upstreamDeleteRepo)
 		logs := recordRemoteMCPLogs(t, apiID)
@@ -162,9 +162,9 @@ func TestRemoteMCPToolView_CompressedUpstream(t *testing.T) {
 
 		for range 3 {
 			res := remoteMCPCompressedRequest(t, ts, "", "tools/list", `{}`)
-			require.Equal(t, http.StatusOK, res.status)
-			assert.Equal(t, "br", res.encoding)
-			assert.Equal(t, encodeFakeBody(t, "br", nil), res.raw, "the body is passed through unchanged")
+			assert.Equal(t, http.StatusBadGateway, res.status, "the overrides cannot be applied, so the body must not pass through")
+			assert.Empty(t, res.encoding)
+			assert.NotContains(t, string(res.raw), "opaque-brotli-bytes")
 		}
 		assert.Equal(t, 1, logs.count(logrus.WarnLevel, "br"), "one warning about the undecodable encoding")
 	})
@@ -272,12 +272,8 @@ func TestMCPListFilterResponseHandler_DecodedSizeIsBoundedByDefault(t *testing.T
 			res.Header.Set("Content-Encoding", "gzip")
 			require.NoError(t, h.HandleResponse(nil, res, req, &user.SessionState{}))
 
-			if method == "server/discover" {
-				assert.Equal(t, http.StatusBadGateway, res.StatusCode, "discovery fails closed")
-			} else {
-				assert.Equal(t, bomb, readResponseBody(t, res), "the body passes through unchanged")
-				assert.Equal(t, "gzip", res.Header.Get("Content-Encoding"))
-			}
+			assert.Equal(t, http.StatusBadGateway, res.StatusCode, "an undecodable body fails closed")
+			assert.Empty(t, res.Header.Get("Content-Encoding"))
 			assert.NotNil(t, logs.find(logrus.WarnLevel, "could not be decoded", "exceeds"))
 		})
 	}
