@@ -183,6 +183,9 @@ type Gateway struct {
 	mcpPairingIndex pairing.Index
 
 	mcpAggregatorIndex mcpaggregator.Index
+	// apiDefinitionsReadAt is when the last reload started reading API
+	// definitions from the app path, in Unix nanoseconds; zero until then.
+	apiDefinitionsReadAt atomic.Int64
 
 	// prmCache memoises upstream Protected Resource Metadata (RFC 9728) docs
 	// for MCP APIs running in mirror mode. Lazily initialised on first use.
@@ -767,6 +770,7 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 			return 0, err
 		}
 	} else {
+		gw.apiDefinitionsReadAt.Store(time.Now().UnixNano())
 		s = loader.FromDir(gw.GetConfig().AppPath)
 	}
 
