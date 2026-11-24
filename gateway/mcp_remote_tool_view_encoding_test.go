@@ -283,6 +283,30 @@ func TestMCPListFilterResponseHandler_DecodedSizeIsBoundedByDefault(t *testing.T
 	}
 }
 
+func TestMCPListFilterResponseHandler_UndecodableBodyFailsClosedUnderAccessRules(t *testing.T) {
+	h := buildMCPListFilterHandlerWithMiddleware("remote-mcp-undecodable-acl", &oas.Middleware{McpTools: oas.MCPPrimitives{
+		"delete_repo": {Operation: oas.Operation{Block: &oas.Allowance{Enabled: true}}},
+	}})
+	for _, encoding := range []string{"br", "gzip"} {
+		t.Run(encoding, func(t *testing.T) {
+			raw := encodeFakeBody(t, "br", nil)
+			if encoding == "gzip" {
+				raw = []byte("not a gzip stream")
+			}
+			req, err := http.NewRequest(http.MethodPost, "/", nil)
+			require.NoError(t, err)
+			httpctx.SetJSONRPCRoutingState(req, &httpctx.JSONRPCRoutingState{Method: "tools/list", ID: float64(1)})
+			res := makeHTTPResponse(raw)
+			res.Header.Set("Content-Encoding", encoding)
+			require.NoError(t, h.HandleResponse(nil, res, req, &user.SessionState{}))
+
+			assert.Equal(t, http.StatusBadGateway, res.StatusCode, "a body access rules cannot be applied to must not pass through")
+			assert.Empty(t, res.Header.Get("Content-Encoding"))
+			assert.Contains(t, string(readResponseBody(t, res)), "could not be decoded")
+		})
+	}
+}
+
 func TestMCPListFilterResponseHandler_EditedBodiesDropValidators(t *testing.T) {
 	h := buildMCPListFilterHandlerWithMiddleware("remote-mcp-etag", &oas.Middleware{McpTools: oas.MCPPrimitives{
 		"delete_repo": {Operation: oas.Operation{Block: &oas.Allowance{Enabled: true}}},

@@ -101,22 +101,27 @@ func decodeMCPResponseBody(encoding string, raw []byte, limit int64) ([]byte, er
 }
 
 // decodingReadCloser decodes a streamed body. The decoder is created on the
-// first Read, so wrapping a response never blocks on the upstream.
+// first Read, so wrapping a response never blocks on the upstream. The
+// decoder is read through a bufio.Reader, whose Read makes at most one read
+// of the decoder, so streamed events are not held back.
 type decodingReadCloser struct {
 	src      io.ReadCloser
 	encoding string
-	decoder  io.Reader
+	decoded  *bufio.Reader
 	err      error
 }
 
 func (d *decodingReadCloser) Read(p []byte) (int, error) {
-	if d.decoder == nil && d.err == nil {
-		d.decoder, d.err = newContentDecoder(d.encoding, d.src)
+	if d.decoded == nil && d.err == nil {
+		var decoder io.Reader
+		if decoder, d.err = newContentDecoder(d.encoding, d.src); d.err == nil {
+			d.decoded = bufio.NewReader(decoder)
+		}
 	}
 	if d.err != nil {
 		return 0, d.err
 	}
-	return d.decoder.Read(p)
+	return d.decoded.Read(p)
 }
 
 // Close closes the upstream body only; it may be called while a Read is
