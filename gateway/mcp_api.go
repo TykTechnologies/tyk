@@ -358,7 +358,7 @@ func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int)
 	if err != nil {
 		return apiError(err.Error()), errCode
 	}
-	gw.mcpAggregatorWrites.written(newDef.APIID, oasObj)
+	gw.mcpAggregatorWrites.written(newDef.APIID, newDef, oasObj)
 
 	if resp, code := handleBaseVersionUpdate(gw, versionParams, newDef.APIID, fs); resp != nil {
 		return resp, code
@@ -397,6 +397,10 @@ func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (
 		return resp, code
 	}
 
+	if errMsg, errCode := gw.mcpAggregatorUpdateConflict(apiID, newDef, oasObj); errMsg != "" {
+		return apiError(errMsg), errCode
+	}
+
 	if err := gw.validator.Validate(identifier.CustomApiId(newDef.APIID)); err != nil {
 		log.WithField("api_id", newDef.APIID).WithError(err).Error("Failed to validate API ID")
 		return apiError(identifier.ErrInvalidCustomApiId.Error()), http.StatusBadRequest
@@ -416,7 +420,7 @@ func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (
 	if err != nil {
 		return apiError(err.Error()), errCode
 	}
-	gw.mcpAggregatorWrites.written(newDef.APIID, oasObj)
+	gw.mcpAggregatorWrites.written(newDef.APIID, newDef, oasObj)
 
 	return buildSuccessResponse(newDef.APIID, "modified")
 }
@@ -581,7 +585,7 @@ func (gw *Gateway) handleDeleteMCP(apiID string, fs afero.Fs) (interface{}, int)
 		log.Warning("Delete failed: ", err)
 		return apiError(errMsgDeleteFailed), http.StatusInternalServerError
 	}
-	gw.mcpAggregatorWrites.written(apiID, nil)
+	gw.mcpAggregatorWrites.written(apiID, nil, nil)
 
 	handleBaseVersionCleanup(gw, spec, apiID, fs)
 
