@@ -44,6 +44,8 @@ type keyspaceMaster struct {
 	mu   sync.Mutex
 	keys map[string]string
 	gets int
+	// slowCalls is the number of next GetKey calls answered after the RPC call timeout
+	slowCalls atomic.Int32
 }
 
 func (m *keyspaceMaster) set(keyName string, session *user.SessionState) {
@@ -65,6 +67,10 @@ func (m *keyspaceMaster) getCount() int {
 }
 
 func (m *keyspaceMaster) getKey(_ string, keyName string) (string, error) {
+	if m.slowCalls.Add(-1) >= 0 {
+		time.Sleep(500 * time.Millisecond)
+	}
+
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.gets++
@@ -102,6 +108,9 @@ func newKeyspaceTest(t *testing.T, hashKeys bool) *keyspaceTest {
 		return true
 	})
 	dispatcher.AddFunc("GetKey", master.getKey)
+	dispatcher.AddFunc("GetKeySpaceUpdate", func(clientAddr, orgID string) ([]string, error) {
+		return nil, nil
+	})
 
 	rpcMock, connectionString := startRPCMock(dispatcher)
 
@@ -323,6 +332,9 @@ func TestProcessKeySpaceChanges_MasterUnavailableRequestsResync(t *testing.T) {
 		forcer := rpc.NewSyncForcer(k.ts.Gw.StorageConnectionHandler, k.listener.buildNodeInfo)
 		forcer.SetFirstConnection(false)
 		t.Cleanup(func() { forcer.SetFirstConnection(false) })
+		// the gateway logged in to its group before: requests made before the first
+		// group login are ignored
+		forcer.GroupLoginCallback("test", "keyspace-test-group")
 
 		event, keyHash := k.newKey(t, "unavailable", keyspaceSession("a"))
 		k.master.set("apikey-"+keyHash, keyspaceSession("a"))
@@ -336,6 +348,87 @@ func TestProcessKeySpaceChanges_MasterUnavailableRequestsResync(t *testing.T) {
 		assert.False(t, found, "key that can't be checked is removed as before")
 		assert.True(t, forcer.IsResyncRequested(), "a group resync must be requested")
 	})
+}
+
+// slowMaster makes the mock MDCB answer the next calls GetKey calls after the RPC
+// call timeout.
+func (k *keyspaceTest) slowMaster(t *testing.T, calls int32) {
+	t.Helper()
+
+	prevTimeout := rpc.GlobalRPCCallTimeout
+	rpc.GlobalRPCCallTimeout = 100 * time.Millisecond
+	k.master.slowCalls.Store(calls)
+	t.Cleanup(func() {
+		k.master.slowCalls.Store(0)
+		rpc.GlobalRPCCallTimeout = prevTimeout
+	})
+}
+
+// A busy MDCB (timeout) must neither remove the key nor request a group resync,
+// which would make MDCB busier (possibly in a loop). The key is checked again with
+// the next keyspace check.
+func TestProcessKeySpaceChanges_TimeoutKeepsKeyAndRetries(t *testing.T) {
+	forEachHashKeys(t, func(t *testing.T, hashKeys bool) {
+		k := newKeyspaceTest(t, hashKeys)
+
+		forcer := rpc.NewSyncForcer(k.ts.Gw.StorageConnectionHandler, k.listener.buildNodeInfo)
+		forcer.SetFirstConnection(false)
+		t.Cleanup(func() { forcer.SetFirstConnection(false) })
+
+		event, keyHash := k.newKey(t, "timeout", keyspaceSession("old"))
+		k.master.set("apikey-"+keyHash, keyspaceSession("new"))
+
+		k.slowMaster(t, 1)
+		k.process(event)
+
+		assert.Zero(t, k.spy.removed.Load(), "key must be kept when MDCB times out")
+		assert.Zero(t, k.spy.updated.Load())
+		session, found := k.localSession(t, keyHash)
+		require.True(t, found)
+		assert.Equal(t, []string{"old"}, session.Tags)
+		assert.False(t, forcer.IsResyncRequested(), "a timeout must not request a group resync")
+
+		// MDCB recovers: the next keyspace check retries the key
+		k.listener.CheckForKeyspaceChanges(keyspaceTestOrg)
+
+		assert.Eventually(t, func() bool {
+			session, found := k.localSession(t, keyHash)
+			return found && len(session.Tags) == 1 && session.Tags[0] == "new"
+		}, 5*time.Second, 50*time.Millisecond, "timed out key must be updated by the retry")
+		assert.Zero(t, k.spy.removed.Load())
+	})
+}
+
+// Timed out keys are retried a bounded number of times, then handled as before.
+func TestProcessKeySpaceChanges_TimeoutRetriesAreBounded(t *testing.T) {
+	k := newKeyspaceTest(t, true)
+
+	forcer := rpc.NewSyncForcer(k.ts.Gw.StorageConnectionHandler, k.listener.buildNodeInfo)
+	forcer.SetFirstConnection(false)
+	t.Cleanup(func() { forcer.SetFirstConnection(false) })
+
+	event, keyHash := k.newKey(t, "timeout-bounded", keyspaceSession("old"))
+	k.master.set("apikey-"+keyHash, keyspaceSession("new"))
+	// every in-place check times out; the delete-and-recreate path after the last
+	// retry gets an answer
+	k.slowMaster(t, maxKeyRetries+1)
+
+	for i := 0; i < maxKeyRetries; i++ {
+		k.process(event)
+		session, found := k.localSession(t, keyHash)
+		require.True(t, found, "key must be kept while it is retried (attempt %d)", i+1)
+		assert.Equal(t, []string{"old"}, session.Tags)
+	}
+	assert.Zero(t, k.spy.removed.Load(), "no removal while retrying")
+
+	k.process(event)
+
+	assert.NotZero(t, k.spy.removed.Load(), "after the last retry the key goes through the delete-and-recreate path")
+	session, found := k.localSession(t, keyHash)
+	require.True(t, found)
+	assert.Equal(t, []string{"new"}, session.Tags)
+	assert.Empty(t, k.ts.Gw.keyspaceRetries.take(), "nothing left to retry")
+	assert.False(t, forcer.IsResyncRequested(), "timeouts never request a group resync")
 }
 
 // TT-15569: a forced resynchronisation of keys that didn't change causes no writes,

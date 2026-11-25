@@ -200,9 +200,7 @@ func TestGroupLoginCallback_ResyncSurvivesRestart(t *testing.T) {
 // TT-12417: the gateway holding the resync lock dies before its forced login
 // completes. Another gateway must force once the lock expires.
 func TestGroupLoginCallback_LockHolderDiesBeforeResult(t *testing.T) {
-	prevTTL := resyncLockTTL
-	resyncLockTTL = 200 * time.Millisecond
-	t.Cleanup(func() { resyncLockTTL = prevTTL })
+	shortLockTTL(t)
 
 	groupID := "group-lock-holder-dies"
 	gws := syncedGroup(t, groupID, 3)
@@ -224,9 +222,17 @@ func TestGroupLoginCallback_LockHolderDiesBeforeResult(t *testing.T) {
 	assert.False(t, connect(t, gws[1], groupID))
 }
 
-// TT-12417: the forced login doesn't reach MDCB. The request must be kept for
-// the group, also when the gateway restarts.
-func TestGroupLoginCallback_FailedForcedLoginKeepsRequest(t *testing.T) {
+func shortLockTTL(t *testing.T) {
+	t.Helper()
+
+	prev := resyncLockTTL
+	resyncLockTTL = 300 * time.Millisecond
+	t.Cleanup(func() { resyncLockTTL = prev })
+}
+
+// TT-12417: the forced login doesn't reach MDCB. The gateway still holding the
+// lock forces again on its next login, and the request stays recorded.
+func TestGroupLoginCallback_FailedForcedLoginRetriedByHolder(t *testing.T) {
 	groupID := "group-failed-login"
 	gws := syncedGroup(t, groupID, 2)
 
@@ -237,12 +243,35 @@ func TestGroupLoginCallback_FailedForcedLoginKeepsRequest(t *testing.T) {
 	assert.True(t, gws[0].IsResyncRequested(), "failed login must re-arm the request")
 	assert.True(t, resyncNeeded(t, gws[0], groupID), "failed login must keep the record")
 
+	assert.False(t, connect(t, gws[1], groupID), "gws[0] still holds the lock")
+	assert.True(t, connect(t, gws[0], groupID), "the lock holder retries the forced login")
+	assert.False(t, resyncNeeded(t, gws[0], groupID))
+}
+
+// TT-12417: the gateway whose forced login failed restarts. The recorded request
+// is forced once the lock it held expired.
+func TestGroupLoginCallback_FailedForcedLoginSurvivesRestart(t *testing.T) {
+	shortLockTTL(t)
+
+	groupID := "group-failed-login-restart"
+	gws := syncedGroup(t, groupID, 2)
+
+	gws[0].RequestResync()
+	assert.True(t, loginForceSync(t, gws[0], groupID))
+	gws[0].groupLoginResult(false)
+
 	gws[0] = newTestSyncForcer(t) // restart
-	assert.True(t, connect(t, gws[0], groupID), "lock must be released after the failed login")
+	assert.False(t, connect(t, gws[0], groupID), "the lock of the failed attempt hasn't expired yet")
+
+	time.Sleep(2 * resyncLockTTL)
+
+	assert.True(t, connect(t, gws[0], groupID), "the recorded resync must be forced once the lock expired")
 	assert.False(t, connect(t, gws[1], groupID))
 }
 
 func TestGroupLoginCallback_FailedForcedLoginTakenOverByGroup(t *testing.T) {
+	shortLockTTL(t)
+
 	groupID := "group-failed-login-takeover"
 	gws := syncedGroup(t, groupID, 2)
 
@@ -250,10 +279,48 @@ func TestGroupLoginCallback_FailedForcedLoginTakenOverByGroup(t *testing.T) {
 	assert.True(t, loginForceSync(t, gws[0], groupID))
 	gws[0].groupLoginResult(false)
 
+	time.Sleep(2 * resyncLockTTL)
+
 	// gws[1] has no request of its own, the group record is enough
 	assert.True(t, connect(t, gws[1], groupID))
 	assert.False(t, connect(t, gws[0], groupID), "gws[1] already resynchronised the group")
 	assert.False(t, gws[0].IsResyncRequested())
+}
+
+// A gateway whose forced login outlasted the lock must not delete the lock that
+// another gateway acquired meanwhile.
+func TestGroupLoginCallback_ForeignLockIsNeverDeleted(t *testing.T) {
+	shortLockTTL(t)
+
+	groupID := "group-foreign-lock"
+	gws := syncedGroup(t, groupID, 3)
+	for _, gw := range gws {
+		gw.RequestResync()
+	}
+
+	assert.True(t, loginForceSync(t, gws[0], groupID), "gws[0] takes the lock")
+	time.Sleep(resyncLockTTL + 50*time.Millisecond) // its login outlasts the lock
+
+	assert.True(t, loginForceSync(t, gws[1], groupID), "gws[1] takes the expired lock")
+	gws[0].groupLoginResult(false) // gws[0] finally fails
+
+	assert.False(t, connect(t, gws[2], groupID), "gws[1]'s lock must still be in place")
+	gws[1].groupLoginResult(true)
+	assert.False(t, connect(t, gws[0], groupID), "gws[1] resynchronised the group")
+}
+
+func TestLockTTL(t *testing.T) {
+	prevTimeout := GlobalRPCCallTimeout
+	t.Cleanup(func() { GlobalRPCCallTimeout = prevTimeout })
+
+	GlobalRPCCallTimeout = time.Second
+	assert.Equal(t, time.Minute, lockTTL(), "at least a minute")
+
+	GlobalRPCCallTimeout = 60 * time.Second
+	assert.Equal(t, 250*time.Second, lockTTL(), "outlives all attempts of a group login")
+
+	shortLockTTL(t)
+	assert.Equal(t, 300*time.Millisecond, lockTTL())
 }
 
 // TT-12417: MDCB crashes again right after a successful forced resync (within
@@ -293,18 +360,21 @@ func TestGroupLoginCallback_LateReconnectFromSameOutageDoesNotForce(t *testing.T
 	assert.False(t, connect(t, gws[1], groupID))
 }
 
-// A request made before the first login (group unknown) is recorded and forced
-// on the first login.
-func TestGroupLoginCallback_RequestBeforeFirstLogin(t *testing.T) {
+// Gateways that fail to reach MDCB while starting request a resync before their
+// first login. They haven't processed any keyspace event, so nothing was lost:
+// none of them may force a synchronisation of the synchronised group.
+func TestGroupLoginCallback_RequestBeforeFirstLoginIsIgnored(t *testing.T) {
 	groupID := "group-request-before-login"
 	syncedGroup(t, groupID, 1)
 
-	gw := newTestSyncForcer(t)
-	gw.RequestResync()
-	assert.False(t, resyncNeeded(t, gw, groupID), "group not known yet")
+	for i := 0; i < 3; i++ {
+		pod := newTestSyncForcer(t)
+		pod.RequestResync()
+		assert.False(t, pod.IsResyncRequested())
+		assert.False(t, resyncNeeded(t, pod, groupID), "nothing to record")
 
-	assert.True(t, connect(t, gw, groupID))
-	assert.False(t, resyncNeeded(t, gw, groupID))
+		assert.False(t, connect(t, pod, groupID), "a new pod must not force")
+	}
 }
 
 // A full synchronisation of a fresh (flushed) storage also serves an

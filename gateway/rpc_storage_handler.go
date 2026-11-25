@@ -1011,14 +1011,21 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 		return
 	}
 
+	var changes []string
 	if keys == nil {
 		log.Info("Keys returned nil object, skipping check")
-		return
+	} else {
+		changes, _ = keys.([]string)
 	}
 
-	if len(keys.([]string)) > 0 {
+	// keys that couldn't be checked with MDCB because it timed out are retried
+	if retries := r.Gw.keyspaceRetries.take(); len(retries) > 0 {
+		changes = append(changes, retries...)
+	}
+
+	if len(changes) > 0 {
 		log.Info("Keyspace changes detected, updating local cache")
-		go r.ProcessKeySpaceChanges(keys.([]string), orgId)
+		go r.ProcessKeySpaceChanges(changes, orgId)
 	}
 }
 
@@ -1278,8 +1285,8 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	}
 
 	synchronizerEnabled := r.Gw.GetConfig().SlaveOptions.SynchroniserEnabled
-	// keys whose local copy already matches the control plane: nothing to write or flush
-	unchangedKeys := map[string]bool{}
+	// keys with nothing to flush in other gateways: unchanged, or kept for a retry
+	skipNotify := map[string]bool{}
 	masterUnavailable := false
 	for _, key := range keys {
 		// Skip keys that are user keys to be reset
@@ -1303,15 +1310,26 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			// update keys stored locally in place instead of removing and recreating
 			// them (TT-15569); quota resets keep using the delete-and-recreate path
 			if !resetQuota {
-				switch r.updateKeyInPlace(key, isHashed, orgId) {
+				event := key
+				switch r.updateKeyInPlace(event, isHashed, orgId) {
 				case keyUpdateUnchanged:
-					unchangedKeys[key] = true
+					r.Gw.keyspaceRetries.done(event)
+					skipNotify[event] = true
 					continue
 				case keyUpdateApplied:
+					r.Gw.keyspaceRetries.done(event)
 					continue
+				case keyUpdateTimeout:
+					// MDCB is busy: keep the key and check it again later
+					if r.Gw.keyspaceRetries.retry(event) {
+						skipNotify[event] = true
+						continue
+					}
+					log.Warning("--> giving up checking key with master after timeouts: ", r.Gw.obfuscateKey(splitKeys[0]))
 				case keyUpdateUnavailable:
 					masterUnavailable = true
 				}
+				r.Gw.keyspaceRetries.done(event)
 			}
 
 			var status int
@@ -1364,8 +1382,8 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		r.Gw.invalidateJWKSCacheByAPIID(apiID)
 	}
 
-	// Notify rest of gateways in cluster to flush cache, except for unchanged keys
-	if payload := keyspaceNotificationPayload(keys, unchangedKeys); payload != "" {
+	// Notify rest of gateways in cluster to flush cache, except for keys left untouched
+	if payload := keyspaceNotificationPayload(keys, skipNotify); payload != "" {
 		n := Notification{
 			Command: KeySpaceUpdateNotification,
 			Payload: payload,

@@ -28,11 +28,31 @@ const (
 	resyncGenSuffix = ":resync-gen"
 )
 
-// resyncLockTTL bounds how long the group resync lock is held by a gateway
-// that never reported the result of its forced login (e.g. it died). After it
-// expires, the next login of any gateway of the group forces the
-// synchronisation that is still recorded as needed.
-var resyncLockTTL = time.Minute
+// groupLoginAttempts is the number of LoginWithGroup calls a single group
+// login may make (doGroupLogin: the first call and 3 retries).
+const groupLoginAttempts = 4
+
+// resyncLockTTL overrides the lifetime of the group resync lock in tests.
+var resyncLockTTL time.Duration
+
+// lockTTL is the lifetime of the group resync lock. The lock is never deleted,
+// only expires, so a gateway can't remove a lock another gateway holds. It
+// outlives the longest group login, so it can't expire while its holder is
+// still waiting for MDCB. A lock that is never released (the holder died or
+// its forced login failed) delays the next forced synchronisation by at most
+// this long.
+func lockTTL() time.Duration {
+	if resyncLockTTL > 0 {
+		return resyncLockTTL
+	}
+
+	ttl := groupLoginAttempts*GlobalRPCCallTimeout + 10*time.Second
+	if ttl < time.Minute {
+		ttl = time.Minute
+	}
+
+	return ttl
+}
 
 type SyncronizerForcer struct {
 	store           *storage.RedisCluster
@@ -45,6 +65,9 @@ type SyncronizerForcer struct {
 	// resyncRequested is set when this gateway lost the connection to MDCB
 	// and wants a forced synchronisation on its next login.
 	resyncRequested bool
+	// resyncUnrecorded is set when resyncRequested couldn't be recorded in
+	// the shared storage; it is recorded on the next login.
+	resyncUnrecorded bool
 	// inOutage is set from the first resync request after this gateway lost
 	// the connection to MDCB until its next successful login.
 	inOutage bool
@@ -54,12 +77,15 @@ type SyncronizerForcer struct {
 	// pending is the login request built with ForceSync, until its result is
 	// reported through groupLoginResult.
 	pending *forcedLogin
+	// heldLock is the group resync lock this gateway acquired and still holds
+	// until heldUntil. It lets this gateway force again, e.g. after its forced
+	// login failed, while no other gateway can.
+	heldLock  string
+	heldUntil time.Time
 }
 
 type forcedLogin struct {
 	groupID string
-	// lockKey is the group resync lock held for this login, if any.
-	lockKey string
 }
 
 var (
@@ -91,6 +117,7 @@ func NewSyncForcer(controller *storage.ConnectionHandler, getNodeDataFunc func()
 // MDCB was lost. The request is recorded in the shared data plane storage, so
 // it survives a restart of this gateway and can be served by any gateway of
 // the group. Only one gateway of the group forces it, see GroupLoginCallback.
+// Requests made before the first group login are ignored.
 func (sf *SyncronizerForcer) RequestResync() {
 	sf.mu.Lock()
 	defer sf.mu.Unlock()
@@ -126,6 +153,7 @@ func (sf *SyncronizerForcer) SetFirstConnection(isFirstConnection bool) {
 	}
 
 	sf.resyncRequested = false
+	sf.resyncUnrecorded = false
 	sf.inOutage = false
 }
 
@@ -154,11 +182,7 @@ func (sf *SyncronizerForcer) GroupLoginCallback(userKey string, groupID string) 
 
 	sf.groupID = groupID
 
-	// a previous attempt never reported its result: release its lock so the
-	// group can still be resynchronised
-	if sf.pending != nil && sf.pending.lockKey != "" {
-		sf.store.DeleteRawKey(sf.pending.lockKey)
-	}
+	// a previous attempt never reported its result; its lock, if any, expires
 	sf.pending = nil
 
 	shouldForce := false
@@ -180,6 +204,7 @@ func (sf *SyncronizerForcer) GroupLoginCallback(userKey string, groupID string) 
 
 	if shouldForce {
 		sf.resyncRequested = false
+		sf.resyncUnrecorded = false
 		sf.pending = login
 	}
 
@@ -206,6 +231,7 @@ func (sf *SyncronizerForcer) electResyncLocked(login *forcedLogin) bool {
 		// another gateway of the group forced a synchronisation after this
 		// gateway lost the connection to MDCB
 		sf.resyncRequested = false
+		sf.resyncUnrecorded = false
 		Log.Info("MDCB synchronization already forced for group, skipping:", login.groupID)
 	}
 
@@ -214,29 +240,54 @@ func (sf *SyncronizerForcer) electResyncLocked(login *forcedLogin) bool {
 			return false
 		}
 
+		if !sf.resyncUnrecorded {
+			// the recorded request is gone: it was served
+			sf.resyncRequested = false
+			return false
+		}
+
 		// the request couldn't be recorded when it was made, record it now
 		if !sf.markResyncNeeded(login.groupID) {
 			return false
 		}
+		sf.resyncUnrecorded = false
 	}
 
-	lockKey := sf.key(login.groupID, resyncLockSuffix)
-	acquired, err := sf.store.Lock(lockKey, resyncLockTTL)
-	switch {
-	case err != nil:
-		// can't coordinate with the group, keep any request for the next login
-		Log.WithError(err).Error("error acquiring syncforcer resync lock")
-		return false
-	case !acquired:
-		// another gateway of the group is forcing the synchronisation. The
-		// record stays in the shared storage until it succeeds, so it is
-		// picked up by the next login once its lock expires.
-		sf.resyncRequested = false
-		Log.Info("MDCB synchronization already in progress for group, skipping:", login.groupID)
+	gen, err := sf.resyncGeneration(login.groupID)
+	if err != nil {
+		Log.WithError(err).Error("error reading syncforcer resync generation")
 		return false
 	}
 
-	login.lockKey = lockKey
+	// one lock per resync generation: once a forced synchronisation succeeded
+	// the next outage uses a new lock, so locks never have to be deleted
+	lockKey := sf.key(login.groupID, resyncLockSuffix+":"+strconv.FormatInt(gen, 10))
+
+	if sf.heldLock != lockKey || !time.Now().Before(sf.heldUntil) {
+		ttl := lockTTL()
+		// local deadline taken before the lock is set, so it ends before the lock
+		until := time.Now().Add(ttl - ttl/10)
+
+		acquired, err := sf.store.Lock(lockKey, ttl)
+		switch {
+		case err != nil:
+			// can't coordinate with the group, keep any request for the next login
+			Log.WithError(err).Error("error acquiring syncforcer resync lock")
+			return false
+		case !acquired:
+			// another gateway of the group is forcing the synchronisation. The
+			// record stays in the shared storage until it succeeds, so it is
+			// picked up by the next login once the lock expires.
+			sf.resyncRequested = false
+			sf.resyncUnrecorded = false
+			Log.Info("MDCB synchronization already in progress for group, skipping:", login.groupID)
+			return false
+		}
+
+		sf.heldLock = lockKey
+		sf.heldUntil = until
+	}
+
 	Log.Info("Forcing MDCB synchronization after reconnection for group:", login.groupID)
 	return true
 }
@@ -259,16 +310,14 @@ func (sf *SyncronizerForcer) groupLoginResult(success bool) {
 		return
 	}
 
-	if login.lockKey != "" {
-		sf.store.DeleteRawKey(login.lockKey)
-	}
-
 	if success {
 		// MDCB accepted the forced synchronisation of the group: bump the
 		// generation first, so gateways still reconnecting from the same outage
-		// see it was served, then drop the record
+		// see it was served, then drop the record. The lock of the old
+		// generation is left to expire.
 		sf.store.IncrememntWithExpire(sf.key(login.groupID, resyncGenSuffix), 0)
 		sf.store.DeleteRawKey(sf.key(login.groupID, resyncNeededSuffix))
+		sf.heldLock = ""
 		return
 	}
 
@@ -280,18 +329,20 @@ func (sf *SyncronizerForcer) groupLoginResult(success bool) {
 }
 
 func (sf *SyncronizerForcer) requestResyncLocked() {
-	sf.resyncRequested = true
-
-	// the group is known once this gateway logged in; before that the request
-	// is recorded on the first login
+	// before its first login a gateway hasn't processed any keyspace event, so
+	// it can't have lost keys, and a fresh storage is resynchronised by the
+	// group key check anyway. Ignoring such requests keeps gateways that fail
+	// to reach MDCB while starting from each forcing a synchronisation.
 	if sf.groupID == "" {
+		Log.Debug("Ignoring MDCB synchronization request before the first group login")
 		return
 	}
 
 	gen, err := sf.resyncGeneration(sf.groupID)
 	if err != nil {
 		Log.WithError(err).Error("error reading syncforcer resync generation")
-		sf.markResyncNeeded(sf.groupID)
+		sf.resyncRequested = true
+		sf.resyncUnrecorded = !sf.markResyncNeeded(sf.groupID)
 		return
 	}
 
@@ -305,10 +356,12 @@ func (sf *SyncronizerForcer) requestResyncLocked() {
 		// gateway lost the connection to MDCB, e.g. it reconnects later than
 		// the others after the same outage
 		sf.resyncRequested = false
+		sf.resyncUnrecorded = false
 		return
 	}
 
-	sf.markResyncNeeded(sf.groupID)
+	sf.resyncRequested = true
+	sf.resyncUnrecorded = !sf.markResyncNeeded(sf.groupID)
 }
 
 // outageServedLocked reports whether the group was resynchronised since this

@@ -135,6 +135,10 @@ type Gateway struct {
 	upstreamDNS   dnsdiscovery.Scheduler
 	upstreamConns upstreamConnRegistries
 
+	// keyspace events whose key couldn't be checked with MDCB (timeout), retried
+	// with the next keyspace check
+	keyspaceRetries keyRetrySet
+
 	Analytics            RedisAnalyticsHandler
 	GlobalEventsJSVM     JSVM
 	MainNotifier         RedisNotifier
