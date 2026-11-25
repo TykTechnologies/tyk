@@ -5,11 +5,12 @@ import (
 	"strings"
 	"testing"
 
-	gqlwebsocket "github.com/TykTechnologies/graphql-go-tools/pkg/subscription/websocket"
 	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	gqlwebsocket "github.com/TykTechnologies/graphql-go-tools/pkg/subscription/websocket"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
