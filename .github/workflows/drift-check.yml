@@ -6,4 +6,4 @@ on:
   pull_request:
 jobs:
   drift:
-    uses: TykTechnologies/github-actions/.github/workflows/drift-check.yml@production
+    uses: TykTechnologies/github-actions/.github/workflows/drift-check.yml@4b2a9f131ad4216701c0538843bc602310a0cab4  # main

@@ -6,7 +6,7 @@ on:
 
 jobs:
   call_force_merge:
-    uses: TykTechnologies/github-actions/.github/workflows/force-merge.yaml@production
+    uses: TykTechnologies/github-actions/.github/workflows/force-merge.yaml@4b2a9f131ad4216701c0538843bc602310a0cab4  # main
     secrets:
       PROBE_APP_ID: ${{ secrets.PROBE_APP_ID }}
       PROBE_APP_PRIVATE_KEY: ${{ secrets.PROBE_APP_PRIVATE_KEY }}

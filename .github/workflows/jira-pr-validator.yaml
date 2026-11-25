@@ -18,7 +18,7 @@ jobs:
       contents: read
     steps:
       - name: Validate Jira ticket
-        uses: TykTechnologies/github-actions/jira-linter@production
+        uses: TykTechnologies/github-actions/jira-linter@4b2a9f131ad4216701c0538843bc602310a0cab4  # main
         with:
           jira-base-url: ${{ secrets.JIRA_BASE_URL }}
           jira-read-auth: ${{ secrets.JIRA_READ_AUTH }}

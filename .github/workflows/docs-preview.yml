@@ -7,7 +7,7 @@ on:
 permissions: {}
 jobs:
   docs-preview:
-    uses: TykTechnologies/github-actions/.github/workflows/docs-preview.yml@production
+    uses: TykTechnologies/github-actions/.github/workflows/docs-preview.yml@4b2a9f131ad4216701c0538843bc602310a0cab4  # main
     with:
       component: gateway
       docs_paths: |

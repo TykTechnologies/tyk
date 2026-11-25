@@ -8,7 +8,7 @@ on:  # yamllint disable-line rule:truthy
 
 jobs:
   s1_scanner:
-    uses: TykTechnologies/github-actions/.github/workflows/s1-cns-scan.yml@production  # main
+    uses: TykTechnologies/github-actions/.github/workflows/s1-cns-scan.yml@4b2a9f131ad4216701c0538843bc602310a0cab4  # main
     permissions:
       contents: read
     with:

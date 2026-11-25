@@ -16,7 +16,7 @@ on:
 permissions: {}
 jobs:
   zizmor:
-    uses: TykTechnologies/github-actions/.github/workflows/zizmor.yml@production
+    uses: TykTechnologies/github-actions/.github/workflows/zizmor.yml@4b2a9f131ad4216701c0538843bc602310a0cab4  # main
     with:
       upload_sarif: true
     permissions:
