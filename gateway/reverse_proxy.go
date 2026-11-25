@@ -1261,8 +1261,7 @@ func handleInMemoryLoop(handler http.Handler, r *http.Request) (resp *http.Respo
 
 func (p *ReverseProxy) handleOutboundRequest(
 	roundTripper http.RoundTripper,
-	inreq *http.Request,
-	outreq *http.Request,
+	inreq, outreq *http.Request,
 	w http.ResponseWriter,
 ) (res *http.Response, hijacked bool, latency time.Duration, err error) {
 
