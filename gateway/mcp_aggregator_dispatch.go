@@ -146,9 +146,9 @@ func (d mcpAggregatorDispatcher) exchange(parent *http.Request, spec *APISpec, m
 	ctxSetMCPAggregatorOrigin(req, parent, trust)
 	// Catalogue hops (tools/list pages, server/discover probes) repeat on
 	// every agent connect and are already counted in the aggregator's own
-	// record; only a routed tools/call is recorded on the proxy.
+	// record, so a successful one writes no analytics record on the proxy.
 	if method != mcp.MethodToolsCall {
-		ctxSetDoNotTrack(req, true)
+		ctxSetMCPAggregatorCatalogueHop(req)
 	}
 
 	rec := d.newResponseRecorder()
