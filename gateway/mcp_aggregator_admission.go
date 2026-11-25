@@ -50,15 +50,15 @@ func (gw *Gateway) validateMCPAggregatorUpstreams(r *http.Request, mcpObj *oas.O
 // probeMCPAggregatorUpstreams checks that the aggregated MCP proxies of an
 // incoming aggregator serve MCP 2026-07-28, the only version an aggregator
 // uses to call them, and expose every tool the aggregator selects from them.
-// The Gateway API handlers call it after the request's API
-// ID checks, so a create probes under the aggregator's final API ID and a
-// request those checks reject never reaches an upstream.
+// The Gateway API handlers call it after the request's API ID checks, so a
+// create probes under the aggregator's final API ID and a request those
+// checks reject never reaches an upstream.
 //
 // An update probes only the aggregated proxies the loaded aggregator does not
 // already admit with the same alias and tool selection. One it admits keeps
-// being served, or omitted, by the runtime
-// on every tools/list, so a change such as a rename never fails because such a
-// proxy has changed since it was admitted.
+// being served, or omitted, by the runtime on every tools/list, so a change
+// such as a rename never fails because such a proxy has changed since it was
+// admitted.
 func (gw *Gateway) probeMCPAggregatorUpstreams(r *http.Request, mcpObj *oas.OAS) (string, int) {
 	if mcpObj == nil || mcpObj.GetTykExtension() == nil {
 		return "", 0
