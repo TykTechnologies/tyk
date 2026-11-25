@@ -210,6 +210,11 @@ func rewriteRemoteMCPToolsList(spec *APISpec, view *tooloverride.View, state *ht
 			logger.WithField("upstream_tool", name).Warning("Upstream MCP tool has the name of a tool override and is hidden; the override is exposed under that name")
 		}
 	}
+	for _, source := range drift.Malformed {
+		if view.ShouldWarnMalformed(source, now) {
+			logger.WithField("source_tool", source).Warning("Upstream MCP tool could not be merged with its tool override and is omitted from tools/list; the rest of the list is rewritten")
+		}
+	}
 	return out, changed
 }
 

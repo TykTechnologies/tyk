@@ -419,6 +419,89 @@ func BenchmarkView_RewriteToolsList_Renames(b *testing.B) {
 	}
 }
 
+func TestView_RewriteToolsList_MalformedOverriddenTool(t *testing.T) {
+	t.Parallel()
+
+	const (
+		createIssue  = `{"name":"create_issue","description":"Open an issue","inputSchema":{"type":"object"}}`
+		upstreamOpen = `{"name":"open_issue","description":"upstream's own open_issue","inputSchema":{"type":"object"}}`
+		listIssues   = `{"name":"list_issues","inputSchema":{"type":"object"}}`
+	)
+	view := compileView(t,
+		annotate("delete_repo", oas.DerivedToolAnnotations{DestructiveHint: boolPtr(true)}),
+		rename("create_issue", "open_issue", ""),
+	)
+
+	for _, annotations := range []string{`"not-an-object"`, `[true]`, `42`, `false`} {
+		t.Run("annotations "+annotations, func(t *testing.T) {
+			deleteRepo := `{"name":"delete_repo","description":"Delete a repository","annotations":` + annotations + `}`
+			out, changed, drift, err := view.RewriteToolsList(toolsListBody(deleteRepo, createIssue, upstreamOpen, listIssues), true)
+			require.NoError(t, err, "one malformed tool must not abandon the whole rewrite")
+			require.True(t, changed)
+
+			assert.Equal(t, []string{"open_issue", "list_issues"}, listedNames(t, out),
+				"only the malformed tool is dropped; the rename and the hidden tool still apply")
+			assert.NotContains(t, string(out), `"delete_repo"`, "a tool whose override cannot be applied is not listed without it")
+			assert.NotContains(t, string(out), `"create_issue"`)
+			assert.NotContains(t, string(out), "upstream's own open_issue")
+			assert.Equal(t, []string{"delete_repo"}, drift.Malformed)
+			assert.Equal(t, []string{"open_issue"}, drift.Hidden)
+			assert.Empty(t, drift.Missing, "a dropped malformed tool is not reported as missing")
+		})
+	}
+
+	t.Run("a malformed renamed tool is dropped and neither of its names is listed", func(t *testing.T) {
+		primitive := rename("create_issue", "open_issue", "")
+		primitive.Annotations = &oas.DerivedToolAnnotations{IdempotentHint: boolPtr(true)}
+		view := compileView(t, primitive)
+		out, changed, drift, err := view.RewriteToolsList(toolsListBody(
+			`{"name":"create_issue","annotations":"not-an-object"}`, upstreamOpen, listIssues), true)
+		require.NoError(t, err)
+		require.True(t, changed)
+		assert.Equal(t, []string{"list_issues"}, listedNames(t, out))
+		assert.NotContains(t, string(out), `"create_issue"`)
+		assert.NotContains(t, string(out), "upstream's own open_issue")
+		assert.Equal(t, []string{"create_issue"}, drift.Malformed)
+		assert.Equal(t, []string{"open_issue"}, drift.Hidden)
+	})
+
+	t.Run("a malformed tool on a later page is dropped", func(t *testing.T) {
+		out, changed, drift, err := view.RewriteToolsList([]byte(`{"jsonrpc":"2.0","id":3,"result":{"tools":[{"name":"delete_repo","annotations":"x"},`+listIssues+`],"nextCursor":"c"}}`), false)
+		require.NoError(t, err)
+		require.True(t, changed)
+		assert.Equal(t, []string{"list_issues"}, listedNames(t, out))
+		assert.Equal(t, []string{"delete_repo"}, drift.Malformed)
+	})
+
+	t.Run("non-object annotations on a tool without annotation overrides are kept", func(t *testing.T) {
+		view := compileView(t, rename("create_issue", "open_issue", "Open an issue"))
+		out, _, drift, err := view.RewriteToolsList(toolsListBody(`{"name":"create_issue","annotations":"not-an-object"}`), true)
+		require.NoError(t, err)
+		assert.Empty(t, drift.Malformed)
+		assert.JSONEq(t, `{"name":"open_issue","description":"Open an issue","annotations":"not-an-object"}`, string(toolsByName(t, out)["open_issue"]))
+	})
+
+	t.Run("a tool without an override passes through whatever its annotations", func(t *testing.T) {
+		const odd = `{"name":"list_repos","annotations":"not-an-object"}`
+		out, _, drift, err := view.RewriteToolsList(toolsListBody(odd, createIssue), true)
+		require.NoError(t, err)
+		assert.Empty(t, drift.Malformed)
+		assert.JSONEq(t, odd, string(toolsByName(t, out)["list_repos"]))
+	})
+}
+
+func TestView_ShouldWarnMalformed(t *testing.T) {
+	t.Parallel()
+
+	view := compileView(t, rename("create_issue", "open_issue", ""))
+	now := time.Unix(1_000, 0)
+
+	assert.True(t, view.ShouldWarnMalformed("create_issue", now))
+	assert.False(t, view.ShouldWarnMalformed("create_issue", now.Add(time.Minute)))
+	assert.True(t, view.ShouldWarnMissing("create_issue", now), "malformed and missing warnings are limited separately")
+	assert.True(t, view.ShouldWarnMalformed("create_issue", now.Add(MissingSourceWarningInterval)))
+}
+
 func TestView_ResolveCall(t *testing.T) {
 	t.Parallel()
 

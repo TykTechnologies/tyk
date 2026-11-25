@@ -35,18 +35,29 @@ type View struct {
 	lastWarning map[warning]time.Time
 }
 
+type warningKind uint8
+
+const (
+	warnMissing warningKind = iota
+	warnHidden
+	warnMalformed
+)
+
 type warning struct {
-	hidden bool
-	tool   string
+	kind warningKind
+	tool string
 }
 
 // Drift reports where an upstream tools/list response no longer matches the
 // overrides. Missing lists override sources that the complete list lacks.
 // Hidden lists upstream tools that were dropped because their own name is
-// bound to an override of another tool.
+// bound to an override of another tool. Malformed lists override sources
+// that were dropped because their override could not be merged into the
+// upstream tool, such as annotations that are not an object.
 type Drift struct {
-	Missing []string
-	Hidden  []string
+	Missing   []string
+	Hidden    []string
+	Malformed []string
 }
 
 // Override holds what a View changes on one upstream tool.
@@ -151,14 +162,21 @@ func (v *View) Override(source string) (*Override, bool) {
 // ShouldWarnMissing reports whether a warning that source is missing from the
 // upstream tool list is due, so that per-request warnings are rate limited.
 func (v *View) ShouldWarnMissing(source string, now time.Time) bool {
-	return v.shouldWarn(warning{tool: source}, now)
+	return v.shouldWarn(warning{kind: warnMissing, tool: source}, now)
 }
 
 // ShouldWarnHidden reports whether a warning that the upstream's own tool
 // called name is hidden behind an override is due. It is rate limited like
 // ShouldWarnMissing.
 func (v *View) ShouldWarnHidden(name string, now time.Time) bool {
-	return v.shouldWarn(warning{hidden: true, tool: name}, now)
+	return v.shouldWarn(warning{kind: warnHidden, tool: name}, now)
+}
+
+// ShouldWarnMalformed reports whether a warning that the upstream tool source
+// was dropped because its override could not be applied is due. It is rate
+// limited like ShouldWarnMissing.
+func (v *View) ShouldWarnMalformed(source string, now time.Time) bool {
+	return v.shouldWarn(warning{kind: warnMalformed, tool: source}, now)
 }
 
 func (v *View) shouldWarn(key warning, now time.Time) bool {
@@ -209,9 +227,13 @@ func compileAnnotations(a *oas.DerivedToolAnnotations) ([]jsonField, error) {
 // the upstream annotation (an explicit false included), and every other
 // field is kept, including unknown ones. An upstream tool whose own name is
 // bound to an override of another tool is dropped and reported as hidden, so
-// the explicit override wins. Tools without an override and responses that
-// need no change are returned untouched, with changed false. Error responses
-// and server messages pass through.
+// the explicit override wins. An overridden tool that its override cannot be
+// merged into is dropped and reported as malformed, so the response never
+// lists it without its override and the rest of the list is still rewritten.
+// Tools without an override and responses that need no change are returned
+// untouched, with changed false. Error responses and server messages pass
+// through. err is set only when the response has no tool list that can be
+// read, or the rewritten response cannot be encoded.
 //
 // complete reports that the request asked for the first page; when the
 // response also has no nextCursor the list is the whole catalogue, and
@@ -229,10 +251,7 @@ func (v *View) RewriteToolsList(body []byte, complete bool) (out []byte, changed
 	if complete && !list.hasNextCursor() {
 		seen = make(sourceSet, len(v.bySource))
 	}
-	kept, changed, err := v.applyOverrides(list.tools, seen, &drift)
-	if err != nil {
-		return nil, false, Drift{}, err
-	}
+	kept, changed := v.applyOverrides(list.tools, seen, &drift)
 	drift.Missing = v.missingSources(seen)
 
 	if !changed {
@@ -295,10 +314,17 @@ func (s sourceSet) add(source string) {
 
 // applyOverrides returns tools with every overridden tool rewritten and
 // every upstream tool hidden behind an override dropped, and reports whether
-// anything changed. Sources of the overridden tools are added to seen and
-// hidden tools to drift.Hidden. Hidden tools are dropped in place, reusing
-// the backing array of tools; kept never overtakes the loop index.
-func (v *View) applyOverrides(tools []json.RawMessage, seen sourceSet, drift *Drift) (kept []json.RawMessage, changed bool, err error) {
+// anything changed. Sources of the overridden tools are added to seen,
+// hidden tools to drift.Hidden and overridden tools that the override cannot
+// be merged into to drift.Malformed. Hidden and malformed tools are dropped
+// in place, reusing the backing array of tools; kept never overtakes the
+// loop index.
+//
+// A malformed tool is dropped rather than passed through: listed without its
+// override it would expose the upstream name of a renamed tool, or drop a
+// configured annotation such as destructiveHint. Abandoning the whole rewrite
+// instead would expose every hidden tool and original name in the response.
+func (v *View) applyOverrides(tools []json.RawMessage, seen sourceSet, drift *Drift) (kept []json.RawMessage, changed bool) {
 	kept = tools[:0]
 	for _, tool := range tools {
 		name, ok := v.affectedToolName(tool)
@@ -310,7 +336,9 @@ func (v *View) applyOverrides(tools []json.RawMessage, seen sourceSet, drift *Dr
 			seen.add(name)
 			rewritten, toolChanged, err := override.apply(tool)
 			if err != nil {
-				return nil, false, fmt.Errorf("tool %q: %w", name, err)
+				drift.Malformed = append(drift.Malformed, name)
+				changed = true
+				continue
 			}
 			if toolChanged {
 				tool = rewritten
@@ -326,7 +354,7 @@ func (v *View) applyOverrides(tools []json.RawMessage, seen sourceSet, drift *Dr
 		}
 		kept = append(kept, tool)
 	}
-	return kept, changed, nil
+	return kept, changed
 }
 
 // affectedToolName returns the name of a raw tool that may be affected by
