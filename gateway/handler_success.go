@@ -202,7 +202,7 @@ func (s *SuccessHandler) addTraceIDTag(reqCtx context.Context, tags []string) []
 
 func (s *SuccessHandler) RecordHit(r *http.Request, timing analytics.Latency, code int, responseCopy *http.Response, cached bool) {
 
-	if s.Spec.DoNotTrack || ctxGetDoNotTrack(r) {
+	if s.Spec.DoNotTrack || ctxGetDoNotTrack(r) || skipsMCPAggregatorCatalogueHopRecord(r, code) {
 		return
 	}
 
