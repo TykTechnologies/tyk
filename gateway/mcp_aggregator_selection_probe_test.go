@@ -17,8 +17,8 @@ func TestMCPAggregatorProbeReadsTheProxysOwnToolView(t *testing.T) {
 	parent := (&http.Request{Header: http.Header{}, Host: mcpAggregatorProbeHost, RemoteAddr: mcpAggregatorProbeRemoteAddr}).WithContext(context.Background())
 	d := mcpAggregatorDispatcher{gw: ts.Gw, aggregator: aggregator}
 
-	narrow := d.probeUpstream(parent, ts.Gw.getApiSpec("orders-narrow"), "orders")
-	full := d.probeUpstream(parent, ts.Gw.getApiSpec("orders-mcp"), "orders")
+	narrow := d.probeUpstream(parent, ts.Gw.getApiSpec("orders-narrow"), "orders", nil)
+	full := d.probeUpstream(parent, ts.Gw.getApiSpec("orders-mcp"), "orders", nil)
 
 	require.NoError(t, narrow.ToolsErr)
 	assert.NoError(t, narrow.Version)
@@ -59,7 +59,8 @@ func TestMCPAggregatorSelectionError(t *testing.T) {
 		"missing tool":            {selecting("github-mcp", "github", "search", "delete_repo"), []string{"list_issues", "search"}, `tool "delete_repo" not found in aggregated MCP proxy "github"`},
 		"first missing reported":  {selecting("github-mcp", "github", "a", "b"), nil, `tool "a" not found in aggregated MCP proxy "github"`},
 		"case differs":            {selecting("github-mcp", "github", "Search"), []string{"search"}, `tool "Search" not found in aggregated MCP proxy "github"`},
-		"long exposed tool":       {aggregated("orders-long", "orders"), []string{"list_orders", long}, `tool "` + long + `" of aggregated MCP proxy "orders" cannot be aggregated: "orders__" plus the tool name is 133 characters, over the 128 character limit for MCP tool names`},
+		"long exposed tool":       {aggregated("orders-long", "orders"), []string{"list_orders", long}, ""},
+		"long tool selected":      {selecting("orders-long", "orders", "list_orders", long), []string{"list_orders", long}, `tool "` + long + `" of aggregated MCP proxy "orders" cannot be aggregated: "orders__" plus the tool name is 133 characters, over the 128 character limit for MCP tool names`},
 		"long tool deselected":    {selecting("orders-long", "orders", "list_orders"), []string{"list_orders", long}, ""},
 		"exactly 128":             {aggregated("orders-long", "o"), []string{long}, ""},
 		"limit counts characters": {aggregated("orders-long", "o"), []string{long[:124] + "é"}, ""},

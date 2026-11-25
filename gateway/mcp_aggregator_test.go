@@ -92,7 +92,16 @@ func postRawMCPAggregatorThroughValidateMCP(t *testing.T, gw *Gateway, method st
 	t.Helper()
 
 	result := mcpAggregatorAdmissionResult{}
-	handler := gw.validateMCP(func(w http.ResponseWriter, _ *http.Request) {
+	// The Gateway API handlers probe aggregated proxies once the request has
+	// passed their API ID checks; this stands in for that step.
+	handler := gw.validateMCP(func(w http.ResponseWriter, r *http.Request) {
+		var doc oas.OAS
+		if err := json.NewDecoder(r.Body).Decode(&doc); err == nil {
+			if msg, code := gw.probeMCPAggregatorUpstreams(r, &doc); msg != "" {
+				doJSONWrite(w, code, apiError(msg))
+				return
+			}
+		}
 		result.nextCalled = true
 		w.WriteHeader(http.StatusOK)
 	})

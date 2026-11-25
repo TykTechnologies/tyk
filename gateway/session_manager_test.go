@@ -14,6 +14,7 @@ import (
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/config"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/storage"
@@ -748,4 +749,32 @@ func TestNewBucketStateChecker(t *testing.T) {
 	assert.Equal(t, 100, stats.Limit)
 	assert.Equal(t, 50, stats.Remaining) // state.Remaining / tokenValue
 	assert.InDelta(t, float64(10*time.Second), float64(stats.Reset), float64(time.Second))
+}
+
+func TestSessionLimiter_RateLimitInfoOnMCPLoops(t *testing.T) {
+	limiter := &SessionLimiter{config: &config.Default}
+	spec := BuildAPI(func(a *APISpec) {
+		a.APIID = "github-mcp"
+		a.Proxy.ListenPath = "/github-mcp/"
+		a.Proxy.StripListenPath = true
+		a.MarkAsMCP()
+	})[0]
+	endpoints := func(path string) user.Endpoints {
+		return user.Endpoints{{Path: path, Methods: []user.EndpointMethod{{Name: http.MethodPost, Limit: user.RateLimit{Rate: 5, Per: 60}}}}}
+	}
+	loop := func(path, routingAPIID string) *http.Request {
+		r := httptest.NewRequest(http.MethodPost, path, nil)
+		httpctx.SetSelfLooping(r, true)
+		httpctx.SetJSONRPCRoutingState(r, &httpctx.JSONRPCRoutingState{APIID: routingAPIID})
+		return r
+	}
+
+	t.Run("own VEM hop matches the unstripped virtual path", func(t *testing.T) {
+		_, found := limiter.RateLimitInfo(loop("/mcp-tool:list_issues", "github-mcp"), spec, endpoints("/mcp-tool:list_issues"))
+		assert.True(t, found)
+	})
+	t.Run("another API's loop matches the stripped listen path", func(t *testing.T) {
+		_, found := limiter.RateLimitInfo(loop("/github-mcp/issues", "company-tools"), spec, endpoints("/issues"))
+		assert.True(t, found, "a cross-API loop is matched on spec's own listen path, like a public request")
+	})
 }
