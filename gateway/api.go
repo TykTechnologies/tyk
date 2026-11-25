@@ -1405,6 +1405,9 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 		if errMsg, errCode := gw.validateMCPProxyReferences(r, &oasObj); errMsg != "" {
 			return apiError(errMsg), errCode
 		}
+		if errMsg, errCode := gw.probeMCPAggregatorUpstreams(r, &oasObj); errMsg != "" {
+			return apiError(errMsg), errCode
+		}
 
 		err, errCode := gw.writeOASAndAPIDefToFile(fs, &newDef, &oasObj)
 		if err != nil {
@@ -1498,6 +1501,9 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 
 		newDef.IsOAS = true
 		if errMsg, errCode := gw.validateMCPProxyReferences(r, &oasObj); errMsg != "" {
+			return apiError(errMsg), errCode
+		}
+		if errMsg, errCode := gw.probeMCPAggregatorUpstreams(r, &oasObj); errMsg != "" {
 			return apiError(errMsg), errCode
 		}
 

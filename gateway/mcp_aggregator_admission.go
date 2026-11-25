@@ -14,8 +14,8 @@ import (
 // call their aggregated proxies in-process, so an API this gateway has not
 // loaded cannot be told apart from one that does not exist.
 //
-// Every aggregated MCP proxy must also serve MCP 2026-07-28, the only version
-// an aggregator uses to call it.
+// It makes no upstream calls; probeMCPAggregatorUpstreams does, once the
+// request has passed its API ID checks.
 func (gw *Gateway) validateMCPAggregatorUpstreams(r *http.Request, mcpObj *oas.OAS) (string, int) {
 	if mcpObj == nil || mcpObj.GetTykExtension() == nil {
 		return "", 0
@@ -43,7 +43,81 @@ func (gw *Gateway) validateMCPAggregatorUpstreams(r *http.Request, mcpObj *oas.O
 			return msg, code
 		}
 	}
-	return gw.validateMCPAggregatorUpstreamVersions(r, &APISpec{APIDefinition: &incoming}, ext, upstreams)
+	return "", 0
+}
+
+// probeMCPAggregatorUpstreams checks that the aggregated MCP proxies of an
+// incoming aggregator serve MCP 2026-07-28, the only version an aggregator
+// uses to call them. The Gateway API handlers call it after the request's API
+// ID checks, so a create probes under the aggregator's final API ID and a
+// request those checks reject never reaches an upstream.
+//
+// An update probes only the aggregated proxies the loaded aggregator does not
+// already admit. One it admits keeps being served, or omitted, by the runtime
+// on every tools/list, so a change such as a rename never fails because such a
+// proxy has changed since it was admitted.
+func (gw *Gateway) probeMCPAggregatorUpstreams(r *http.Request, mcpObj *oas.OAS) (string, int) {
+	if mcpObj == nil || mcpObj.GetTykExtension() == nil {
+		return "", 0
+	}
+	ext := mcpObj.GetTykMCPAggregatorExtension()
+	if ext == nil {
+		return "", 0
+	}
+
+	var incoming apidef.APIDefinition
+	mcpObj.ExtractTo(&incoming)
+	admitted := gw.admittedMCPAggregatorUpstreams(incoming.APIID, incoming.OrgID)
+
+	var refs []oas.TykMCPAggregatorUpstream
+	var upstreams []*APISpec
+	gw.apisMu.RLock()
+	for _, ref := range ext.Upstreams {
+		if mcpAggregatorUpstreamUnchanged(admitted, ref) {
+			continue
+		}
+		spec := gw.apisByID[ref.APIID]
+		if classifyMCPAggregatorUpstream(incoming.OrgID, spec) != mcpAggregatorUpstreamAdmitted {
+			continue
+		}
+		refs = append(refs, ref)
+		upstreams = append(upstreams, spec)
+	}
+	gw.apisMu.RUnlock()
+
+	if len(upstreams) == 0 {
+		return "", 0
+	}
+	return gw.validateMCPAggregatorUpstreamVersions(r, &APISpec{APIDefinition: &incoming}, refs, upstreams)
+}
+
+// admittedMCPAggregatorUpstreams returns the aggregated MCP proxies of the
+// loaded aggregator with this API ID and organisation, by API ID; nil when no
+// such aggregator is loaded.
+func (gw *Gateway) admittedMCPAggregatorUpstreams(apiID, orgID string) map[string]oas.TykMCPAggregatorUpstream {
+	if apiID == "" {
+		return nil
+	}
+	loaded := gw.getApiSpec(apiID)
+	if loaded == nil || loaded.APIDefinition == nil || loaded.OrgID != orgID || !loaded.IsMCPAggregator() {
+		return nil
+	}
+	ext := loaded.OAS.GetTykMCPAggregatorExtension()
+	if ext == nil {
+		return nil
+	}
+	admitted := make(map[string]oas.TykMCPAggregatorUpstream, len(ext.Upstreams))
+	for _, ref := range ext.Upstreams {
+		admitted[ref.APIID] = ref
+	}
+	return admitted
+}
+
+// mcpAggregatorUpstreamUnchanged reports whether the loaded aggregator already
+// admits ref, so an update need not probe it again.
+func mcpAggregatorUpstreamUnchanged(admitted map[string]oas.TykMCPAggregatorUpstream, ref oas.TykMCPAggregatorUpstream) bool {
+	_, ok := admitted[ref.APIID]
+	return ok
 }
 
 // mcpAggregatorUpstreamStatus says whether an API can serve as an aggregated
@@ -103,7 +177,7 @@ func (s mcpAggregatorUpstreamStatus) admissionError(apiID string) (string, int) 
 }
 
 // validateMCPProxyReferences runs the admission checks for MCP proxies that
-// reference other APIs loaded on this gateway.
+// reference other APIs loaded on this gateway. It makes no upstream calls.
 func (gw *Gateway) validateMCPProxyReferences(r *http.Request, mcpObj *oas.OAS) (string, int) {
 	if msg, code := gw.validatePairedMCPAdapterUpstream(r, mcpObj); msg != "" {
 		return msg, code
