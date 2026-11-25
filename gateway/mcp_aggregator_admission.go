@@ -16,7 +16,7 @@ import (
 //
 // It makes no upstream calls; probeMCPAggregatorUpstreams does, once the
 // request has passed its API ID checks.
-func (gw *Gateway) validateMCPAggregatorUpstreams(r *http.Request, mcpObj *oas.OAS) (string, int) {
+func (gw *Gateway) validateMCPAggregatorUpstreams(_ *http.Request, mcpObj *oas.OAS) (string, int) {
 	if mcpObj == nil || mcpObj.GetTykExtension() == nil {
 		return "", 0
 	}
