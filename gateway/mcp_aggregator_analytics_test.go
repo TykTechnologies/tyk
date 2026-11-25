@@ -436,3 +436,40 @@ func TestMCPAggregatorTraceHasTheRoutedProxySpanAsAChildOfTheAggregatorSpan(t *t
 		assert.Equal(t, agg.SpanContext().TraceID(), span.SpanContext().TraceID(), "span %q is in the aggregator's trace", span.Name())
 	}
 }
+
+func TestMCPAggregatorRecordsACatalogueHopTheProxyRejects(t *testing.T) {
+	ts, records := startMCPAggregatorAnalyticsTest(t, nil, func(orders *APISpec) {
+		orders.EnableIpBlacklisting = true
+		orders.BlacklistedIPs = []string{"127.0.0.1"}
+	})
+	key := companyToolsKey(t, ts)
+	require.Equal(t, http.StatusOK, postModernToolsList(t, ts, "/company-tools/", key).status)
+	records.reset()
+
+	res := postModernToolsList(t, ts, "/company-tools/", key)
+	require.Equal(t, http.StatusOK, res.status, res.body)
+	require.NotContains(t, res.tools, "orders__list_orders", "orders-mcp rejects the hop and drops out")
+	require.Contains(t, res.tools, "github__list_issues")
+
+	rejected := singleRecord(t, records.forAPI("orders-mcp"), "orders-mcp")
+	assert.Equal(t, http.StatusForbidden, rejected.ResponseCode)
+	assert.Equal(t, mcp.MethodToolsList, rejected.MCPStats.JSONRPCMethod)
+	assert.Equal(t, "company-tools", rejected.MCPStats.AggregatorAPIID)
+	assert.Empty(t, records.forAPI("github-mcp"), "a catalogue hop the proxy answers still writes no record")
+}
+
+func TestSkipsMCPAggregatorCatalogueHopRecord(t *testing.T) {
+	hop := func() *http.Request {
+		r := httptest.NewRequest(http.MethodPost, "/", nil)
+		ctxSetMCPAggregatorCatalogueHop(r)
+		return r
+	}
+
+	assert.True(t, skipsMCPAggregatorCatalogueHopRecord(hop(), http.StatusOK))
+	assert.False(t, skipsMCPAggregatorCatalogueHopRecord(hop(), http.StatusTooManyRequests), "an HTTP error is recorded")
+	withRPCError := hop()
+	ctxSetJSONRPCErrorCode(withRPCError, -32603)
+	assert.False(t, skipsMCPAggregatorCatalogueHopRecord(withRPCError, http.StatusOK), "a JSON-RPC error is recorded")
+	assert.False(t, skipsMCPAggregatorCatalogueHopRecord(httptest.NewRequest(http.MethodPost, "/", nil), http.StatusOK), "not a catalogue hop")
+	assert.False(t, ctxGetDoNotTrack(hop()), "a catalogue hop is not do-not-track: access log, metrics and health check still see it")
+}
