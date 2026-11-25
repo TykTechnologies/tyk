@@ -20,9 +20,9 @@ import (
 const mcpAggregatorVersionUncheckedMsg = "MCP aggregator admits aggregated MCP proxy without a protocol version check"
 
 const (
-	// mcpAggregatorDefaultProbeTimeout bounds the protocol version check of
-	// all aggregated MCP proxies of one aggregator create or update when the
-	// gateway sets no proxy_default_timeout.
+	// mcpAggregatorDefaultProbeTimeout bounds each step of the protocol
+	// version check of an aggregated MCP proxy, server/discover and the
+	// tools/list fallback, when the gateway sets no proxy_default_timeout.
 	mcpAggregatorDefaultProbeTimeout = 10 * time.Second
 
 	// The probe runs on behalf of no client, so aggregated proxies see a
@@ -32,7 +32,9 @@ const (
 )
 
 // mcpAggregatorProbeTimeout follows the gateway's upstream timeout, which bounds every
-// upstream call the probe makes through an aggregated proxy.
+// upstream call the probe makes through an aggregated proxy. Each probe step
+// gets the whole of it, so a slow server/discover never leaves the tools/list
+// fallback without time to answer.
 func (gw *Gateway) mcpAggregatorProbeTimeout() time.Duration {
 	if seconds := gw.GetConfig().ProxyDefaultTimeout; seconds > 0 {
 		return time.Duration(seconds * float64(time.Second))
@@ -172,7 +174,7 @@ func (d mcpAggregatorDispatcher) probeVersion(parent *http.Request, spec *APISpe
 		UpstreamAPIID:   spec.APIID,
 		Probe:           true,
 	}
-	raw, err := d.send(parent, spec, mcp.MethodServerDiscover, map[string]any{}, trust)
+	raw, err := d.probeStep(parent, spec, mcp.MethodServerDiscover, trust)
 	if err == nil {
 		var result struct {
 			SupportedVersions []string `json:"supportedVersions"`
@@ -191,13 +193,20 @@ func (d mcpAggregatorDispatcher) probeVersion(parent *http.Request, spec *APISpe
 	if isMCPAggregatorVersionMismatch(err) {
 		return err
 	}
-	if _, listErr := d.send(parent, spec, mcp.MethodToolsList, map[string]any{}, trust); listErr != nil {
+	if _, listErr := d.probeStep(parent, spec, mcp.MethodToolsList, trust); listErr != nil {
 		if isMCPAggregatorVersionMismatch(listErr) {
 			return listErr
 		}
 		return fmt.Errorf("server/discover: %w; tools/list: %w", err, listErr)
 	}
 	return fmt.Errorf("%w: %w; tools/list answered without declaring a version", errMCPAggregatorVersionUnconfirmed, err)
+}
+
+// probeStep sends one probe request within its own probe timeout.
+func (d mcpAggregatorDispatcher) probeStep(parent *http.Request, spec *APISpec, method string, trust *mcpAggregatorLoopTrust) (json.RawMessage, error) {
+	ctx, cancel := context.WithTimeout(parent.Context(), d.gw.mcpAggregatorProbeTimeout())
+	defer cancel()
+	return d.send(parent.WithContext(ctx), spec, method, map[string]any{}, trust)
 }
 
 var errMCPAggregatorVersionUnconfirmed = errors.New("2026-07-28 support not confirmed")
@@ -207,18 +216,17 @@ func isMCPAggregatorVersionMismatch(err error) bool {
 	return errors.As(err, &mismatch)
 }
 
-// validateMCPAggregatorUpstreamVersions probes every aggregated MCP proxy of
-// an incoming aggregator on 2026-07-28 and rejects the aggregator when one of
-// them does not serve it. A proxy that cannot be checked, for example because
-// its upstream is down, is admitted with a warning: the runtime omits it from
-// tools/list until it answers, as it does any failing aggregated proxy.
-func (gw *Gateway) validateMCPAggregatorUpstreamVersions(r *http.Request, aggregator *APISpec, ext *oas.TykMCPAggregator, upstreams []*APISpec) (string, int) {
+// validateMCPAggregatorUpstreamVersions probes the given aggregated MCP
+// proxies of an incoming aggregator, refs[i] served by upstreams[i], on
+// 2026-07-28 and rejects the aggregator when one of them does not serve it. A
+// proxy that cannot be checked, for example because its upstream is down, is
+// admitted with a warning: the runtime omits it from tools/list until it
+// answers, as it does any failing aggregated proxy.
+func (gw *Gateway) validateMCPAggregatorUpstreamVersions(r *http.Request, aggregator *APISpec, refs []oas.TykMCPAggregatorUpstream, upstreams []*APISpec) (string, int) {
 	ctx := context.Background()
 	if r != nil {
 		ctx = r.Context()
 	}
-	ctx, cancel := context.WithTimeout(ctx, gw.mcpAggregatorProbeTimeout())
-	defer cancel()
 	parent := (&http.Request{Header: http.Header{}, Host: mcpAggregatorProbeHost, RemoteAddr: mcpAggregatorProbeRemoteAddr}).WithContext(ctx)
 
 	dispatcher := mcpAggregatorDispatcher{gw: gw, aggregator: aggregator}
@@ -236,15 +244,15 @@ func (gw *Gateway) validateMCPAggregatorUpstreamVersions(r *http.Request, aggreg
 	for i, err := range errs {
 		var mismatch *mcpAggregatorVersionMismatchError
 		if errors.As(err, &mismatch) {
-			return fmt.Sprintf("aggregated MCP proxy %q does not support MCP version %s: %s", ext.Upstreams[i].APIID, mcp.ModernProtocolVersion, mismatch.Detail), http.StatusBadRequest
+			return fmt.Sprintf("aggregated MCP proxy %q does not support MCP version %s: %s", refs[i].APIID, mcp.ModernProtocolVersion, mismatch.Detail), http.StatusBadRequest
 		}
 	}
 	for i, err := range errs {
 		if err != nil {
 			log.WithFields(logrus.Fields{
 				"aggregator_api_id": aggregator.APIID,
-				"upstream_api_id":   ext.Upstreams[i].APIID,
-				"alias":             ext.Upstreams[i].Alias,
+				"upstream_api_id":   refs[i].APIID,
+				"alias":             refs[i].Alias,
 				"reason":            err.Error(),
 			}).Warn(mcpAggregatorVersionUncheckedMsg)
 		}
