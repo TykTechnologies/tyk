@@ -1,12 +1,24 @@
 package streams
 
 import (
+	"context"
 	"sync/atomic"
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/model"
+	"github.com/TykTechnologies/tyk/internal/redis"
 )
+
+type KafkaTelemetrySnapshot struct {
+	APIID, StreamID, ComponentID string
+	Deltas                       map[string]uint64
+	State                        map[string]int64
+}
+
+type KafkaTelemetryRecorder interface {
+	RecordKafkaStreams(context.Context, KafkaTelemetrySnapshot)
+}
 
 const (
 	// ExtensionTykStreaming is the OAS extension for Tyk streaming.
@@ -23,6 +35,7 @@ type BaseMiddleware interface {
 type Gateway interface {
 	model.ConfigProvider
 	model.ReplaceTykVariables
+	StreamingRedisClient() (redis.UniversalClient, error)
 }
 
 // APISpec is a subset of gateway.APISpec for the values the middleware consumes.
