@@ -7,7 +7,8 @@ import (
 )
 
 const (
-	mcpAggregatorOriginKey mcpContextKey = "mcp_aggregator_origin"
+	mcpAggregatorOriginKey       mcpContextKey = "mcp_aggregator_origin"
+	mcpAggregatorCatalogueHopKey mcpContextKey = "mcp_aggregator_catalogue_hop"
 
 	// mcpAggregatorAnalyticsTagPrefix prefixes the analytics tag naming the
 	// aggregator that routed a request to an aggregated MCP proxy.
@@ -78,4 +79,28 @@ func recordMCPAggregatorOrigin(rec *analytics.AnalyticsRecord, r *http.Request) 
 		rec.Alias = origin.consumer.alias
 		rec.OauthID = origin.consumer.oauthClientID
 	}
+}
+
+// ctxSetMCPAggregatorCatalogueHop marks an aggregator's internal tools/list or
+// server/discover request to an aggregated MCP proxy.
+//
+// Unlike do-not-track, the mark only drops the analytics record of a hop the
+// proxy answers: the access log, OpenTelemetry metrics and health check still
+// see every hop, and a hop the proxy rejects is recorded in analytics as any
+// rejected request is, so the reason a proxy dropped out of an aggregator's
+// catalogue can always be traced.
+func ctxSetMCPAggregatorCatalogueHop(r *http.Request) {
+	setCtxValue(r, mcpAggregatorCatalogueHopKey, true)
+}
+
+func ctxIsMCPAggregatorCatalogueHop(r *http.Request) bool {
+	hop, ok := r.Context().Value(mcpAggregatorCatalogueHopKey).(bool)
+	return ok && hop
+}
+
+// skipsMCPAggregatorCatalogueHopRecord reports whether a completed request is
+// a catalogue hop the proxy answered successfully, whose analytics record is
+// dropped. A hop answered with an HTTP or JSON-RPC error is still recorded.
+func skipsMCPAggregatorCatalogueHopRecord(r *http.Request, code int) bool {
+	return ctxIsMCPAggregatorCatalogueHop(r) && code < http.StatusBadRequest && ctxGetJSONRPCErrorCode(r) == 0
 }
