@@ -129,6 +129,12 @@ type APISpec struct {
 	mcpTrustedOrigins       map[string]struct{}
 	mcpTrustedProxyPrefixes []netip.Prefix
 	mcpOriginConfigErr      error
+
+	// WebSocket origin checking is immutable for a loaded spec. Build the
+	// checker once, off the request path.
+	webSocketOriginOnce sync.Once
+	webSocketOrigin     *httputil.WebSocketOriginChecker
+	webSocketOriginErr  error
 }
 
 // MCPAdapterRuntime groups runtime-only state for a synthetic REST-as-MCP

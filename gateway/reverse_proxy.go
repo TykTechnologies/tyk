@@ -439,13 +439,10 @@ func (gw *Gateway) TykNewSingleHostReverseProxy(target *url.URL, spec *APISpec, 
 		TykAPISpec:    spec,
 		FlushInterval: time.Duration(spec.GlobalConfig.HttpServerOptions.FlushInterval) * time.Millisecond,
 		logger:        logger,
-		wsUpgrader: websocket.Upgrader{
-			// CheckOrigin is not needed for the upgrader as tyk already provides
-			// its own middlewares for that.
-			CheckOrigin: func(r *http.Request) bool {
-				return true
-			},
-		},
+		// CheckOrigin is set for each handshake in handleGraphQL, because it
+		// must check the inbound request, not the request rewritten for the
+		// upstream.
+		wsUpgrader: websocket.Upgrader{},
 		sp: sync.Pool{
 			New: func() interface{} {
 				buffer := make([]byte, 32*1024)
@@ -1264,6 +1261,7 @@ func handleInMemoryLoop(handler http.Handler, r *http.Request) (resp *http.Respo
 
 func (p *ReverseProxy) handleOutboundRequest(
 	roundTripper http.RoundTripper,
+	inreq *http.Request,
 	outreq *http.Request,
 	w http.ResponseWriter,
 ) (res *http.Response, hijacked bool, latency time.Duration, err error) {
@@ -1274,7 +1272,7 @@ func (p *ReverseProxy) handleOutboundRequest(
 	}()
 
 	if p.TykAPISpec.GraphQL.Enabled {
-		res, hijacked, err = p.handleGraphQL(roundTripper, outreq, w)
+		res, hijacked, err = p.handleGraphQL(roundTripper, inreq, outreq, w)
 		return
 	}
 
@@ -1286,7 +1284,9 @@ func isCORSPreflight(r *http.Request) bool {
 	return r.Method == http.MethodOptions
 }
 
-func (p *ReverseProxy) handleGraphQL(roundTripper http.RoundTripper, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
+// handleGraphQL serves a GraphQL request. inreq is the request as the Gateway
+// received it, and outreq is the same request rewritten for the upstream.
+func (p *ReverseProxy) handleGraphQL(roundTripper http.RoundTripper, inreq, outreq *http.Request, w http.ResponseWriter) (res *http.Response, hijacked bool, err error) {
 	isWebSocketUpgrade := ctxGetGraphQLIsWebSocketUpgrade(outreq)
 	needsEngine := needsGraphQLExecutionEngine(p.TykAPISpec)
 
@@ -1306,11 +1306,23 @@ func (p *ReverseProxy) handleGraphQL(roundTripper http.RoundTripper, outreq *htt
 		// Use the canonical format of the MIME header key.
 		requestHeadersRewrite[textproto.CanonicalMIMEHeaderKey(key)] = value
 	}
+	wsUpgrader := &p.wsUpgrader
+	if isWebSocketUpgrade {
+		// Browsers don't apply CORS to WebSocket handshakes, so Tyk's CORS
+		// middleware doesn't protect them. Check the inbound request's Origin:
+		// the outbound request carries the upstream's Host.
+		upgrader := p.wsUpgrader
+		upgrader.CheckOrigin = func(*http.Request) bool {
+			return p.TykAPISpec.webSocketOriginAllowed(inreq)
+		}
+		wsUpgrader = &upgrader
+	}
+
 	res, hijacked, err = p.TykAPISpec.GraphEngine.HandleReverseProxy(graphengine.ReverseProxyParams{
 		RoundTripper:       roundTripper,
 		ResponseWriter:     w,
 		OutRequest:         outreq,
-		WebSocketUpgrader:  &p.wsUpgrader,
+		WebSocketUpgrader:  wsUpgrader,
 		NeedsEngine:        needsEngine,
 		IsCORSPreflight:    isCORSPreflight(outreq),
 		IsWebSocketUpgrade: isWebSocketUpgrade,
@@ -1547,14 +1559,14 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}
 		p.logger.Debug("ON REQUEST: Circuit Breaker is in CLOSED or HALF-OPEN state")
 
-		res, isHijacked, upstreamLatency, err = p.handleOutboundRequest(decoratedRoundTripper, outreq, rw)
+		res, isHijacked, upstreamLatency, err = p.handleOutboundRequest(decoratedRoundTripper, req, outreq, rw)
 		if err != nil || res.StatusCode/100 == 5 {
 			breakerConf.CB.Fail()
 		} else {
 			breakerConf.CB.Success()
 		}
 	} else {
-		res, isHijacked, upstreamLatency, err = p.handleOutboundRequest(decoratedRoundTripper, outreq, rw)
+		res, isHijacked, upstreamLatency, err = p.handleOutboundRequest(decoratedRoundTripper, req, outreq, rw)
 	}
 
 	if err != nil {
