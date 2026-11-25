@@ -79,10 +79,11 @@ const (
 // wrote for apiID to this gateway's app path. A definition modified before the
 // last reload started reading the app path was read by that reload.
 func (gw *Gateway) apiDefinitionFileState(apiID string) apiDefinitionFileState {
-	if sanitize.ValidatePathComponent(apiID) != nil {
+	name := apiID + ".json"
+	if sanitize.ValidatePathComponent(apiID) != nil || !filepath.IsLocal(name) {
 		return apiDefinitionNoFile
 	}
-	info, err := os.Stat(filepath.Join(gw.GetConfig().AppPath, apiID+".json"))
+	info, err := os.Stat(filepath.Join(gw.GetConfig().AppPath, name))
 	if err != nil {
 		return apiDefinitionNoFile
 	}
