@@ -183,6 +183,9 @@ type Gateway struct {
 	mcpPairingIndex pairing.Index
 
 	mcpAggregatorIndex mcpaggregator.Index
+	// mcpAggregatorWarnings throttles the aggregator warnings every
+	// tools/list would otherwise repeat.
+	mcpAggregatorWarnings mcpAggregatorWarningThrottle
 
 	// prmCache memoises upstream Protected Resource Metadata (RFC 9728) docs
 	// for MCP APIs running in mirror mode. Lazily initialised on first use.

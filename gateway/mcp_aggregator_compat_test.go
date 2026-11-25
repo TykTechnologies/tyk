@@ -398,7 +398,10 @@ func TestMCPAggregatorProbeReachesAggregatedProxiesFromLoopback(t *testing.T) {
 	req.Header.Set("X-Forwarded-For", "203.0.113.9")
 	req.Host = "admin.example.com"
 	w := httptest.NewRecorder()
-	ts.Gw.validateMCP(func(w http.ResponseWriter, _ *http.Request) { w.WriteHeader(http.StatusOK) }).ServeHTTP(w, req)
+	ts.Gw.validateMCP(func(w http.ResponseWriter, r *http.Request) {
+		resp, code := ts.Gw.handleAddMCP(r, afero.NewMemMapFs())
+		doJSONWrite(w, code, resp)
+	}).ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 	assert.Empty(t, mcpAggregatorVersionCheckWarnings(hook, "github-mcp"), "neither the admin caller's address nor its forwarded client IP reaches the allow-list")
