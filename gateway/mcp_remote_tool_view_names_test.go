@@ -134,6 +134,36 @@ func TestRemoteMCPToolView_UpstreamToolNamedLikeAnOverrideIsHidden(t *testing.T)
 	}
 }
 
+func TestRemoteMCPToolView_MalformedOverriddenToolIsOmitted(t *testing.T) {
+	const upstreamMalformedDeleteRepo = `{"name":"delete_repo","description":"Delete a repository","inputSchema":{"type":"object"},"annotations":"not-an-object"}`
+	for _, transport := range []string{"json", "sse"} {
+		t.Run(transport, func(t *testing.T) {
+			apiID := "remote-mcp-malformed-tool-" + transport
+			ts, fake, _ := startRemoteMCPProxyWithView(t, apiID, transport == "sse", []oas.TykMCPServerPrimitive{
+				openIssueOverride(),
+				annotationOverride("delete_repo", oas.DerivedToolAnnotations{DestructiveHint: boolPtr(true)}),
+			}, upstreamGitHubCreateIssue, upstreamDeleteRepo, upstreamGitHubListIssues)
+			logs := recordRemoteMCPLogs(t, apiID)
+			fake.setTools(upstreamMalformedDeleteRepo, upstreamGitHubCreateIssue, upstreamGitHubOpenIssue, upstreamGitHubListIssues)
+
+			for range 2 {
+				status, _, body := remoteMCPRequest(t, ts, "", "tools/list", `{}`)
+				require.Equal(t, http.StatusOK, status, string(body))
+				tools, names, _ := listedTools(t, body)
+				assert.Equal(t, []string{"open_issue", "list_issues"}, names,
+					"only delete_repo is omitted; the rename and the hidden upstream tool still apply")
+				assert.JSONEq(t, `"`+openIssueDescription+`"`, string(toolField(t, tools["open_issue"], "description")))
+				assert.NotContains(t, string(body), `"delete_repo"`, "delete_repo is never listed without its destructiveHint")
+				assert.NotContains(t, string(body), `"create_issue"`)
+				assert.NotContains(t, string(body), "The upstream's own open_issue")
+			}
+			assert.NotNil(t, logs.find(logrus.WarnLevel, "could not be merged", "source_tool=delete_repo"))
+			assert.Equal(t, 1, logs.count(logrus.WarnLevel, "could not be merged"), "the warning is rate limited")
+			assert.Zero(t, logs.count(logrus.WarnLevel, "not rewritten"), "the response is still rewritten")
+		})
+	}
+}
+
 func TestRemoteMCPToolView_AccessRulesApplyToExposedNames(t *testing.T) {
 	for _, transport := range []string{"json", "sse"} {
 		t.Run(transport, func(t *testing.T) {
