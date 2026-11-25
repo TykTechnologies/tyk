@@ -159,6 +159,9 @@ func ValidateTykMCPAggregator(ext *TykMCPAggregator) error {
 		}
 		tools := make(map[string]struct{}, len(upstream.Tools))
 		for toolIdx, tool := range upstream.Tools {
+			if strings.TrimSpace(tool) == "" {
+				return fmt.Errorf("%s.tools[%d]: a tool name cannot be empty or blank", field, toolIdx)
+			}
 			if _, duplicate := tools[tool]; duplicate {
 				return fmt.Errorf("%s.tools[%d] %q is duplicated: each tool may be selected only once", field, toolIdx, tool)
 			}

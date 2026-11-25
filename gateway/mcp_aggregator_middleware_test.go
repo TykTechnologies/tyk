@@ -2,12 +2,14 @@ package gateway
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/mcp"
 )
@@ -65,6 +67,8 @@ func TestMCPAggregatorRequestHeaderTransformDoesNotForwardCredentialsOrProtocolH
 		oas.Header{Name: "Authorization", Value: "Bearer operator"},
 		oas.Header{Name: "Proxy-Authorization", Value: "Basic operator"},
 		oas.Header{Name: "Cookie", Value: "session=operator"},
+		oas.Header{Name: "X-Api-Key", Value: "operator-key"},
+		oas.Header{Name: "X-Auth-Token", Value: "operator-token"},
 		oas.Header{Name: "Proxy-Foo", Value: "p"},
 		oas.Header{Name: "X-Forwarded-For", Value: "10.9.9.9"},
 		oas.Header{Name: "X-Forwarded-Host", Value: "evil.example"},
@@ -83,7 +87,7 @@ func TestMCPAggregatorRequestHeaderTransformDoesNotForwardCredentialsOrProtocolH
 	require.Len(t, calls, 1)
 	header := calls[0].Header
 	assert.Equal(t, "acme", header.Get("X-Acme-Tenant"))
-	for _, name := range []string{"Authorization", "Proxy-Authorization", "Cookie", "Proxy-Foo", "X-Real-IP", "Forwarded", "X-Tyk-Internal", "X-Forwarded-Host"} {
+	for _, name := range []string{"Authorization", "Proxy-Authorization", "Cookie", "X-Api-Key", "X-Auth-Token", "Proxy-Foo", "X-Real-IP", "Forwarded", "X-Tyk-Internal", "X-Forwarded-Host"} {
 		assert.Empty(t, header.Get(name), name)
 	}
 	assert.NotContains(t, strings.Join(header.Values("X-Forwarded-For"), ","), "10.9.9.9", "the client address is not taken from the transform")
@@ -135,4 +139,22 @@ func TestMCPAggregatorForwardsTransformHeadersAlongsideTheClientIP(t *testing.T)
 			assert.Equal(t, "acme", calls[0].Header.Get("X-Acme-Tenant"))
 		})
 	}
+}
+
+func TestMCPAggregatorTransformDoesNotForwardTheAggregatorsOwnCredentialHeaders(t *testing.T) {
+	aggregator := companyToolsWithRequestHeaders()
+	aggregator.AuthConfigs = map[string]apidef.AuthConfig{
+		apidef.AuthTokenType: {AuthHeaderName: "X-Acme-Key"},
+		apidef.HMACType:      {AuthHeaderName: "X-Acme-Hmac", Signature: apidef.SignatureConfig{Header: "X-Acme-Signature"}},
+	}
+	aggregator.Auth = apidef.AuthConfig{AuthHeaderName: "X-Legacy-Key"}
+
+	r := httptest.NewRequest(http.MethodPost, "/company-tools/", nil)
+	for _, name := range []string{"X-Acme-Key", "x-acme-hmac", "X-Acme-Signature", "X-Legacy-Key", "X-Acme-Tenant"} {
+		r.Header.Set(name, "value")
+	}
+	ctxAddMCPAggregatorTransformedHeaders(r, []string{"X-Acme-Key", "x-acme-hmac", "X-Acme-Signature", "X-Legacy-Key", "X-Acme-Tenant"})
+
+	assert.Equal(t, http.Header{"X-Acme-Tenant": {"value"}}, mcpAggregatorTransformedHeaders(r, aggregator),
+		"a header the aggregator reads credentials from is never set on a proxy hop")
 }
