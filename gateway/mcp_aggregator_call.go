@@ -247,7 +247,7 @@ func (d mcpAggregatorDispatcher) callTool(parent *http.Request, upstream mcpaggr
 	body := append([]byte(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":`), forwarded...)
 	body = append(body, '}')
 
-	extra := mcpAggregatorTransformedHeaders(parent)
+	extra := mcpAggregatorTransformedHeaders(parent, d.aggregator)
 	for name, values := range parent.Header {
 		if strings.HasPrefix(http.CanonicalHeaderKey(name), mcp.HeaderParamPrefix) {
 			extra[name] = values
@@ -422,15 +422,16 @@ func ctxAddMCPAggregatorTransformedHeaders(r *http.Request, names []string) {
 // request header transform set, with their current values, for the internal
 // call to an aggregated MCP proxy. Agent headers are never forwarded this
 // way, and neither are the headers mcpAggregatorForwardsTransformedHeader
-// refuses.
-func mcpAggregatorTransformedHeaders(r *http.Request) http.Header {
+// refuses for the aggregator.
+func mcpAggregatorTransformedHeaders(r *http.Request, aggregator *APISpec) http.Header {
 	out := http.Header{}
 	names, ok := r.Context().Value(mcpAggregatorTransformedHeadersKey).([]string)
 	if !ok {
 		return out
 	}
+	credentials := mcpAggregatorCredentialHeaders(aggregator)
 	for _, name := range names {
-		if !mcpAggregatorForwardsTransformedHeader(name) {
+		if !mcpAggregatorForwardsTransformedHeader(name, credentials) {
 			continue
 		}
 		values := r.Header[name]
@@ -446,23 +447,52 @@ func mcpAggregatorTransformedHeaders(r *http.Request) http.Header {
 
 // Headers a transform may set that never travel to the proxy hop: credentials,
 // client-address and gateway-internal headers (the client address travels in
-// the request context), and headers that frame the internal request.
+// the request context), and headers that frame the internal request. Besides
+// these, the headers the aggregator itself reads credentials from never travel
+// either (see mcpAggregatorCredentialHeaders). A credential an aggregated
+// proxy's upstream needs belongs on that proxy, which scopes it to that
+// upstream, not on the aggregator, which would send it to every proxy.
 var (
 	mcpAggregatorUnforwardedHeaders = []string{
-		"Authorization", "Cookie", "Forwarded", "X-Real-Ip",
+		"Authorization", "Cookie", "X-Api-Key", "Api-Key", "X-Auth-Token",
+		"Forwarded", "X-Real-Ip",
 		"Accept", "Content-Type", "Content-Length", "Content-Encoding", "Host",
 	}
 	mcpAggregatorUnforwardedHeaderPrefixes = []string{"Mcp-", "Proxy-", "X-Forwarded-", "X-Tyk-"}
 )
 
-func mcpAggregatorForwardsTransformedHeader(name string) bool {
+// mcpAggregatorCredentialHeaders returns the headers the aggregator reads
+// client credentials from: the header of every authentication method it
+// configures, its custom authentication header names included, and the
+// header carrying a request signature.
+func mcpAggregatorCredentialHeaders(aggregator *APISpec) []string {
+	if aggregator == nil || aggregator.APIDefinition == nil {
+		return nil
+	}
+	var names []string
+	add := func(config apidef.AuthConfig) {
+		if config.AuthHeaderName != "" {
+			names = append(names, config.AuthHeaderName)
+		}
+		if config.Signature.Header != "" {
+			names = append(names, config.Signature.Header)
+		}
+	}
+	add(aggregator.Auth)
+	for _, config := range aggregator.AuthConfigs {
+		add(config)
+	}
+	return names
+}
+
+func mcpAggregatorForwardsTransformedHeader(name string, credentials []string) bool {
 	canonical := http.CanonicalHeaderKey(name)
 	for _, prefix := range mcpAggregatorUnforwardedHeaderPrefixes {
 		if strings.HasPrefix(canonical, prefix) {
 			return false
 		}
 	}
-	for _, blocked := range slices.Concat(mcpAggregatorUnforwardedHeaders, hopHeaders) {
+	for _, blocked := range slices.Concat(mcpAggregatorUnforwardedHeaders, hopHeaders, credentials) {
 		if strings.EqualFold(canonical, blocked) {
 			return false
 		}

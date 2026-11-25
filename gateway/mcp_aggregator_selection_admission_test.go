@@ -185,18 +185,16 @@ func TestMCPAggregatorRejectsAggregatedToolNamesOverTheLimit(t *testing.T) {
 		return postMCPAggregatorThroughValidateMCP(t, ts.Gw, http.MethodPost, mcpAggregatorOAS("company-tools", mcpAggregatorRuntimeOrg, upstream))
 	}
 
-	for name, upstream := range map[string]oas.TykMCPAggregatorUpstream{
-		"no selection":       aggregated("github-mcp", "orders"),
-		"long tool selected": selecting("github-mcp", "orders", "list_orders", longToolName),
-	} {
-		t.Run(name, func(t *testing.T) {
-			res := admit(upstream)
-
-			assert.Equal(t, http.StatusBadRequest, res.code, res.body)
-			assert.Contains(t, res.body, `tool \"`+longToolName+`\" of aggregated MCP proxy \"orders\" cannot be aggregated: \"orders__\" plus the tool name is 133 characters, over the 128 character limit for MCP tool names`)
-		})
-	}
-
+	t.Run("long tool selected", func(t *testing.T) {
+		res := admit(selecting("github-mcp", "orders", "list_orders", longToolName))
+		assert.Equal(t, http.StatusBadRequest, res.code, res.body)
+		assert.Contains(t, res.body, `tool \"`+longToolName+`\" of aggregated MCP proxy \"orders\" cannot be aggregated: \"orders__\" plus the tool name is 133 characters, over the 128 character limit for MCP tool names`)
+	})
+	t.Run("129 characters selected", func(t *testing.T) {
+		res := admit(selecting("github-mcp", "or", longToolName))
+		assert.Equal(t, http.StatusBadRequest, res.code, res.body)
+		assert.Contains(t, res.body, `\"or__\" plus the tool name is 129 characters`)
+	})
 	t.Run("long tool deselected", func(t *testing.T) {
 		res := admit(selecting("github-mcp", "orders", "list_orders"))
 		assert.Equal(t, http.StatusOK, res.code, res.body)
@@ -205,11 +203,22 @@ func TestMCPAggregatorRejectsAggregatedToolNamesOverTheLimit(t *testing.T) {
 		res := admit(aggregated("github-mcp", "o"))
 		assert.Equal(t, http.StatusOK, res.code, res.body)
 	})
-	t.Run("129 characters", func(t *testing.T) {
-		res := admit(aggregated("github-mcp", "or"))
-		assert.Equal(t, http.StatusBadRequest, res.code, res.body)
-		assert.Contains(t, res.body, `\"or__\" plus the tool name is 129 characters`)
-	})
+}
+
+// Without a selection, admission treats a tool whose aggregated name is too
+// long as the runtime does: it is left out with a warning, and the rest of
+// the proxy's tools are aggregated.
+func TestMCPAggregatorAdmitsLongToolNamesWithoutASelectionWithAWarning(t *testing.T) {
+	ts := startMCPAggregatorCompatTest(t, newLatestOnlyMCPUpstream(t, "list_orders", longToolName).URL)
+	hook := log.GetTestHook(t)
+
+	res := postMCPAggregatorThroughValidateMCP(t, ts.Gw, http.MethodPost, mcpAggregatorOAS("company-tools", mcpAggregatorRuntimeOrg, aggregated("github-mcp", "orders")))
+
+	require.Equal(t, http.StatusOK, res.code, res.body)
+	warnings := mcpAggregatorToolCheckWarnings(hook, mcpAggregatorToolNameTooLongMsg, "github-mcp")
+	require.Len(t, warnings, 1)
+	assert.Equal(t, longToolName, warnings[0].Data["tool"])
+	assert.Contains(t, warnings[0].Data["reason"], `"orders__" plus the tool name is 133 characters`)
 }
 
 func TestMCPAggregatorAdmitsAnUnavailableProxyWithoutCheckingItsSelection(t *testing.T) {
