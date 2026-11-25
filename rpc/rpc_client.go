@@ -426,6 +426,8 @@ func doGroupLogin(login func() error) bool {
 func groupLogin() error {
 	groupLoginData := getGroupLoginCallback(values.Config().APIKey, values.Config().GroupID)
 	ok, err := FuncClientSingleton("LoginWithGroup", groupLoginData)
+	// let the sync forcer know whether a requested forced synchronisation reached MDCB
+	notifyGroupLoginResult(err == nil && ok == true)
 	if err != nil {
 		Log.WithError(err).Error("RPC Login failed")
 		EmitErrorEventKv(

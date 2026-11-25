@@ -867,8 +867,9 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) bool {
 				r.CheckForReload(orgId)
 			}
 		} else if !strings.Contains(err.Error(), "Cannot obtain response during") {
-			forcer := rpc.NewSyncForcer(r.Gw.StorageConnectionHandler, r.buildNodeInfo)
-			forcer.SetFirstConnection(true)
+			// ask for a resync on the next login; it is coordinated across the
+			// group so only one gateway forces MDCB to synchronise
+			r.requestResync()
 			log.Warning("[RPC STORE] RPC Reload Checker encountered unexpected error: ", err)
 		}
 
@@ -1028,6 +1029,10 @@ func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isH
 	if !isHashed {
 		key = storage.HashKey(keyName, gw.GetConfig().HashKeys)
 	}
+
+	// a cached value may predate the change being processed, e.g. a key that was
+	// just removed on the control plane would be recreated from it
+	gw.RPCGlobalCache.Delete("apikey-" + key)
 
 	sessionString, err := r.GetRawKey("apikey-" + key)
 	if err != nil {
@@ -1273,6 +1278,9 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	}
 
 	synchronizerEnabled := r.Gw.GetConfig().SlaveOptions.SynchroniserEnabled
+	// keys whose local copy already matches the control plane: nothing to write or flush
+	unchangedKeys := map[string]bool{}
+	masterUnavailable := false
 	for _, key := range keys {
 		// Skip keys that are user keys to be reset
 		splitKeys := strings.Split(key, ":")
@@ -1291,6 +1299,21 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			_, resetQuota := keysToReset[splitKeys[0]]
 
 			isHashed := len(splitKeys) > 1 && splitKeys[1] == "hashed"
+
+			// update keys stored locally in place instead of removing and recreating
+			// them (TT-15569); quota resets keep using the delete-and-recreate path
+			if !resetQuota {
+				switch r.updateKeyInPlace(key, isHashed, orgId) {
+				case keyUpdateUnchanged:
+					unchangedKeys[key] = true
+					continue
+				case keyUpdateApplied:
+					continue
+				case keyUpdateUnavailable:
+					masterUnavailable = true
+				}
+			}
+
 			var status int
 			var err error
 			if isHashed {
@@ -1321,6 +1344,12 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		}
 	}
 
+	if masterUnavailable {
+		// keys that couldn't be fetched were removed as before; a forced
+		// synchronisation restores the ones still on the control plane (TT-12417)
+		r.requestResync()
+	}
+
 	for _, apiID := range apiIDsToDeleteCache {
 		if r.Gw.invalidateAPICache(apiID) {
 			log.WithField("apiID", apiID).Info("cache invalidated")
@@ -1335,13 +1364,15 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		r.Gw.invalidateJWKSCacheByAPIID(apiID)
 	}
 
-	// Notify rest of gateways in cluster to flush cache
-	n := Notification{
-		Command: KeySpaceUpdateNotification,
-		Payload: strings.Join(keys, ","),
-		Gw:      r.Gw,
+	// Notify rest of gateways in cluster to flush cache, except for unchanged keys
+	if payload := keyspaceNotificationPayload(keys, unchangedKeys); payload != "" {
+		n := Notification{
+			Command: KeySpaceUpdateNotification,
+			Payload: payload,
+			Gw:      r.Gw,
+		}
+		r.Gw.MainNotifier.Notify(n)
 	}
-	r.Gw.MainNotifier.Notify(n)
 }
 
 // Function to handle fallback deletion using token ID
