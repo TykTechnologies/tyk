@@ -16,7 +16,7 @@ on:
 permissions: {}
 jobs:
   zizmor:
-    uses: TykTechnologies/github-actions/.github/workflows/zizmor.yml@4b2a9f131ad4216701c0538843bc602310a0cab4  # main
+    uses: TykTechnologies/github-actions/.github/workflows/zizmor.yml@df343b28cd00636f436f6a2b9988d4e1784ced5e  # TT-18378-setup-go-version
     with:
       upload_sarif: true
     permissions:

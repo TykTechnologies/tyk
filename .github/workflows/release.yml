@@ -33,7 +33,7 @@ env:
 jobs:
   dep-guard:
     if: github.event_name == 'pull_request'
-    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@4b2a9f131ad4216701c0538843bc602310a0cab4  # main
+    uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@df343b28cd00636f436f6a2b9988d4e1784ced5e  # TT-18378-setup-go-version
     permissions:
       contents: read
   goreleaser:
@@ -1121,7 +1121,7 @@ jobs:
       sink: ${{ steps.params.outputs.sink }}
     steps:
       - name: Set test parameters
-        uses: TykTechnologies/github-actions/.github/actions/tests/test-controller@4b2a9f131ad4216701c0538843bc602310a0cab4  # main
+        uses: TykTechnologies/github-actions/.github/actions/tests/test-controller@df343b28cd00636f436f6a2b9988d4e1784ced5e  # TT-18378-setup-go-version
         id: params
         with:
           variation: ${{ env.VARIATION }}
@@ -1185,11 +1185,11 @@ jobs:
           # Only ${{ github.actor }} has access
           # See https://github.com/mxschmitt/action-tmate#use-registered-public-ssh-keys
       - name: Fetch environment from tyk-pro
-        uses: TykTechnologies/github-actions/.github/actions/tests/checkout-tyk-pro@4b2a9f131ad4216701c0538843bc602310a0cab4  # main
+        uses: TykTechnologies/github-actions/.github/actions/tests/checkout-tyk-pro@df343b28cd00636f436f6a2b9988d4e1784ced5e  # TT-18378-setup-go-version
         with:
           org_gh_token: ${{ steps.app-token.outputs.token }}
       - name: Set up test environment
-        uses: TykTechnologies/github-actions/.github/actions/tests/env-up@4b2a9f131ad4216701c0538843bc602310a0cab4  # main
+        uses: TykTechnologies/github-actions/.github/actions/tests/env-up@df343b28cd00636f436f6a2b9988d4e1784ced5e  # TT-18378-setup-go-version
         timeout-minutes: 5
         id: env_up
         with:
@@ -1200,18 +1200,18 @@ jobs:
           TYK_DB_LICENSEKEY: ${{ secrets.DASH_LICENSE }}
           TYK_MDCB_LICENSE: ${{ secrets.MDCB_LICENSE }}
       - name: Choose test code branch
-        uses: TykTechnologies/github-actions/.github/actions/tests/choose-test-branch@4b2a9f131ad4216701c0538843bc602310a0cab4  # main
+        uses: TykTechnologies/github-actions/.github/actions/tests/choose-test-branch@df343b28cd00636f436f6a2b9988d4e1784ced5e  # TT-18378-setup-go-version
         with:
           test_folder: api
           org_gh_token: ${{ steps.app-token.outputs.token }}
       - name: Run API tests
-        uses: TykTechnologies/github-actions/.github/actions/tests/api-tests@4b2a9f131ad4216701c0538843bc602310a0cab4  # main
+        uses: TykTechnologies/github-actions/.github/actions/tests/api-tests@df343b28cd00636f436f6a2b9988d4e1784ced5e  # TT-18378-setup-go-version
         timeout-minutes: 25
         id: test_execution
         with:
           user_api_secret: ${{ steps.env_up.outputs.USER_API_SECRET }}
       - name: Generate test reports and collect logs
-        uses: TykTechnologies/github-actions/.github/actions/tests/reporting@4b2a9f131ad4216701c0538843bc602310a0cab4  # main
+        uses: TykTechnologies/github-actions/.github/actions/tests/reporting@df343b28cd00636f436f6a2b9988d4e1784ced5e  # TT-18378-setup-go-version
         if: always() && (steps.test_execution.conclusion != 'skipped')
         # Bound this best-effort step: `docker compose logs` inside it can hang on
         # an unresponsive container and otherwise burn the whole job timeout.
@@ -1266,12 +1266,12 @@ jobs:
       rpm_amd64: ${{ steps.params.outputs.rpm_amd64 }}
     steps:
       - name: Set distro matrix
-        uses: TykTechnologies/github-actions/.github/actions/tests/distro-matrix@4b2a9f131ad4216701c0538843bc602310a0cab4  # main
+        uses: TykTechnologies/github-actions/.github/actions/tests/distro-matrix@df343b28cd00636f436f6a2b9988d4e1784ced5e  # TT-18378-setup-go-version
         id: params
   upgrade-tests:
     needs:
       - test-controller-distros
-    uses: TykTechnologies/github-actions/.github/workflows/upgrade-tests.yml@4b2a9f131ad4216701c0538843bc602310a0cab4  # main
+    uses: TykTechnologies/github-actions/.github/workflows/upgrade-tests.yml@df343b28cd00636f436f6a2b9988d4e1784ced5e  # TT-18378-setup-go-version
     with:
       deb: ${{ needs.test-controller-distros.outputs.deb }}
       rpm: ${{ needs.test-controller-distros.outputs.rpm }}

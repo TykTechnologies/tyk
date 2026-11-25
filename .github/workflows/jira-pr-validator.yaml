@@ -18,7 +18,7 @@ jobs:
       contents: read
     steps:
       - name: Validate Jira ticket
-        uses: TykTechnologies/github-actions/jira-linter@4b2a9f131ad4216701c0538843bc602310a0cab4  # main
+        uses: TykTechnologies/github-actions/jira-linter@df343b28cd00636f436f6a2b9988d4e1784ced5e  # TT-18378-setup-go-version
         with:
           jira-base-url: ${{ secrets.JIRA_BASE_URL }}
           jira-read-auth: ${{ secrets.JIRA_READ_AUTH }}
