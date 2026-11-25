@@ -342,6 +342,9 @@ func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int)
 
 	newDef.IsOAS = true
 	oasObj.GetTykExtension().Info.ID = newDef.APIID
+	if errMsg, errCode := gw.probeMCPAggregatorUpstreams(r, oasObj); errMsg != "" {
+		return apiError(errMsg), errCode
+	}
 	if dryRun {
 		if expand {
 			expanded, err := gw.expandMCPProxyDefinition(oasObj)
@@ -411,6 +414,10 @@ func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (
 
 	if err := gw.alignPairedMCPProxyGatewayTags(newDef, oasObj); err != nil {
 		return apiError(err.Error()), http.StatusBadRequest
+	}
+
+	if errMsg, errCode := gw.probeMCPAggregatorUpstreams(r, oasObj); errMsg != "" {
+		return apiError(errMsg), errCode
 	}
 
 	newDef.IsOAS = true
