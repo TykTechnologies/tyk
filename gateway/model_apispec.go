@@ -65,6 +65,12 @@ type APISpec struct {
 	GraphEngine graphengine.Engine
 
 	oasRouter routers.Router
+
+	// WebSocket origin checking is immutable for a loaded spec. Build the
+	// checker once, off the request path.
+	webSocketOriginOnce sync.Once
+	webSocketOrigin     *httputil.WebSocketOriginChecker
+	webSocketOriginErr  error
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.
