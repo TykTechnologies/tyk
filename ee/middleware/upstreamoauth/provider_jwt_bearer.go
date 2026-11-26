@@ -121,12 +121,39 @@ func tokenErrorStatus(err error) int {
 // JWTBearerOAuthProvider implements the OAuth 2.0 JWT Bearer grant (RFC 7523 §2.1).
 type JWTBearerOAuthProvider struct{}
 
+// errJWTBearerClientMessage is what the API consumer sees when the grant fails.
+const errJWTBearerClientMessage = "upstream authentication failed"
+
+// jwtBearerClientError keeps token acquisition details (the IdP error
+// description, the certificate ID) out of the response to the API consumer.
+// The full error is logged, sent with the UpstreamOAuthError event, and stays
+// reachable through errors.As / errors.Is.
+type jwtBearerClientError struct{ err error }
+
+func (e *jwtBearerClientError) Error() string { return errJWTBearerClientMessage }
+
+func (e *jwtBearerClientError) Unwrap() error { return e.err }
+
 func (p *JWTBearerOAuthProvider) getOAuthToken(r *http.Request, mw *Middleware) (string, error) {
-	client := JWTBearerClient{mw: mw}
-	token, err := client.GetToken(r)
+	var (
+		token string
+		err   error
+	)
+
+	// Validation rejects the grant for classic APIs when they are saved through
+	// the Gateway or Dashboard API. A classic definition loaded from disk skips
+	// that, so refuse it here as well.
+	if mw.Spec.IsOAS {
+		client := JWTBearerClient{mw: mw}
+		token, err = client.GetToken(r)
+	} else {
+		err = apidef.ErrUpstreamOAuthJWTBearerOASOnly
+	}
+
 	if err != nil {
 		logJWTBearerError(mw, err)
-		return handleOAuthError(r, mw, err)
+		_, err = handleOAuthError(r, mw, err)
+		return "", &jwtBearerClientError{err: err}
 	}
 
 	return fmt.Sprintf("Bearer %s", token), nil

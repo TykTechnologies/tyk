@@ -126,8 +126,67 @@ func TestUpstreamOAuthJWTBearer(t *testing.T) {
 		upstreamAuth.Store("")
 		load("jwt-rejected", certID)
 
-		_, _ = ts.Run(t, test.TestCase{Path: "/jwt-rejected/", Code: http.StatusUnauthorized})
-		assert.EqualValues(t, 1, atomic.LoadInt32(&idpCalls))
+		// Repeated requests keep the 401: the token fetch lock is released after
+		// the rejection, so the second request does not fail with a 500.
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/jwt-rejected/", Code: http.StatusUnauthorized, BodyNotMatch: "invalid_grant"},
+			{Path: "/jwt-rejected/", Code: http.StatusUnauthorized, BodyNotMatch: "invalid_grant"},
+		}...)
+		assert.EqualValues(t, 2, atomic.LoadInt32(&idpCalls))
 		assert.Equal(t, "", upstreamAuth.Load(), "upstream is not called")
+	})
+}
+
+// The Gateway API must accept the grant on Tyk OAS and MCP APIs: IsOAS has to be
+// set before validation, or the OAS-only rule rejects it.
+func TestUpstreamOAuthJWTBearer_GatewayAPI(t *testing.T) {
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+
+	withJWTBearer := func(apiID string) oas.OAS {
+		oasAPI := getSampleOASAPI()
+		ext := oasAPI.GetTykExtension()
+		ext.Info.ID = apiID
+		ext.Server.ListenPath = oas.ListenPath{Value: "/" + apiID + "/", Strip: true}
+		ext.Upstream.Authentication = &oas.UpstreamAuth{
+			Enabled: true,
+			OAuth: &oas.UpstreamOAuth{
+				Enabled:               true,
+				AllowedAuthorizeTypes: []string{apidef.OAuthAuthorizationTypeJWTBearer},
+				JWTBearer: &oas.UpstreamOAuthJWTBearer{
+					TokenURL: "https://login.example.com/services/oauth2/token",
+					CertID:   "cert-id",
+					Issuer:   "consumer-key",
+					Subject:  "user@example.com",
+					Audience: "https://login.example.com",
+				},
+			},
+		}
+		oasAPI.SetTykExtension(ext)
+		return oasAPI
+	}
+
+	t.Run("Tyk OAS create and update", func(t *testing.T) {
+		oasAPI := withJWTBearer("jwt-oas-api")
+		_, _ = ts.Run(t, []test.TestCase{
+			{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/apis/oas", Data: &oasAPI, Code: http.StatusOK},
+		}...)
+		ts.Gw.DoReload()
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{AdminAuth: true, Method: http.MethodPut, Path: "/tyk/apis/oas/jwt-oas-api", Data: &oasAPI, Code: http.StatusOK},
+		}...)
+	})
+
+	t.Run("MCP create and update", func(t *testing.T) {
+		oasAPI := withJWTBearer("jwt-mcp-api")
+		_, _ = ts.Run(t, []test.TestCase{
+			{AdminAuth: true, Method: http.MethodPost, Path: "/tyk/mcps", Data: &oasAPI, Code: http.StatusOK},
+		}...)
+		ts.Gw.DoReload()
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{AdminAuth: true, Method: http.MethodPut, Path: "/tyk/mcps/jwt-mcp-api", Data: &oasAPI, Code: http.StatusOK},
+		}...)
 	})
 }

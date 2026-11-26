@@ -35,6 +35,11 @@ func getToken(r *http.Request, cacheKey string, obtainTokenFunc func(context.Con
 		return decryptedToken, nil
 	}
 
+	// This request holds the fetch lock. Release it once done: after a success the
+	// token is cached, and after a failure the next request must retry right away
+	// instead of failing to acquire the lock until it expires.
+	defer cache.DeleteRawKey(tokenLockKey(cacheKey))
+
 	token, err := obtainTokenFunc(r.Context())
 	if err != nil {
 		return "", err

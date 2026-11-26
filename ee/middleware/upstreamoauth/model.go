@@ -39,6 +39,9 @@ type Storage interface {
 	GetKey(key string) (string, error)
 	SetKey(string, string, int64) error
 	Lock(key string, timeout time.Duration) (bool, error)
+	// DeleteRawKey removes a key without applying the storage prefix. It releases
+	// the token lock, which Lock also stores unprefixed.
+	DeleteRawKey(key string) bool
 }
 
 type ClientCredentialsOAuthProvider struct{}

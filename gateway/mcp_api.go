@@ -59,6 +59,8 @@ func decodeMCPProxyDefinition(reqBody io.Reader) (*mcpProxyDefinition, error) {
 	}
 
 	parsed.oasObj.ExtractTo(&parsed.apiDef)
+	// MCP Proxies are Tyk OAS APIs; set before validation so OAS-only rules apply.
+	parsed.apiDef.IsOAS = true
 	if !parsed.apiDef.IsPairedMCPAdapterProxy() {
 		parsed.apiDef.MarkAsMCP()
 	}

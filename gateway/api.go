@@ -1365,6 +1365,9 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 		}
 
 		oasObj.ExtractTo(&newDef)
+		// Set before validation: some rules (e.g. the upstream OAuth JWT Bearer
+		// grant) are only valid for Tyk OAS APIs.
+		newDef.IsOAS = true
 	} else {
 		if err := json.NewDecoder(r.Body).Decode(&newDef); err != nil {
 			log.Error("Couldn't decode new API Definition object: ", err)
@@ -1457,6 +1460,9 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 		}
 
 		oasObj.ExtractTo(&newDef)
+		// Set before validation: some rules (e.g. the upstream OAuth JWT Bearer
+		// grant) are only valid for Tyk OAS APIs.
+		newDef.IsOAS = true
 	} else {
 		if spec.IsOAS {
 			return apiError(apidef.ErrClassicAPIExpected.Error()), http.StatusBadRequest

@@ -41,15 +41,17 @@ const (
 )
 
 // memStorage is an in-memory Storage; expire() simulates the cache TTL elapsing.
+// Lock behaves like Redis SET NX: it fails while the key is held.
 type memStorage struct {
 	mu       sync.Mutex
 	data     map[string]string
 	ttls     map[string]int64
+	locks    map[string]bool
 	setCalls int
 }
 
 func newMemStorage() *memStorage {
-	return &memStorage{data: map[string]string{}, ttls: map[string]int64{}}
+	return &memStorage{data: map[string]string{}, ttls: map[string]int64{}, locks: map[string]bool{}}
 }
 
 func (s *memStorage) GetKey(key string) (string, error) {
@@ -71,7 +73,22 @@ func (s *memStorage) SetKey(key, value string, ttl int64) error {
 	return nil
 }
 
-func (s *memStorage) Lock(string, time.Duration) (bool, error) { return true, nil }
+func (s *memStorage) Lock(key string, _ time.Duration) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.locks[key] {
+		return false, nil
+	}
+	s.locks[key] = true
+	return true, nil
+}
+
+func (s *memStorage) DeleteRawKey(key string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.locks, key)
+	return true
+}
 
 func (s *memStorage) expire() {
 	s.mu.Lock()
@@ -333,6 +350,8 @@ func TestJWTBearer_SigningKeyUnavailable(t *testing.T) {
 			var signErr *JWTBearerSigningError
 			require.ErrorAs(t, err, &signErr)
 			assert.Equal(t, jwtTestCertID, signErr.CertID)
+			assert.Equal(t, "failed to get OAuth token: "+errJWTBearerClientMessage, err.Error(),
+				"the certificate ID is not returned to the client")
 
 			assert.Zero(t, idp.callCount(), "IdP must not be called")
 			assert.Zero(t, store.setCalls, "nothing is cached")
@@ -445,12 +464,56 @@ func TestJWTBearer_IdPRejection(t *testing.T) {
 			var idpErr *JWTBearerIdPError
 			require.ErrorAs(t, err, &idpErr)
 			assert.Equal(t, tc.wantIdPErr, idpErr.IdPError)
+			assert.Equal(t, "failed to get OAuth token: "+errJWTBearerClientMessage, err.Error(),
+				"IdP error details are not returned to the client")
 
 			assert.Equal(t, 1, idp.callCount())
 			assert.Zero(t, store.setCalls, "rejections are not cached")
 			base.AssertCalled(t, "FireEvent", event.UpstreamOAuthError, mock.Anything)
 		})
 	}
+}
+
+// After a rejection the fetch lock is released, so the next request asks the
+// IdP again and gets the same 401 instead of failing to take the lock.
+func TestJWTBearer_RepeatedRejectionKeepsStatus(t *testing.T) {
+	cert, pub := newTestRSACert(t)
+	idp := newMockIdP(t, pub, func(w http.ResponseWriter, _ int32) {
+		writeOAuthError(t, w, http.StatusBadRequest, "invalid_grant")
+	})
+
+	base := &mockBaseMiddleware{cert: cert}
+	base.On("FireEvent", event.UpstreamOAuthError, mock.Anything).Return()
+	store := newMemStorage()
+	m := newJWTBearerMiddleware(idp.URL, base, store, nil)
+
+	for i := 0; i < 3; i++ {
+		_, code, err := processAndFill(t, m)
+		require.Error(t, err)
+		assert.Equal(t, http.StatusUnauthorized, code, "request %d", i+1)
+	}
+
+	assert.Equal(t, 3, idp.callCount())
+	assert.Empty(t, store.locks, "the fetch lock is released")
+}
+
+// A classic API definition that bypassed save-time validation (for example,
+// loaded from disk) must not run the grant.
+func TestJWTBearer_ClassicAPIRefused(t *testing.T) {
+	cert, _ := newTestRSACert(t)
+	idp := newMockIdP(t, nil, func(w http.ResponseWriter, _ int32) {
+		writeTokenResponse(t, w, "should-not-be-issued", 3600)
+	})
+
+	base := &mockBaseMiddleware{cert: cert}
+	base.On("FireEvent", event.UpstreamOAuthError, mock.Anything).Return()
+	m := newJWTBearerMiddleware(idp.URL, base, newMemStorage(), nil)
+	m.Spec.IsOAS = false
+
+	_, code, err := processAndFill(t, m)
+	require.ErrorIs(t, err, apidef.ErrUpstreamOAuthJWTBearerOASOnly)
+	assert.Equal(t, http.StatusInternalServerError, code)
+	assert.Zero(t, idp.callCount(), "IdP must not be called")
 }
 
 func TestJWTBearer_IdPUnreachableIsServerError(t *testing.T) {

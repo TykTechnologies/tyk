@@ -83,6 +83,11 @@ func (m *mockStorage) Lock(key string, timeout time.Duration) (bool, error) {
 	return args.Bool(0), args.Error(1)
 }
 
+func (m *mockStorage) DeleteRawKey(key string) bool {
+	delete(m.data, key)
+	return true
+}
+
 func TestMiddleware_NewMiddleware(t *testing.T) {
 	gw := &mockGateway{}
 	mw := &mockBaseMiddleware{}
