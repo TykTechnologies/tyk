@@ -629,6 +629,7 @@ func TestTrackEndpointMiddleware_ProcessRequest(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tt.givenAPI.endpointMatcher = legacyEndpointMatcher{}
 			mw := &TrackEndpointMiddleware{
 				BaseMiddleware: &BaseMiddleware{Spec: tt.givenAPI},
 			}

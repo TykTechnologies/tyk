@@ -430,7 +430,7 @@ func TestTransformMiddleware(t *testing.T) {
 					}
 				})
 			})[0]
-			ts.Gw.LoadAPI(api)
+			api = ts.Gw.LoadAPI(api)[0]
 
 			mw := &TransformMiddleware{
 				BaseMiddleware: &BaseMiddleware{

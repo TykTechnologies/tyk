@@ -46,6 +46,7 @@ func TestRedisCacheMiddleware_BypassesCredentialSpecificMCPFiltering(t *testing.
 		spec.CacheOptions.EnableCache = true
 	})[0]
 	spec.CacheOptions.CacheTimeout = 60
+	spec.endpointMatcher = newEndpointMatcher(spec)
 	spec.RxPaths = map[string][]URLSpec{"v1": (APIDefinitionLoader{}).compileCachedPathSpec(nil, []apidef.CacheMeta{{Path: "/mcp", Method: http.MethodPost}}, config.Config{})}
 	store := &cacheReadCountingStore{DummyStorage: storage.NewDummyStorage(), written: make(chan struct{}, 1)}
 	middleware := &RedisCacheMiddleware{BaseMiddleware: &BaseMiddleware{Spec: spec}, store: store}

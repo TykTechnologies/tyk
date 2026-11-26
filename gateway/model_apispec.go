@@ -66,6 +66,9 @@ type APISpec struct {
 	OrgHasNoSession          bool
 	AnalyticsPluginConfig    *GoAnalyticsPlugin
 
+	// Chosen once in MakeSpec from the API type and the Gateway config.
+	endpointMatcher endpointMatcher
+
 	// Swapped by a reload while requests read it, so the reads stay lock-free.
 	dnsDiscovery atomic.Pointer[dnsDiscoveryPlan]
 
@@ -325,13 +328,7 @@ func (a *APISpec) getMatchPathAndMethod(r *http.Request, mode URLStatus) (string
 		}
 	}
 
-	// For OAS APIs the listen path is stripped once, in matchesPath. Stripping
-	// it here as well eats a listen path that is also a prefix of the endpoint
-	// path, which the full URL fallback used to mask.
-	unsafeMatching := !a.IsOAS || a.GlobalConfig.AllowUnsafeListenPathMatching
-	if unsafeMatching && a.Proxy.ListenPath != "/" && !isJSONRPCVEMPath(r, matchPath) {
-		matchPath = a.StripListenPath(matchPath)
-	}
+	matchPath = a.endpointMatcher.matchPath(r, matchPath, a)
 
 	if !strings.HasPrefix(matchPath, "/") {
 		matchPath = "/" + matchPath
@@ -444,11 +441,95 @@ func (a *APISpec) findRouteForOASPath(oasPath, method, actualPath, fullRequestPa
 	return route, pathParams, nil
 }
 
-// strictOASMatching reports whether allow and ignoreAuthentication entries of
-// this API grant only the declared OAS operation. Classic APIs and
-// allow_unsafe_listen_path_matching keep plain regex matching.
-func (a *APISpec) strictOASMatching() bool {
-	return a.IsOAS && !a.GlobalConfig.AllowUnsafeListenPathMatching && a.OAS.Paths != nil
+// endpointMatcher decides how a request path is matched against the endpoint
+// specs of an API. One implementation per matching mode, chosen once per API
+// in MakeSpec, so no per-request code consults the mode.
+type endpointMatcher interface {
+	// matchPath returns the request path CheckSpecMatchesStatus and
+	// FindSpecMatchesStatus hand to matchesPath.
+	matchPath(r *http.Request, path string, api *APISpec) string
+	// matchesPath reports whether the request path matches the spec regex.
+	matchesPath(spec *URLSpec, reqPath string, api *APISpec) bool
+	// grants reports whether a matched allow or ignoreAuthentication entry
+	// applies to the request.
+	grants(r *http.Request, spec *URLSpec, api *APISpec) bool
+}
+
+// newEndpointMatcher picks the matcher for the API. Tyk OAS APIs match the
+// path proxied upstream unless allow_unsafe_listen_path_matching is set;
+// Tyk Classic APIs keep legacyEndpointMatcher.
+func newEndpointMatcher(spec *APISpec) endpointMatcher {
+	if spec.IsOAS && !spec.GlobalConfig.AllowUnsafeListenPathMatching {
+		return oasEndpointMatcher{}
+	}
+	return legacyEndpointMatcher{}
+}
+
+// legacyEndpointMatcher is the matching every API used before TT-18034: the
+// listen path is stripped before matching, and the regex is tried against the
+// path with listen path and version stripped, with the listen path stripped,
+// and against the full URL including the listen path. Customers declare
+// Classic endpoint paths that include the listen path, so the last step stays.
+type legacyEndpointMatcher struct{}
+
+func (legacyEndpointMatcher) matchPath(r *http.Request, path string, api *APISpec) string {
+	if api.Proxy.ListenPath != "/" && !isJSONRPCVEMPath(r, path) {
+		return api.StripListenPath(path)
+	}
+	return path
+}
+
+func (legacyEndpointMatcher) matchesPath(spec *URLSpec, reqPath string, api *APISpec) bool {
+	clean := api.StripListenPath(reqPath)
+	noVersion := api.StripVersionPath(clean)
+	// match /users
+	if noVersion != clean && spec.spec.MatchString(noVersion) {
+		return true
+	}
+	// match /v3/users
+	if spec.spec.MatchString(clean) {
+		return true
+	}
+	// match /listenpath/v3/users
+	if spec.spec.MatchString(reqPath) {
+		return true
+	}
+	return false
+}
+
+func (legacyEndpointMatcher) grants(*http.Request, *URLSpec, *APISpec) bool {
+	return true
+}
+
+// oasEndpointMatcher matches Tyk OAS endpoints against the path proxied
+// upstream only: the listen path is stripped once, in matchesPath, and the
+// full URL is never tried, so what the allow list approves is what the
+// upstream receives. Allow and ignoreAuthentication entries additionally
+// require the exact declared operation.
+type oasEndpointMatcher struct{}
+
+func (oasEndpointMatcher) matchPath(_ *http.Request, path string, _ *APISpec) string {
+	return path
+}
+
+func (oasEndpointMatcher) matchesPath(spec *URLSpec, reqPath string, api *APISpec) bool {
+	clean := api.StripListenPath(reqPath)
+	noVersion := api.StripVersionPath(clean)
+	// match /users
+	if noVersion != clean && spec.spec.MatchString(noVersion) {
+		return true
+	}
+	// match /v3/users
+	if spec.spec.MatchString(clean) {
+		return true
+	}
+	// VEM paths are internal looping targets without a listen path, so the
+	// full URL is the only form they can be matched against.
+	return agentprotocol.IsProtocolVEMPath(reqPath) && spec.spec.MatchString(reqPath)
+}
+
+func (oasEndpointMatcher) grants(r *http.Request, spec *URLSpec, api *APISpec) bool {
+	return api.oasOperationMatches(r, spec)
 }
 
 // oasOperationMatches reports whether the request targets exactly the OAS

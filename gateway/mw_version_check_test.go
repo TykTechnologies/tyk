@@ -646,7 +646,8 @@ func TestVersionCheck_checkVEMWhiteListEntry(t *testing.T) {
 	}
 	loader := APIDefinitionLoader{}
 	spec := &APISpec{
-		APIDefinition: &apidef.APIDefinition{},
+		APIDefinition:   &apidef.APIDefinition{},
+		endpointMatcher: legacyEndpointMatcher{},
 	}
 
 	tests := []struct {

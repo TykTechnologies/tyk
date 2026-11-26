@@ -266,7 +266,8 @@ func buildMCPAdapterSpec(rest *APISpec, proxies []*APISpec, existing *APISpec) (
 			orgID: rest.OrgID,
 			Gw:    gw,
 		},
-		GlobalConfig: rest.GlobalConfig,
+		GlobalConfig:    rest.GlobalConfig,
+		endpointMatcher: rest.endpointMatcher,
 		MCPAdapter: MCPAdapterRuntime{
 			Synthetic:                true,
 			SourceRESTAPIID:          rest.APIID,
