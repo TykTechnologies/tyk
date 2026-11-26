@@ -1828,6 +1828,10 @@
       "type": ["boolean", "null"],
       "additionalProperties": false
     },
+    "allow_unsafe_websocket_origin": {
+      "type": ["boolean", "null"],
+      "additionalProperties": false
+    },
     "error_overrides": {
       "$ref": "#/definitions/ErrorOverrides"
     }

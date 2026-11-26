@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gorilla/mux"
+	"github.com/gorilla/websocket"
 	"github.com/sirupsen/logrus"
 )
 
@@ -25,6 +26,11 @@ func (h *HandleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, 
 
 	h.StreamManager.routeLock.Lock()
 	h.Muxer.HandleFunc(path, func(w http.ResponseWriter, r *http.Request) {
+		if websocket.IsWebSocketUpgrade(r) && !h.webSocketOriginAllowed(r) {
+			http.Error(w, http.StatusText(http.StatusForbidden), http.StatusForbidden)
+			return
+		}
+
 		recorder := h.StreamManager.analyticsFactory.CreateRecorder(r)
 		analyticsResponseWriter := h.StreamManager.analyticsFactory.CreateResponseWriter(w, r, h.StreamID, recorder)
 
@@ -34,6 +40,17 @@ func (h *HandleFuncAdapter) HandleFunc(path string, f func(http.ResponseWriter, 
 	})
 	h.StreamManager.routeLock.Unlock()
 	h.Logger.Debugf("Registered handler for path: %s", path)
+}
+
+// webSocketOriginAllowed runs the Gateway's origin check before Bento handles
+// a WebSocket handshake. Bento's own cors check, when set, still runs after it,
+// so an origin must pass both.
+func (h *HandleFuncAdapter) webSocketOriginAllowed(r *http.Request) bool {
+	spec := h.StreamMiddleware.Spec
+	if spec == nil || spec.WebSocketOriginAllowed == nil {
+		return false
+	}
+	return spec.WebSocketOriginAllowed(r)
 }
 
 // Helper function to extract paths from an http_server configuration
