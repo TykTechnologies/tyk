@@ -1608,6 +1608,9 @@ func (gw *Gateway) initSystem() error {
 	defer globalMu.Unlock()
 
 	gwConfig := gw.GetConfig()
+	if err := gwConfig.HttpServerOptions.ValidateTrustedProxyCIDRs(); err != nil {
+		return fmt.Errorf("invalid http_server_options.trusted_proxy_cidrs: %w", err)
+	}
 
 	// Initialize the appropriate log formatter
 	if !gw.isRunningTests() && os.Getenv("TYK_LOGFORMAT") == "" && !*cli.DebugMode {
@@ -1921,6 +1924,11 @@ func (gw *Gateway) afterConfSetup() error {
 	if conf.AllowUnsafeBodyTransformTemplatePaths {
 		mainLog.Warn("allow_unsafe_body_transform_template_paths is enabled: body transform template paths are not confined to template_path. " +
 			"Risk: API definitions can read arbitrary files from the gateway filesystem.")
+	}
+
+	if conf.AllowUnsafeWebSocketOrigin {
+		mainLog.Warn("allow_unsafe_websocket_origin is enabled: WebSocket handshakes for GraphQL and Streams APIs are accepted from any origin. " +
+			"Risk: any website can open a WebSocket to these APIs through a visitor's browser and read the responses.")
 	}
 
 	if conf.HealthCheckEndpointName == "" {
