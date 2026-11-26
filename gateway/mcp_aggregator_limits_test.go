@@ -14,6 +14,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
 	"github.com/TykTechnologies/tyk/internal/mcp"
+	"github.com/TykTechnologies/tyk/test"
 	"github.com/TykTechnologies/tyk/user"
 )
 
@@ -195,4 +196,49 @@ func TestMCPAggregatorKeepsTheProxyChainsErrorClassificationWithTracing(t *testi
 			assert.Equal(t, jsonrpcerrors.CodeModernIPBlocked, res.rpc.Error.Code, res.body)
 		})
 	}
+}
+
+// TestMCPAggregatorChargesTheOrgQuotaAsADirectCallDoes checks that a call
+// through an aggregator spends the organisation's quota as a direct call to
+// the aggregated proxy does: the hop into the proxy belongs to the same
+// organisation, which the aggregator has already charged.
+func TestMCPAggregatorChargesTheOrgQuotaAsADirectCallDoes(t *testing.T) {
+	orders := newMCPRoutingUpstream(t, namedTools("list_orders")...)
+	orders.call = answering(`{"content":[]}`)
+	ts := startExactRateLimitTest(t, func(c *config.Config) {
+		c.EnforceOrgQuotas = true
+		c.ExperimentalProcessOrgOffThread = false
+		c.LocalSessionCache.DisableCacheSessionState = true
+	})
+	ts.Gw.LoadAPI(
+		remoteMCPProxyRuntimeSpec("orders-mcp", orders.URL),
+		companyToolsRuntimeSpec(aggregated("orders-mcp", "orders")),
+	)
+	key, directKey := companyToolsKey(t, ts), mcpProxyKey(t, ts, "orders-mcp")
+
+	admitted := func(call func() mcpTestResponse) int {
+		t.Helper()
+		ts.Run(t, test.TestCase{
+			Method:    http.MethodPost,
+			Path:      "/tyk/org/keys/" + mcpAggregatorRuntimeOrg + "?reset_quota=1",
+			AdminAuth: true,
+			Data:      map[string]any{"org_id": mcpAggregatorRuntimeOrg, "quota_max": 12, "quota_remaining": 12, "quota_renewal_rate": 3600},
+			Code:      http.StatusOK,
+		})
+		for i := 0; i < 13; i++ {
+			if res := call(); res.status != http.StatusOK || res.rpc.Error != nil {
+				return i
+			}
+		}
+		return 13
+	}
+	direct := admitted(func() mcpTestResponse {
+		return postMCPToolsCallTo(t, ts, "/orders-mcp/", directKey, toolCallParams("list_orders", `{}`, ""))
+	})
+	viaAggregator := admitted(func() mcpTestResponse {
+		return postMCPToolsCall(t, ts, key, toolCallParams("orders__list_orders", `{}`, ""))
+	})
+
+	require.Positive(t, direct)
+	assert.Equal(t, direct, viaAggregator, "the hop into the proxy is not charged to the org again")
 }
