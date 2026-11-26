@@ -111,7 +111,22 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 
 	newpath = gw.ReplaceTykVariables(r, newpath, true)
 
+	if len(matchGroups) > 0 {
+		newpath = keepSingleLeadingSlash(rewriteToPath, newpath)
+	}
+
 	return newpath, nil
+}
+
+// keepSingleLeadingSlash keeps a rewritten path that the API manager started
+// with a single "/" from starting with "//". An empty value at the start, as
+// with "/$1/$2" and an empty $1, would otherwise make the rest read as a host
+// and be dropped from the path.
+func keepSingleLeadingSlash(rewriteTo, rewritten string) string {
+	if strings.HasPrefix(rewriteTo, "/") && !strings.HasPrefix(rewriteTo, "//") && strings.HasPrefix(rewritten, "//") {
+		return "/" + strings.TrimLeft(rewritten, "/")
+	}
+	return rewritten
 }
 
 // ReplaceTykVariables implements a variable replacement hook. It will replace
