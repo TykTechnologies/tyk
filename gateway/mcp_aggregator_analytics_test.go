@@ -243,32 +243,44 @@ func TestMCPProxyDirectCallHasNoAggregatorOrigin(t *testing.T) {
 	}
 }
 
-func TestMCPAggregatorMarksToolsListFanOutRecordsWithItsOrigin(t *testing.T) {
+func TestMCPAggregatorToolsListWritesOnlyTheAggregatorRecord(t *testing.T) {
 	ts, records := startMCPAggregatorAnalyticsTest(t, nil, nil)
 	key := companyToolsKey(t, ts)
-	// The first call may also run the admission probes; only the second is
-	// a plain catalogue fan-out.
+
+	// The first call also runs the admission probes; the second is a plain
+	// catalogue fan-out. Neither writes a record for an aggregated proxy.
+	for _, call := range []string{"first", "second"} {
+		records.reset()
+		res := postModernToolsList(t, ts, "/company-tools/", key)
+		require.Equal(t, http.StatusOK, res.status, res.body)
+		require.Contains(t, res.tools, "orders__list_orders", call)
+		require.Contains(t, res.tools, "github__list_issues", call)
+
+		agg := singleRecord(t, records.forAPI("company-tools"), "company-tools")
+		assert.Equal(t, mcp.MethodToolsList, agg.MCPStats.JSONRPCMethod, call)
+		records.mu.Lock()
+		assert.Len(t, records.records, 1, "%s tools/list writes only the aggregator's record", call)
+		records.mu.Unlock()
+	}
+}
+
+func TestMCPAggregatorToolCallStillWritesTheRoutedProxyRecord(t *testing.T) {
+	ts, records := startMCPAggregatorAnalyticsTest(t, nil, nil)
+	key := companyToolsKey(t, ts)
 	require.Equal(t, http.StatusOK, postModernToolsList(t, ts, "/company-tools/", key).status)
 	records.reset()
 
-	res := postModernToolsList(t, ts, "/company-tools/", key)
+	res := postMCPToolsCall(t, ts, key, toolCallParams("github__list_issues", `{}`, ""))
 	require.Equal(t, http.StatusOK, res.status, res.body)
-	require.Contains(t, res.tools, "orders__list_orders")
-	require.Contains(t, res.tools, "github__list_issues")
+	require.Nil(t, res.rpc.Error, res.body)
 
-	agg := singleRecord(t, records.forAPI("company-tools"), "company-tools")
-	assert.Equal(t, mcp.MethodToolsList, agg.MCPStats.JSONRPCMethod)
-	assert.Empty(t, agg.MCPStats.AggregatorAPIID)
-
-	for _, apiID := range []string{"orders-mcp", "github-mcp"} {
-		source := records.forAPI(apiID)
-		require.NotEmpty(t, source, apiID)
-		for _, record := range source {
-			assert.Equal(t, mcp.MethodToolsList, record.MCPStats.JSONRPCMethod, apiID)
-			assert.Equal(t, "company-tools", record.MCPStats.AggregatorAPIID, apiID)
-			assert.Contains(t, record.Tags, "mcp-aggregator-company-tools", apiID)
-		}
-	}
+	singleRecord(t, records.forAPI("company-tools"), "company-tools")
+	github := singleRecord(t, records.forAPI("github-mcp"), "github-mcp")
+	assert.Equal(t, mcp.MethodToolsCall, github.MCPStats.JSONRPCMethod)
+	assert.Equal(t, "company-tools", github.MCPStats.AggregatorAPIID)
+	records.mu.Lock()
+	assert.Len(t, records.records, 2)
+	records.mu.Unlock()
 }
 
 // recordingTracerProvider is a gateway tracer provider over an SDK provider
@@ -358,4 +370,41 @@ func TestMCPAggregatorTraceHasTheRoutedProxySpanAsAChildOfTheAggregatorSpan(t *t
 	for _, span := range spans {
 		assert.Equal(t, agg.SpanContext().TraceID(), span.SpanContext().TraceID(), "span %q is in the aggregator's trace", span.Name())
 	}
+}
+
+func TestMCPAggregatorRecordsACatalogueHopTheProxyRejects(t *testing.T) {
+	ts, records := startMCPAggregatorAnalyticsTest(t, nil, func(orders *APISpec) {
+		orders.EnableIpBlacklisting = true
+		orders.BlacklistedIPs = []string{"127.0.0.1"}
+	})
+	key := companyToolsKey(t, ts)
+	require.Equal(t, http.StatusOK, postModernToolsList(t, ts, "/company-tools/", key).status)
+	records.reset()
+
+	res := postModernToolsList(t, ts, "/company-tools/", key)
+	require.Equal(t, http.StatusOK, res.status, res.body)
+	require.NotContains(t, res.tools, "orders__list_orders", "orders-mcp rejects the hop and drops out")
+	require.Contains(t, res.tools, "github__list_issues")
+
+	rejected := singleRecord(t, records.forAPI("orders-mcp"), "orders-mcp")
+	assert.Equal(t, http.StatusForbidden, rejected.ResponseCode)
+	assert.Equal(t, mcp.MethodToolsList, rejected.MCPStats.JSONRPCMethod)
+	assert.Equal(t, "company-tools", rejected.MCPStats.AggregatorAPIID)
+	assert.Empty(t, records.forAPI("github-mcp"), "a catalogue hop the proxy answers still writes no record")
+}
+
+func TestSkipsMCPAggregatorCatalogueHopRecord(t *testing.T) {
+	hop := func() *http.Request {
+		r := httptest.NewRequest(http.MethodPost, "/", nil)
+		ctxSetMCPAggregatorCatalogueHop(r)
+		return r
+	}
+
+	assert.True(t, skipsMCPAggregatorCatalogueHopRecord(hop(), http.StatusOK))
+	assert.False(t, skipsMCPAggregatorCatalogueHopRecord(hop(), http.StatusTooManyRequests), "an HTTP error is recorded")
+	withRPCError := hop()
+	ctxSetJSONRPCErrorCode(withRPCError, -32603)
+	assert.False(t, skipsMCPAggregatorCatalogueHopRecord(withRPCError, http.StatusOK), "a JSON-RPC error is recorded")
+	assert.False(t, skipsMCPAggregatorCatalogueHopRecord(httptest.NewRequest(http.MethodPost, "/", nil), http.StatusOK), "not a catalogue hop")
+	assert.False(t, ctxGetDoNotTrack(hop()), "a catalogue hop is not do-not-track: access log, metrics and health check still see it")
 }

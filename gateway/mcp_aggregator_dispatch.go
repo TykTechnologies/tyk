@@ -144,6 +144,12 @@ func (d mcpAggregatorDispatcher) exchange(parent *http.Request, spec *APISpec, m
 	sink := &mcpAggregatorErrorSink{}
 	setCtxValue(req, mcpAggregatorErrorSinkKey, sink)
 	ctxSetMCPAggregatorOrigin(req, trust)
+	// Catalogue hops (tools/list pages, server/discover probes) repeat on
+	// every agent connect and are already counted in the aggregator's own
+	// record, so a successful one writes no analytics record on the proxy.
+	if method != mcp.MethodToolsCall {
+		ctxSetMCPAggregatorCatalogueHop(req)
+	}
 
 	rec := d.newResponseRecorder()
 	// The chain runs apart from this goroutine so that the caller's
