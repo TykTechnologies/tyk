@@ -214,6 +214,71 @@ func TestMCPAggregatorMarksTheRoutedProxyErrorRecordWithItsOrigin(t *testing.T) 
 	}
 }
 
+func TestMCPAggregatorRoutedProxyRecordCarriesTheConsumerIdentity(t *testing.T) {
+	spoofed := map[string][]string{
+		"no extra headers": nil,
+		"look-alike identity headers": {
+			"X-Tyk-Key-Alias", "spoofed",
+			"X-Tyk-Alias", "spoofed",
+			"X-Tyk-Api-Key", "spoofed",
+			"X-Tyk-Oauth-Client-Id", "spoofed",
+			"X-Tyk-MCP-Consumer", "spoofed",
+		},
+	}
+	for name, extra := range spoofed {
+		t.Run(name, func(t *testing.T) {
+			ts, records := startMCPAggregatorAnalyticsTest(t, nil, nil)
+			_, key := ts.CreateSession(func(s *user.SessionState) {
+				s.OrgID = mcpAggregatorRuntimeOrg
+				s.Alias = "agent-k"
+				s.OauthClientID = "client-k"
+				s.AccessRights = map[string]user.AccessDefinition{
+					"company-tools": {APIID: "company-tools", APIName: "company-tools"},
+				}
+			})
+			require.NotEmpty(t, key)
+
+			res := postMCPToolsCall(t, ts, key, toolCallParams("github__list_issues", `{}`, ""), extra...)
+			require.Equal(t, http.StatusOK, res.status, res.body)
+			require.Nil(t, res.rpc.Error, res.body)
+
+			agg := singleRecord(t, records.forAPI("company-tools"), "company-tools")
+			require.Equal(t, key, agg.APIKey)
+			require.Equal(t, "agent-k", agg.Alias)
+			require.Equal(t, "client-k", agg.OauthID)
+
+			github := singleRecord(t, records.forAPI("github-mcp"), "github-mcp")
+			assert.Equal(t, agg.APIKey, github.APIKey)
+			assert.Equal(t, agg.Alias, github.Alias)
+			assert.Equal(t, agg.OauthID, github.OauthID)
+		})
+	}
+}
+
+func TestMCPAggregatorRoutedProxyErrorRecordCarriesTheConsumerIdentity(t *testing.T) {
+	const blockedIP = "203.0.113.9"
+	ts, records := startMCPAggregatorAnalyticsTest(t, nil, func(orders *APISpec) {
+		orders.EnableIpBlacklisting = true
+		orders.BlacklistedIPs = []string{blockedIP}
+	})
+	_, key := ts.CreateSession(func(s *user.SessionState) {
+		s.OrgID = mcpAggregatorRuntimeOrg
+		s.Alias = "agent-k"
+		s.AccessRights = map[string]user.AccessDefinition{
+			"company-tools": {APIID: "company-tools", APIName: "company-tools"},
+		}
+	})
+
+	res := postMCPToolsCall(t, ts, key, toolCallParams("orders__list_orders", `{}`, ""), "X-Real-IP", blockedIP)
+	require.Equal(t, http.StatusOK, res.status, res.body)
+	require.NotNil(t, res.rpc.Error, res.body)
+
+	orders := singleRecord(t, records.forAPI("orders-mcp"), "orders-mcp")
+	assert.Equal(t, http.StatusForbidden, orders.ResponseCode)
+	assert.Equal(t, key, orders.APIKey)
+	assert.Equal(t, "agent-k", orders.Alias)
+}
+
 func TestMCPProxyDirectCallHasNoAggregatorOrigin(t *testing.T) {
 	spoofed := map[string][]string{
 		"no extra headers": nil,

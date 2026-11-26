@@ -143,7 +143,7 @@ func (d mcpAggregatorDispatcher) exchange(parent *http.Request, spec *APISpec, m
 	ctxSetMCPAggregatorLoopTrust(req, trust)
 	sink := &mcpAggregatorErrorSink{}
 	setCtxValue(req, mcpAggregatorErrorSinkKey, sink)
-	ctxSetMCPAggregatorOrigin(req, trust)
+	ctxSetMCPAggregatorOrigin(req, parent, trust)
 	// Catalogue hops (tools/list pages, server/discover probes) repeat on
 	// every agent connect and are already counted in the aggregator's own
 	// record, so a successful one writes no analytics record on the proxy.
