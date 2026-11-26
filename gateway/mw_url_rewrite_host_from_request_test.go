@@ -124,13 +124,19 @@ func TestReplaceTykVariables_ReusesResolvedSecrets(t *testing.T) {
 // contextData, when set, stands in for the request context variables.
 func processRewrite(t *testing.T, ts *Test, rewriteTo, target string, contextData map[string]interface{}) (int, *http.Request) {
 	t.Helper()
+	return processRewriteWithPattern(t, ts, `^/q\?u=(.*)$`, rewriteTo, target, contextData)
+}
+
+// processRewriteWithPattern is processRewrite with the rule's match_pattern.
+func processRewriteWithPattern(t *testing.T, ts *Test, pattern, rewriteTo, target string, contextData map[string]interface{}) (int, *http.Request) {
+	t.Helper()
 	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
 	spec.VersionData.NotVersioned = true
 	spec.VersionData.Versions = map[string]apidef.VersionInfo{"Default": {
 		Name:             "Default",
 		UseExtendedPaths: true,
 		ExtendedPaths: apidef.ExtendedPathsSet{URLRewrite: []apidef.URLRewriteMeta{{
-			Path: "/q", Method: http.MethodGet, MatchPattern: `^/q\?u=(.*)$`, RewriteTo: rewriteTo,
+			Path: "/q", Method: http.MethodGet, MatchPattern: pattern, RewriteTo: rewriteTo,
 		}}},
 	}}
 	loader := APIDefinitionLoader{Gw: ts.Gw}
@@ -173,6 +179,13 @@ func TestURLRewriteMiddleware_RequestValueCannotSetHost(t *testing.T) {
 			assert.Nil(t, r.Context().Value(ctx.RetainHost))
 		})
 	}
+
+	t.Run("context value as the host, pattern without capture groups", func(t *testing.T) {
+		code, r := processRewriteWithPattern(t, ts, "/", "http://$tyk_context.headers_X_Host/x", "/q",
+			map[string]interface{}{"headers_X_Host": "rogue.example"})
+		assert.Equal(t, http.StatusBadRequest, code)
+		assert.Nil(t, ctxGetURLRewriteTarget(r))
+	})
 
 	t.Run("context value with a full URL is escaped into a path", func(t *testing.T) {
 		code, r := processRewrite(t, ts, "$tyk_context.headers_X_Target", "/q?u=x",
