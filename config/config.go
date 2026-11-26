@@ -1519,6 +1519,12 @@ type Config struct {
 	// A token with no iss claim is matched by key ID (kid) alone.
 	// It exists for compatibility with legacy records that predate issuer becoming mandatory. Not recommended for production use: without the issuer check, an identity provider that shares signing keys across tenants cannot be distinguished by tenant.
 	AllowUnsafeIDPMissingIssuer bool `json:"allow_unsafe_idp_missing_issuer"`
+
+	// AllowUnsafeWebSocketOrigin turns off the Origin check on WebSocket handshakes for GraphQL and Streams APIs, so a handshake from any origin is accepted (default: false).
+	// It exists for compatibility with browser clients on other origins that connected before the check was added.
+	// Not recommended: any website can then open a WebSocket to these APIs through a visitor's browser and read the responses.
+	// To allow a browser client, add its origin to the API's CORS allowed origins instead.
+	AllowUnsafeWebSocketOrigin bool `json:"allow_unsafe_websocket_origin"`
 }
 
 // LabsConfig include config for streaming

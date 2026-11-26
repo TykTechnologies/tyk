@@ -1,6 +1,7 @@
 package streams
 
 import (
+	"net/http"
 	"sync/atomic"
 	"time"
 
@@ -33,6 +34,12 @@ type APISpec struct {
 	OAS   oas.OAS
 
 	StripListenPath model.StripListenPathFunc
+
+	// WebSocketOriginAllowed reports whether a WebSocket handshake may
+	// proceed. Bento's http_server output accepts every origin unless its own
+	// cors setting is on, so the Gateway checks the origin first. When nil,
+	// handshakes are refused.
+	WebSocketOriginAllowed func(*http.Request) bool
 }
 
 // NewAPISpec creates a new APISpec object based on the required inputs.
