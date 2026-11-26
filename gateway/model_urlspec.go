@@ -1,17 +1,85 @@
 package gateway
 
 import (
+	"strings"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/agentprotocol"
 	"github.com/TykTechnologies/tyk/regexp"
 )
 
+var oasPathParamRegex = regexp.MustCompile(`\{([^}]+)\}`)
+
+// oasExactPath is an OAS path template compiled to an anchored regex with one
+// capture group per path parameter. It is enabled only on allow and
+// ignoreAuthentication entries; a template that fails to compile never matches.
+type oasExactPath struct {
+	enabled bool
+	re      *regexp.Regexp
+	err     error
+	params  []string
+}
+
+// newOASExactPath compiles the template; a trailing slash on the request path
+// is tolerated. A compile failure is logged once, here.
+func newOASExactPath(template string, ignoreCase bool) oasExactPath {
+	var (
+		b      strings.Builder
+		params []string
+		last   int
+	)
+
+	if ignoreCase {
+		b.WriteString("(?i)")
+	}
+	b.WriteString("^")
+
+	for _, m := range oasPathParamRegex.FindAllStringSubmatchIndex(template, -1) {
+		b.WriteString(regexp.QuoteMeta(template[last:m[0]]))
+		b.WriteString("([^/]+)")
+		params = append(params, template[m[2]:m[3]])
+		last = m[1]
+	}
+
+	b.WriteString(regexp.QuoteMeta(template[last:]))
+	b.WriteString("/?$")
+
+	re, err := regexp.Compile(b.String())
+	if err != nil {
+		log.WithError(err).Errorf("OAS path %q: cannot compile exact matcher, requests to it will be denied", template)
+	}
+
+	return oasExactPath{enabled: true, re: re, err: err, params: params}
+}
+
+// matches returns the path parameter values when path is exactly the template.
+func (p *oasExactPath) matches(path string) (map[string]string, bool) {
+	if !p.enabled || p.err != nil {
+		return nil, false
+	}
+
+	m := p.re.FindStringSubmatch(path)
+	if m == nil {
+		return nil, false
+	}
+
+	params := make(map[string]string, len(p.params))
+	for i, name := range p.params {
+		params[name] = m[i+1]
+	}
+
+	return params, true
+}
+
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
 // path is on any of the white, black or ignored lists. This is generated as part of the
 // configuration init
 type URLSpec struct {
 	spec *regexp.Regexp
+	// oasExact is the OAS path template behind an allow or ignoreAuthentication
+	// entry, used to grant only the declared operation. Disabled for other entries.
+	oasExact oasExactPath
 
 	Status                    URLStatus
 	MethodActions             map[string]apidef.EndpointMethodMeta

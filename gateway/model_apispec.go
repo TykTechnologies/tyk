@@ -444,6 +444,52 @@ func (a *APISpec) findRouteForOASPath(oasPath, method, actualPath, fullRequestPa
 	return route, pathParams, nil
 }
 
+// strictOASMatching reports whether allow and ignoreAuthentication entries of
+// this API grant only the declared OAS operation. Classic APIs and
+// allow_unsafe_listen_path_matching keep plain regex matching.
+func (a *APISpec) strictOASMatching() bool {
+	return a.IsOAS && !a.GlobalConfig.AllowUnsafeListenPathMatching && a.OAS.Paths != nil
+}
+
+// oasOperationMatches reports whether the request targets exactly the OAS
+// operation an allow or ignoreAuthentication entry was declared for, path
+// parameter schemas included. Other entries, and entries not declared in the
+// OAS document, keep the regex verdict.
+func (a *APISpec) oasOperationMatches(r *http.Request, spec *URLSpec) bool {
+	if !spec.oasExact.enabled {
+		return true
+	}
+
+	meta := spec.Whitelist
+	if spec.Status == Ignored {
+		meta = spec.Ignored
+	}
+
+	pathItem := a.OAS.Paths.Value(meta.Path)
+	if pathItem == nil {
+		return true
+	}
+
+	method := meta.Method
+	if method == "" {
+		method = r.Method
+	}
+
+	operation := pathItem.GetOperation(strings.ToUpper(method))
+	if operation == nil {
+		return true
+	}
+
+	clean := a.StripListenPath(r.URL.Path)
+	for _, candidate := range []string{a.StripVersionPath(clean), clean} {
+		if params, ok := spec.oasExact.matches(candidate); ok {
+			return pathParamsMatchOperation(params, operation)
+		}
+	}
+
+	return false
+}
+
 // matchCandidatePath looks up the path item and operation from the OAS spec for a
 // candidate path+method, extracts path parameters from the actual request path, and
 // validates them against the operation's path parameter schemas. Returns the operation,
