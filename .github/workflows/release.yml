@@ -36,6 +36,7 @@ jobs:
     uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@production
     permissions:
       contents: read
+      pull-requests: read # dep-guard reads the PR's current labels, so a re-run sees deps-reviewed
   goreleaser:
     needs:
       - dep-guard
