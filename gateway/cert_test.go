@@ -18,6 +18,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -1745,7 +1746,7 @@ func TestCertificateHandlerTLS(t *testing.T) {
 
 	t.Run("List certificates, empty", func(t *testing.T) {
 		_, _ = ts.Run(t, test.TestCase{
-			Path: "/tyk/certs?org_id=1", Code: 200, AdminAuth: true, BodyMatch: `{"certs":null}`,
+			Path: "/tyk/certs?org_id=1", Code: 200, AdminAuth: true, BodyMatch: `{"certs":\[\]}`,
 		})
 	})
 
@@ -1847,7 +1848,7 @@ func TestCertificateHandlerTLS(t *testing.T) {
 			{Method: "DELETE", Path: "/tyk/certs/1" + serverCertID + "?org_id=1", AdminAuth: true, Code: 200},
 			{Method: "DELETE", Path: "/tyk/certs/1" + clientCertID + "?org_id=1", AdminAuth: true, Code: 200},
 			{Method: "DELETE", Path: "/tyk/certs/1" + rootCertID + "?org_id=1", AdminAuth: true, Code: 200},
-			{Method: "GET", Path: "/tyk/certs?org_id=1", AdminAuth: true, Code: 200, BodyMatch: `{"certs":null}`},
+			{Method: "GET", Path: "/tyk/certs?org_id=1", AdminAuth: true, Code: 200, BodyMatch: `{"certs":\[\]}`},
 		}...)
 	})
 }
@@ -2547,4 +2548,114 @@ func newCertSet(tb testing.TB) certSet {
 		servCert:   servCert,
 		servKey:    servKey,
 	}
+}
+
+// TestCertificateListing_RepeatedCalls covers GET /tyk/certs on a control
+// plane (non-RPC) gateway: repeated calls return the same list, adds and
+// deletes are visible in the next call, and an empty result is [] not null.
+func TestCertificateListing_RepeatedCalls(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	const org = "acorg"
+
+	list := func(path string) []string {
+		t.Helper()
+		resp, err := ts.Run(t, test.TestCase{Path: path, AdminAuth: true, Code: http.StatusOK})
+		require.NoError(t, err)
+		var body struct {
+			Certs []string `json:"certs"`
+		}
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+		require.NotNil(t, body.Certs, "certs must be a JSON array, not null")
+		sort.Strings(body.Certs)
+		return body.Certs
+	}
+	same := func(path string, n int) []string {
+		t.Helper()
+		first := list(path)
+		for i := 1; i < n; i++ {
+			assert.Equal(t, first, list(path), "%s call %d", path, i+1)
+		}
+		return first
+	}
+	add := func(cn, orgID string) string {
+		t.Helper()
+		pemData, _, _, _ := crypto.GenCertificate(&x509.Certificate{Subject: pkix.Name{CommonName: cn}}, false)
+		path := "/tyk/certs"
+		if orgID != "" {
+			path += "?org_id=" + orgID
+		}
+		resp, err := ts.Run(t, test.TestCase{Method: http.MethodPost, Path: path, Data: string(pemData), AdminAuth: true, Code: http.StatusOK})
+		require.NoError(t, err)
+		var body struct {
+			ID string `json:"id"`
+		}
+		require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+		return body.ID
+	}
+	del := func(id string) {
+		t.Helper()
+		_, err := ts.Run(t, test.TestCase{Method: http.MethodDelete, Path: "/tyk/certs/" + id, AdminAuth: true, Code: http.StatusOK})
+		require.NoError(t, err)
+	}
+
+	// Start from a gateway with no certificates.
+	for _, id := range ts.Gw.CertificateManager.ListAllIds("") {
+		del(id)
+	}
+
+	t.Run("empty gateway returns an empty array", func(t *testing.T) {
+		for i := 0; i < 3; i++ {
+			_, _ = ts.Run(t,
+				test.TestCase{Path: "/tyk/certs", AdminAuth: true, Code: 200, BodyMatch: `^{"certs":\[\]}`},
+				test.TestCase{Path: "/tyk/certs?org_id=" + org, AdminAuth: true, Code: 200, BodyMatch: `^{"certs":\[\]}`},
+			)
+		}
+	})
+
+	orgCert := add("org-cert", org)
+	noOrgCert := add("no-org-cert", "")
+
+	t.Run("repeated calls without org_id return the same list", func(t *testing.T) {
+		got := same("/tyk/certs", 5)
+		assert.ElementsMatch(t, []string{orgCert, noOrgCert}, got)
+	})
+
+	t.Run("repeated calls with org_id return the same list", func(t *testing.T) {
+		got := same("/tyk/certs?org_id="+org, 5)
+		assert.Equal(t, []string{orgCert}, got)
+	})
+
+	t.Run("added certificate is listed in the next call", func(t *testing.T) {
+		second := add("org-cert-2", org)
+		assert.ElementsMatch(t, []string{orgCert, second}, list("/tyk/certs?org_id="+org))
+		assert.Contains(t, list("/tyk/certs"), second)
+		del(second)
+	})
+
+	t.Run("deleted certificate is omitted from the next call", func(t *testing.T) {
+		del(orgCert)
+		assert.Empty(t, list("/tyk/certs?org_id="+org))
+		assert.NotContains(t, list("/tyk/certs"), orgCert)
+
+		del(noOrgCert)
+		assert.Empty(t, list("/tyk/certs"))
+	})
+
+	t.Run("adding after the org's last certificate was deleted", func(t *testing.T) {
+		again := add("org-cert-3", org)
+		same("/tyk/certs?org_id="+org, 3)
+		assert.Equal(t, []string{again}, list("/tyk/certs?org_id="+org))
+		del(again)
+	})
+
+	t.Run("detailed mode", func(t *testing.T) {
+		id := add("detailed", org)
+		for i := 0; i < 3; i++ {
+			_, _ = ts.Run(t, test.TestCase{Path: "/tyk/certs?mode=detailed&org_id=" + org, AdminAuth: true, Code: 200, BodyMatch: id})
+		}
+		del(id)
+		_, _ = ts.Run(t, test.TestCase{Path: "/tyk/certs?mode=detailed&org_id=" + org, AdminAuth: true, Code: 200, BodyMatch: `^{"certs":\[\]}`})
+	})
 }
