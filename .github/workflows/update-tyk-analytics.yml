@@ -16,19 +16,19 @@ jobs:
     steps:
       - name: Generate GitHub App token
         id: app-token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0 # zizmor: ignore[github-app] owner-wide token, scoping tracked separately
         with:
           app-id: ${{ secrets.PROBE_APP_ID }}
           private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
           owner: TykTechnologies
 
-      - uses: peter-evans/repository-dispatch@ce5485de42c9b2622d2ed064be479e8ed65e76f4  # v1
+      - uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697  # v4.0.1
         with:
           token: ${{ steps.app-token.outputs.token }}
           repository: TykTechnologies/tyk-analytics
           event-type: new-tyk
           client-payload: '{"ref": "${{ github.ref }}", "sha": "${{ github.sha }}"}'
-      - uses: peter-evans/repository-dispatch@ce5485de42c9b2622d2ed064be479e8ed65e76f4  # v1
+      - uses: peter-evans/repository-dispatch@28959ce8df70de7be546dd1250a005dd32156697  # v4.0.1
         with:
           token: ${{ steps.app-token.outputs.token }}
           repository: TykTechnologies/tyk-sink

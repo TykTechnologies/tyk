@@ -10,12 +10,12 @@ jobs:
     name: Opentelemetry e2e
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 1
 
       - name: Install Task
-        uses: arduino/setup-task@e26d8975574116b0097a1161e0fe16ba75d84c1c  # v1
+        uses: arduino/setup-task@c0bc642852239c2689f73f4ea6459c29405f3c52  # v3.0.0
         with:
           version: 3
           repo-token: ${{ secrets.GITHUB_TOKEN }}
@@ -32,17 +32,17 @@ jobs:
     name: Opentelemetry Metrics e2e
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 1
 
       - name: Setup Go
-        uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff  # v5
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5  # v7.1.0
         with:
           go-version-file: go.mod
 
       - name: Install Task
-        uses: arduino/setup-task@e26d8975574116b0097a1161e0fe16ba75d84c1c  # v1
+        uses: arduino/setup-task@c0bc642852239c2689f73f4ea6459c29405f3c52  # v3.0.0
         with:
           version: 3
           repo-token: ${{ secrets.GITHUB_TOKEN }}
@@ -60,7 +60,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 1
 
@@ -68,7 +68,7 @@ jobs:
         uses: ./.github/actions/ecr-login
 
       - name: Setup CI Tooling
-        uses: shrink/actions-docker-extract@04c17c51a5b9fd93b7aed2e05e86c8fe2d90ee52  # v3
+        uses: shrink/actions-docker-extract@f1ef61065b78731fe3310b4e84e511f6a927a77e  # v4
         with:
           image: tykio/ci-tools@sha256:1796c0938247f42c580c501f7cd04e1144a59a62c6d8ba743572ff40371e1306  # latest
           path: /usr/local/bin/.
@@ -98,7 +98,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags')
 
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
         with:
           fetch-depth: 1
 
