@@ -1,6 +1,7 @@
 package gateway
 
 import (
+	"net/url"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -20,6 +21,16 @@ type oasExactPath struct {
 	params  []string
 }
 
+// quoteOASPathLiteral quotes a literal part of an OAS path template, keeping
+// the mux wildcards the way httputil.PreparePathRegexp reads them: "/*/" is
+// one segment, a trailing "/*" is the rest of the path.
+func quoteOASPathLiteral(literal string) string {
+	quoted := regexp.QuoteMeta(literal)
+	quoted = strings.ReplaceAll(quoted, `/\*/`, "/[^/]+/")
+	quoted = strings.ReplaceAll(quoted, `/\*`, "/.*")
+	return quoted
+}
+
 // newOASExactPath compiles the template; a trailing slash on the request path
 // is tolerated. A compile failure is logged once, here.
 func newOASExactPath(template string, ignoreCase bool) oasExactPath {
@@ -35,13 +46,13 @@ func newOASExactPath(template string, ignoreCase bool) oasExactPath {
 	b.WriteString("^")
 
 	for _, m := range oasPathParamRegex.FindAllStringSubmatchIndex(template, -1) {
-		b.WriteString(regexp.QuoteMeta(template[last:m[0]]))
+		b.WriteString(quoteOASPathLiteral(template[last:m[0]]))
 		b.WriteString("([^/]+)")
 		params = append(params, template[m[2]:m[3]])
 		last = m[1]
 	}
 
-	b.WriteString(regexp.QuoteMeta(template[last:]))
+	b.WriteString(quoteOASPathLiteral(template[last:]))
 	b.WriteString("/?$")
 
 	re, err := regexp.Compile(b.String())
@@ -65,7 +76,11 @@ func (p *oasExactPath) matches(path string) (map[string]string, bool) {
 
 	params := make(map[string]string, len(p.params))
 	for i, name := range p.params {
-		params[name] = m[i+1]
+		value, err := url.PathUnescape(m[i+1])
+		if err != nil {
+			value = m[i+1]
+		}
+		params[name] = value
 	}
 
 	return params, true

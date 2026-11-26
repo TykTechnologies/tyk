@@ -523,9 +523,13 @@ func (oasEndpointMatcher) matchesPath(spec *URLSpec, reqPath string, api *APISpe
 	if spec.spec.MatchString(clean) {
 		return true
 	}
+	// Block entries keep the full URL step: narrowing a denial is not safe.
 	// VEM paths are internal looping targets without a listen path, so the
 	// full URL is the only form they can be matched against.
-	return agentprotocol.IsProtocolVEMPath(reqPath) && spec.spec.MatchString(reqPath)
+	if spec.Status == BlackList || agentprotocol.IsProtocolVEMPath(reqPath) {
+		return spec.spec.MatchString(reqPath)
+	}
+	return false
 }
 
 func (oasEndpointMatcher) grants(r *http.Request, spec *URLSpec, api *APISpec) bool {
@@ -561,7 +565,8 @@ func (a *APISpec) oasOperationMatches(r *http.Request, spec *URLSpec) bool {
 		return true
 	}
 
-	clean := a.StripListenPath(r.URL.Path)
+	// The escaped path keeps an encoded slash inside one parameter value.
+	clean := a.StripListenPath(r.URL.EscapedPath())
 	for _, candidate := range []string{a.StripVersionPath(clean), clean} {
 		params, ok := spec.oasExact.matches(candidate)
 		if !ok {
@@ -572,10 +577,38 @@ func (a *APISpec) oasOperationMatches(r *http.Request, spec *URLSpec) bool {
 		if a.validateRequestEnabled(operation.OperationID) {
 			return true
 		}
-		return pathParamsMatchOperation(params, operation)
+		return pathParamsMatchParameters(params, pathParameters(pathItem, operation))
 	}
 
 	return false
+}
+
+// pathParameters returns the operation parameters plus the path item
+// parameters the operation does not override (same name and location).
+func pathParameters(pathItem *openapi3.PathItem, operation *openapi3.Operation) openapi3.Parameters {
+	if len(pathItem.Parameters) == 0 {
+		return operation.Parameters
+	}
+
+	merged := make(openapi3.Parameters, 0, len(operation.Parameters)+len(pathItem.Parameters))
+	merged = append(merged, operation.Parameters...)
+	for _, ref := range pathItem.Parameters {
+		if ref == nil || ref.Value == nil {
+			continue
+		}
+		overridden := false
+		for _, opRef := range operation.Parameters {
+			if opRef != nil && opRef.Value != nil && opRef.Value.Name == ref.Value.Name && opRef.Value.In == ref.Value.In {
+				overridden = true
+				break
+			}
+		}
+		if !overridden {
+			merged = append(merged, ref)
+		}
+	}
+
+	return merged
 }
 
 // validateRequestEnabled reports whether the Tyk validateRequest middleware

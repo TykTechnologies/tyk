@@ -117,6 +117,55 @@ func TestOASAllowList_ListenPathPrefixOfEndpoints(t *testing.T) {
 }
 
 func TestOASAllowList_DeclaredOperationOnly(t *testing.T) {
+	t.Run("parameters declared on the path item", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ts.Gw.LoadAPI(buildOASAPIWithPaths("/api", true, oas.Operations{
+			"getUser": {Allow: &oas.Allowance{Enabled: true}},
+		}, map[string]*openapi3.PathItem{"/users/{id}": {
+			Parameters: openapi3.Parameters{pathParam("id", &openapi3.Schema{Type: &openapi3.Types{"integer"}})},
+			Get:        &openapi3.Operation{OperationID: "getUser", Responses: oasResponse200()},
+		}}))
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/api/users/123", Code: http.StatusOK, BodyMatch: `"Url":"/users/123"`},
+			{Path: "/api/users/abc", Code: http.StatusForbidden},
+		}...)
+	})
+
+	t.Run("encoded slash inside a parameter value", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ts.Gw.LoadAPI(buildOASAPIWithPaths("/api", true, oas.Operations{
+			"getFile": {Allow: &oas.Allowance{Enabled: true}},
+		}, map[string]*openapi3.PathItem{"/files/{name}": {Get: &openapi3.Operation{
+			OperationID: "getFile",
+			Parameters:  openapi3.Parameters{pathParam("name", &openapi3.Schema{Type: &openapi3.Types{"string"}})},
+			Responses:   oasResponse200(),
+		}}}))
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/api/files/a%2Fb", Code: http.StatusOK},
+			{Path: "/api/files/a/b", Code: http.StatusForbidden},
+		}...)
+	})
+
+	t.Run("wildcard template", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ts.Gw.LoadAPI(buildOASAPIWithPaths("/api", true, oas.Operations{
+			"files": {Allow: &oas.Allowance{Enabled: true}},
+		}, map[string]*openapi3.PathItem{"/files/*": {Get: &openapi3.Operation{OperationID: "files", Responses: oasResponse200()}}}))
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/api/files/a/b", Code: http.StatusOK, BodyMatch: `"Url":"/files/a/b"`},
+			{Path: "/api/other", Code: http.StatusForbidden},
+		}...)
+	})
+
 	t.Run("allow list alone enforces path parameter schemas", func(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
@@ -189,6 +238,29 @@ func TestOASIgnoreAuthentication_ListenPathPrefixOfEndpoints(t *testing.T) {
 // behaviour TT-18034 must not touch: an endpoint path that includes the listen
 // path still matches the full request URL, and the upstream receives the
 // stripped path.
+// TestOASBlockList_ListenPathPrefixOfEndpoints: a block entry keeps matching
+// the full URL, so the listen-path-only form stays blocked.
+func TestOASBlockList_ListenPathPrefixOfEndpoints(t *testing.T) {
+	for _, unsafe := range []bool{false, true} {
+		t.Run("allow_unsafe_listen_path_matching="+jsonMarshalString(unsafe), func(t *testing.T) {
+			ts := StartTest(func(globalConf *config.Config) {
+				globalConf.AllowUnsafeListenPathMatching = unsafe
+			})
+			defer ts.Close()
+
+			ts.Gw.LoadAPI(buildOASAPIWithPaths("/employees", true, oas.Operations{
+				"getStatic": {Block: &oas.Allowance{Enabled: true}},
+			}, employeesPaths()))
+
+			_, _ = ts.Run(t, []test.TestCase{
+				{Path: "/employees/employees/static", Code: http.StatusForbidden},
+				{Path: "/employees/static", Code: http.StatusForbidden},
+				{Path: "/employees/employees/123", Code: http.StatusOK, BodyMatch: `"Url":"/employees/123"`},
+			}...)
+		})
+	}
+}
+
 func TestClassicAllowList_ListenPathInEndpointPathUnchanged(t *testing.T) {
 	for _, unsafe := range []bool{false, true} {
 		t.Run("allow_unsafe_listen_path_matching="+jsonMarshalString(unsafe), func(t *testing.T) {
