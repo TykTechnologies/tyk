@@ -10,6 +10,10 @@ type ProtocolSupport interface{ SupportedProtocolVersions() []string }
 // modern protocol themselves instead of treating it as removed.
 type ModernInitializeSupport interface{ ServesModernInitialize() bool }
 
+// ModernPingSupport is implemented by endpoints that answer ping on the modern
+// protocol themselves instead of treating it as removed.
+type ModernPingSupport interface{ ServesModernPing() bool }
+
 // ServedProtocolVersions lists native proxy support in deterministic order.
 func ServedProtocolVersions() []string {
 	return append([]string{ModernProtocolVersion}, LegacyProtocolVersions()...)

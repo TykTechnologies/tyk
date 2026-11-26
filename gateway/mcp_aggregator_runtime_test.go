@@ -509,7 +509,7 @@ func TestMCPAggregatorLoopTrustDoesNotAuthenticateFurtherLoops(t *testing.T) {
 
 	res := postModernToolsList(t, ts, "/company-tools/", companyToolsKey(t, ts))
 
-	require.Equal(t, http.StatusOK, res.status, res.body)
+	require.Equal(t, http.StatusServiceUnavailable, res.status, "the only aggregated proxy did not answer: %s", res.body)
 	assert.Empty(t, res.tools, "the aggregator's per-hop trust must not reach secret-rest")
 	warnings := mcpAggregatorOmissionWarnings(hook, "github-mcp")
 	require.Len(t, warnings, 1)
@@ -589,7 +589,7 @@ func TestMCPAggregatorOmitsAggregatedProxyRepeatingACursor(t *testing.T) {
 
 	res := postModernToolsList(t, ts, "/company-tools/", companyToolsKey(t, ts))
 
-	require.Equal(t, http.StatusOK, res.status, res.body)
+	require.Equal(t, http.StatusServiceUnavailable, res.status, "the only aggregated proxy did not answer: %s", res.body)
 	assert.Empty(t, res.tools)
 	warnings := mcpAggregatorOmissionWarnings(hook, "github-mcp")
 	require.Len(t, warnings, 1)
@@ -608,7 +608,7 @@ func TestMCPAggregatorOmitsAggregatedProxyExceedingThePageLimit(t *testing.T) {
 
 	res := postModernToolsList(t, ts, "/company-tools/", companyToolsKey(t, ts))
 
-	require.Equal(t, http.StatusOK, res.status, res.body)
+	require.Equal(t, http.StatusServiceUnavailable, res.status, "the only aggregated proxy did not answer: %s", res.body)
 	assert.Empty(t, res.tools, "a partial list is not served")
 	assert.EqualValues(t, mcpAggregatorMaxListPages, pages.Load())
 	warnings := mcpAggregatorOmissionWarnings(hook, "github-mcp")
