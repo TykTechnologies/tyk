@@ -283,3 +283,43 @@ func TestMCPAggregatorUpstreamExchangeRecoversFromAPanickingChain(t *testing.T) 
 	require.Error(t, err)
 	assert.False(t, errors.Is(err, context.Canceled))
 }
+
+func TestMCPAggregatorListDeadlineOmitsAHungProxyWithoutBoundingToolCalls(t *testing.T) {
+	previous := mcpAggregatorListTimeout
+	mcpAggregatorListTimeout = 500 * time.Millisecond
+	t.Cleanup(func() { mcpAggregatorListTimeout = previous })
+
+	hung := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		select {
+		case <-time.After(3 * time.Second):
+		case <-r.Context().Done():
+		}
+	}))
+	t.Cleanup(hung.Close)
+	github := newMCPRoutingUpstream(t, namedTools("list_issues")...)
+	github.call = slowTool(1500*time.Millisecond, make(chan time.Time, 1))
+	ts := StartTest(nil)
+	t.Cleanup(ts.Close)
+	ts.Gw.LoadAPI(
+		remoteMCPProxyRuntimeSpec("orders-mcp", hung.URL),
+		remoteMCPProxyRuntimeSpec("github-mcp", github.URL),
+		companyToolsRuntimeSpec(aggregated("orders-mcp", "orders"), aggregated("github-mcp", "github")),
+	)
+	key := companyToolsKey(t, ts)
+	hook := log.GetTestHook(t)
+
+	start := time.Now()
+	names, _ := mcpListedTools(t, postMCPTestCall(t, ts, "/company-tools/", modernCall(mcp.MethodToolsList, key)))
+
+	assert.Equal(t, []string{"github__list_issues"}, names)
+	assert.Less(t, time.Since(start), 2*time.Second, "the hung proxy does not hold the list past its deadline")
+	warnings := mcpAggregatorOmissionWarnings(hook, "orders-mcp")
+	require.Len(t, warnings, 1)
+	assert.Equal(t, "orders", warnings[0].Data["alias"])
+
+	res := postMCPToolsCall(t, ts, key, toolCallParams("github__list_issues", `{}`, ""))
+
+	assert.Equal(t, http.StatusOK, res.status, res.body)
+	assert.Nil(t, res.rpc.Error, res.body)
+	assert.Contains(t, res.body, "slow answer", "a call may run longer than the list deadline")
+}
