@@ -105,6 +105,12 @@ func (k *RateLimitForAPI) ProcessRequest(rw http.ResponseWriter, r *http.Request
 		return nil, http.StatusOK
 	}
 
+	// The aggregator lists an aggregated proxy's tools on its own account, so
+	// the listing leaves the proxy's limits to the calls agents make.
+	if isMCPAggregatorCatalogueHop(k.Spec, r) {
+		return nil, http.StatusOK
+	}
+
 	session, endpoint := k.getSession(r)
 	// The listen path already spent the API-wide limit on this request. Its
 	// JSON-RPC VEM hops only enforce the endpoint limits that match them.
