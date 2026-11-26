@@ -236,6 +236,23 @@ func TestMCPAggregatorVersionMismatchSignals(t *testing.T) {
 			"method \"tools/list\" is invalid during session initialization\n",
 			`upstream requires a legacy session: method "tools/list" is invalid during session initialization`,
 		},
+		"mcp-go invalid session ID": {
+			http.StatusBadRequest, http.Header{headerContentType: {"text/plain"}},
+			"Invalid session ID\n",
+			"upstream requires a legacy session: Invalid session ID",
+		},
+		"application error saying not initialized in plain text": {
+			http.StatusBadRequest, http.Header{headerContentType: {"text/plain"}}, "Database not initialized", "",
+		},
+		"application error saying not initialized as a JSON-RPC error": {
+			http.StatusBadRequest, jsonHeader, `{"jsonrpc":"2.0","id":1,"error":{"code":-32603,"message":"Database not initialized"}}`, "",
+		},
+		"application error naming a session ID": {
+			http.StatusNotFound, jsonHeader, `{"jsonrpc":"2.0","id":1,"error":{"code":-32000,"message":"user for session id abc has no tools"}}`, "",
+		},
+		"application error about a missing session cookie": {
+			http.StatusBadRequest, http.Header{headerContentType: {"text/plain"}}, "missing session cookie", "",
+		},
 		"invalid session token from an auth layer": {
 			http.StatusBadRequest, jsonHeader, `{"jsonrpc":"2.0","id":1,"error":{"code":-32000,"message":"invalid session token"}}`, "",
 		},
@@ -252,6 +269,19 @@ func TestMCPAggregatorVersionMismatchSignals(t *testing.T) {
 			assert.Equal(t, tc.want, mcpAggregatorVersionMismatch(mcp.MethodServerDiscover, tc.status, tc.header, []byte(tc.body)))
 		})
 	}
+}
+
+func TestMCPAggregatorAdmitsAggregatedProxyWhoseUpstreamFailsWithAnUnrelatedError(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "Database not initialized", http.StatusBadRequest)
+	}))
+	t.Cleanup(upstream.Close)
+	ts := startMCPAggregatorCompatTest(t, upstream.URL)
+
+	res := postMCPAggregatorThroughValidateMCP(t, ts.Gw, http.MethodPost, mcpAggregatorOAS("company-tools", mcpAggregatorRuntimeOrg, aggregated("github-mcp", "github")))
+
+	assert.Equal(t, http.StatusOK, res.code, res.body)
+	assert.NotContains(t, res.body, "does not support MCP version")
 }
 
 func TestMCPAggregatorVersionTextSignalsApplyOnlyToDiscovery(t *testing.T) {

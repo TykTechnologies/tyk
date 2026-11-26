@@ -124,19 +124,21 @@ func mcpAggregatorVersionMismatch(method string, status int, header http.Header,
 // asksForLegacySession matches the replies stateful MCP SDK servers give to a
 // request without a session: "Mcp-Session-Id header is required", "No valid
 // session ID provided", "Session not found", "Server not initialized",
-// "Missing session ID" and "... is invalid during session initialization".
-// Only session-id forms count, so an application error such as "invalid
-// session token" from a modern upstream is not mistaken for one.
+// "Missing session ID", "Invalid session ID" and "... is invalid during
+// session initialization". Only these SDK forms count, so an application
+// error such as "invalid session token" or "Database not initialized" from a
+// modern upstream is reported as that upstream failing, not as a version
+// mismatch.
 func asksForLegacySession(text string) bool {
 	text = strings.ToLower(text)
 	for _, phrase := range []string{
 		"mcp-session-id",
-		"session id",
+		"no valid session id",
+		"missing session id",
+		"invalid session id",
 		"session not found",
-		"no valid session",
-		"missing session",
-		"not initialized",
-		"during session initialization",
+		"server not initialized",
+		"invalid during session initialization",
 	} {
 		if strings.Contains(text, phrase) {
 			return true
