@@ -1231,8 +1231,8 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 const jwtClaimsOnlyMetaKey = "tyk_jwt_claims_only"
 
 func isJWTClaimsOnlySession(session *user.SessionState) bool {
-	claimsOnly, _ := session.MetaData[jwtClaimsOnlyMetaKey].(bool)
-	return claimsOnly
+	claimsOnly, ok := session.MetaData[jwtClaimsOnlyMetaKey].(bool)
+	return ok && claimsOnly
 }
 
 // claimsOnlySessionLifetime bounds, in seconds, the Redis record of a claims-only

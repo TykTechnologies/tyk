@@ -644,10 +644,10 @@ func TestJWTClaimsOnly_SessionKeyRejectedByOtherAuthMethods(t *testing.T) {
 	alice := "alice-" + uuid.New()
 
 	spec := claimsOnlyAPI("multi-auth-api")
-	spec.OAS.T.Components.SecuritySchemes["apiKey"] = &openapi3.SecuritySchemeRef{
+	spec.OAS.Components.SecuritySchemes["apiKey"] = &openapi3.SecuritySchemeRef{
 		Value: &openapi3.SecurityScheme{Type: "apiKey", In: "header", Name: "X-Tyk-Key"},
 	}
-	spec.OAS.T.Security = openapi3.SecurityRequirements{{"jwtAuth": []string{}}, {"apiKey": []string{}}}
+	spec.OAS.Security = openapi3.SecurityRequirements{{"jwtAuth": []string{}}, {"apiKey": []string{}}}
 	authentication := spec.OAS.GetTykExtension().Server.Authentication
 	authentication.SecurityProcessingMode = oas.SecurityProcessingModeCompliant
 	enabled := true

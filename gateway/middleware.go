@@ -689,7 +689,7 @@ func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, 
 	return session, found
 }
 
-func (t *BaseMiddleware) checkSessionAndIdentityForValidKey(originalKey string, r *http.Request) (user.SessionState, bool) {
+func (t *BaseMiddleware) checkSessionAndIdentityForValidKey(originalKey string, _ *http.Request) (user.SessionState, bool) {
 	key := originalKey
 	minLength := effectiveMinTokenLength(t.Spec.GlobalConfig.MinTokenLength)
 
