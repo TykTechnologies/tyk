@@ -500,3 +500,9 @@ func (a *APISpec) APIType() string {
 func (a *APISpec) IsSyntheticMCPAdapter() bool {
 	return a != nil && a.MCPAdapter.Synthetic
 }
+
+// IsMCPAggregator reports whether this spec is an MCP aggregator: an MCP API
+// with the reserved aggregator upstream and an x-tyk-mcp-aggregator extension.
+func (a *APISpec) IsMCPAggregator() bool {
+	return a != nil && a.APIDefinition.IsMCPAggregator() && a.OAS.GetTykMCPAggregatorExtension() != nil
+}
