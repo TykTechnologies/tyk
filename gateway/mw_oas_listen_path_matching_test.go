@@ -75,7 +75,7 @@ func TestOASAllowList_ListenPathPrefixOfEndpoints(t *testing.T) {
 		_, _ = ts.Run(t, []test.TestCase{
 			{Path: "/employees/employees/static", Code: http.StatusOK, BodyMatch: `"Url":"/employees/static"`},
 			{Path: "/employees/employees/123", Code: http.StatusOK, BodyMatch: `"Url":"/employees/123"`},
-			{Path: "/employees/employees/abc", Code: http.StatusForbidden},
+			{Path: "/employees/employees/abc", Code: http.StatusUnprocessableEntity},
 			{Path: "/employees/static", Code: http.StatusForbidden},
 			{Path: "/employees/hello_world", Code: http.StatusForbidden},
 			{Path: "/employees/foo/bar", Code: http.StatusForbidden},
@@ -142,7 +142,7 @@ func TestOASAllowList_DeclaredOperationOnly(t *testing.T) {
 
 		_, _ = ts.Run(t, []test.TestCase{
 			{Path: "/api/users/123", Code: http.StatusOK, BodyMatch: `"Url":"/users/123"`},
-			{Path: "/api/users/abc", Code: http.StatusForbidden},
+			{Path: "/api/users/abc", Code: http.StatusUnprocessableEntity},
 			{Path: "/api/other", Code: http.StatusForbidden},
 		}...)
 	})
@@ -157,7 +157,7 @@ func TestOASAllowList_DeclaredOperationOnly(t *testing.T) {
 
 		_, _ = ts.Run(t, []test.TestCase{
 			{Path: "/employees/users/123", Code: http.StatusOK, BodyMatch: `"Url":"/employees/users/123"`},
-			{Path: "/employees/users/abc", Code: http.StatusForbidden},
+			{Path: "/employees/users/abc", Code: http.StatusUnprocessableEntity},
 			{Path: "/employees/other", Code: http.StatusForbidden},
 		}...)
 	})

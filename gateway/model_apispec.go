@@ -563,12 +563,30 @@ func (a *APISpec) oasOperationMatches(r *http.Request, spec *URLSpec) bool {
 
 	clean := a.StripListenPath(r.URL.Path)
 	for _, candidate := range []string{a.StripVersionPath(clean), clean} {
-		if params, ok := spec.oasExact.matches(candidate); ok {
-			return pathParamsMatchOperation(params, operation)
+		params, ok := spec.oasExact.matches(candidate)
+		if !ok {
+			continue
 		}
+		// validateRequest on the operation keeps answering invalid parameter
+		// values with its configured status code.
+		if a.validateRequestEnabled(operation.OperationID) {
+			return true
+		}
+		return pathParamsMatchOperation(params, operation)
 	}
 
 	return false
+}
+
+// validateRequestEnabled reports whether the Tyk validateRequest middleware
+// is enabled on the OAS operation.
+func (a *APISpec) validateRequestEnabled(operationID string) bool {
+	middleware := a.OAS.GetTykMiddleware()
+	if middleware == nil {
+		return false
+	}
+	operation := middleware.Operations[operationID]
+	return operation != nil && operation.ValidateRequest != nil && operation.ValidateRequest.Enabled
 }
 
 // matchCandidatePath looks up the path item and operation from the OAS spec for a
