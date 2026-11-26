@@ -3,6 +3,7 @@ package gateway
 import (
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -48,14 +49,16 @@ func (gw *Gateway) validateMCPAggregatorUpstreams(_ *http.Request, mcpObj *oas.O
 
 // probeMCPAggregatorUpstreams checks that the aggregated MCP proxies of an
 // incoming aggregator serve MCP 2026-07-28, the only version an aggregator
-// uses to call them. The Gateway API handlers call it after the request's API
-// ID checks, so a create probes under the aggregator's final API ID and a
-// request those checks reject never reaches an upstream.
+// uses to call them, and expose every tool the aggregator selects from them.
+// The Gateway API handlers call it after the request's API ID checks, so a
+// create probes under the aggregator's final API ID and a request those
+// checks reject never reaches an upstream.
 //
 // An update probes only the aggregated proxies the loaded aggregator does not
-// already admit. One it admits keeps being served, or omitted, by the runtime
-// on every tools/list, so a change such as a rename never fails because such a
-// proxy has changed since it was admitted.
+// already admit with the same alias and tool selection. One it admits keeps
+// being served, or omitted, by the runtime on every tools/list, so a change
+// such as a rename never fails because such a proxy has changed since it was
+// admitted.
 func (gw *Gateway) probeMCPAggregatorUpstreams(r *http.Request, mcpObj *oas.OAS) (string, int) {
 	if mcpObj == nil || mcpObj.GetTykExtension() == nil {
 		return "", 0
@@ -88,7 +91,7 @@ func (gw *Gateway) probeMCPAggregatorUpstreams(r *http.Request, mcpObj *oas.OAS)
 	if len(upstreams) == 0 {
 		return "", 0
 	}
-	return gw.validateMCPAggregatorUpstreamVersions(r, &APISpec{APIDefinition: &incoming}, refs, upstreams)
+	return gw.validateMCPAggregatorUpstreamViews(r, &APISpec{APIDefinition: &incoming}, refs, upstreams)
 }
 
 // admittedMCPAggregatorUpstreams returns the aggregated MCP proxies of the
@@ -114,10 +117,11 @@ func (gw *Gateway) admittedMCPAggregatorUpstreams(apiID, orgID string) map[strin
 }
 
 // mcpAggregatorUpstreamUnchanged reports whether the loaded aggregator already
-// admits ref, so an update need not probe it again.
+// admits ref under the same alias and tool selection, so an update need not
+// probe it again: its selection and aggregated names were checked then.
 func mcpAggregatorUpstreamUnchanged(admitted map[string]oas.TykMCPAggregatorUpstream, ref oas.TykMCPAggregatorUpstream) bool {
-	_, ok := admitted[ref.APIID]
-	return ok
+	previous, ok := admitted[ref.APIID]
+	return ok && previous.Alias == ref.Alias && slices.Equal(previous.Tools, ref.Tools)
 }
 
 // mcpAggregatorUpstreamStatus says whether an API can serve as an aggregated

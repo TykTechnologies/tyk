@@ -11,6 +11,7 @@ import (
 	"sort"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	mcpsdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/sirupsen/logrus"
@@ -41,6 +42,9 @@ const (
 	mcpAggregatorMaxCatalogueBytes = 32 << 20
 
 	mcpAggregatorUnnamedToolMsg = "MCP aggregator skips aggregated tool without a name"
+
+	mcpAggregatorSelectedToolMissingMsg = "MCP aggregator omits selected tool the aggregated MCP proxy does not expose"
+	mcpAggregatorToolNameTooLongMsg     = "MCP aggregator omits aggregated tool whose name exceeds the MCP tool name limit"
 )
 
 // MCPAggregatorMiddleware serves an MCP aggregator's JSON-RPC methods after the
@@ -305,8 +309,138 @@ func mcpAggregatorFailureReason(err error) string {
 	return "tools/list failed: " + err.Error()
 }
 
+// listUpstreamTools lists the tools an aggregated MCP proxy exposes now and
+// keeps the ones the aggregator selects. A selected tool the proxy no longer
+// exposes is left out with a warning, so the aggregator keeps serving the rest.
 func (d mcpAggregatorDispatcher) listUpstreamTools(parent *http.Request, upstream mcpaggregator.Upstream) ([]mcpAggregatorTool, error) {
+	spec, err := d.upstreamSpec(upstream.APIID)
+	if err != nil {
+		return nil, err
+	}
+	exposed, err := d.exposedTools(parent, spec, upstream.Alias, d.loopTrust(spec), newMCPAggregatorToolSelection(upstream))
+	if err != nil {
+		return nil, err
+	}
 	var tools []mcpAggregatorTool
+	names := make(map[string]struct{}, len(exposed))
+	for _, tool := range exposed {
+		names[tool.Name] = struct{}{}
+		aggregatedName := mcpaggregator.ToolName(upstream.Alias, tool.Name)
+		if reason, tooLong := mcpAggregatorNameTooLong(upstream.Alias, tool.Name); tooLong {
+			d.warnRepeated(mcpAggregatorToolNameTooLongMsg, upstream, tool.Name, reason)
+			continue
+		}
+		encodedName, err := json.Marshal(aggregatedName)
+		if err != nil {
+			return nil, err
+		}
+		tool.Definition["name"] = encodedName
+		tools = append(tools, mcpAggregatorTool{
+			Name:             aggregatedName,
+			Alias:            upstream.Alias,
+			UpstreamAPIID:    upstream.APIID,
+			UpstreamToolName: tool.Name,
+			Definition:       tool.Definition,
+		})
+	}
+	for _, tool := range upstream.Tools {
+		if _, ok := names[tool]; !ok {
+			d.warnRepeated(mcpAggregatorSelectedToolMissingMsg, upstream, tool, "")
+		}
+	}
+	return tools, nil
+}
+
+// mcpAggregatorNameTooLong says why the aggregated name of an aggregated MCP
+// proxy's tool is over MCP's tool name limit, if it is.
+func mcpAggregatorNameTooLong(alias, tool string) (string, bool) {
+	aggregatedName := mcpaggregator.ToolName(alias, tool)
+	if mcpAggregatorNameFits(aggregatedName) {
+		return "", false
+	}
+	return fmt.Sprintf("%q plus the tool name is %d characters, over the %d character limit for MCP tool names",
+		alias+mcpaggregator.NamespaceSeparator, utf8.RuneCountInString(aggregatedName), mcpaggregator.MaxToolNameLength), true
+}
+
+// warnRepeated logs a warning about one tool of an aggregated MCP proxy that
+// every tools/list finds again, since the catalogue is not cached: at most once
+// per mcpAggregatorRepeatedWarningInterval for the same aggregator, proxy, tool
+// and message.
+func (d mcpAggregatorDispatcher) warnRepeated(msg string, upstream mcpaggregator.Upstream, tool, reason string) {
+	if d.gw != nil && !d.gw.mcpAggregatorWarnings.allow(msg+"\x00"+d.aggregator.APIID+"\x00"+upstream.APIID+"\x00"+tool, time.Now()) {
+		return
+	}
+	fields := logrus.Fields{
+		"aggregator_api_id": d.aggregator.APIID,
+		"upstream_api_id":   upstream.APIID,
+		"alias":             upstream.Alias,
+		"tool":              tool,
+	}
+	if reason != "" {
+		fields["reason"] = reason
+	}
+	log.WithFields(fields).Warn(msg)
+}
+
+const (
+	// mcpAggregatorRepeatedWarningInterval is how often a warning that every
+	// tools/list would repeat is logged again for the same tool.
+	mcpAggregatorRepeatedWarningInterval = 10 * time.Minute
+	// mcpAggregatorMaxThrottledWarnings bounds the warnings remembered for
+	// throttling; past it, warnings are logged every time again.
+	mcpAggregatorMaxThrottledWarnings = 10000
+)
+
+// mcpAggregatorWarningThrottle remembers when each repeated tools/list
+// warning was last logged. The zero value is ready to use.
+type mcpAggregatorWarningThrottle struct {
+	mu     sync.Mutex
+	logged map[string]time.Time
+}
+
+// allow reports whether the warning identified by key should be logged now,
+// and if so records that it was.
+func (t *mcpAggregatorWarningThrottle) allow(key string, now time.Time) bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if last, ok := t.logged[key]; ok && now.Sub(last) < mcpAggregatorRepeatedWarningInterval {
+		return false
+	}
+	if t.logged == nil {
+		t.logged = make(map[string]time.Time)
+	}
+	if len(t.logged) >= mcpAggregatorMaxThrottledWarnings {
+		for k, last := range t.logged {
+			if now.Sub(last) >= mcpAggregatorRepeatedWarningInterval {
+				delete(t.logged, k)
+			}
+		}
+		if len(t.logged) >= mcpAggregatorMaxThrottledWarnings {
+			return true
+		}
+	}
+	t.logged[key] = now
+	return true
+}
+
+// mcpAggregatorExposedTool is one tool as an aggregated MCP proxy lists it,
+// under the proxy's own name.
+type mcpAggregatorExposedTool struct {
+	Name       string
+	Definition map[string]json.RawMessage
+}
+
+// exposedTools reads every tools/list page of an aggregated MCP proxy under
+// the given loop trust, the proxy's complete current tool view after its own
+// renames and restrictions, and returns the tools the selection keeps (every
+// tool for a nil selection). Admission and the runtime share it, so a
+// selection is checked against the same view the aggregator serves from.
+//
+// The tool limit counts kept tools only, so a proxy with more tools than an
+// aggregator may serve can still be narrowed to the few it selects; the
+// definitions of the other tools are never kept.
+func (d mcpAggregatorDispatcher) exposedTools(parent *http.Request, spec *APISpec, alias string, trust *mcpAggregatorLoopTrust, selection mcpAggregatorToolSelection) ([]mcpAggregatorExposedTool, error) {
+	var tools []mcpAggregatorExposedTool
 	params := map[string]any{}
 	seenCursors := map[string]struct{}{}
 	var listedBytes int
@@ -314,12 +448,14 @@ func (d mcpAggregatorDispatcher) listUpstreamTools(parent *http.Request, upstrea
 		if page == mcpAggregatorMaxListPages {
 			return nil, fmt.Errorf("returned more than %d pages", mcpAggregatorMaxListPages)
 		}
-		raw, err := d.call(parent, upstream, mcp.MethodToolsList, params)
+		raw, err := d.send(parent, spec, mcp.MethodToolsList, params, trust)
 		if err != nil {
 			return nil, err
 		}
-		// A proxy that lists more than the whole catalogue may hold can never
-		// be served, so its pages stop being read and buffered here.
+		// Reading stops once a proxy lists more than the whole catalogue may
+		// hold, so one proxy cannot make the aggregator read more than that.
+		// The pages are read whole to find the selected tools, so such a proxy
+		// is left out even when only some of its tools are selected.
 		if listedBytes += len(raw); listedBytes > mcpAggregatorMaxCatalogueBytes {
 			return nil, fmt.Errorf("returned more than %d bytes of tools", mcpAggregatorMaxCatalogueBytes)
 		}
@@ -335,24 +471,15 @@ func (d mcpAggregatorDispatcher) listUpstreamTools(parent *http.Request, upstrea
 			if json.Unmarshal(definition["name"], &name) != nil || name == "" {
 				log.WithFields(logrus.Fields{
 					"aggregator_api_id": d.aggregator.APIID,
-					"upstream_api_id":   upstream.APIID,
-					"alias":             upstream.Alias,
+					"upstream_api_id":   spec.APIID,
+					"alias":             alias,
 				}).Warn(mcpAggregatorUnnamedToolMsg)
 				continue
 			}
-			aggregatedName := mcpaggregator.ToolName(upstream.Alias, name)
-			encodedName, err := json.Marshal(aggregatedName)
-			if err != nil {
-				return nil, err
+			if !selection.selects(name) {
+				continue
 			}
-			definition["name"] = encodedName
-			tools = append(tools, mcpAggregatorTool{
-				Name:             aggregatedName,
-				Alias:            upstream.Alias,
-				UpstreamAPIID:    upstream.APIID,
-				UpstreamToolName: name,
-				Definition:       definition,
-			})
+			tools = append(tools, mcpAggregatorExposedTool{Name: name, Definition: definition})
 		}
 		if len(tools) > mcpAggregatorMaxCatalogueTools {
 			return nil, fmt.Errorf("returned more than %d tools", mcpAggregatorMaxCatalogueTools)
