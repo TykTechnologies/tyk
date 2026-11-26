@@ -235,6 +235,8 @@ var (
 	ErrInvalidUpstreamOAuthClientAuthMethod = errors.New("invalid upstream OAuth client authentication method, valid values are: client_secret_basic, client_secret_post")
 	// ErrUpstreamOAuthJWTBearerOASOnly is the error to return when the JWT Bearer grant is configured on a Tyk classic API.
 	ErrUpstreamOAuthJWTBearerOASOnly = errors.New("upstream OAuth JWT Bearer grant is supported only for Tyk OAS APIs")
+	// ErrUpstreamOAuthJWTBearerConfigRequired is the error to return when the JWT Bearer grant is selected without its settings.
+	ErrUpstreamOAuthJWTBearerConfigRequired = errors.New("upstream OAuth JWT Bearer grant requires tokenUrl, certId, issuer, subject and audience")
 	// ErrInvalidUpstreamOAuthJWTBearerExpiresIn is the error to return when the JWT Bearer expiresIn is not a positive duration.
 	ErrInvalidUpstreamOAuthJWTBearerExpiresIn = errors.New("invalid upstream OAuth JWT Bearer expiresIn, must be a positive duration")
 	// ErrAllLoadBalancingTargetsZeroWeight is the error to return when all load balancing targets have weight 0.
@@ -285,6 +287,13 @@ func (r *RuleUpstreamAuth) Validate(apiDef *APIDefinition, validationResult *Val
 		if !apiDef.IsOAS {
 			validationResult.IsValid = false
 			validationResult.AppendError(ErrUpstreamOAuthJWTBearerOASOnly)
+		}
+		// The OAS schema requires these when the jwtBearer block is present, but
+		// not the block itself. Without them every request would fail with a 500.
+		if jb := upstreamOAuth.JWTBearer; jb.TokenURL == "" || jb.CertID == "" ||
+			jb.Issuer == "" || jb.Subject == "" || jb.Audience == "" {
+			validationResult.IsValid = false
+			validationResult.AppendError(ErrUpstreamOAuthJWTBearerConfigRequired)
 		}
 		// Zero means unset: the gateway applies its default lifetime. Malformed
 		// duration strings are rejected by the OAS schema pattern on save.

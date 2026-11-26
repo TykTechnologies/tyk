@@ -628,6 +628,13 @@ func TestRuleUpstreamAuth_Validate(t *testing.T) {
 				OAuth: UpstreamOAuth{
 					Enabled:               true,
 					AllowedAuthorizeTypes: []string{OAuthAuthorizationTypeJWTBearer},
+					JWTBearer: UpstreamOAuthJWTBearer{
+						TokenURL: "https://login.salesforce.com/services/oauth2/token",
+						CertID:   "cert-id",
+						Issuer:   "consumer-key",
+						Subject:  "user@example.com",
+						Audience: "https://login.salesforce.com",
+					},
 				},
 			},
 			result: ValidationResult{IsValid: true},
@@ -641,6 +648,11 @@ func TestRuleUpstreamAuth_Validate(t *testing.T) {
 					Enabled:               true,
 					AllowedAuthorizeTypes: []string{OAuthAuthorizationTypeJWTBearer},
 					JWTBearer: UpstreamOAuthJWTBearer{
+						TokenURL:  "https://login.salesforce.com/services/oauth2/token",
+						CertID:    "cert-id",
+						Issuer:    "consumer-key",
+						Subject:   "user@example.com",
+						Audience:  "https://login.salesforce.com",
 						ExpiresIn: tyktime.ReadableDuration(-time.Minute),
 					},
 				},
@@ -657,11 +669,54 @@ func TestRuleUpstreamAuth_Validate(t *testing.T) {
 				OAuth: UpstreamOAuth{
 					Enabled:               true,
 					AllowedAuthorizeTypes: []string{OAuthAuthorizationTypeJWTBearer},
+					JWTBearer: UpstreamOAuthJWTBearer{
+						TokenURL: "https://login.salesforce.com/services/oauth2/token",
+						CertID:   "cert-id",
+						Issuer:   "consumer-key",
+						Subject:  "user@example.com",
+						Audience: "https://login.salesforce.com",
+					},
 				},
 			},
 			result: ValidationResult{
 				IsValid: false,
 				Errors:  []error{ErrUpstreamOAuthJWTBearerOASOnly},
+			},
+		},
+		{
+			name:  "jwt bearer without its settings is rejected",
+			isOAS: true,
+			upstreamAuth: UpstreamAuth{
+				Enabled: true,
+				OAuth: UpstreamOAuth{
+					Enabled:               true,
+					AllowedAuthorizeTypes: []string{OAuthAuthorizationTypeJWTBearer},
+				},
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrUpstreamOAuthJWTBearerConfigRequired},
+			},
+		},
+		{
+			name:  "jwt bearer with a missing setting is rejected",
+			isOAS: true,
+			upstreamAuth: UpstreamAuth{
+				Enabled: true,
+				OAuth: UpstreamOAuth{
+					Enabled:               true,
+					AllowedAuthorizeTypes: []string{OAuthAuthorizationTypeJWTBearer},
+					JWTBearer: UpstreamOAuthJWTBearer{
+						TokenURL: "https://login.salesforce.com/services/oauth2/token",
+						CertID:   "cert-id",
+						Issuer:   "consumer-key",
+						Subject:  "user@example.com",
+					},
+				},
+			},
+			result: ValidationResult{
+				IsValid: false,
+				Errors:  []error{ErrUpstreamOAuthJWTBearerConfigRequired},
 			},
 		},
 		{
