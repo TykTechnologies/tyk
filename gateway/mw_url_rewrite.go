@@ -3,6 +3,7 @@ package gateway
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -109,14 +110,34 @@ func (gw *Gateway) urlRewrite(meta *apidef.URLRewriteMeta, r *http.Request) (str
 		ctxSetUrlRewritePath(r, r.URL.Path)
 	}
 
-	newpath = gw.ReplaceTykVariables(r, newpath, true)
+	// Each secret is resolved once, so the host check below compares against
+	// the values this rewrite used, without a second lookup in the secret store.
+	varsReq := r
+	if len(matchGroups) > 0 && strings.Contains(rewriteToPath, "$secret_") {
+		varsReq = r.WithContext(context.WithValue(r.Context(), resolvedSecretsKey{}, map[string]string{}))
+	}
+
+	newpath = gw.ReplaceTykVariables(varsReq, newpath, true)
 
 	if len(matchGroups) > 0 {
 		newpath = keepSingleLeadingSlash(rewriteToPath, newpath)
+
+		if gw.requestValueSetsHost(varsReq, rewriteToPath, newpath) {
+			return path, errRewriteHostFromRequest
+		}
 	}
 
 	return newpath, nil
 }
+
+// errRewriteHostFromRequest is returned when a value from the request would
+// set the scheme, user info, host or port of the rewritten URL.
+var errRewriteHostFromRequest = errors.New("the rewritten URL can't take its host from the request")
+
+// resolvedSecretsKey is the context key of a map from secret reference to the
+// value it resolved to. When a request carries one, replaceVariables reuses
+// those values instead of asking the secret store again.
+type resolvedSecretsKey struct{}
 
 // keepSingleLeadingSlash keeps a rewritten path that the API manager started
 // with a single "/" from starting with "//". An empty value at the start, as
@@ -127,6 +148,43 @@ func keepSingleLeadingSlash(rewriteTo, rewritten string) string {
 		return "/" + strings.TrimLeft(rewritten, "/")
 	}
 	return rewritten
+}
+
+// requestValueSetsHost reports whether values from the request changed the
+// scheme, user info, host or port of rewritten, the result of rewriteTo. Only
+// a host that the API manager wrote, literally or through a variable only they
+// set, may send the request to another server. Loop targets (tyk://) are left
+// to the looping rules.
+//
+// It rebuilds the rewrite with every request value (numbered captures and
+// $tyk_context variables) left empty, and compares the two URLs. That second
+// pass runs only when the rewritten URL has a host and rewriteTo has a
+// variable; a rewrite_to without variables was written by the API manager.
+func (gw *Gateway) requestValueSetsHost(r *http.Request, rewriteTo, rewritten string) bool {
+	if !strings.Contains(rewritten, "//") || !strings.Contains(rewriteTo, "$") {
+		return false
+	}
+
+	got, err := url.Parse(rewritten)
+	if err != nil || got.Host == "" || strings.EqualFold(got.Scheme, LoopScheme) {
+		return false
+	}
+
+	withoutRequest := r.WithContext(r.Context())
+	ctxSetData(withoutRequest, map[string]interface{}{})
+
+	apiManagerOnly := dollarMatch.ReplaceAllString(rewriteTo, "")
+	apiManagerOnly = gw.ReplaceTykVariables(withoutRequest, apiManagerOnly, true)
+	apiManagerOnly = keepSingleLeadingSlash(rewriteTo, apiManagerOnly)
+
+	want, err := url.Parse(apiManagerOnly)
+	if err != nil {
+		return true
+	}
+
+	return !strings.EqualFold(got.Scheme, want.Scheme) ||
+		!strings.EqualFold(got.Host, want.Host) ||
+		got.User.String() != want.User.String()
 }
 
 // ReplaceTykVariables implements a variable replacement hook. It will replace
@@ -222,12 +280,25 @@ func (gw *Gateway) replaceVariables(
 
 		case secretsConfLabel, envLabel, vaultLabel, consulLabel, fileLabel:
 
-			val, err := gw.kvResolver.Resolve(reqCtx, dollarSecretToKVRef(label, key))
+			ref := dollarSecretToKVRef(label, key)
+			resolved, _ := reqCtx.Value(resolvedSecretsKey{}).(map[string]string)
+			if val, ok := resolved[ref]; ok {
+				in = strings.ReplaceAll(in, v, val)
+				continue
+			}
+
+			val, err := gw.kvResolver.Resolve(reqCtx, ref)
 			if err != nil {
+				if resolved != nil {
+					resolved[ref] = ""
+				}
 				in = emptyStringFn(key, in, v)
 				continue
 			}
 
+			if resolved != nil {
+				resolved[ref] = val
+			}
 			in = strings.ReplaceAll(in, v, val)
 
 		default:
@@ -436,6 +507,10 @@ func (m *URLRewriteMiddleware) ProcessRequest(w http.ResponseWriter, r *http.Req
 	oldPath := r.URL.String()
 
 	p, err := m.Gw.urlRewrite(umeta, r)
+	if errors.Is(err, errRewriteHostFromRequest) {
+		m.Logger().WithField("path", umeta.Path).Warning("URL rewrite blocked: ", err)
+		return err, http.StatusBadRequest
+	}
 	if err != nil {
 		log.Error(err)
 		return err, http.StatusInternalServerError
