@@ -93,6 +93,16 @@ func TestRuleURLRewriteTarget_Validate(t *testing.T) {
 		assert.True(t, result.IsValid)
 	})
 
+	t.Run("an unnamed version is left out of the message", func(t *testing.T) {
+		def := &APIDefinition{VersionData: VersionData{Versions: map[string]VersionInfo{
+			"": {ExtendedPaths: ExtendedPathsSet{URLRewrite: []URLRewriteMeta{{Path: "/q", Method: http.MethodGet, RewriteTo: "$1"}}}},
+		}}}
+		result := Validate(def, ValidationRuleSet{&RuleURLRewriteTarget{}})
+
+		require.Equal(t, 1, result.ErrorCount())
+		assert.Equal(t, "url rewrite GET /q: "+ErrRewriteToStartsWithRequestValue.Error(), result.FirstError().Error())
+	})
+
 	t.Run("no versions", func(t *testing.T) {
 		result := Validate(&APIDefinition{}, ValidationRuleSet{&RuleURLRewriteTarget{}})
 		assert.True(t, result.IsValid)

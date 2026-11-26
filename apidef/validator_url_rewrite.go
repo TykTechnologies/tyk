@@ -37,19 +37,28 @@ func (r *RuleURLRewriteTarget) Validate(apiDef *APIDefinition, validationResult 
 				continue
 			}
 
+			rule := urlRewriteRuleName(rewrite, version)
+
 			if RewriteToStartsWithRequestValue(rewrite.RewriteTo) {
 				validationResult.IsValid = false
-				validationResult.AppendError(fmt.Errorf("url rewrite %s %s in version %q: %w",
-					rewrite.Method, rewrite.Path, version, ErrRewriteToStartsWithRequestValue))
+				validationResult.AppendError(fmt.Errorf("%s: %w", rule, ErrRewriteToStartsWithRequestValue))
 			}
 
 			for i, trigger := range rewrite.Triggers {
 				if RewriteToStartsWithRequestValue(trigger.RewriteTo) {
 					validationResult.IsValid = false
-					validationResult.AppendError(fmt.Errorf("url rewrite %s %s in version %q, trigger %d: %w",
-						rewrite.Method, rewrite.Path, version, i, ErrRewriteToStartsWithRequestValue))
+					validationResult.AppendError(fmt.Errorf("%s, trigger %d: %w", rule, i, ErrRewriteToStartsWithRequestValue))
 				}
 			}
 		}
 	}
+}
+
+// urlRewriteRuleName names a URL rewrite in an error message. OAS APIs have a
+// single unnamed version, so the version is left out when it has no name.
+func urlRewriteRuleName(rewrite URLRewriteMeta, version string) string {
+	if version == "" {
+		return fmt.Sprintf("url rewrite %s %s", rewrite.Method, rewrite.Path)
+	}
+	return fmt.Sprintf("url rewrite %s %s in version %q", rewrite.Method, rewrite.Path, version)
 }
