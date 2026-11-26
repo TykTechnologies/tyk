@@ -57,7 +57,7 @@ jobs:
           git rev-parse origin/${{ env.BRANCH_NAME }}
 
       - name: Setup Golang
-        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5  # v7.1.0
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5  # v7.1.0 # zizmor: ignore[cache-poisoning] test/lint job; the cache was already on before this PR
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
@@ -149,7 +149,7 @@ jobs:
           destination: /usr/local/bin
 
       - name: Setup Golang
-        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5  # v7.1.0
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5  # v7.1.0 # zizmor: ignore[cache-poisoning] test/lint job; the cache was already on before this PR
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
