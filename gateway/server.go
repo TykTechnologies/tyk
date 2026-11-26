@@ -2100,6 +2100,11 @@ func (gw *Gateway) afterConfSetup() error {
 			"Risk: API definitions can read arbitrary files from the gateway filesystem.")
 	}
 
+	if conf.AllowUnsafeWebSocketOrigin {
+		mainLog.Warn("allow_unsafe_websocket_origin is enabled: WebSocket handshakes for GraphQL and Streams APIs are accepted from any origin. " +
+			"Risk: any website can open a WebSocket to these APIs through a visitor's browser and read the responses.")
+	}
+
 	if conf.HealthCheckEndpointName == "" {
 		conf.HealthCheckEndpointName = "hello"
 	}
