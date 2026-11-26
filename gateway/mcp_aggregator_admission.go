@@ -3,11 +3,14 @@ package gateway
 import (
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
+	"github.com/TykTechnologies/tyk/internal/sanitize"
 )
 
 // validateMCPAggregatorUpstreams checks every aggregated MCP proxy of an
@@ -40,7 +43,16 @@ func (gw *Gateway) validateMCPAggregatorUpstreams(_ *http.Request, mcpObj *oas.O
 	gw.apisMu.RUnlock()
 
 	for i, ref := range ext.Upstreams {
-		if msg, code := classifyMCPAggregatorUpstream(incoming.OrgID, upstreams[i]).admissionError(ref.APIID); msg != "" {
+		status := classifyMCPAggregatorUpstream(incoming.OrgID, upstreams[i])
+		if status == mcpAggregatorUpstreamNotLoaded {
+			switch gw.apiDefinitionFileState(ref.APIID) {
+			case apiDefinitionAwaitsReload:
+				return fmt.Sprintf("aggregated MCP proxy %q is not loaded yet: reload the gateway, then retry", ref.APIID), http.StatusBadRequest
+			case apiDefinitionNotLoadedByReload:
+				return fmt.Sprintf("aggregated MCP proxy %q has a definition on this gateway that the last reload did not load: check the gateway log for why, fix the definition, then reload", ref.APIID), http.StatusBadRequest
+			}
+		}
+		if msg, code := status.admissionError(ref.APIID); msg != "" {
 			return msg, code
 		}
 	}
@@ -122,6 +134,41 @@ func (gw *Gateway) admittedMCPAggregatorUpstreams(apiID, orgID string) map[strin
 func mcpAggregatorUpstreamUnchanged(admitted map[string]oas.TykMCPAggregatorUpstream, ref oas.TykMCPAggregatorUpstream) bool {
 	previous, ok := admitted[ref.APIID]
 	return ok && previous.Alias == ref.Alias && slices.Equal(previous.Tools, ref.Tools)
+}
+
+// apiDefinitionFileState says whether the Gateway API has written a
+// definition for an API that is not loaded, and whether a reload has read it.
+type apiDefinitionFileState int
+
+const (
+	// apiDefinitionNoFile: no definition for the API is in the app path.
+	apiDefinitionNoFile apiDefinitionFileState = iota
+	// apiDefinitionAwaitsReload: the definition was written after the last
+	// reload read the app path, so a reload loads it.
+	apiDefinitionAwaitsReload
+	// apiDefinitionNotLoadedByReload: the last reload read the definition and
+	// did not load it, for example because it is invalid; another reload
+	// will not change that.
+	apiDefinitionNotLoadedByReload
+)
+
+// apiDefinitionFileState reports the state of the definition the Gateway API
+// wrote for apiID to this gateway's app path. A definition modified before the
+// last reload started reading the app path was read by that reload.
+func (gw *Gateway) apiDefinitionFileState(apiID string) apiDefinitionFileState {
+	name := apiID + ".json"
+	if sanitize.ValidatePathComponent(apiID) != nil || !filepath.IsLocal(name) {
+		return apiDefinitionNoFile
+	}
+	info, err := os.Stat(filepath.Join(gw.GetConfig().AppPath, name))
+	if err != nil {
+		return apiDefinitionNoFile
+	}
+	readAt := gw.apiDefinitionsReadAt.Load()
+	if readAt != 0 && info.ModTime().UnixNano() < readAt {
+		return apiDefinitionNotLoadedByReload
+	}
+	return apiDefinitionAwaitsReload
 }
 
 // mcpAggregatorUpstreamStatus says whether an API can serve as an aggregated
