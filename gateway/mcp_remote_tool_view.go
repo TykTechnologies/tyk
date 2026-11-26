@@ -8,7 +8,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -131,6 +133,7 @@ func (gw *Gateway) loadRemoteMCPToolView(spec *APISpec, logger *logrus.Entry) {
 		return
 	}
 	spec.mcpToolView.Store(view)
+	warnRemoteMCPRenamedAwaySettings(spec, view, logger)
 
 	ctx, generation, done := spec.startRemoteMCPToolViewCheck(gw.ctx)
 	targetURL := spec.Proxy.TargetURL
@@ -161,6 +164,40 @@ func (gw *Gateway) loadRemoteMCPToolView(spec *APISpec, logger *logrus.Entry) {
 			logger.WithField("source_tool", source).Warning("MCP tool override source tool is not in the upstream tool list; it is not exposed")
 		}
 	}()
+}
+
+// warnRemoteMCPRenamedAwaySettings warns about every per-tool setting in the
+// API definition whose meaning the overrides change: middleware.mcpTools
+// entries, which carry the API's tool allow and block rules, rate limits and
+// other tool middleware. Tool settings match exposed names, so an entry for
+// an upstream tool that was renamed away no longer applies to any tool, and
+// an entry for an upstream tool whose name another override took (a swap or
+// a chained rename) now applies to that other upstream tool. This is the rule
+// the Dashboard applies on save. Wildcard entries are left alone, since they
+// may match other tools on purpose. Enforcement is not changed.
+func warnRemoteMCPRenamedAwaySettings(spec *APISpec, view *tooloverride.View, logger *logrus.Entry) {
+	middleware := oasMiddleware(spec)
+	if middleware == nil {
+		return
+	}
+	names := make([]string, 0, len(middleware.McpTools))
+	for name := range middleware.McpTools {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		if strings.Contains(name, "*") {
+			continue
+		}
+		if exposed, renamedAway := view.RenamedAway(name); renamedAway {
+			logger.WithFields(logrus.Fields{"setting": "middleware.mcpTools", "tool": name, "exposed_name": exposed}).
+				Warning("MCP tool setting names a tool that an x-tyk-mcp-server override renamed; it no longer applies, configure it under the exposed name")
+		}
+		if source, taken := view.NameTakenBy(name); taken {
+			logger.WithFields(logrus.Fields{"setting": "middleware.mcpTools", "tool": name, "upstream_tool": source}).
+				Warning("MCP tool setting names a tool whose name an x-tyk-mcp-server override gave to another upstream tool; it now applies to upstream tool " + source)
+		}
+	}
 }
 
 // fetchRemoteMCPToolNames lists the upstream catalogue the way the proxy
