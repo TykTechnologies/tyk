@@ -64,6 +64,7 @@ var DefaultValidationRuleSet = ValidationRuleSet{
 	&RuleUpstreamAuth{},
 	&RuleLoadBalancingTargets{},
 	&RuleDNSDiscovery{},
+	&RuleURLRewriteTarget{},
 }
 
 func Validate(definition *APIDefinition, ruleSet ValidationRuleSet) ValidationResult {
