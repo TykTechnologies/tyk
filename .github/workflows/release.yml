@@ -36,6 +36,7 @@ jobs:
     uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@production
     permissions:
       contents: read
+      pull-requests: read # dep-guard reads the PR's current labels, so a re-run sees deps-reviewed
   goreleaser:
     needs:
       - dep-guard
@@ -172,7 +173,7 @@ jobs:
           ci/bin/unlock-agent.sh
           git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
           git config --global --add safe.directory /go/src/github.com/TykTechnologies/tyk
-          goreleaser release --timeout 120m --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip=sign,docker' || '--skip=docker' }}' | tee /tmp/build.sh
+          goreleaser release --timeout 120m --clean -f ${{ matrix.goreleaser }} ${{ !startsWith(github.ref, 'refs/tags/') && ' --snapshot --skip=sign,docker' || '--skip=docker,publish' }}' | tee /tmp/build.sh
           chmod +x /tmp/build.sh
           docker run --rm --privileged -e GITHUB_TOKEN=${{ github.token }} \
           -e GOPRIVATE=github.com/TykTechnologies                                \
@@ -193,6 +194,63 @@ jobs:
           -v /tmp/build.sh:/tmp/build.sh                                         \
           -w /go/src/github.com/TykTechnologies/tyk                      \
           tykio/golang-cross:${{ matrix.golang_cross }} /tmp/build.sh
+      - name: Scan dist for secrets
+        continue-on-error: true
+        timeout-minutes: 20
+        uses: TykTechnologies/github-actions/.github/actions/secret-scan@production
+        with:
+          path: dist
+          enforce: "false"
+      - name: Publish packages
+        if: startsWith(github.ref, 'refs/tags/')
+        timeout-minutes: 60
+        env:
+          PACKAGECLOUD_TOKEN: ${{ secrets.PACKAGECLOUD_TOKEN }}
+        run: |
+          cat > /tmp/publish.sh <<'EOF'
+          #!/bin/sh
+          set -eu
+          : > /tmp/packages
+          jq -r '.[] | select(.type == "Linux Package" and .extra.ID == "ee") | "tyk/tyk-ee-unstable " + .path' dist/artifacts.json >> /tmp/packages
+          jq -r '.[] | select(.type == "Linux Package" and .extra.ID == "fips") | "tyk/tyk-ee-unstable " + .path' dist/artifacts.json >> /tmp/packages
+          jq -r '.[] | select(.type == "Linux Package" and .extra.ID == "std") | "tyk/tyk-gateway-unstable " + .path' dist/artifacts.json >> /tmp/packages
+          if [ ! -s /tmp/packages ]; then
+            echo "No packages to publish in dist/artifacts.json" >&2
+            exit 1
+          fi
+          cat /tmp/packages
+          xargs -P 4 -n 2 sh -c '
+            case "$1" in
+              *.deb) vers=$DEBVERS ;;
+              *.rpm) vers=$RPMVERS ;;
+              *) exec packagecloud publish --debvers "$DEBVERS" --rpmvers "$RPMVERS" "$0" "$1" ;;
+            esac
+            rc=0
+            for v in $vers; do
+              n=1
+              until packagecloud publish --debvers "$v" --rpmvers "$v" "$0" "$1"; do
+                if [ "$n" -ge 3 ]; then
+                  echo "Upload of $1 for $v failed after 3 attempts" >&2
+                  rc=1
+                  break
+                fi
+                echo "Upload of $1 for $v failed (attempt $n of 3), retrying in $((n * 15))s" >&2
+                sleep $((n * 15))
+                n=$((n + 1))
+              done
+            done
+            exit $rc
+          ' < /tmp/packages
+          EOF
+          chmod +x /tmp/publish.sh
+          docker run --rm \
+          -e DEBVERS='${{ matrix.debvers }}' \
+          -e RPMVERS='${{ matrix.rpmvers }}' \
+          -e PACKAGECLOUD_TOKEN \
+          -v ${{github.workspace}}:/go/src/github.com/TykTechnologies/tyk \
+          -v /tmp/publish.sh:/tmp/publish.sh \
+          -w /go/src/github.com/TykTechnologies/tyk \
+          tykio/golang-cross:${{ matrix.golang_cross }} /tmp/publish.sh
       # Only master/tags populate the go cache; PRs are read-only (see the
       # restore step above) so they don't pay the multi-GB upload every run.
       # Save under the restore step's primary key (computed from the committed
@@ -225,6 +283,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
       - name: push ee image to CI
+        id: ci_push_ee
         if: ${{ matrix.golang_cross == '1.26-bullseye' }}
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -285,6 +344,14 @@ jobs:
             verify_manifest manifest.json
           fi
           echo "Success: All layers are uniformly compressed using gzip."
+      - name: Scan ee image for secrets
+        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
+        continue-on-error: true
+        timeout-minutes: 20
+        uses: TykTechnologies/github-actions/.github/actions/secret-scan@production
+        with:
+          image: ${{ steps.ecr.outputs.registry }}/tyk-ee@${{ steps.ci_push_ee.outputs.digest }}
+          enforce: "false"
       - name: Docker metadata for ee tag push
         id: tag_metadata_ee
         if: startsWith(github.ref, 'refs/tags')
@@ -381,6 +448,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
       - name: push fips image to CI
+        id: ci_push_fips
         if: ${{ matrix.golang_cross == '1.26-bullseye' }}
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -441,6 +509,14 @@ jobs:
             verify_manifest manifest.json
           fi
           echo "Success: All layers are uniformly compressed using gzip."
+      - name: Scan fips image for secrets
+        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
+        continue-on-error: true
+        timeout-minutes: 20
+        uses: TykTechnologies/github-actions/.github/actions/secret-scan@production
+        with:
+          image: ${{ steps.ecr.outputs.registry }}/tyk-fips@${{ steps.ci_push_fips.outputs.digest }}
+          enforce: "false"
       - name: Docker metadata for fips tag push
         id: tag_metadata_fips
         if: startsWith(github.ref, 'refs/tags')
@@ -536,6 +612,7 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},prefix=v
             type=semver,pattern={{version}},prefix=v
       - name: push std image to CI
+        id: ci_push_std
         if: ${{ matrix.golang_cross == '1.26-bullseye' }}
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -594,6 +671,14 @@ jobs:
             verify_manifest manifest.json
           fi
           echo "Success: All layers are uniformly compressed using gzip."
+      - name: Scan std image for secrets
+        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
+        continue-on-error: true
+        timeout-minutes: 20
+        uses: TykTechnologies/github-actions/.github/actions/secret-scan@production
+        with:
+          image: ${{ steps.ecr.outputs.registry }}/tyk@${{ steps.ci_push_std.outputs.digest }}
+          enforce: "false"
       - name: Docker metadata for std tag push
         id: tag_metadata_std
         if: startsWith(github.ref, 'refs/tags')
