@@ -22,7 +22,7 @@ jobs:
   godoc:
     needs: [dep-guard]
     if: ${{ !github.event.pull_request.draft }}
-    uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@9c5508248b2f513e484716d19deec747e8f37977  # main
+    uses: TykTechnologies/github-actions/.github/workflows/godoc.yml@production
     secrets:
       PROBE_APP_ID: ${{ secrets.PROBE_APP_ID }}
       PROBE_APP_PRIVATE_KEY: ${{ secrets.PROBE_APP_PRIVATE_KEY }}

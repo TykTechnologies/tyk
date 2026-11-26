@@ -9,7 +9,7 @@ jobs:
 
     steps:
       - name: Delete drafts
-        uses: hugo19941994/delete-draft-releases@f962e497fe892965a04b2266b3b865e1a59ecd06  # v1.0.0
+        uses: hugo19941994/delete-draft-releases@3f19a25abf2ce87850c2268938f98f14e4d3d1f1  # v3.0.0
         with:
           threshold: 5d
         env:

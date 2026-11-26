@@ -12,7 +12,7 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - uses: aws-actions/configure-aws-credentials@v4
+    - uses: aws-actions/configure-aws-credentials@45666896f5d8e0f10ae255413f3a4cdd03bdc8f5  # v6.3.1
       with:
         role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
         role-session-name: cipush
