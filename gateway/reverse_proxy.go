@@ -1516,6 +1516,10 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 
 	}
 
+	if p.TykAPISpec.IsMCP() && mcpResponseMayBeEdited(req) {
+		restrictMCPAcceptEncoding(outreq.Header)
+	}
+
 	p.addAuthInfo(outreq, req)
 
 	// do request round trip
@@ -1659,6 +1663,9 @@ func (p *ReverseProxy) WrappedServeHTTP(rw http.ResponseWriter, req *http.Reques
 		}
 		if filterHook := NewMCPListFilterSSEHook(p.TykAPISpec, ses, req); filterHook != nil {
 			hooks = append(hooks, filterHook)
+			// The filter edits events, so a compressed stream is decoded
+			// first. The debug logging hook alone never changes the stream.
+			decodeMCPEventStream(p.TykAPISpec, res, p.logger)
 		}
 		res.Body = NewSSETap(res.Body, hooks...)
 		// Hooks may modify event data, changing the body length. Remove

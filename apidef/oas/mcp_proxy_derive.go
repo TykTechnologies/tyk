@@ -624,7 +624,7 @@ func ValidateMCPToolName(name string) error {
 		return fmt.Errorf("invalid tool name: name is required")
 	}
 	if len(name) > maxMCPToolNameLength {
-		return fmt.Errorf("invalid tool name %q: exceeds maximum length of %d", name, maxMCPToolNameLength)
+		return fmt.Errorf("invalid tool name %q: exceeds maximum length of %d characters", name, maxMCPToolNameLength)
 	}
 	if !toolNameValid.MatchString(name) {
 		return fmt.Errorf("invalid tool name %q: use ASCII letters, digits, underscores, hyphens, and dots only", name)

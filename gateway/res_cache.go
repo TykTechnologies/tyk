@@ -70,7 +70,7 @@ func (m *ResponseCacheMiddleware) HandleResponse(w http.ResponseWriter, res *htt
 	if ses == nil {
 		ses = ctxGetSession(r)
 	}
-	if credentialSpecificMCPFilteringApplies(m.Spec, r, ses) {
+	if remoteMCPToolViewBypassesCache(m.Spec, r) || credentialSpecificMCPFilteringApplies(m.Spec, r, ses) {
 		return nil
 	}
 
