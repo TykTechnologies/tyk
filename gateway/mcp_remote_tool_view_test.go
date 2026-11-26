@@ -33,11 +33,21 @@ type fakeRemoteMCPServer struct {
 	sse       bool
 	listCalls int
 	calls     []string
+	received  []receivedToolsCall
 	block     chan struct{}
 	// encoding, when set, compresses every tools/list and tools/call
 	// response body with that Content-Encoding (see encodeFakeBody);
 	// "negotiate" picks one from the request's Accept-Encoding.
 	encoding string
+}
+
+// receivedToolsCall is what the upstream saw for one tools/call.
+type receivedToolsCall struct {
+	ID        json.RawMessage
+	Name      string
+	Arguments json.RawMessage
+	Meta      json.RawMessage
+	MCPName   []string
 }
 
 func (f *fakeRemoteMCPServer) setTools(tools ...string) {
@@ -65,8 +75,10 @@ func (f *fakeRemoteMCPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		ID     json.RawMessage `json:"id"`
 		Method string          `json:"method"`
 		Params struct {
-			Name   string `json:"name"`
-			Cursor string `json:"cursor"`
+			Name      string          `json:"name"`
+			Cursor    string          `json:"cursor"`
+			Arguments json.RawMessage `json:"arguments"`
+			Meta      json.RawMessage `json:"_meta"`
 		} `json:"params"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -94,6 +106,10 @@ func (f *fakeRemoteMCPServer) ServeHTTP(w http.ResponseWriter, r *http.Request) 
 		result = page
 	case "tools/call":
 		f.calls = append(f.calls, req.Params.Name)
+		f.received = append(f.received, receivedToolsCall{
+			ID: req.ID, Name: req.Params.Name, Arguments: req.Params.Arguments, Meta: req.Params.Meta,
+			MCPName: r.Header.Values("Mcp-Name"),
+		})
 		result = `{"content":[{"type":"text","text":"called ` + req.Params.Name + `"}]}`
 	default:
 		f.mu.Unlock()
@@ -311,7 +327,7 @@ func recordRemoteMCPLogs(t *testing.T, apiID string) *remoteMCPLogRecorder {
 }
 
 // remoteMCPCollisionWarning identifies the catalogue check's collision warning.
-const remoteMCPCollisionWarning = "sets a name that an upstream tool without an override already has"
+const remoteMCPCollisionWarning = "the override wins and the upstream tool is hidden"
 
 func renameOverride(source, name string) oas.TykMCPServerPrimitive {
 	return oas.TykMCPServerPrimitive{Source: oas.TykMCPServerSource{ToolName: source}, Name: name}
@@ -341,7 +357,7 @@ func TestRemoteMCPToolView_CatalogueCheckOnLoad(t *testing.T) {
 		assert.NotNil(t, logs.find(logrus.WarnLevel, "archived_tool"), "missing source tool must be logged as a warning")
 	})
 
-	t.Run("fresh load with a colliding upstream tool admits the overrides and warns about the collision", func(t *testing.T) {
+	t.Run("fresh load with a colliding upstream tool admits the overrides and warns that the override wins", func(t *testing.T) {
 		ts := StartTest(nil)
 		t.Cleanup(ts.Close)
 		const apiID = "remote-mcp-collision"

@@ -182,11 +182,16 @@ func ValidateModernMirroredHeaders(header http.Header, envelope *RequestEnvelope
 	return nil
 }
 
+const (
+	mirroredHeaderPrefix = "=?base64?"
+	mirroredHeaderSuffix = "?="
+)
+
 // DecodeMirroredHeader decodes the SEP-2243 Base64 wrapper. Partial wrappers
 // and invalid payloads are rejected rather than compared as literal text.
 func DecodeMirroredHeader(value string) (string, bool) {
-	const prefix = "=?base64?"
-	const suffix = "?="
+	const prefix = mirroredHeaderPrefix
+	const suffix = mirroredHeaderSuffix
 	starts := strings.HasPrefix(value, prefix)
 	ends := strings.HasSuffix(value, suffix)
 	if !starts && !ends {
@@ -208,6 +213,19 @@ func DecodeMirroredHeader(value string) (string, bool) {
 		return "", false
 	}
 	return string(decoded), true
+}
+
+// EncodeMirroredHeaderLike encodes value for a mirrored header that replaces
+// original, keeping the original's encoding: the SEP-2243 Base64 wrapper when
+// original used it, plain text otherwise. A value that plain text cannot
+// carry is always wrapped.
+func EncodeMirroredHeaderLike(original, value string) string {
+	if !strings.HasPrefix(original, mirroredHeaderPrefix) {
+		if plain, ok := DecodeMirroredHeader(value); ok && plain == value {
+			return value
+		}
+	}
+	return mirroredHeaderPrefix + base64.StdEncoding.EncodeToString([]byte(value)) + mirroredHeaderSuffix
 }
 
 func primitiveName(envelope *RequestEnvelope) (string, bool) {
