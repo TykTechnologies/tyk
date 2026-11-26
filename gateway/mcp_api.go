@@ -361,6 +361,7 @@ func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int)
 	if err != nil {
 		return apiError(err.Error()), errCode
 	}
+	gw.mcpAggregatorWrites.written(newDef.APIID, newDef, oasObj)
 
 	if resp, code := handleBaseVersionUpdate(gw, versionParams, newDef.APIID, fs); resp != nil {
 		return resp, code
@@ -426,6 +427,7 @@ func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (
 	if err != nil {
 		return apiError(err.Error()), errCode
 	}
+	gw.mcpAggregatorWrites.written(newDef.APIID, newDef, oasObj)
 
 	return buildSuccessResponse(newDef.APIID, "modified")
 }
@@ -590,6 +592,7 @@ func (gw *Gateway) handleDeleteMCP(apiID string, fs afero.Fs) (interface{}, int)
 		log.Warning("Delete failed: ", err)
 		return apiError(errMsgDeleteFailed), http.StatusInternalServerError
 	}
+	gw.mcpAggregatorWrites.written(apiID, nil, nil)
 
 	handleBaseVersionCleanup(gw, spec, apiID, fs)
 
