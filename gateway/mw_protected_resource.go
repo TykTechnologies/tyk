@@ -201,7 +201,7 @@ func (gw *Gateway) upstreamPRMDoc(ctx context.Context, spec *APISpec) (*mcp.PRMD
 // scheme + host + the API's listen path. Used as the rewritten `resource`
 // field so RFC 9728 §3.3 origin validation passes.
 func gatewayResourceURL(r *http.Request, spec *APISpec) string {
-	scheme := httputil.RequestScheme(r)
+	scheme := httputil.ForwardedScheme(r)
 	listen := spec.Proxy.ListenPath
 	if !strings.HasSuffix(listen, "/") {
 		listen += "/"
@@ -239,7 +239,7 @@ func prmMetadataURL(r *http.Request, spec *APISpec) string {
 	} else {
 		return ""
 	}
-	return fmt.Sprintf("%s://%s%s", httputil.RequestScheme(r), r.Host, wellKnown)
+	return fmt.Sprintf("%s://%s%s", httputil.ForwardedScheme(r), r.Host, wellKnown)
 }
 
 // setPRMWWWAuthenticateHeader sets the WWW-Authenticate header with a Bearer challenge

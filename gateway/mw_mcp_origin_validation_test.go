@@ -33,9 +33,14 @@ func TestMCPOriginValidationMiddleware(t *testing.T) {
 		name       string
 		origin     string
 		forwarded  string
+		proto      string
 		remoteAddr string
 		wantStatus int
 	}{
+		{name: "same origin behind TLS terminator", origin: "https://gateway.example", proto: "https", wantStatus: http.StatusOK},
+		{name: "https origin without TLS evidence", origin: "https://gateway.example", wantStatus: http.StatusForbidden},
+		{name: "other host behind TLS terminator", origin: "https://evil.example", proto: "https", wantStatus: http.StatusForbidden},
+		{name: "TLS terminator cannot change host", origin: "https://evil.example", proto: "https", forwarded: "host=evil.example", wantStatus: http.StatusForbidden},
 		{name: "absent", wantStatus: http.StatusOK},
 		{name: "same direct", origin: "http://gateway.example", wantStatus: http.StatusOK},
 		{name: "canonical same direct", origin: "HTTP://GATEWAY.EXAMPLE:80", wantStatus: http.StatusOK},
@@ -56,6 +61,9 @@ func TestMCPOriginValidationMiddleware(t *testing.T) {
 			}
 			if test.forwarded != "" {
 				req.Header.Set("Forwarded", test.forwarded)
+			}
+			if test.proto != "" {
+				req.Header.Set("X-Forwarded-Proto", test.proto)
 			}
 			if test.remoteAddr != "" {
 				req.RemoteAddr = test.remoteAddr
