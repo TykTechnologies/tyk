@@ -720,6 +720,22 @@
         "grpc_round_robin_load_balancing": {
           "type": "boolean"
         },
+        "grpc_dns_discovery": {
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "refresh_interval": {
+              "type": "string",
+              "pattern": "^(\\d+h)?(\\d+m)?(\\d+s)?(\\d+ms)?(\\d+µs)?(\\d+ns)?$"
+            }
+          }
+        },
         "enable_coprocess": {
           "type": "boolean"
         },
