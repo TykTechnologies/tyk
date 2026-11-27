@@ -109,6 +109,12 @@ type APISpec struct {
 	// compiledErrorOverrides holds the indexed error override rules for O(1) lookup.
 	// Built from apidef.ErrorOverrides during gateway startup.
 	compiledErrorOverrides atomic.Pointer[CompiledErrorOverrides]
+
+	// WebSocket origin checking is immutable for a loaded spec. Build the
+	// checker once, off the request path.
+	webSocketOriginOnce sync.Once
+	webSocketOrigin     *httputil.WebSocketOriginChecker
+	webSocketOriginErr  error
 }
 
 // CheckSpecMatchesStatus checks if a URL spec has a specific status.
