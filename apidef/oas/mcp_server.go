@@ -2,7 +2,9 @@ package oas
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"reflect"
 )
 
 // TykMCPServer configures a REST-as-MCP proxy's caller-facing primitive view.
@@ -55,6 +57,9 @@ type TykMCPServerSource struct {
 	Path string `bson:"path,omitempty" json:"path,omitempty"`
 	// Method selects a source REST operation by HTTP method.
 	Method string `bson:"method,omitempty" json:"method,omitempty"`
+	// ToolName selects an upstream tool by name on a remote MCP proxy. It is
+	// mutually exclusive with the REST selectors above.
+	ToolName string `bson:"toolName,omitempty" json:"toolName,omitempty"`
 }
 
 // TykMCPServerParameter overrides one derived MCP input argument. Param names
@@ -111,12 +116,46 @@ func (s *OAS) GetTykMCPServerExtension() *TykMCPServer {
 }
 
 func (s *OAS) cacheTykMCPServerExtension(raw []byte) *TykMCPServer {
-	var parsed TykMCPServer
-	if err := json.Unmarshal(raw, &parsed); err != nil {
+	parsed, err := decodeTykMCPServer(raw)
+	if err != nil {
 		return nil
 	}
-	s.Extensions[ExtensionTykMCPServer] = &parsed
-	return &parsed
+	s.Extensions[ExtensionTykMCPServer] = parsed
+	return parsed
+}
+
+// decodeTykMCPServerExtension is GetTykMCPServerExtension with the decode
+// error kept, so validation can report a malformed extension instead of
+// silently treating it as absent.
+func (s *OAS) decodeTykMCPServerExtension() (*TykMCPServer, error) {
+	if ext := s.GetTykMCPServerExtension(); ext != nil {
+		return ext, nil
+	}
+
+	raw, err := json.Marshal(s.Extensions[ExtensionTykMCPServer])
+	if err != nil {
+		return nil, fmt.Errorf("%s is invalid: %w", ExtensionTykMCPServer, err)
+	}
+	_, err = decodeTykMCPServer(raw)
+	return nil, err
+}
+
+func decodeTykMCPServer(raw []byte) (*TykMCPServer, error) {
+	var parsed TykMCPServer
+	err := json.Unmarshal(raw, &parsed)
+	if err == nil {
+		return &parsed, nil
+	}
+
+	var typeErr *json.UnmarshalTypeError
+	if errors.As(err, &typeErr) && typeErr.Field != "" {
+		kind := "a " + typeErr.Type.Kind().String()
+		if typeErr.Type.Kind() == reflect.Bool {
+			kind = "a boolean"
+		}
+		return nil, fmt.Errorf("%s field %s must be %s", ExtensionTykMCPServer, typeErr.Field, kind)
+	}
+	return nil, fmt.Errorf("%s is invalid: %w", ExtensionTykMCPServer, err)
 }
 
 // RemoveTykMCPServerExtension clears the REST-as-MCP proxy tool-view extension.
@@ -190,7 +229,7 @@ func cloneBoolPtr(src *bool) *bool {
 }
 
 func (s *OAS) validateMCPServerExtensionPlacement(isMCP bool) error {
-	if s.GetTykMCPServerExtension() == nil {
+	if s.Extensions == nil || s.Extensions[ExtensionTykMCPServer] == nil {
 		return nil
 	}
 
@@ -198,11 +237,21 @@ func (s *OAS) validateMCPServerExtensionPlacement(isMCP bool) error {
 		return fmt.Errorf("%s is valid only for MCP proxies", ExtensionTykMCPServer)
 	}
 
-	ext := s.GetTykExtension()
-	if ext == nil || !isMCPServerAdapterTarget(ext.Upstream.URL) {
-		return fmt.Errorf("%s is valid only for MCP proxies targeting a REST-as-MCP adapter", ExtensionTykMCPServer)
+	mcpServer, err := s.decodeTykMCPServerExtension()
+	if err != nil || mcpServer == nil {
+		return err
 	}
 
+	ext := s.GetTykExtension()
+	if ext == nil || !isMCPServerAdapterTarget(ext.Upstream.URL) {
+		return ValidateRemoteMCPToolOverrides(mcpServer)
+	}
+
+	for i, primitive := range mcpServer.Primitives {
+		if primitive.Source.ToolName != "" {
+			return fmt.Errorf("%s primitive %d: source.toolName is valid only for remote MCP proxies; REST-as-MCP proxies select operations by operationId or path+method", ExtensionTykMCPServer, i)
+		}
+	}
 	return nil
 }
 

@@ -8,6 +8,7 @@ import (
 	"github.com/buger/jsonparser"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 )
@@ -69,7 +70,7 @@ func TestValidateMCPObject(t *testing.T) {
 
 	t.Run("valid MCP object with resources", func(t *testing.T) {
 		t.Parallel()
-		mcpWithResources := validOASObject
+		mcpWithResources := copyWithoutExtensions(validOASObject)
 		extWithResources := validXTykAPIGateway
 		extWithResources.Middleware = &oas.Middleware{
 			McpResources: map[string]*oas.MCPPrimitive{
@@ -94,7 +95,7 @@ func TestValidateMCPObject(t *testing.T) {
 
 	t.Run("valid MCP object with prompts", func(t *testing.T) {
 		t.Parallel()
-		mcpWithPrompts := validOASObject
+		mcpWithPrompts := copyWithoutExtensions(validOASObject)
 		extWithPrompts := validXTykAPIGateway
 		extWithPrompts.Middleware = &oas.Middleware{
 			McpPrompts: map[string]*oas.MCPPrimitive{
@@ -119,7 +120,7 @@ func TestValidateMCPObject(t *testing.T) {
 
 	t.Run("valid MCP object with all MCP fields", func(t *testing.T) {
 		t.Parallel()
-		mcpWithAll := validOASObject
+		mcpWithAll := copyWithoutExtensions(validOASObject)
 		extWithAll := validXTykAPIGateway
 		extWithAll.Middleware = &oas.Middleware{
 			McpTools: map[string]*oas.MCPPrimitive{
@@ -154,7 +155,7 @@ func TestValidateMCPObject(t *testing.T) {
 		assert.Nil(t, err)
 	})
 
-	invalidOASObject := validOASObject
+	invalidOASObject := copyWithoutExtensions(validOASObject)
 	invalidXTykAPIGateway := validXTykAPIGateway
 	invalidXTykAPIGateway.Info = oas.Info{} // Empty name should fail
 	invalidXTykAPIGateway.Server.GatewayTags = &oas.GatewayTags{Enabled: true, Tags: []string{}}
@@ -774,4 +775,83 @@ func TestGetMCPSchema_ContainsMCPExtensions(t *testing.T) {
 		_, _, _, err = jsonparser.Get(schema, keyProperties, ExtensionTykMCPServer)
 		assert.NoError(t, err, "x-tyk-mcp-server should be present in MCP schema")
 	})
+}
+
+func TestValidateMCPObject_RemoteToolOverrides(t *testing.T) {
+	t.Parallel()
+
+	doc := func(primitive string) []byte {
+		return []byte(`{
+			"openapi": "3.0.3",
+			"info": {"title": "GitHub MCP", "version": "1.0.0"},
+			"paths": {},
+			"x-tyk-api-gateway": {
+				"info": {"name": "github", "state": {"active": true}},
+				"upstream": {"url": "https://mcp.example.com/mcp"},
+				"server": {"listenPath": {"value": "/github/"}}
+			},
+			"x-tyk-mcp-server": {"primitives": [` + primitive + `]}
+		}`)
+	}
+
+	t.Run("toolName selector with annotations accepted", func(t *testing.T) {
+		assert.NoError(t, ValidateMCPObject(doc(`{
+			"source": {"toolName": "create_issue"},
+			"name": "open_issue",
+			"description": "Open an issue",
+			"annotations": {"title": "Create GitHub issue", "readOnlyHint": false, "destructiveHint": false, "idempotentHint": false, "openWorldHint": true}
+		}`), "3.0.3"))
+	})
+
+	t.Run("non-boolean hint names the field", func(t *testing.T) {
+		err := ValidateMCPObject(doc(`{"source": {"toolName": "delete_repo"}, "annotations": {"destructiveHint": "yes"}}`), "3.0.3")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "x-tyk-mcp-server.primitives.0.annotations.destructiveHint")
+		assert.Contains(t, err.Error(), "Expected: boolean")
+	})
+
+	t.Run("toolName combined with operationId rejected", func(t *testing.T) {
+		err := ValidateMCPObject(doc(`{"source": {"toolName": "delete_repo", "operationId": "deleteRepo"}}`), "3.0.3")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "x-tyk-mcp-server.primitives.0.source")
+	})
+
+	t.Run("toolName combined with path and method rejected", func(t *testing.T) {
+		err := ValidateMCPObject(doc(`{"source": {"toolName": "delete_repo", "path": "/repos", "method": "DELETE"}}`), "3.0.3")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "x-tyk-mcp-server.primitives.0.source")
+	})
+
+	t.Run("empty toolName rejected", func(t *testing.T) {
+		err := ValidateMCPObject(doc(`{"source": {"toolName": ""}}`), "3.0.3")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "x-tyk-mcp-server.primitives.0.source.toolName")
+	})
+
+	t.Run("toolName with whitespace or invalid characters rejected", func(t *testing.T) {
+		for _, toolName := range []string{" delete_repo", "delete repo", strings.Repeat("a", 129)} {
+			err := ValidateMCPObject(doc(`{"source": {"toolName": "`+toolName+`"}}`), "3.0.3")
+			require.Error(t, err, toolName)
+			assert.Contains(t, err.Error(), "x-tyk-mcp-server.primitives.0.source.toolName", toolName)
+		}
+	})
+
+	t.Run("name over 128 characters states the limit", func(t *testing.T) {
+		err := ValidateMCPObject(doc(`{"source": {"toolName": "delete_repo"}, "name": "`+strings.Repeat("a", 129)+`"}`), "3.0.3")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "x-tyk-mcp-server.primitives.0.name")
+		assert.Contains(t, err.Error(), "128")
+	})
+}
+
+// copyWithoutExtensions returns a copy of doc with its own, empty extensions
+// map and its own Info, the parts that SetTykExtension and MarshalJSON write,
+// so that parallel subtests never write to state shared with doc.
+func copyWithoutExtensions(doc oas.OAS) oas.OAS {
+	doc.Extensions = nil
+	if doc.Info != nil {
+		info := *doc.Info
+		doc.Info = &info
+	}
+	return doc
 }
