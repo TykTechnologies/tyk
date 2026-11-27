@@ -62,17 +62,22 @@ func (b *BatchRequestHandler) doRequest(req *http.Request, relURL string) BatchR
 
 	client := &http.Client{Transport: tr}
 
+	failed := BatchReplyUnit{
+		RelativeURL: relURL,
+		Code:        http.StatusBadGateway,
+	}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		log.Error("Webhook request failed: ", err)
-		return BatchReplyUnit{}
+		return failed
 	}
 
 	defer resp.Body.Close()
 	content, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		log.Warning("Body read failure! ", err)
-		return BatchReplyUnit{}
+		return failed
 	}
 
 	return BatchReplyUnit{

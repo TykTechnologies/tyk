@@ -155,7 +155,7 @@ const virtBatchTest = `function batchTest(request, session, config) {
     var newBody = TykBatchRequest(JSON.stringify(batch))
     var asJS = JSON.parse(newBody)
     for (var i in asJS) {
-        if (asJS[i].code == 0) {
+        if (asJS[i].code != 200) {
             response.Code = 500
         }
     }
