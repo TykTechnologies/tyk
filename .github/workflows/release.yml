@@ -16,7 +16,7 @@ on:
   schedule:
     - cron: "0 0 * * 1"
   pull_request:
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened, ready_for_review, labeled]
   push:
     branches:
       - master
@@ -36,6 +36,7 @@ jobs:
     uses: TykTechnologies/github-actions/.github/workflows/dependency-guard.yml@production
     permissions:
       contents: read
+      pull-requests: read # dep-guard reads the PR's current labels, so a re-run sees deps-reviewed
   goreleaser:
     needs:
       - dep-guard
@@ -44,7 +45,7 @@ jobs:
       (needs.dep-guard.result == 'success' || needs.dep-guard.result == 'skipped') &&
       github.event.pull_request.draft == false
     name: '${{ matrix.golang_cross }}'
-    runs-on: ${{ vars.BUILD_RUNNER || vars.DEFAULT_RUNNER }}
+    runs-on: ${{ vars.WARP_RUNNER_16X_X64 || vars.WARP_RUNNER_8X_X64 || vars.BUILD_RUNNER || vars.DEFAULT_RUNNER }}
     permissions:
       id-token: write # AWS OIDC JWT
       contents: read # actions/checkout
@@ -67,13 +68,13 @@ jobs:
     steps:
       - name: Generate GitHub App token
         id: app-token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0 # zizmor: ignore[github-app] owner-wide token, scoping tracked separately
         with:
           app-id: ${{ secrets.PROBE_APP_ID }}
           private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
           owner: TykTechnologies
       - name: Checkout of tyk
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 1
       - name: Set some outputs for later
@@ -84,41 +85,50 @@ jobs:
         run: |
           echo "commit_author=$(git show -s --format='%ae' HEAD)" >> $GITHUB_OUTPUT
           echo "branch=${HEAD_REF##*/}" >> $GITHUB_OUTPUT
-      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
-      - uses: sigstore/cosign-installer@d7d6bc7722e3daa8354c50bcb52f4837da5e9b6a # v3
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - name: Login to DockerHub
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
       - name: Login to Cloudsmith
         if: startsWith(github.ref, 'refs/tags')
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@8aa5831fb8d48d8f76594c7ddde61ae58019f550 # v4.8.0
         with:
           registry: docker.tyk.io
           username: ${{ secrets.CLOUDSMITH_USERNAME }}
           password: ${{ secrets.CLOUDSMITH_API_KEY }}
-      - uses: aws-actions/configure-aws-credentials@ff717079ee2060e4bcee96c4779b553acc87447c # v4
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
           role-session-name: cipush
           aws-region: eu-central-1
           # Don't mask to pass it across job boundaries
           mask-aws-account-id: false
-      - uses: aws-actions/amazon-ecr-login@f2e9fc6c2b355c1890b65e6f6f0e2ac3e6e22f78 # v2
+      - uses: aws-actions/amazon-ecr-login@7290e214a610b32bc0eef81748948b6d466a8783 # v2.2.0
         id: ecr
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
         with:
           mask-password: 'true'
-      - uses: WarpBuilds/cache@f643a1ba29942d56621d07fc2d4284c7219868ad # v1
+      # Restore-only here; the matching save runs after Build and only off-PR
+      # (see "Save Go build cache"). PRs read the cache but never write it, so
+      # they don't re-upload the multi-GB cache each run, and the store isn't
+      # churned. master/tags keep the cache warm for PRs to restore from.
+      - uses: WarpBuilds/cache/restore@f643a1ba29942d56621d07fc2d4284c7219868ad # v1
+        id: go-cache
         with:
           path: |
             ~/.cache/go-build
             ~/go/pkg/mod
-          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          key: ${{ runner.os }}-go-tyk-goreleaser-${{ hashFiles('go.sum') }}
+          # loose prefix so a changed go.sum / fresh branch gets a partial
+          # restore instead of a cold rebuild (exact key = no fallback). The
+          # prefix ends in a fixed -goreleaser- so it cannot swallow another
+          # cache: a bare "-go-" prefix also matched the "-go-dashboard-"
+          # entry rendered into tyk, and "-go-tyk-" would match "-go-tyk-pump-".
           restore-keys: |
-            ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+            ${{ runner.os }}-go-tyk-goreleaser-
       - name: Validate Go version
         run: |
           GO_VERSION_STR=$(docker run --rm tykio/golang-cross:${{ matrix.golang_cross }} go version 2>&1 || true)
@@ -145,7 +155,7 @@ jobs:
               echo "::error::Go version validation failed!"
               echo "Used version: $GO_VERSION (in tykio/golang-cross:${{ matrix.golang_cross }})"
               echo "Latest patch: $LATEST_PATCH"
-              echo "Please update the buildenv Go version to the latest patch version."
+              echo "Please rebuild or update the tykio/golang-cross image so that it carries the latest patch of Go $MINOR_VERSION."
               exit 1
             else
               echo "Go version is up to date: $GO_VERSION"
@@ -184,19 +194,25 @@ jobs:
           -v /tmp/build.sh:/tmp/build.sh                                         \
           -w /go/src/github.com/TykTechnologies/tyk                      \
           tykio/golang-cross:${{ matrix.golang_cross }} /tmp/build.sh
-      - name: Install Docker Scout CLI
-        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
-        run: |
-          mkdir -p ~/.docker/cli-plugins
-          curl --proto '=https' --tlsv1.2 -fsSL https://github.com/docker/scout-cli/releases/download/v1.22.0/docker-scout_1.22.0_linux_amd64.tar.gz -o /tmp/scout.tar.gz
-          curl --proto '=https' --tlsv1.2 -fsSL https://github.com/docker/scout-cli/releases/download/v1.22.0/docker-scout_1.22.0_checksums.txt -o /tmp/scout_checksums.txt
-          grep "docker-scout_1.22.0_linux_amd64.tar.gz" /tmp/scout_checksums.txt | awk '{print $1 "  /tmp/scout.tar.gz"}' | sha256sum -c -
-          tar -xzf /tmp/scout.tar.gz -C ~/.docker/cli-plugins/ docker-scout
-          chmod +x ~/.docker/cli-plugins/docker-scout
+      # Only master/tags populate the go cache; PRs are read-only (see the
+      # restore step above) so they don't pay the multi-GB upload every run.
+      # Save under the restore step's primary key (computed from the committed
+      # go.sum at job start), NOT a fresh hashFiles() — the build rewrites go.sum,
+      # so re-hashing here would save under a key the next run never looks up,
+      # causing a perpetual re-save + cache eviction. Skip if we already had an
+      # exact hit (nothing new to store).
+      - name: Save Go build cache
+        uses: WarpBuilds/cache/save@f643a1ba29942d56621d07fc2d4284c7219868ad # v1
+        if: ${{ github.event_name != 'pull_request' && steps.go-cache.outputs.cache-hit != 'true' }}
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ steps.go-cache.outputs.cache-primary-key }}
       - name: Docker metadata for ee CI
         id: ci_metadata_ee
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
-        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: |
             ${{ steps.ecr.outputs.registry }}/tyk-ee
@@ -211,12 +227,13 @@ jobs:
             type=semver,pattern={{version}},prefix=v
       - name: push ee image to CI
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: "dist"
           platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           file: ci/Dockerfile.distroless
           provenance: mode=max
+          sbom: true
           outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -272,7 +289,7 @@ jobs:
       - name: Docker metadata for ee tag push
         id: tag_metadata_ee
         if: startsWith(github.ref, 'refs/tags')
-        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: |
             docker.tyk.io/tyk-gateway/tyk-gateway-ee
@@ -290,12 +307,13 @@ jobs:
             org.opencontainers.image.version=${{ github.ref_name }}
       - name: push ee image to prod
         if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: "dist"
           platforms: linux/amd64,linux/arm64
           file: ci/Dockerfile.distroless
           provenance: mode=max
+          sbom: true
           cache-from: type=gha
           outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           tags: ${{ steps.tag_metadata_ee.outputs.tags }}
@@ -347,22 +365,10 @@ jobs:
             verify_manifest manifest.json
           fi
           echo "Success: All layers are uniformly compressed using gzip."
-      - name: Attach base image VEX to ee
-        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
-        run: |
-          docker scout vex get --org tykio -o /tmp/ee-vex.json tykio/dhi-busybox:1.37-fips || true
-          if [ -f /tmp/ee-vex.json ]; then
-            cosign attest --yes --type openvex \
-              --predicate /tmp/ee-vex.json \
-              docker.tyk.io/tyk-gateway/tyk-gateway-ee:${{ github.ref_name }} || true
-            cosign attest --yes --type openvex \
-              --predicate /tmp/ee-vex.json \
-              tykio/tyk-gateway-ee:${{ github.ref_name }} || true
-          fi
       - name: Docker metadata for fips CI
         id: ci_metadata_fips
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
-        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: |
             ${{ steps.ecr.outputs.registry }}/tyk-fips
@@ -377,12 +383,13 @@ jobs:
             type=semver,pattern={{version}},prefix=v
       - name: push fips image to CI
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: "dist"
           platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64' }}
           file: ci/Dockerfile.distroless
           provenance: mode=max
+          sbom: true
           outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -438,7 +445,7 @@ jobs:
       - name: Docker metadata for fips tag push
         id: tag_metadata_fips
         if: startsWith(github.ref, 'refs/tags')
-        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: |
             tykio/tyk-gateway-fips
@@ -455,12 +462,13 @@ jobs:
             org.opencontainers.image.version=${{ github.ref_name }}
       - name: push fips image to prod
         if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: "dist"
           platforms: linux/amd64,linux/arm64
           file: ci/Dockerfile.distroless
           provenance: mode=max
+          sbom: true
           cache-from: type=gha
           outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           tags: ${{ steps.tag_metadata_fips.outputs.tags }}
@@ -512,19 +520,10 @@ jobs:
             verify_manifest manifest.json
           fi
           echo "Success: All layers are uniformly compressed using gzip."
-      - name: Attach base image VEX to fips
-        if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
-        run: |
-          docker scout vex get --org tykio -o /tmp/fips-vex.json tykio/dhi-busybox:1.37-fips || true
-          if [ -f /tmp/fips-vex.json ]; then
-            cosign attest --yes --type openvex \
-              --predicate /tmp/fips-vex.json \
-              tykio/tyk-gateway-fips:${{ github.ref_name }} || true
-          fi
       - name: Docker metadata for std CI
         id: ci_metadata_std
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
-        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: |
             ${{ steps.ecr.outputs.registry }}/tyk
@@ -539,12 +538,13 @@ jobs:
             type=semver,pattern={{version}},prefix=v
       - name: push std image to CI
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: "dist"
           platforms: ${{ github.event_name == 'pull_request' && 'linux/amd64' || 'linux/amd64,linux/arm64,linux/s390x' }}
           file: ci/Dockerfile.distroless
           provenance: mode=max
+          sbom: true
           outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -598,7 +598,7 @@ jobs:
       - name: Docker metadata for std tag push
         id: tag_metadata_std
         if: startsWith(github.ref, 'refs/tags')
-        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: |
             docker.tyk.io/tyk-gateway/tyk-gateway
@@ -616,12 +616,13 @@ jobs:
             org.opencontainers.image.version=${{ github.ref_name }}
       - name: push std image to prod
         if: ${{ matrix.golang_cross == '1.25-bullseye' && startsWith(github.ref, 'refs/tags') }}
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: "dist"
           platforms: linux/amd64,linux/arm64,linux/s390x
           file: ci/Dockerfile.distroless
           provenance: mode=max
+          sbom: true
           cache-from: type=gha
           outputs: type=image,push=true,compression=gzip,force-compression=true,oci-mediatypes=true
           tags: ${{ steps.tag_metadata_std.outputs.tags }}
@@ -672,7 +673,7 @@ jobs:
           fi
           echo "Success: All layers are uniformly compressed using gzip."
       - name: save deb
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
         with:
           name: deb
@@ -682,7 +683,7 @@ jobs:
             !dist/*PAYG*.deb
             !dist/*fips*.deb
       - name: save rpm
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: ${{ matrix.golang_cross == '1.25-bullseye' }}
         with:
           name: rpm
@@ -709,13 +710,13 @@ jobs:
     steps:
       - name: Generate GitHub App token
         id: app-token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0 # zizmor: ignore[github-app] owner-wide token, scoping tracked separately
         with:
           app-id: ${{ secrets.PROBE_APP_ID }}
           private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
           owner: TykTechnologies
       - name: Checkout tyk repository
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -753,7 +754,7 @@ jobs:
             echo "ℹ️ No relevant package changes in PR"
           fi
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@ff717079ee2060e4bcee96c4779b553acc87447c # v4
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
           role-session-name: cipush
@@ -761,7 +762,7 @@ jobs:
           mask-aws-account-id: false
       - name: Login to Amazon ECR
         id: ecr
-        uses: aws-actions/amazon-ecr-login@f2e9fc6c2b355c1890b65e6f6f0e2ac3e6e22f78 # v2
+        uses: aws-actions/amazon-ecr-login@7290e214a610b32bc0eef81748948b6d466a8783 # v2.2.0
         with:
           mask-password: 'true'
       - name: Check if tyk-analytics branch exists
@@ -923,7 +924,7 @@ jobs:
   build-dashboard-image:
     if: needs.resolve-dashboard-image.outputs.needs_build == 'true'
     needs: resolve-dashboard-image
-    runs-on: ${{ vars.DEFAULT_RUNNER }}
+    runs-on: ${{ vars.WARP_RUNNER_8X_X64 || vars.DEFAULT_RUNNER }}
     permissions:
       id-token: write
       contents: read
@@ -932,13 +933,13 @@ jobs:
     steps:
       - name: Generate GitHub App token
         id: app-token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0 # zizmor: ignore[github-app] owner-wide token, scoping tracked separately
         with:
           app-id: ${{ secrets.PROBE_APP_ID }}
           private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
           owner: TykTechnologies
       - name: Checkout tyk-analytics
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: TykTechnologies/tyk-analytics
           ref: ${{ needs.resolve-dashboard-image.outputs.dashboard_branch }}
@@ -986,18 +987,18 @@ jobs:
 
           echo "✓ Assets fetched successfully to internal/uiassets/dist/"
       - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@ff717079ee2060e4bcee96c4779b553acc87447c # v4
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
           role-session-name: cipush
           aws-region: eu-central-1
       - name: Login to Amazon ECR
         id: ecr
-        uses: aws-actions/amazon-ecr-login@f2e9fc6c2b355c1890b65e6f6f0e2ac3e6e22f78 # v2
+        uses: aws-actions/amazon-ecr-login@7290e214a610b32bc0eef81748948b6d466a8783 # v2.2.0
         with:
           mask-password: 'true'
-      - uses: docker/setup-qemu-action@c7c53464625b32c7a7e944ae62b3e17d2b600130 # v3
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
       - uses: WarpBuilds/cache@f643a1ba29942d56621d07fc2d4284c7219868ad # v1
         with:
           path: |
@@ -1081,7 +1082,7 @@ jobs:
           echo "platform=$PLATFORM" >> $GITHUB_OUTPUT
           echo "Building for platform: $PLATFORM"
       - name: Build and push dashboard Docker image
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: dist
           file: ci/Dockerfile.distroless
@@ -1141,7 +1142,9 @@ jobs:
       needs.goreleaser.result == 'success' &&
       needs.resolve-dashboard-image.result == 'success' &&
       (needs.build-dashboard-image.result == 'success' || needs.build-dashboard-image.result == 'skipped')
-    runs-on: ${{ vars.DEFAULT_RUNNER }}
+    runs-on: ${{ vars.WARP_RUNNER_8X_X64 || vars.DEFAULT_RUNNER }}
+    # Cost guard: hard cap vs the 360-min default (matters on bigger runners).
+    timeout-minutes: 25
     env:
       XUNIT_REPORT_PATH: ${{ github.workspace}}/test-results.xml
     permissions:
@@ -1161,22 +1164,22 @@ jobs:
     steps:
       - name: Generate GitHub App token
         id: app-token
-        uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
+        uses: actions/create-github-app-token@f418cff399f7aef4c2f0ad47e25ca7a6abbdd6fc # v3.4.0 # zizmor: ignore[github-app] owner-wide token, scoping tracked separately
         with:
           app-id: ${{ secrets.PROBE_APP_ID }}
           private-key: ${{ secrets.PROBE_APP_PRIVATE_KEY }}
           owner: TykTechnologies
-      - uses: aws-actions/configure-aws-credentials@ff717079ee2060e4bcee96c4779b553acc87447c # v4
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: arn:aws:iam::754489498669:role/ecr_rw_tyk
           role-session-name: cipush
           aws-region: eu-central-1
       - id: ecr
-        uses: aws-actions/amazon-ecr-login@f2e9fc6c2b355c1890b65e6f6f0e2ac3e6e22f78 # v2
+        uses: aws-actions/amazon-ecr-login@7290e214a610b32bc0eef81748948b6d466a8783 # v2.2.0
         with:
           mask-password: 'true'
       - name: Setup tmate session only in debug mode
-        uses: mxschmitt/action-tmate@c0afd6f790e3a5564914980036ebf83216678101 # v3
+        uses: mxschmitt/action-tmate@35b54afac29c97fb54faba5b513f8fbd1882f113 # v3.24
         if: runner.debug == '1'
         with:
           detached: true
@@ -1205,13 +1208,19 @@ jobs:
           org_gh_token: ${{ steps.app-token.outputs.token }}
       - name: Run API tests
         uses: TykTechnologies/github-actions/.github/actions/tests/api-tests@production
-        timeout-minutes: 45
+        timeout-minutes: 25
         id: test_execution
         with:
           user_api_secret: ${{ steps.env_up.outputs.USER_API_SECRET }}
       - name: Generate test reports and collect logs
         uses: TykTechnologies/github-actions/.github/actions/tests/reporting@production
         if: always() && (steps.test_execution.conclusion != 'skipped')
+        # Bound this best-effort step: `docker compose logs` inside it can hang on
+        # an unresponsive container and otherwise burn the whole job timeout.
+        # continue-on-error keeps a log-collection hang from failing an otherwise
+        # green test run (the real result comes from the Execute step above).
+        timeout-minutes: 8
+        continue-on-error: true
         with:
           report_xml: 'true'
           execution_status: ${{ steps.test_execution.outcome }}
