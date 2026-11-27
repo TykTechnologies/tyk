@@ -1483,3 +1483,213 @@ func TestApply_PostExpiryPropagation_Scenarios(t *testing.T) {
 		assert.Equal(t, user.PostExpiryActionDelete, sess.PostExpiryAction)
 	})
 }
+
+func TestApply_NoAcl_UpdatesLimits(t *testing.T) {
+	t.Run("updates rate limits, quotas and complexity when ACL is disabled", func(t *testing.T) {
+		orgID := ""
+
+		pol := user.Policy{
+			ID: "pol-no-acl",
+			Partitions: user.PolicyPartitions{
+				Acl:        false,
+				RateLimit:  true,
+				Quota:      true,
+				Complexity: true,
+			},
+			Rate:             1000,
+			Per:              60,
+			QuotaMax:         5000,
+			QuotaRenewalRate: 3600,
+			MaxQueryDepth:    10,
+			AccessRights: map[string]user.AccessDefinition{
+				"api1": {
+					APIID: "api1",
+					Limit: user.APILimit{
+						RateLimit: user.RateLimit{
+							Rate: 1000,
+							Per:  60,
+						},
+						QuotaMax:         5000,
+						QuotaRenews:      1,
+						QuotaRenewalRate: 3600,
+						MaxQueryDepth:    10,
+					},
+				},
+			},
+		}
+		store := policy.NewStoreMap(map[string]user.Policy{"pol-no-acl": pol})
+		logger, _ := tyklog.NewNullLogger()
+		svc := policy.New(&orgID, store, logger)
+
+		sess := &user.SessionState{
+			AccessRights: map[string]user.AccessDefinition{
+				"api1": {
+					APIID: "api1",
+					Limit: user.APILimit{
+						RateLimit: user.RateLimit{
+							Rate: 5,
+							Per:  60,
+						},
+						QuotaMax:         10,
+						QuotaRenews:      1,
+						QuotaRenewalRate: 3600,
+						MaxQueryDepth:    2,
+					},
+				},
+			},
+		}
+		sess.SetPolicies("pol-no-acl")
+
+		err := svc.Apply(sess)
+		assert.NoError(t, err)
+
+		ar, ok := sess.AccessRights["api1"]
+		assert.True(t, ok)
+
+		assert.Equal(t, float64(1000), ar.Limit.Rate)
+		assert.Equal(t, float64(60), ar.Limit.Per)
+		assert.Equal(t, int64(5000), ar.Limit.QuotaMax)
+		assert.Equal(t, 10, ar.Limit.MaxQueryDepth)
+	})
+}
+
+// TestApply_NoAcl_EndpointsAreRateLimitData covers the scenario raised in review of
+// #8562: a rate-limit-only policy applied to a session that already carries ACL data.
+// AccessDefinition.Endpoints holds endpoint rate limits, not ACL, so it follows the
+// rate-limit partition, while ACL fields on the session are left untouched.
+func TestApply_NoAcl_EndpointsAreRateLimitData(t *testing.T) {
+	orgID := ""
+
+	newSession := func() *user.SessionState {
+		sess := &user.SessionState{
+			AccessRights: map[string]user.AccessDefinition{
+				"api1": {
+					APIID:       "api1",
+					Versions:    []string{"Default"},
+					AllowedURLs: []user.AccessSpec{{URL: "/allowed", Methods: []string{"GET"}}},
+					Limit: user.APILimit{
+						RateLimit: user.RateLimit{Rate: 5, Per: 60},
+					},
+					Endpoints: user.Endpoints{{
+						Path:    "/old",
+						Methods: user.EndpointMethods{{Name: "GET", Limit: user.RateLimit{Rate: 5, Per: 60}}},
+					}},
+				},
+			},
+		}
+		sess.SetPolicies("pol-rl")
+		return sess
+	}
+
+	rlPolicy := func(endpoints user.Endpoints) user.Policy {
+		return user.Policy{
+			ID:         "pol-rl",
+			Partitions: user.PolicyPartitions{RateLimit: true},
+			Rate:       1000,
+			Per:        60,
+			AccessRights: map[string]user.AccessDefinition{
+				"api1": {APIID: "api1", Endpoints: endpoints},
+			},
+		}
+	}
+
+	t.Run("policy endpoint limits replace session endpoint limits, ACL untouched", func(t *testing.T) {
+		logger, _ := tyklog.NewNullLogger()
+
+		newEndpoints := user.Endpoints{{
+			Path:    "/new",
+			Methods: user.EndpointMethods{{Name: "GET", Limit: user.RateLimit{Rate: 1000, Per: 60}}},
+		}}
+		store := policy.NewStoreMap(map[string]user.Policy{"pol-rl": rlPolicy(newEndpoints)})
+		svc := policy.New(&orgID, store, logger)
+
+		sess := newSession()
+		assert.NoError(t, svc.Apply(sess))
+
+		ar, ok := sess.AccessRights["api1"]
+		assert.True(t, ok)
+		assert.Equal(t, []string{"Default"}, ar.Versions)
+		assert.Equal(t, []user.AccessSpec{{URL: "/allowed", Methods: []string{"GET"}}}, ar.AllowedURLs)
+		assert.Equal(t, float64(1000), ar.Limit.Rate)
+		assert.Equal(t, newEndpoints, ar.Endpoints)
+	})
+
+	t.Run("policy without endpoint limits clears session endpoint limits, ACL untouched", func(t *testing.T) {
+		logger, _ := tyklog.NewNullLogger()
+
+		store := policy.NewStoreMap(map[string]user.Policy{"pol-rl": rlPolicy(nil)})
+		svc := policy.New(&orgID, store, logger)
+
+		sess := newSession()
+		assert.NoError(t, svc.Apply(sess))
+
+		ar, ok := sess.AccessRights["api1"]
+		assert.True(t, ok)
+		assert.Equal(t, []string{"Default"}, ar.Versions)
+		assert.Equal(t, []user.AccessSpec{{URL: "/allowed", Methods: []string{"GET"}}}, ar.AllowedURLs)
+		assert.Equal(t, float64(1000), ar.Limit.Rate)
+		assert.Empty(t, ar.Endpoints)
+	})
+}
+
+// TestApply_NoAcl_EmptiedPolicyRevokesAccess covers B2 from the MDCB verification of #8562:
+// a policy whose access rights were emptied must not leave the session with the ACL it
+// granted earlier; the key is rejected as on master (TT-12710).
+func TestApply_NoAcl_EmptiedPolicyRevokesAccess(t *testing.T) {
+	orgID := ""
+	logger, _ := tyklog.NewNullLogger()
+
+	emptied := user.Policy{ID: "pol-emptied", AccessRights: map[string]user.AccessDefinition{}}
+	store := policy.NewStoreMap(map[string]user.Policy{"pol-emptied": emptied})
+	svc := policy.New(&orgID, store, logger)
+
+	sess := &user.SessionState{
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {APIID: "api1", Versions: []string{"Default"}},
+		},
+	}
+	sess.SetPolicies("pol-emptied")
+
+	assert.EqualError(t, svc.Apply(sess), "key has no valid policies to be applied")
+}
+
+// TestApply_NoAcl_RateOnlyPolicyKeepsSessionQuota covers B3 from the MDCB verification of
+// #8562: a rate-limit-only policy merged into a key whose per-API limit was empty must
+// carry the session quota along, otherwise the now non-empty per-API limit has no quota.
+func TestApply_NoAcl_RateOnlyPolicyKeepsSessionQuota(t *testing.T) {
+	orgID := ""
+	logger, _ := tyklog.NewNullLogger()
+
+	rl := user.Policy{
+		ID:         "pol-rl",
+		Partitions: user.PolicyPartitions{RateLimit: true},
+		Rate:       1000,
+		Per:        60,
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {APIID: "api1"},
+		},
+	}
+	store := policy.NewStoreMap(map[string]user.Policy{"pol-rl": rl})
+	svc := policy.New(&orgID, store, logger)
+
+	sess := &user.SessionState{
+		QuotaMax:         2,
+		QuotaRenewalRate: 3600,
+		QuotaRenews:      1,
+		MaxQueryDepth:    3,
+		AccessRights: map[string]user.AccessDefinition{
+			"api1": {APIID: "api1", Versions: []string{"Default"}},
+		},
+	}
+	sess.SetPolicies("pol-rl")
+
+	assert.NoError(t, svc.Apply(sess))
+
+	ar := sess.AccessRights["api1"]
+	assert.Equal(t, float64(1000), ar.Limit.Rate)
+	assert.Equal(t, float64(60), ar.Limit.Per)
+	assert.Equal(t, int64(2), ar.Limit.QuotaMax)
+	assert.Equal(t, int64(3600), ar.Limit.QuotaRenewalRate)
+	assert.Equal(t, int64(1), ar.Limit.QuotaRenews)
+	assert.Equal(t, 3, ar.Limit.MaxQueryDepth)
+}
