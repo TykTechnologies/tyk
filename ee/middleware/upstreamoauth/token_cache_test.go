@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -127,6 +128,39 @@ func TestGetToken_ObtainTokenError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "OAuth server error")
 	assert.Empty(t, token)
+}
+
+func TestGetToken_CachesOnlyTokensThatOutliveTheTTLUnit(t *testing.T) {
+	testCases := []struct {
+		name       string
+		expiry     time.Time
+		wantCached bool
+	}{
+		{name: "expires in an hour", expiry: time.Now().Add(time.Hour), wantCached: true},
+		{name: "no expiry", expiry: time.Time{}, wantCached: true},
+		{name: "expires in under a second", expiry: time.Now().Add(500 * time.Millisecond), wantCached: false},
+		{name: "already expired", expiry: time.Now().Add(-time.Minute), wantCached: false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			store := newMemStorage()
+			obtain := func(context.Context) (*oauth2.Token, error) {
+				return &oauth2.Token{AccessToken: "access-token", Expiry: tc.expiry}, nil
+			}
+
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			token, err := getToken(req, "cache-key", obtain, "secret", nil, store)
+
+			require.NoError(t, err)
+			assert.Equal(t, "access-token", token, "the token is used for this request either way")
+			if tc.wantCached {
+				assert.Equal(t, 1, store.setCalls)
+			} else {
+				assert.Zero(t, store.setCalls, "a key with a TTL of 0 would never expire in Redis")
+			}
+		})
+	}
 }
 
 func TestSetTokenInCache(t *testing.T) {
