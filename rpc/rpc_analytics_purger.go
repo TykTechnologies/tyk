@@ -81,6 +81,17 @@ func (r *Purger) PurgeCache() {
 			analyticsKeyName = fmt.Sprintf("%v_%v", ANALYTICS_KEYNAME, i)
 		}
 
+		// Remember the remaining TTL so that records put back after a failed
+		// purge still expire on the original schedule (see RedisPurger).
+		var expiresAt time.Time
+		if ttl, err := r.Store.GetExp(analyticsKeyName); err != nil {
+			Log.WithError(err).Debug("Failed to read expiry of analytics records")
+		} else if ttl >= 0 {
+			// Redis rounds TTL to whole seconds: 0 means less than half a
+			// second is left, not that the key has no expiry (-1).
+			expiresAt = time.Now().Add(time.Duration(ttl) * time.Second)
+		}
+
 		analyticsValues := r.Store.GetAndDeleteSet(analyticsKeyName)
 		if len(analyticsValues) == 0 {
 			continue
@@ -97,9 +108,60 @@ func (r *Purger) PurgeCache() {
 		// Send keys to RPC
 		if _, err := FuncClientSingleton("PurgeAnalyticsData", string(data)); err != nil {
 			EmitErrorEvent(FuncClientSingletonCall, "PurgeAnalyticsData", err)
-			Log.Warn("Failed to call purge, retrying: ", err)
+			Log.WithError(err).Warn("Failed to call purge, analytics will be retried on the next purge cycle")
+			r.restoreAnalyticsValues(analyticsKeyName, analyticsValues, expiresAt)
 		}
 
+	}
+}
+
+// restoreAnalyticsValues puts records popped by GetAndDeleteSet back to Redis
+// after a failed purge, so they are retried on the next cycle instead of
+// being lost. The key keeps the expiry it had before the pop, minus the time
+// spent on the failed call: otherwise a slow failing MDCB would keep the
+// records alive forever, and Redis would grow without bound. A zero expiresAt
+// means the key had no expiry.
+func (r *Purger) restoreAnalyticsValues(analyticsKeyName string, analyticsValues []interface{}, expiresAt time.Time) {
+	var ttl int64
+	if !expiresAt.IsZero() {
+		// Round like Redis does, so repeated failed cycles don't drift
+		// the expiry earlier than its original schedule.
+		ttl = int64((time.Until(expiresAt) + time.Second/2) / time.Second)
+		if ttl <= 0 {
+			Log.Warnf("Dropping %d analytics records that expired during the failed purge", len(analyticsValues))
+			return
+		}
+	}
+
+	raw := make([][]byte, 0, len(analyticsValues))
+	for _, v := range analyticsValues {
+		switch val := v.(type) {
+		case string:
+			raw = append(raw, []byte(val))
+		case []byte:
+			raw = append(raw, val)
+		default:
+			Log.Errorf("Dropping analytics record of unexpected type %T", v)
+		}
+	}
+	if len(raw) == 0 {
+		return
+	}
+
+	if pipelined, ok := r.Store.(interface {
+		AppendToSetPipelined(string, [][]byte)
+	}); ok {
+		pipelined.AppendToSetPipelined(analyticsKeyName, raw)
+	} else {
+		for _, v := range raw {
+			r.Store.AppendToSet(analyticsKeyName, string(v))
+		}
+	}
+
+	if ttl > 0 {
+		if err := r.Store.SetExp(analyticsKeyName, ttl); err != nil {
+			Log.WithError(err).Error("Failed to restore expiry of analytics records")
+		}
 	}
 }
 
