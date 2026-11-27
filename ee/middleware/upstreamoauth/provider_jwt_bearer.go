@@ -68,9 +68,9 @@ func (e *JWTBearerSigningError) Error() string {
 
 func (e *JWTBearerSigningError) Unwrap() error { return e.Err }
 
-// JWTBearerIdPError is returned when the token endpoint rejects the assertion
-// or answers with an unusable response. StatusCode is the HTTP status the
-// gateway returns to the client (401 or 403).
+// JWTBearerIdPError is returned when the token endpoint answers with an error
+// or an unusable response. StatusCode is the HTTP status the gateway returns to
+// the client: 401 or 403 for a rejection, 500 when the IdP is unavailable.
 type JWTBearerIdPError struct {
 	// IdPStatus is the HTTP status returned by the token endpoint.
 	IdPStatus int
@@ -83,13 +83,20 @@ type JWTBearerIdPError struct {
 }
 
 func (e *JWTBearerIdPError) Error() string {
-	return fmt.Sprintf("jwt bearer: token endpoint rejected assertion: status=%d error=%s description=%s",
+	return fmt.Sprintf("jwt bearer: token endpoint returned an error: status=%d error=%s description=%s",
 		e.IdPStatus, e.IdPError, e.Description)
 }
 
-// jwtBearerRejectionStatus maps a token endpoint rejection to the status the
+// jwtBearerRejectionStatus maps a token endpoint error to the status the
 // gateway returns to the client.
 func jwtBearerRejectionStatus(idpStatus int, idpErr string) int {
+	// A 5xx or 429 means the IdP is unavailable, not that it rejected the
+	// assertion. Report it as a gateway error, the same as an unreachable IdP,
+	// so an outage does not look like bad credentials.
+	if idpStatus >= http.StatusInternalServerError || idpStatus == http.StatusTooManyRequests {
+		return http.StatusInternalServerError
+	}
+
 	if idpStatus == http.StatusUnauthorized || idpStatus == http.StatusForbidden {
 		return idpStatus
 	}
@@ -102,7 +109,7 @@ func jwtBearerRejectionStatus(idpStatus int, idpErr string) int {
 		// is intentionally mapped to 401. This may be revisited if product guidance changes.
 		return http.StatusUnauthorized
 	default:
-		// Unknown IdP errors are treated as an authentication failure rather
+		// Unknown 4xx IdP errors are treated as an authentication failure rather
 		// than a gateway error, so a rejected assertion is not reported as a 5xx.
 		return http.StatusUnauthorized
 	}
@@ -190,7 +197,7 @@ func logJWTBearerError(mw *Middleware, err error) {
 			"idp_error":             idpErr.IdPError,
 			"idp_error_description": idpErr.Description,
 			"status":                idpErr.StatusCode,
-		}).Error("Upstream OAuth JWT Bearer: token endpoint rejected assertion")
+		}).Error("Upstream OAuth JWT Bearer: token endpoint returned an error")
 	default:
 		mw.Logger().WithError(err).Error("Upstream OAuth JWT Bearer: failed to obtain token")
 	}

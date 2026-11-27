@@ -420,10 +420,44 @@ func TestJWTBearer_IdPRejection(t *testing.T) {
 		{
 			name: "unknown IdP error maps to 401",
 			respond: func(t *testing.T, w http.ResponseWriter) {
-				writeOAuthError(t, w, http.StatusInternalServerError, "server_error")
+				writeOAuthError(t, w, http.StatusBadRequest, "unsupported_grant_type")
 			},
 			wantStatus: http.StatusUnauthorized,
+			wantIdPErr: "unsupported_grant_type",
+		},
+		{
+			name: "IdP 500 server_error maps to 500",
+			respond: func(t *testing.T, w http.ResponseWriter) {
+				writeOAuthError(t, w, http.StatusInternalServerError, "server_error")
+			},
+			wantStatus: http.StatusInternalServerError,
 			wantIdPErr: "server_error",
+		},
+		{
+			name: "IdP 503 status wins over error code",
+			respond: func(t *testing.T, w http.ResponseWriter) {
+				writeOAuthError(t, w, http.StatusServiceUnavailable, "invalid_grant")
+			},
+			wantStatus: http.StatusInternalServerError,
+			wantIdPErr: "invalid_grant",
+		},
+		{
+			name: "IdP 503 with non JSON body maps to 500",
+			respond: func(t *testing.T, w http.ResponseWriter) {
+				w.WriteHeader(http.StatusServiceUnavailable)
+				_, err := w.Write([]byte("<html>maintenance</html>"))
+				assert.NoError(t, err)
+			},
+			wantStatus: http.StatusInternalServerError,
+			wantIdPErr: "unknown",
+		},
+		{
+			name: "IdP 429 rate limit maps to 500",
+			respond: func(t *testing.T, w http.ResponseWriter) {
+				writeOAuthError(t, w, http.StatusTooManyRequests, "")
+			},
+			wantStatus: http.StatusInternalServerError,
+			wantIdPErr: "unknown",
 		},
 		{
 			name: "non JSON error body maps to 401",
