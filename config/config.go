@@ -13,6 +13,7 @@ import (
 	"github.com/kelseyhightower/envconfig"
 
 	"github.com/TykTechnologies/tyk/apidef"
+	internalhttputil "github.com/TykTechnologies/tyk/internal/httputil"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	logger "github.com/TykTechnologies/tyk/log"
 	"github.com/TykTechnologies/tyk/regexp"
@@ -662,12 +663,25 @@ type HttpServerOptionsConfig struct {
 	// A value of 1 means using the last IP, 2 means second to last, and so on.
 	XFFDepth int `json:"xff_depth"`
 
+	// TrustedProxyCIDRs lists the proxy networks whose Forwarded and
+	// X-Forwarded-* headers may be used to determine the request's public
+	// origin. Requests received directly, or from any other peer, ignore those
+	// headers.
+	TrustedProxyCIDRs []string `json:"trusted_proxy_cidrs"`
+
 	// MaxResponseBodySize sets an upper limit on the response body (payload) size in bytes. It defaults to 0, which means there is no restriction on the response body size.
 	//
 	// The Gateway will return `HTTP 500 Response Body Too Large` if the response payload exceeds MaxResponseBodySize+1 bytes.
 	//
 	// **Note:** The limit is applied only when the [Response Body Transform middleware](/api-management/traffic-transformation/response-body) is enabled.
 	MaxResponseBodySize int64 `json:"max_response_body_size"`
+}
+
+// ValidateTrustedProxyCIDRs validates the networks permitted to supply public
+// request-origin headers.
+func (h HttpServerOptionsConfig) ValidateTrustedProxyCIDRs() error {
+	_, err := internalhttputil.ParseTrustedProxyCIDRs(h.TrustedProxyCIDRs)
+	return err
 }
 
 type AuthOverrideConf struct {
@@ -1455,6 +1469,12 @@ type Config struct {
 
 	// AllowUnsafeBodyTransformTemplatePaths disables body transform template path validation. This is provided for compatibility with legacy API definitions containing potentially unsafe template paths (default: false).
 	AllowUnsafeBodyTransformTemplatePaths bool `json:"allow_unsafe_body_transform_template_paths"`
+
+	// AllowUnsafeWebSocketOrigin turns off the Origin check on WebSocket handshakes for GraphQL and Streams APIs, so a handshake from any origin is accepted (default: false).
+	// It exists for compatibility with browser clients on other origins that connected before the check was added.
+	// Not recommended: any website can then open a WebSocket to these APIs through a visitor's browser and read the responses.
+	// To allow a browser client, add its origin to the API's CORS allowed origins instead.
+	AllowUnsafeWebSocketOrigin bool `json:"allow_unsafe_websocket_origin"`
 }
 
 // LabsConfig include config for streaming
