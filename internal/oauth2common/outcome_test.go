@@ -21,6 +21,7 @@ func TestClassifyExchangeOutcome(t *testing.T) {
 		{"misconfig", &MisconfigError{Reason: "audience unresolvable"}, OutcomeMisconfig},
 		{"idp rejection", &ExchangeFailedError{Status: 400, IdpError: "invalid_grant"}, OutcomeIdPError},
 		{"generic error treated as idp_error", errors.New("dial tcp: connection refused"), OutcomeIdPError},
+		{"unexpected token type is not an idp_error", &UnexpectedTokenTypeError{Requested: "a", Issued: "b"}, OutcomeUnexpectedTokenType},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -49,4 +50,5 @@ func TestOutcomeKind_WireValues(t *testing.T) {
 	assert.Equal(t, OutcomeKind("idp_error"), OutcomeIdPError)
 	assert.Equal(t, OutcomeKind("misconfig"), OutcomeMisconfig)
 	assert.Equal(t, OutcomeKind("no_matching_provider"), OutcomeNoMatchingProvider)
+	assert.Equal(t, OutcomeKind("unexpected_token_type"), OutcomeUnexpectedTokenType)
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/internal/event"
 	"github.com/TykTechnologies/tyk/internal/oauth2common"
 )
@@ -176,6 +177,35 @@ func TestEventPayload_AuditMeta_FailedCarriesIdPError(t *testing.T) {
 	assertNoForbiddenKeys(t, meta)
 }
 
+// TestEventPayload_UnexpectedTokenTypeFields pins that a refused token type is
+// logged and audited with both types (the issued one capped, being
+// IdP-supplied) and without the idp_error fields, which describe IdP failures.
+func TestEventPayload_UnexpectedTokenTypeFields(t *testing.T) {
+	t.Parallel()
+
+	p := okPayload()
+	p.Outcome = oauth2common.OutcomeUnexpectedTokenType
+	p.RequestedTokenType = oas.OAuth2TokenTypeAccessToken
+	p.IssuedTokenType = "urn:ietf:params:oauth:token-type:id_token"
+
+	for name, fields := range map[string]map[string]interface{}{"log": p.LogFields(), "audit": p.AuditMeta()} {
+		assert.Equal(t, "unexpected_token_type", fields["oauth2_exchange_outcome"], name)
+		assert.Equal(t, oas.OAuth2TokenTypeAccessToken, fields["oauth2_requested_token_type"], name)
+		assert.Equal(t, "urn:ietf:params:oauth:token-type:id_token", fields["oauth2_issued_token_type"], name)
+		assert.NotContains(t, fields, "oauth2_idp_error", name)
+		assertNoForbiddenKeys(t, fields)
+	}
+
+	p.IssuedTokenType = strings.Repeat("x", 4*oauth2common.MaxIdPErrorBodyBytes)
+	got, _ := p.LogFields()["oauth2_issued_token_type"].(string)
+	assert.True(t, strings.HasSuffix(got, "...(truncated)"), "issued_token_type must be capped")
+
+	// The fields only appear on this outcome.
+	ok := okPayload()
+	ok.RequestedTokenType, ok.IssuedTokenType = "a", "b"
+	assert.NotContains(t, ok.LogFields(), "oauth2_issued_token_type")
+}
+
 // TestEventPayload_AuditDecision pins TC7/TC8/TC14: ok → Succeeded; idp_error
 // and no_matching_provider → Failed; misconfig → no audit event.
 func TestEventPayload_AuditDecision(t *testing.T) {
@@ -189,6 +219,7 @@ func TestEventPayload_AuditDecision(t *testing.T) {
 		{oauth2common.OutcomeOK, event.OAuth2ExchangeSucceeded, true},
 		{oauth2common.OutcomeIdPError, event.OAuth2ExchangeFailed, true},
 		{oauth2common.OutcomeNoMatchingProvider, event.OAuth2ExchangeFailed, true},
+		{oauth2common.OutcomeUnexpectedTokenType, event.OAuth2ExchangeFailed, true},
 		{oauth2common.OutcomeMisconfig, "", false},
 	}
 	for _, tt := range tests {

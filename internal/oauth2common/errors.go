@@ -65,6 +65,19 @@ func (e *ExchangeFailedError) Error() string {
 	return fmt.Sprintf("exchange_failed: idp_error=%s (status %d)", e.IdpError, e.Status)
 }
 
+// UnexpectedTokenTypeError is raised when the IdP answers a token exchange
+// successfully but its issued_token_type does not satisfy the provider's
+// requestedTokenType. The IdP did not fail, so it is not an idp_error: the
+// gateway refused the token, which is never forwarded upstream or cached.
+type UnexpectedTokenTypeError struct {
+	Requested string
+	Issued    string
+}
+
+func (e *UnexpectedTokenTypeError) Error() string {
+	return fmt.Sprintf("exchange response issued_token_type %q does not match requested_token_type %q", e.Issued, e.Requested)
+}
+
 // MaxIdPErrorBodyBytes caps the raw snippet captured from a non-JSON IdP error body.
 const MaxIdPErrorBodyBytes = 256
 

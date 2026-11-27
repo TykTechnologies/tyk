@@ -21,6 +21,11 @@ type CacheKeyInput struct {
 	// from the provider's configured one; empty for static endpoints. It
 	// keys the cache per tenant for IdPs whose tenants share one issuer.
 	TenantEndpoint string
+	// RequestedTokenType is the provider's configured requested_token_type,
+	// empty when none is configured. It keeps a cached token of
+	// one type from being served after the provider is reconfigured to ask for
+	// another.
+	RequestedTokenType string
 }
 
 // Build returns the cache key for this input as a hex-encoded SHA-256 with the oauth2:exchange: prefix.
@@ -36,6 +41,11 @@ func (k CacheKeyInput) Build() string {
 	// unchanged by the field's introduction.
 	if k.TenantEndpoint != "" {
 		raw += "|" + k.TenantEndpoint
+	}
+	// Same rule: providers without one keep their existing keys. The
+	// "rtt=" tag keeps it distinct from a TenantEndpoint in the same slot.
+	if k.RequestedTokenType != "" {
+		raw += "|rtt=" + k.RequestedTokenType
 	}
 	h := sha256.Sum256([]byte(raw))
 	return fmt.Sprintf("%s%x", cacheKeyPrefix, h)

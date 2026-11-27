@@ -65,18 +65,20 @@ func (m *Middleware) emitObservability(ctx context.Context, st *oauth2common.Sta
 	}
 
 	payload := EventPayload{
-		TraceID:         tykotel.ExtractTraceID(ctx),
-		APIID:           st.APIID,
-		Provider:        out.ProviderName,
-		Outcome:         outcome,
-		CacheHit:        out.CacheHit,
-		DurationMS:      out.Duration.Milliseconds(),
-		IdpError:        out.IdpErrorCode,
-		IdpErrorDesc:    out.IdpErrorDesc,
-		SubjectAzp:      oauth2common.StringClaim(st.Claims, oas.OAuth2ClaimAzp),
-		ExchangedAzp:    exchangedAzp(out.ExchangedToken),
-		Audience:        out.Audience,
-		ScopesRequested: out.Scopes,
+		TraceID:            tykotel.ExtractTraceID(ctx),
+		APIID:              st.APIID,
+		Provider:           out.ProviderName,
+		Outcome:            outcome,
+		CacheHit:           out.CacheHit,
+		DurationMS:         out.Duration.Milliseconds(),
+		IdpError:           out.IdpErrorCode,
+		IdpErrorDesc:       out.IdpErrorDesc,
+		RequestedTokenType: out.RequestedTokenType,
+		IssuedTokenType:    out.IssuedTokenType,
+		SubjectAzp:         oauth2common.StringClaim(st.Claims, oas.OAuth2ClaimAzp),
+		ExchangedAzp:       exchangedAzp(out.ExchangedToken),
+		Audience:           out.Audience,
+		ScopesRequested:    out.Scopes,
 	}
 
 	m.Logger().WithFields(payload.LogFields()).Info("oauth2 token exchange")

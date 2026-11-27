@@ -222,8 +222,17 @@ type OAuth2TokenExchangeProvider struct {
 	// Defaults to 15s when unset.
 	Timeout tyktime.ReadableDuration `bson:"timeout,omitempty" json:"timeout,omitempty"`
 
+	// RequestedTokenType is the RFC 8693 requested_token_type sent on the
+	// exchange request: an absolute URI naming the token type Tyk asks the IdP
+	// to issue, e.g. urn:ietf:params:oauth:token-type:access_token. Opt-in:
+	// when unset nothing is sent and the response is not checked, so existing
+	// providers are unaffected. When set, the response's issued_token_type, if
+	// present, must match it. Only valid with the token-exchange grant.
+	RequestedTokenType string `bson:"requestedTokenType,omitempty" json:"requestedTokenType,omitempty"`
+
 	// CustomParams are extra form parameters appended to the exchange request.
-	// Keys in oauth2ReservedExchangeFormKeys are rejected at API-load time.
+	// Keys in oauth2ReservedExchangeFormKeys are rejected at API-load time;
+	// requested_token_type is one of them — set RequestedTokenType instead.
 	// Values accept env://, secrets://, vault://, consul:// prefixes.
 	CustomParams map[string]string `bson:"customParams,omitempty" json:"customParams,omitempty"`
 
@@ -585,6 +594,9 @@ func validateOAuth2ExchangeProvider(schemeName string, i int, p *OAuth2TokenExch
 	if err := validateExchangeIssuers(schemeName, p, issuerOwner); err != nil {
 		return err
 	}
+	if err := validateExchangeRequestedTokenType(schemeName, p); err != nil {
+		return err
+	}
 	if err := validateExchangeCustomParams(schemeName, p); err != nil {
 		return err
 	}
@@ -713,6 +725,25 @@ func validateExchangeCustomParams(schemeName string, p *OAuth2TokenExchangeProvi
 		if _, reserved := reservedKeys[key]; reserved {
 			return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q customParams cannot override reserved %s wire key %q", schemeName, p.Name, grantLabel, key)
 		}
+	}
+	return nil
+}
+
+// validateExchangeRequestedTokenType requires requestedTokenType, when set, to
+// be an absolute URI (RFC 8693 §3) and rejects it on the jwt-bearer grant,
+// which has no such wire parameter.
+func validateExchangeRequestedTokenType(schemeName string, p *OAuth2TokenExchangeProvider) error {
+	if p.RequestedTokenType == "" {
+		return nil
+	}
+	if p.IsJWTBearer() {
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q requestedTokenType is only valid with the %q grant",
+			schemeName, p.Name, OAuth2ProviderGrantTokenExchange)
+	}
+	u, err := url.Parse(p.RequestedTokenType)
+	if err != nil || !u.IsAbs() {
+		return fmt.Errorf("oauth2 scheme %q: tokenExchange.provider %q requestedTokenType %q must be an absolute URI (e.g. %q)",
+			schemeName, p.Name, p.RequestedTokenType, OAuth2TokenTypeAccessToken)
 	}
 	return nil
 }
