@@ -28,6 +28,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/cache"
 	"github.com/TykTechnologies/tyk/internal/otel"
 	"github.com/TykTechnologies/tyk/internal/otel/apimetrics"
+	"github.com/TykTechnologies/tyk/internal/rate"
 	"github.com/TykTechnologies/tyk/internal/uuid"
 	"github.com/TykTechnologies/tyk/storage"
 	storagemock "github.com/TykTechnologies/tyk/storage/mock"
@@ -1558,4 +1559,351 @@ func TestCheckSessionAndIdentityForValidKey_AuthStorePath_MarksSessionAsNew(t *t
 	// Check update session behavior
 	updated := baseMid.UpdateRequestSession(req)
 	assert.True(t, updated, "Should update session if session is touched")
+}
+
+// newSplitSessionStoresAPI loads an API whose AuthManager (RPC/MDCB) and the gateway's
+// GlobalSessionManager (local data plane Redis) are backed by separate mocked stores.
+// The AuthManager store always returns the given session. The local store returns it only
+// when foundLocally is true; otherwise it reports a miss, forcing the MDCB fallback path in
+// CheckSessionAndIdentityForValidKey.
+func newSplitSessionStoresAPI(t *testing.T, ts *Test, session *user.SessionState, foundLocally bool) *APISpec {
+	t.Helper()
+
+	ctrl := gomock.NewController(t)
+
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = uuid.New()
+		spec.UseKeylessAccess = false
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			apidef.AuthTokenType: {AuthHeaderName: "Authorization"},
+		}
+	})[0]
+
+	sessionJSON, err := json.Marshal(session)
+	require.NoError(t, err)
+
+	// rpc/mdcb storage
+	rpcStore := storagemock.NewMockHandler(ctrl)
+	rpcStore.EXPECT().GetKey(gomock.Any()).Return(string(sessionJSON), nil).AnyTimes()
+	rpcStore.EXPECT().GetMultiKey(gomock.Any()).Return([]string{string(sessionJSON)}, nil).AnyTimes()
+	rpcStore.EXPECT().GetRawKey(gomock.Any()).Return(string(sessionJSON), nil).AnyTimes()
+	rpcStore.EXPECT().GetKeyPrefix().Return("").AnyTimes()
+	api.AuthManager = &DefaultSessionManager{store: rpcStore, orgID: api.OrgID, Gw: ts.Gw}
+
+	// local storage
+	localStore := storagemock.NewMockHandler(ctrl)
+	if foundLocally {
+		localStore.EXPECT().GetKey(gomock.Any()).Return(string(sessionJSON), nil).AnyTimes()
+		localStore.EXPECT().GetMultiKey(gomock.Any()).Return([]string{string(sessionJSON)}, nil).AnyTimes()
+		localStore.EXPECT().GetRawKey(gomock.Any()).Return(string(sessionJSON), nil).AnyTimes()
+	} else {
+		localStore.EXPECT().GetKey(gomock.Any()).Return("", storage.ErrKeyNotFound).AnyTimes()
+		localStore.EXPECT().GetMultiKey(gomock.Any()).Return(nil, storage.ErrKeyNotFound).AnyTimes()
+		localStore.EXPECT().GetRawKey(gomock.Any()).Return("", storage.ErrKeyNotFound).AnyTimes()
+	}
+	localStore.EXPECT().GetKeyPrefix().Return("").AnyTimes()
+	localStore.EXPECT().SetKey(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	localStore.EXPECT().SetKeyEx(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+	ts.Gw.GlobalSessionManager = &DefaultSessionManager{store: localStore, orgID: api.OrgID, Gw: ts.Gw}
+
+	return api
+}
+
+// TT-16576: when a key is fetched from MDCB (AuthManager fallback) with hash_keys enabled, the
+// session's key hash must be the hashed key, never the raw key - the same as for the local
+// session store path.
+func TestCheckSessionAndIdentityForValidKey_AuthStorePath_KeyHash(t *testing.T) {
+	lookup := func(t *testing.T, hashKeys, foundLocally bool, key string) (*Test, user.SessionState) {
+		t.Helper()
+
+		ts := StartTest(func(globalConf *config.Config) {
+			globalConf.HashKeys = hashKeys
+			globalConf.LocalSessionCache.DisableCacheSessionState = false
+		})
+		t.Cleanup(ts.Close)
+
+		api := newSplitSessionStoresAPI(t, ts, CreateStandardSession(), foundLocally)
+		baseMid := NewBaseMiddleware(ts.Gw, api, nil, nil)
+
+		got, ok := baseMid.CheckSessionAndIdentityForValidKey(key, httptest.NewRequest(http.MethodGet, "/", nil))
+		require.True(t, ok, "session should be found")
+		require.False(t, got.KeyHashEmpty(), "key hash should be set on the returned session")
+
+		return ts, got
+	}
+
+	t.Run("hash_keys enabled: MDCB fallback sets hashed key hash", func(t *testing.T) {
+		key := "mdcb-fallback-" + uuid.New()
+		ts, got := lookup(t, true, false, key)
+
+		assert.Equal(t, storage.HashStr(got.KeyID), got.KeyHash())
+		assert.NotEqual(t, key, got.KeyHash(), "raw key must not be used as key hash")
+		assert.NotEqual(t, got.KeyID, got.KeyHash(), "raw key ID must not be used as key hash")
+
+		// the session cached in memory (served for subsequent requests) must carry the hashed value too
+		cacheKey := storage.HashStr(key, storage.HashMurmur64)
+		require.Eventually(t, func() bool {
+			_, found := ts.Gw.SessionCache.Get(cacheKey)
+			return found
+		}, time.Second, 10*time.Millisecond, "session should be cached after MDCB lookup")
+
+		cachedVal, _ := ts.Gw.SessionCache.Get(cacheKey)
+		cached := cachedVal.(user.SessionState)
+		assert.Equal(t, got.KeyHash(), cached.KeyHash())
+	})
+
+	t.Run("hash_keys enabled: MDCB fallback and local store produce identical key hash", func(t *testing.T) {
+		key := "mdcb-consistency-" + uuid.New()
+		_, fromMDCB := lookup(t, true, false, key)
+		_, fromLocal := lookup(t, true, true, key)
+
+		assert.Equal(t, fromLocal.KeyID, fromMDCB.KeyID)
+		assert.Equal(t, fromLocal.KeyHash(), fromMDCB.KeyHash())
+	})
+
+	t.Run("hash_keys disabled: MDCB fallback keeps existing behaviour", func(t *testing.T) {
+		key := "mdcb-unhashed-" + uuid.New()
+		_, fromMDCB := lookup(t, false, false, key)
+		_, fromLocal := lookup(t, false, true, key)
+
+		assert.Equal(t, key, fromMDCB.KeyHash())
+		assert.Equal(t, fromLocal.KeyHash(), fromMDCB.KeyHash())
+	})
+
+	// The rate limiter derives its redis key from session.KeyHash(). A raw key there leaks the
+	// credential into redis key names and splits the counter between the first (MDCB) request
+	// and subsequent (local) requests.
+	t.Run("hash_keys enabled: rate limiter key uses hashed key and is not split", func(t *testing.T) {
+		key := "mdcb-ratelimit-" + uuid.New()
+		_, fromMDCB := lookup(t, true, false, key)
+		_, fromLocal := lookup(t, true, true, key)
+
+		// mirrors SessionLimiter.newRateLimitChecker: rateLimitKey is the auth token (session.KeyID)
+		mdcbLimiterKey := rate.LimiterKey(&fromMDCB, "", fromMDCB.KeyID, false)
+		localLimiterKey := rate.LimiterKey(&fromLocal, "", fromLocal.KeyID, false)
+
+		assert.Equal(t, rate.Prefix(rate.LimiterKeyPrefix, storage.HashStr(fromMDCB.KeyID)), mdcbLimiterKey)
+		assert.Equal(t, localLimiterKey, mdcbLimiterKey, "first and subsequent requests must share one rate limit counter")
+		assert.NotContains(t, mdcbLimiterKey, key, "raw key must not appear in rate limiter redis key")
+		assert.NotContains(t, mdcbLimiterKey, fromMDCB.KeyID, "raw key ID must not appear in rate limiter redis key")
+	})
+}
+
+// TT-16576: the tyk.api.apikey span attribute must contain the hashed key on the first request
+// of a key fetched from MDCB, and must be omitted when hash_keys is disabled.
+func TestAuthKey_APIKeySpanAttribute_AuthStorePath(t *testing.T) {
+	findAttr := func(attrs []otel.SpanAttribute, name string) (string, bool) {
+		for _, a := range attrs {
+			if string(a.Key) == name {
+				return a.Value.AsString(), true
+			}
+		}
+		return "", false
+	}
+
+	for _, tc := range []struct {
+		name     string
+		hashKeys bool
+	}{
+		{name: "hash_keys enabled", hashKeys: true},
+		{name: "hash_keys disabled", hashKeys: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := StartTest(func(globalConf *config.Config) {
+				globalConf.HashKeys = tc.hashKeys
+				globalConf.LocalSessionCache.DisableCacheSessionState = false
+			})
+			defer ts.Close()
+
+			api := newSplitSessionStoresAPI(t, ts, CreateStandardSession(), false)
+			authKey := &AuthKey{BaseMiddleware: NewBaseMiddleware(ts.Gw, api, nil, nil)}
+
+			key := "mdcb-otel-" + uuid.New()
+			r := httptest.NewRequest(http.MethodGet, "/", nil)
+			r.Header.Set("Authorization", key)
+
+			err, code := authKey.ProcessRequest(httptest.NewRecorder(), r, nil)
+			require.NoError(t, err)
+			require.Equal(t, http.StatusOK, code)
+
+			session := ctxGetSession(r)
+			require.NotNil(t, session)
+
+			attrs := ctxGetSpanAttributes(r, authKey.Name())
+			for _, a := range attrs {
+				assert.NotEqual(t, key, a.Value.AsString(), "raw key must not appear in span attribute %s", a.Key)
+			}
+
+			got, found := findAttr(attrs, string(otel.APIKeyAttribute("").Key))
+			if !tc.hashKeys {
+				assert.False(t, found, "tyk.api.apikey must be omitted when hash_keys is disabled")
+				return
+			}
+
+			require.True(t, found, "tyk.api.apikey should be set when hash_keys is enabled")
+			assert.Equal(t, storage.HashStr(session.KeyID), got)
+			assert.NotEqual(t, session.KeyID, got)
+		})
+	}
+}
+
+// newMDCBBackedAPIWithStatefulLocalStore loads an API whose AuthManager (RPC/MDCB) always returns
+// the given session, while the gateway's local session store starts empty and keeps whatever is
+// written to it - like a data plane Redis that is populated on the first MDCB fallback.
+// The returned func reports how many times the MDCB store was queried.
+func newMDCBBackedAPIWithStatefulLocalStore(t *testing.T, ts *Test, session *user.SessionState) (*APISpec, func() int) {
+	t.Helper()
+
+	ctrl := gomock.NewController(t)
+
+	api := ts.Gw.BuildAndLoadAPI(func(spec *APISpec) {
+		spec.APIID = uuid.New()
+		spec.UseKeylessAccess = false
+		spec.AuthConfigs = map[string]apidef.AuthConfig{
+			apidef.AuthTokenType: {AuthHeaderName: "Authorization"},
+		}
+	})[0]
+
+	sessionJSON, err := json.Marshal(session)
+	require.NoError(t, err)
+
+	var mu sync.Mutex
+	rpcLookups := 0
+	countRPC := func() {
+		mu.Lock()
+		rpcLookups++
+		mu.Unlock()
+	}
+
+	// rpc/mdcb storage
+	rpcStore := storagemock.NewMockHandler(ctrl)
+	rpcStore.EXPECT().GetKey(gomock.Any()).DoAndReturn(func(string) (string, error) {
+		countRPC()
+		return string(sessionJSON), nil
+	}).AnyTimes()
+	rpcStore.EXPECT().GetMultiKey(gomock.Any()).DoAndReturn(func([]string) ([]string, error) {
+		countRPC()
+		return []string{string(sessionJSON)}, nil
+	}).AnyTimes()
+	rpcStore.EXPECT().GetRawKey(gomock.Any()).DoAndReturn(func(string) (string, error) {
+		countRPC()
+		return string(sessionJSON), nil
+	}).AnyTimes()
+	rpcStore.EXPECT().GetKeyPrefix().Return("").AnyTimes()
+	api.AuthManager = &DefaultSessionManager{store: rpcStore, orgID: api.OrgID, Gw: ts.Gw}
+
+	// local storage (data plane redis)
+	local := map[string]string{}
+	get := func(k string) (string, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		if v, ok := local[k]; ok {
+			return v, nil
+		}
+		return "", storage.ErrKeyNotFound
+	}
+	set := func(k, v string, _ int64) error {
+		mu.Lock()
+		defer mu.Unlock()
+		local[k] = v
+		return nil
+	}
+
+	localStore := storagemock.NewMockHandler(ctrl)
+	localStore.EXPECT().GetKey(gomock.Any()).DoAndReturn(get).AnyTimes()
+	localStore.EXPECT().GetRawKey(gomock.Any()).DoAndReturn(get).AnyTimes()
+	localStore.EXPECT().GetMultiKey(gomock.Any()).DoAndReturn(func(keys []string) ([]string, error) {
+		values := make([]string, len(keys))
+		found := false
+		for i, k := range keys {
+			if v, err := get(k); err == nil {
+				values[i] = v
+				found = true
+			}
+		}
+		if !found {
+			return nil, storage.ErrKeyNotFound
+		}
+		return values, nil
+	}).AnyTimes()
+	localStore.EXPECT().GetKeyPrefix().Return("").AnyTimes()
+	localStore.EXPECT().SetKey(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(set).AnyTimes()
+	localStore.EXPECT().SetKeyEx(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(set).AnyTimes()
+	ts.Gw.GlobalSessionManager = &DefaultSessionManager{store: localStore, orgID: api.OrgID, Gw: ts.Gw}
+
+	return api, func() int {
+		mu.Lock()
+		defer mu.Unlock()
+		return rpcLookups
+	}
+}
+
+// TT-16576: tyk.api.apikey must be the hashed key on the first request (key fetched from MDCB)
+// and stay identical on the subsequent request (key served from the in-memory session cache or
+// from the local data plane store).
+func TestAuthKey_APIKeySpanAttribute_ConsecutiveRequests(t *testing.T) {
+	apiKeyAttrName := string(otel.APIKeyAttribute("").Key)
+
+	for _, tc := range []struct {
+		name                     string
+		disableInMemorySessCache bool
+	}{
+		{name: "second request served from in-memory session cache", disableInMemorySessCache: false},
+		{name: "second request served from local session store", disableInMemorySessCache: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ts := StartTest(func(globalConf *config.Config) {
+				globalConf.HashKeys = true
+				globalConf.LocalSessionCache.DisableCacheSessionState = tc.disableInMemorySessCache
+			})
+			defer ts.Close()
+
+			api, rpcLookups := newMDCBBackedAPIWithStatefulLocalStore(t, ts, CreateStandardSession())
+			authKey := &AuthKey{BaseMiddleware: NewBaseMiddleware(ts.Gw, api, nil, nil)}
+			key := "mdcb-consecutive-" + uuid.New()
+
+			doRequest := func() (apiKeyAttr string, session *user.SessionState) {
+				t.Helper()
+
+				r := httptest.NewRequest(http.MethodGet, "/", nil)
+				r.Header.Set("Authorization", key)
+
+				err, code := authKey.ProcessRequest(httptest.NewRecorder(), r, nil)
+				require.NoError(t, err)
+				require.Equal(t, http.StatusOK, code)
+
+				session = ctxGetSession(r)
+				require.NotNil(t, session)
+
+				for _, a := range ctxGetSpanAttributes(r, authKey.Name()) {
+					assert.NotEqual(t, key, a.Value.AsString(), "raw key must not appear in span attribute %s", a.Key)
+					assert.NotEqual(t, session.KeyID, a.Value.AsString(), "raw key ID must not appear in span attribute %s", a.Key)
+					if string(a.Key) == apiKeyAttrName {
+						apiKeyAttr = a.Value.AsString()
+					}
+				}
+				require.NotEmpty(t, apiKeyAttr, "tyk.api.apikey should be set when hash_keys is enabled")
+				return apiKeyAttr, session
+			}
+
+			// first request: cold data plane, key is fetched from MDCB
+			first, firstSession := doRequest()
+			require.Equal(t, 1, rpcLookups(), "first request should fall back to MDCB")
+			assert.Equal(t, storage.HashStr(firstSession.KeyID), first)
+
+			if !tc.disableInMemorySessCache {
+				// the in-memory cache is populated asynchronously after the MDCB fallback
+				cacheKey := storage.HashStr(key, storage.HashMurmur64)
+				require.Eventually(t, func() bool {
+					_, found := ts.Gw.SessionCache.Get(cacheKey)
+					return found
+				}, time.Second, 10*time.Millisecond, "session should be cached after MDCB lookup")
+			}
+
+			// second request: served by the data plane without querying MDCB again
+			second, _ := doRequest()
+			require.Equal(t, 1, rpcLookups(), "second request should not query MDCB")
+			assert.Equal(t, first, second, "tyk.api.apikey must be identical across requests")
+		})
+	}
 }
