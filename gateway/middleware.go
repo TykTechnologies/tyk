@@ -677,8 +677,19 @@ func effectiveMinTokenLength(configured int) int {
 }
 
 // CheckSessionAndIdentityForValidKey will check first the Session store for a valid key, if not found, it will try
-// the Auth Handler, if not found it will fail
+// the Auth Handler, if not found it will fail. A JWT claims-only session is never valid here: only the
+// JWT middleware may use it, after the token's claims passed validation.
 func (t *BaseMiddleware) CheckSessionAndIdentityForValidKey(originalKey string, r *http.Request) (user.SessionState, bool) {
+	session, found := t.checkSessionAndIdentityForValidKey(originalKey, r)
+	if found && isJWTClaimsOnlySession(&session) {
+		t.Logger().Warning("Refused a JWT claims-only session key presented as a credential")
+		return user.SessionState{}, false
+	}
+
+	return session, found
+}
+
+func (t *BaseMiddleware) checkSessionAndIdentityForValidKey(originalKey string, _ *http.Request) (user.SessionState, bool) {
 	key := originalKey
 	minLength := effectiveMinTokenLength(t.Spec.GlobalConfig.MinTokenLength)
 

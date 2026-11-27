@@ -3,9 +3,11 @@ package gateway
 import (
 	"bytes"
 	"crypto/md5"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
 	"errors"
@@ -916,16 +918,29 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		return err, http.StatusForbidden
 	}
 
+	// The manual API-def scope-to-policy map is merged with any matched registry
+	// binding (manual wins on collision, binding fills gaps). With no binding this
+	// returns the manual map unchanged — byte-identical for manual APIs.
+	binding := ctxGetMatchedBinding(r)
+	scopeMap := scopeToPolicyMapForRequest(k.Spec.GetScopeToPolicyMapping(), binding)
+	claimsOnly := k.claimsOnlyMode(scopeMap)
+
 	// Generate a virtual token
 	data := []byte(baseFieldData)
 	keyID := fmt.Sprintf("%x", md5.Sum(data))
+	if claimsOnly {
+		keyID = claimsOnlySessionKeyID(k.Spec.APIID, baseFieldData)
+	}
 	sessionID := k.Gw.generateToken(k.Spec.OrgID, keyID)
 	updateSession := false
 
 	k.Logger().Debug("JWT Temporary session ID is: ", sessionID)
 
-	// CheckSessionAndIdentityForValidKey returns a session with keyID populated
-	session, exists := k.CheckSessionAndIdentityForValidKey(sessionID, r)
+	// checkSessionAndIdentityForValidKey returns a session with keyID populated
+	session, exists := k.checkSessionAndIdentityForValidKey(sessionID, r)
+	if exists && claimsOnly && !isJWTClaimsOnlySession(&session) {
+		exists = false
+	}
 
 	sessionID = session.KeyID
 	isDefaultPol := false
@@ -980,6 +995,9 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		}
 
 		session.MetaData = map[string]interface{}{"TykJWTSessionID": sessionID}
+		if claimsOnly {
+			session.MetaData[jwtClaimsOnlyMetaKey] = true
+		}
 		session.Alias = baseFieldData
 
 		// Update the session in the session manager in case it gets called again
@@ -1007,7 +1025,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		}
 		// check if token for this session was switched to another valid policy
 		pols := session.PolicyIDs()
-		if len(pols) == 0 {
+		if len(pols) == 0 && !claimsOnly {
 			k.reportLoginFailure(baseFieldData, r)
 			k.Logger().Error("No policies for the found session. Failing Request.")
 			return errors.New("key not authorized: no matching policy found"), http.StatusForbidden
@@ -1065,12 +1083,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		}
 	}
 
-	// apply policies from scope if scope-to-policy mapping is specified for this
-	// API. The manual API-def map is merged with any matched registry binding
-	// (manual wins on collision, binding fills gaps). With no binding this
-	// returns the manual map unchanged — byte-identical for manual APIs.
-	binding := ctxGetMatchedBinding(r)
-	scopeMap := scopeToPolicyMapForRequest(k.Spec.GetScopeToPolicyMapping(), binding)
+	// apply policies from scope if scope-to-policy mapping is specified for this API.
 	if len(scopeMap) != 0 {
 		scopeClaimName := k.scopeClaimNameForRequest(claims, binding)
 
@@ -1124,7 +1137,7 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		}
 	}
 
-	if basePolicyID == "" && len(k.Spec.JWTDefaultPolicies) == 0 {
+	if !claimsOnly && basePolicyID == "" && len(k.Spec.JWTDefaultPolicies) == 0 {
 		if len(session.PolicyIDs()) == 0 {
 			k.reportLoginFailure(baseFieldData, r)
 			k.Logger().Error("No policies could be determined from token (no base policy, no valid scopes)")
@@ -1191,6 +1204,12 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 		}
 	}
 
+	if claimsOnly {
+		restricted := k.restrictSessionToAPI(&session)
+		bounded := k.boundClaimsOnlySession(&session)
+		updateSession = updateSession || restricted || bounded
+	}
+
 	// ensure to set the sessionID
 	session.KeyID = sessionID
 	k.Logger().Debug("Key found")
@@ -1205,6 +1224,124 @@ func (k *JWTMiddleware) processCentralisedJWT(r *http.Request, token *jwt.Token)
 	ctxSetJWTContextVars(k.Spec, r, token)
 
 	return nil, http.StatusOK
+}
+
+// jwtClaimsOnlyMetaKey marks a session created for a claims-only API. Its key is
+// derivable from public data, so it must never be accepted as a credential.
+const jwtClaimsOnlyMetaKey = "tyk_jwt_claims_only"
+
+func isJWTClaimsOnlySession(session *user.SessionState) bool {
+	claimsOnly, ok := session.MetaData[jwtClaimsOnlyMetaKey].(bool)
+	return ok && claimsOnly
+}
+
+// claimsOnlySessionLifetime bounds, in seconds, the Redis record of a claims-only
+// session whose JWT has no exp claim, unless the API sets a session lifetime.
+const claimsOnlySessionLifetime int64 = 3600
+
+// claimsOnlyMode reports whether custom claim validation alone decides access
+// for this request: a Tyk OAS API without any policy source (base policy claim,
+// client ID base field, default policies, scope claim, effective scope-to-policy
+// mapping) and with at least one custom claim rule that restricts access.
+func (k *JWTMiddleware) claimsOnlyMode(scopeMap map[string]string) bool {
+	if !k.Spec.IsOAS || len(scopeMap) > 0 || len(k.Spec.JWTDefaultPolicies) > 0 ||
+		k.Spec.JWTPolicyFieldName != "" || k.Spec.JWTClientIDBaseField != "" ||
+		k.Spec.GetScopeClaimName() != "" {
+		return false
+	}
+
+	jwtConfig := k.Spec.OAS.GetJWTConfiguration()
+	if jwtConfig == nil || len(jwtConfig.BasePolicyClaims) > 0 {
+		return false
+	}
+
+	// OAS scopes.claims is not extracted into the classic scope claim name.
+	if jwtConfig.Scopes != nil && (jwtConfig.Scopes.ClaimName != "" || len(jwtConfig.Scopes.Claims) > 0) {
+		return false
+	}
+
+	for _, rule := range jwtConfig.CustomClaimValidation {
+		if claimRuleRestrictsAccess(rule) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// claimRuleRestrictsAccess reports whether a custom claim rule rejects tokens
+// based on the claim's value. A required rule only checks presence, a
+// non-blocking rule only logs, and an empty string is contained in every
+// string claim, so none of these count.
+func claimRuleRestrictsAccess(rule oas.CustomClaimValidationConfig) bool {
+	if rule.NonBlocking {
+		return false
+	}
+
+	if rule.Type != oas.ClaimValidationTypeExactMatch && rule.Type != oas.ClaimValidationTypeContains {
+		return false
+	}
+
+	for _, allowed := range rule.AllowedValues {
+		if allowed != nil && allowed != "" {
+			return true
+		}
+	}
+
+	return false
+}
+
+// claimsOnlySessionKeyID returns the key ID of the session an identity gets on
+// a claims-only API. It is bound to the API so the session is never the one
+// shared by the org's other JWT APIs, and a SHA-256 digest cannot collide with
+// their MD5 key IDs.
+func claimsOnlySessionKeyID(apiID, identity string) string {
+	sum := sha256.Sum256([]byte(apiID + "\x00" + identity))
+	return hex.EncodeToString(sum[:])
+}
+
+// boundClaimsOnlySession gives a claims-only session the lifetime of its JWT:
+// the Redis record is deleted when the session expires, or, when the JWT has no
+// exp claim, after the API's session lifetime or claimsOnlySessionLifetime.
+// It reports whether it changed the session.
+func (k *JWTMiddleware) boundClaimsOnlySession(session *user.SessionState) bool {
+	postExpiryAction, lifetime := user.PostExpiryActionDelete, int64(0)
+	if session.Expires <= 0 {
+		postExpiryAction, lifetime = "", claimsOnlySessionLifetime
+		if k.Spec.SessionLifetime > 0 {
+			lifetime = k.Spec.SessionLifetime
+		}
+	}
+
+	if session.PostExpiryAction == postExpiryAction && session.SessionLifetime == lifetime {
+		return false
+	}
+
+	session.PostExpiryAction = postExpiryAction
+	session.SessionLifetime = lifetime
+
+	return true
+}
+
+// restrictSessionToAPI limits the session's access rights to this API and
+// reports whether it changed them. Empty access rights would grant every API.
+func (k *JWTMiddleware) restrictSessionToAPI(session *user.SessionState) bool {
+	access, ok := session.AccessRights[k.Spec.APIID]
+	if ok && len(session.AccessRights) == 1 {
+		return false
+	}
+
+	if !ok {
+		access = user.AccessDefinition{
+			APIID:    k.Spec.APIID,
+			APIName:  k.Spec.Name,
+			Versions: expmaps.Keys(k.Spec.VersionData.Versions),
+		}
+	}
+
+	session.AccessRights = map[string]user.AccessDefinition{k.Spec.APIID: access}
+
+	return true
 }
 
 // scopeClaimNameForRequest resolves the JWT claim that holds the OAuth scopes.
@@ -1494,29 +1631,26 @@ func validateJTI(claims jwt.MapClaims) error {
 }
 
 func customClaimsContainsMatch(expectedValues []interface{}, claimValue interface{}) bool {
-	matched := false
 	for _, expectedValue := range expectedValues {
 		switch cv := claimValue.(type) {
 		case string:
-			if expectedStr, ok := expectedValue.(string); ok {
-				if strings.Contains(cv, expectedStr) {
-					matched = true
-					break
-				}
+			if expectedStr, ok := expectedValue.(string); ok && strings.Contains(cv, expectedStr) {
+				return true
 			}
 		case []interface{}:
 			for _, item := range cv {
 				if cmp.Equal(expectedValue, item) {
-					matched = true
-					break
+					return true
 				}
 			}
 		default:
-			matched = cmp.Equal(expectedValue, cv)
+			if cmp.Equal(expectedValue, cv) {
+				return true
+			}
 		}
 	}
 
-	return matched
+	return false
 }
 
 // validateCustomClaims performs validation of custom claims according to the configuration
