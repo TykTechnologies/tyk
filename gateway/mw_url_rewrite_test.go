@@ -1831,14 +1831,14 @@ func TestURLRewrite_EscapeBySource(t *testing.T) {
 		})
 	})
 
-	t.Run("trigger capture with a full URL does not change the upstream host", func(t *testing.T) {
+	t.Run("trigger capture at the start of rewrite_to is not loaded", func(t *testing.T) {
 		triggerAPI("$tyk_context.trigger-0-X-Test-0")
 		atomic.StoreInt32(&otherHostHits, 0)
 
 		_, _ = ts.Run(t, test.TestCase{
-			Path:      "/inject",
-			Headers:   map[string]string{"x-test": otherHost.URL},
-			BodyMatch: `"Url":`,
+			Path:    "/inject",
+			Headers: map[string]string{"x-test": otherHost.URL},
+			Code:    http.StatusNotFound,
 		})
 		assert.Zero(t, atomic.LoadInt32(&otherHostHits), "request reached the host named in the header")
 	})

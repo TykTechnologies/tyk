@@ -251,6 +251,15 @@ func (s *APISpec) Validate(oasConfig config.OASConfig) error {
 		}
 	}
 
+	// A rewrite_to that starts with a request value lets the API client choose
+	// the upstream host, so the API is not loaded.
+	if s.APIDefinition != nil {
+		rewrites := apidef.Validate(s.APIDefinition, apidef.ValidationRuleSet{&apidef.RuleURLRewriteTarget{}})
+		if !rewrites.IsValid {
+			return errors.Join(rewrites.Errors...)
+		}
+	}
+
 	// For tcp services we need to make sure we can bind to the port.
 	switch s.Protocol {
 	case "tcp", "tls":

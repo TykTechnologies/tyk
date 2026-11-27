@@ -783,7 +783,7 @@ func (gw *Gateway) syncAPISpecs() (int, error) {
 	var filter []*APISpec
 	for _, v := range s {
 		if err := v.Validate(gw.GetConfig().OAS); err != nil {
-			mainLog.WithError(err).WithField("spec", v.Name).Error("Skipping loading spec because it failed validation")
+			mainLog.WithError(err).WithField("spec", v.Name).WithField("api_id", v.APIID).Error("Skipping loading spec because it failed validation")
 			continue
 		}
 		filter = append(filter, v)
