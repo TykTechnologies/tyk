@@ -35,6 +35,11 @@ func getToken(r *http.Request, cacheKey string, obtainTokenFunc func(context.Con
 		return decryptedToken, nil
 	}
 
+	// This request holds the fetch lock. Release it once done: after a success the
+	// token is cached, and after a failure the next request must retry right away
+	// instead of failing to acquire the lock until it expires.
+	defer cache.DeleteRawKey(tokenLockKey(cacheKey))
+
 	token, err := obtainTokenFunc(r.Context())
 	if err != nil {
 		return "", err
@@ -48,9 +53,15 @@ func getToken(r *http.Request, cacheKey string, obtainTokenFunc func(context.Con
 	metadataMap := BuildMetadataMap(token, extraMetadata)
 	SetExtraMetadata(r, extraMetadata, metadataMap)
 
+	// The cache TTL is stored in whole seconds and Redis keeps a key with a TTL
+	// of 0 forever, so a token that expires in under a second (or has already
+	// expired) is used for this request but not cached. A token with no expiry
+	// is still cached without one.
 	ttl := time.Until(token.Expiry)
-	if err := setTokenInCache(cache, cacheKey, string(tokenDataBytes), ttl); err != nil {
-		return "", err
+	if token.Expiry.IsZero() || ttl >= time.Second {
+		if err := setTokenInCache(cache, cacheKey, string(tokenDataBytes), ttl); err != nil {
+			return "", err
+		}
 	}
 
 	return token.AccessToken, nil

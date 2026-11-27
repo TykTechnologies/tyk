@@ -1218,6 +1218,69 @@ type UpstreamOAuth struct {
 	ClientCredentials *ClientCredentials `bson:"clientCredentials,omitempty" json:"clientCredentials,omitempty"`
 	// PasswordAuthentication holds the configuration for upstream OAauth password authentication flow.
 	PasswordAuthentication *PasswordAuthentication `bson:"password,omitempty" json:"password,omitempty"`
+	// JWTBearer holds the configuration for the upstream OAuth2 JWT Bearer grant (RFC 7523).
+	// Tyk mints a JWT signed with RS256 using the private key of the certificate `certId`,
+	// exchanges it at `tokenUrl` for an access token and sends that token to the upstream.
+	// Available only for Tyk OAS APIs.
+	//
+	// Tyk classic API definition: N/A.
+	JWTBearer *UpstreamOAuthJWTBearer `bson:"jwtBearer,omitempty" json:"jwtBearer,omitempty"`
+}
+
+// UpstreamOAuthJWTBearer holds the configuration for the upstream OAuth2 JWT Bearer grant (RFC 7523).
+type UpstreamOAuthJWTBearer struct {
+	// Header holds the configuration for the custom header to be used for OAuth authentication.
+	Header *AuthSource `bson:"header,omitempty" json:"header,omitempty"`
+	// TokenURL is the token endpoint of the authorization server.
+	TokenURL string `bson:"tokenUrl" json:"tokenUrl"`
+	// CertID is the ID of the certificate in the Tyk certificate store whose RSA private key
+	// is used to sign the JWT (RS256).
+	CertID string `bson:"certId" json:"certId"`
+	// Issuer is the `iss` claim of the JWT (for Salesforce: the Connected App consumer key).
+	Issuer string `bson:"issuer" json:"issuer"`
+	// Subject is the `sub` claim of the JWT (for Salesforce: the username).
+	Subject string `bson:"subject" json:"subject"`
+	// Audience is the `aud` claim of the JWT (for Salesforce: https://login.salesforce.com).
+	Audience string `bson:"audience" json:"audience"`
+	// ExpiresIn is the lifetime of the signed JWT, e.g. "2m". Defaults to 2m when unset.
+	// Some authorization servers cap it (Salesforce requires `exp` within 3 minutes).
+	ExpiresIn ReadableDuration `bson:"expiresIn,omitempty" json:"expiresIn,omitempty"`
+}
+
+// Fill fills *UpstreamOAuthJWTBearer from apidef.UpstreamOAuthJWTBearer.
+func (j *UpstreamOAuthJWTBearer) Fill(api apidef.UpstreamOAuthJWTBearer) {
+	j.TokenURL = api.TokenURL
+	j.CertID = api.CertID
+	j.Issuer = api.Issuer
+	j.Subject = api.Subject
+	j.Audience = api.Audience
+	j.ExpiresIn = api.ExpiresIn
+
+	if j.Header == nil {
+		j.Header = &AuthSource{}
+	}
+	j.Header.Fill(api.Header.Enabled, api.Header.Name)
+	if ShouldOmit(j.Header) {
+		j.Header = nil
+	}
+}
+
+// ExtractTo extracts *UpstreamOAuthJWTBearer into *apidef.UpstreamOAuthJWTBearer.
+func (j *UpstreamOAuthJWTBearer) ExtractTo(api *apidef.UpstreamOAuthJWTBearer) {
+	api.TokenURL = j.TokenURL
+	api.CertID = j.CertID
+	api.Issuer = j.Issuer
+	api.Subject = j.Subject
+	api.Audience = j.Audience
+	api.ExpiresIn = j.ExpiresIn
+
+	if j.Header == nil {
+		j.Header = &AuthSource{}
+		defer func() {
+			j.Header = nil
+		}()
+	}
+	j.Header.ExtractTo(&api.Header.Enabled, &api.Header.Name)
 }
 
 // PasswordAuthentication holds the configuration for upstream OAuth2 password authentication flow.
@@ -1327,6 +1390,14 @@ func (u *UpstreamOAuth) Fill(api apidef.UpstreamOAuth) {
 	if ShouldOmit(u.PasswordAuthentication) {
 		u.PasswordAuthentication = nil
 	}
+
+	if u.JWTBearer == nil {
+		u.JWTBearer = &UpstreamOAuthJWTBearer{}
+	}
+	u.JWTBearer.Fill(api.JWTBearer)
+	if ShouldOmit(u.JWTBearer) {
+		u.JWTBearer = nil
+	}
 }
 
 func (c *ClientCredentials) ExtractTo(api *apidef.ClientCredentials) {
@@ -1383,6 +1454,14 @@ func (u *UpstreamOAuth) ExtractTo(api *apidef.UpstreamOAuth) {
 		}()
 	}
 	u.PasswordAuthentication.ExtractTo(&api.PasswordAuthentication)
+
+	if u.JWTBearer == nil {
+		u.JWTBearer = &UpstreamOAuthJWTBearer{}
+		defer func() {
+			u.JWTBearer = nil
+		}()
+	}
+	u.JWTBearer.ExtractTo(&api.JWTBearer)
 }
 
 // UpstreamRequestSigning represents configuration for generating signed requests to an upstream API.

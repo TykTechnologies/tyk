@@ -247,6 +247,61 @@ func TestUpstream(t *testing.T) {
 		assert.Equal(t, upstream, result)
 	})
 
+	t.Run("upstream oauth jwt bearer", func(t *testing.T) {
+		upstream := Upstream{
+			Authentication: &UpstreamAuth{
+				Enabled: true,
+				OAuth: &UpstreamOAuth{
+					Enabled:               true,
+					AllowedAuthorizeTypes: []string{apidef.OAuthAuthorizationTypeJWTBearer},
+					JWTBearer: &UpstreamOAuthJWTBearer{
+						Header:    &AuthSource{Enabled: true, Name: "X-Upstream-Auth"},
+						TokenURL:  "https://login.salesforce.com/services/oauth2/token",
+						CertID:    "cert-id",
+						Issuer:    "consumer-key",
+						Subject:   "user@example.com",
+						Audience:  "https://login.salesforce.com",
+						ExpiresIn: ReadableDuration(2 * time.Minute),
+					},
+				},
+			},
+		}
+
+		var api apidef.APIDefinition
+		api.SetDisabledFlags()
+		upstream.ExtractTo(&api)
+
+		assert.Equal(t, apidef.UpstreamOAuthJWTBearer{
+			Header:    apidef.AuthSource{Enabled: true, Name: "X-Upstream-Auth"},
+			TokenURL:  "https://login.salesforce.com/services/oauth2/token",
+			CertID:    "cert-id",
+			Issuer:    "consumer-key",
+			Subject:   "user@example.com",
+			Audience:  "https://login.salesforce.com",
+			ExpiresIn: time.ReadableDuration(2 * time.Minute),
+		}, api.UpstreamAuth.OAuth.JWTBearer)
+
+		var result Upstream
+		result.Fill(api)
+
+		assert.Equal(t, upstream, result)
+	})
+
+	t.Run("upstream oauth without jwt bearer omits it", func(t *testing.T) {
+		var api apidef.APIDefinition
+		api.SetDisabledFlags()
+		api.UpstreamAuth.Enabled = true
+		api.UpstreamAuth.OAuth.Enabled = true
+		api.UpstreamAuth.OAuth.AllowedAuthorizeTypes = []string{apidef.OAuthAuthorizationTypeClientCredentials}
+
+		var result Upstream
+		result.Fill(api)
+
+		require.NotNil(t, result.Authentication)
+		require.NotNil(t, result.Authentication.OAuth)
+		assert.Nil(t, result.Authentication.OAuth.JWTBearer)
+	})
+
 	t.Run("rate limit", func(t *testing.T) {
 		t.Run("valid duration", func(t *testing.T) {
 			rateLimitUpstream := Upstream{

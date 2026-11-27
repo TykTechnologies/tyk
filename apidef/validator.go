@@ -233,6 +233,12 @@ var (
 	ErrInvalidUpstreamOAuthAuthorizationType = errors.New("invalid OAuth authorization type")
 	// ErrInvalidUpstreamOAuthClientAuthMethod is the error to return when the configured upstream OAuth client authentication method is invalid.
 	ErrInvalidUpstreamOAuthClientAuthMethod = errors.New("invalid upstream OAuth client authentication method, valid values are: client_secret_basic, client_secret_post")
+	// ErrUpstreamOAuthJWTBearerOASOnly is the error to return when the JWT Bearer grant is configured on a Tyk classic API.
+	ErrUpstreamOAuthJWTBearerOASOnly = errors.New("upstream OAuth JWT Bearer grant is supported only for Tyk OAS APIs")
+	// ErrUpstreamOAuthJWTBearerConfigRequired is the error to return when the JWT Bearer grant is selected without its settings.
+	ErrUpstreamOAuthJWTBearerConfigRequired = errors.New("upstream OAuth JWT Bearer grant requires tokenUrl, certId, issuer, subject and audience")
+	// ErrInvalidUpstreamOAuthJWTBearerExpiresIn is the error to return when the JWT Bearer expiresIn is not a positive duration.
+	ErrInvalidUpstreamOAuthJWTBearerExpiresIn = errors.New("invalid upstream OAuth JWT Bearer expiresIn, must be a positive duration")
 	// ErrAllLoadBalancingTargetsZeroWeight is the error to return when all load balancing targets have weight 0.
 	ErrAllLoadBalancingTargetsZeroWeight  = errors.New("all load balancing targets have weight 0, at least one target must have weight > 0")
 	ErrDNSDiscoveryRequiresLoadBalancing  = errors.New("proxy.dns_discovery supplies the target list but does not distribute across it; proxy.enable_load_balancing must be enabled too")
@@ -275,7 +281,29 @@ func (r *RuleUpstreamAuth) Validate(apiDef *APIDefinition, validationResult *Val
 		validationResult.AppendError(ErrMultipleUpstreamOAuthAuthorizationType)
 	}
 
-	if authType := upstreamAuth.OAuth.AllowedAuthorizeTypes[0]; authType != OAuthAuthorizationTypeClientCredentials && authType != OAuthAuthorizationTypePassword {
+	switch authType := upstreamAuth.OAuth.AllowedAuthorizeTypes[0]; authType {
+	case OAuthAuthorizationTypeClientCredentials, OAuthAuthorizationTypePassword:
+	case OAuthAuthorizationTypeJWTBearer:
+		if !apiDef.IsOAS {
+			validationResult.IsValid = false
+			validationResult.AppendError(ErrUpstreamOAuthJWTBearerOASOnly)
+		}
+		// The OAS schema requires these when the jwtBearer block is present, but
+		// not the block itself. Without them every request would fail with a 500.
+		if jb := upstreamOAuth.JWTBearer; jb.TokenURL == "" || jb.CertID == "" ||
+			jb.Issuer == "" || jb.Subject == "" || jb.Audience == "" {
+			validationResult.IsValid = false
+			validationResult.AppendError(ErrUpstreamOAuthJWTBearerConfigRequired)
+		}
+		// Zero means unset: the gateway applies its default lifetime. Malformed
+		// duration strings are rejected by the OAS schema pattern on save.
+		// No upper bound is enforced here; IdP-specific caps (e.g. Salesforce
+		// requires exp within 3 minutes) are documented, not hard-coded.
+		if upstreamOAuth.JWTBearer.ExpiresIn < 0 {
+			validationResult.IsValid = false
+			validationResult.AppendError(ErrInvalidUpstreamOAuthJWTBearerExpiresIn)
+		}
+	default:
 		validationResult.IsValid = false
 		validationResult.AppendError(ErrInvalidUpstreamOAuthAuthorizationType)
 	}

@@ -16,6 +16,7 @@ func getUpstreamOAuthMw(base *BaseMiddleware) TykMiddleware {
 		mwSpec,
 		getClientCredentialsStorageHandler(base),
 		getPasswordStorageHandler(base),
+		getJWTBearerStorageHandler(base),
 	)
 
 	return WrapMiddleware(base, upstreamOAuthMw)
@@ -29,6 +30,12 @@ func getClientCredentialsStorageHandler(base *BaseMiddleware) *storage.RedisClus
 
 func getPasswordStorageHandler(base *BaseMiddleware) *storage.RedisCluster {
 	handler := &storage.RedisCluster{KeyPrefix: "upstreamOAuthPW-", ConnectionHandler: base.Gw.StorageConnectionHandler}
+	handler.Connect()
+	return handler
+}
+
+func getJWTBearerStorageHandler(base *BaseMiddleware) *storage.RedisCluster {
+	handler := &storage.RedisCluster{KeyPrefix: "upstreamOAuthJWT-", ConnectionHandler: base.Gw.StorageConnectionHandler}
 	handler.Connect()
 	return handler
 }

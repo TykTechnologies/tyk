@@ -2961,7 +2961,8 @@
             "type": "string",
             "enum": [
               "clientCredentials",
-              "password"
+              "password",
+              "jwtBearer"
             ]
           },
           "minItems": 0
@@ -3053,6 +3054,39 @@
             "tokenUrl",
             "username",
             "password"
+          ]
+        },
+        "jwtBearer": {
+          "type": "object",
+          "properties": {
+            "tokenUrl": {
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+            },
+            "certId": {
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+            },
+            "issuer": {
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+            },
+            "subject": {
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+            },
+            "audience": {
+              "$ref": "#/definitions/X-Tyk-NonEmptyString"
+            },
+            "expiresIn": {
+              "$ref": "#/definitions/X-Tyk-ReadableDuration"
+            },
+            "header": {
+              "$ref": "#/definitions/X-Tyk-UpstreamAuthSource"
+            }
+          },
+          "required": [
+            "tokenUrl",
+            "certId",
+            "issuer",
+            "subject",
+            "audience"
           ]
         }
       },

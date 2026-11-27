@@ -60,6 +60,8 @@ func NewOAuthHeaderProvider(oauthConfig apidef.UpstreamOAuth) (OAuthHeaderProvid
 		return &ClientCredentialsOAuthProvider{}, nil
 	case oauthConfig.AllowedAuthorizeTypes[0] == PasswordAuthorizeType:
 		return &PasswordOAuthProvider{}, nil
+	case oauthConfig.AllowedAuthorizeTypes[0] == JWTBearerAuthorizeType:
+		return &JWTBearerOAuthProvider{}, nil
 	default:
 		return nil, fmt.Errorf("no valid OAuth configuration provided")
 	}
@@ -152,6 +154,11 @@ func generateClientCredentialsCacheKey(config apidef.UpstreamOAuth, apiId string
 	return hex.EncodeToString(hash.Sum(nil))
 }
 
+// tokenLockKey is the key that guards a token fetch for cacheKey.
+func tokenLockKey(cacheKey string) string {
+	return cacheKey + ":lock"
+}
+
 func retryGetKeyAndLock(cacheKey string, cache Storage) (string, error) {
 	const maxRetries = 10
 	const retryDelay = 100 * time.Millisecond
@@ -165,8 +172,7 @@ func retryGetKeyAndLock(cacheKey string, cache Storage) (string, error) {
 			return tokenData, nil
 		}
 
-		lockKey := cacheKey + ":lock"
-		ok, err := cache.Lock(lockKey, time.Second*5)
+		ok, err := cache.Lock(tokenLockKey(cacheKey), time.Second*5)
 		if err == nil && ok {
 			return "", nil
 		}

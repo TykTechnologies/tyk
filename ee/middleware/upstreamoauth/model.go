@@ -1,6 +1,7 @@
 package upstreamoauth
 
 import (
+	"crypto/tls"
 	"time"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -15,12 +16,16 @@ const (
 
 	ClientCredentialsAuthorizeType = "clientCredentials"
 	PasswordAuthorizeType          = "password"
+	JWTBearerAuthorizeType         = "jwtBearer"
 )
 
 // BaseMiddleware is the subset of BaseMiddleware APIs that the middleware uses.
 type BaseMiddleware interface {
 	model.LoggerProvider
 	FireEvent(name apidef.TykEvent, meta interface{})
+	// GetClientCertificate returns the certificate (with private key) stored
+	// under certID in the gateway certificate store.
+	GetClientCertificate(certID string) (*tls.Certificate, error)
 }
 
 // Gateway is the subset of Gateway APIs that the middleware uses.
@@ -34,6 +39,9 @@ type Storage interface {
 	GetKey(key string) (string, error)
 	SetKey(string, string, int64) error
 	Lock(key string, timeout time.Duration) (bool, error)
+	// DeleteRawKey removes a key without applying the storage prefix. It releases
+	// the token lock, which Lock also stores unprefixed.
+	DeleteRawKey(key string) bool
 }
 
 type ClientCredentialsOAuthProvider struct{}
