@@ -1,12 +1,14 @@
 package gateway
 
 import (
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/sirupsen/logrus"
+	logrustest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -151,6 +153,50 @@ func TestGoPluginMiddleware_HandleErrorResponse(t *testing.T) {
 					// Expected: No event fired
 				}
 			}
+		})
+	}
+}
+
+func TestGoPluginMiddleware_handleErrorResponse_LogLevel(t *testing.T) {
+	tests := []struct {
+		name       string
+		statusCode int
+		wantLevel  logrus.Level
+	}{
+		{"429 Too Many Requests is a warning", http.StatusTooManyRequests, logrus.WarnLevel},
+		{"503 Service Unavailable is a warning", http.StatusServiceUnavailable, logrus.WarnLevel},
+		{"408 Request Timeout is a warning", http.StatusRequestTimeout, logrus.WarnLevel},
+		{"401 Unauthorized stays an error", http.StatusUnauthorized, logrus.ErrorLevel},
+		{"403 Forbidden stays an error", http.StatusForbidden, logrus.ErrorLevel},
+		{"500 Internal Server Error stays an error", http.StatusInternalServerError, logrus.ErrorLevel},
+		{"400 Bad Request stays an error", http.StatusBadRequest, logrus.ErrorLevel},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			mw := &GoPluginMiddleware{
+				BaseMiddleware: &BaseMiddleware{
+					Spec: &APISpec{APIDefinition: &apidef.APIDefinition{}},
+				},
+			}
+
+			rec := httptest.NewRecorder()
+			rw := &customResponseWriter{ResponseWriter: rec}
+			rw.WriteHeader(tc.statusCode)
+			_, err := rw.Write([]byte("error response"))
+			require.NoError(t, err)
+
+			req := httptest.NewRequest(http.MethodGet, "/test/path", nil)
+			l := logrus.New()
+			l.SetOutput(io.Discard)
+			hook := logrustest.NewLocal(l)
+
+			_, code := mw.handleErrorResponse(req, rw, logrus.NewEntry(l))
+			assert.Equal(t, tc.statusCode, code)
+
+			entries := hook.AllEntries()
+			require.Len(t, entries, 1)
+			assert.Equal(t, tc.wantLevel, entries[0].Level)
 		})
 	}
 }
