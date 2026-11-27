@@ -12,7 +12,7 @@ on:
       - "v*"
 
 env:
-  GOLANG_CROSS: 1.26-bullseye
+  GOLANG_CROSS: 1.27-bullseye
   NG_BASE_SOURCE: tykio/dhi-busybox-plugin-compiler:1.37.0-debian13-fips_plugin-compiler-ng-toolchain
   NG_GLIBC_TARGET: "2.17"
   NG_CROSS: "1"
