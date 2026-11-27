@@ -83,6 +83,11 @@ func TestParseExchangeResponse(t *testing.T) {
 				if tc.wantErr {
 					require.Error(t, err)
 					assert.Contains(t, err.Error(), "does not match requested_token_type")
+					// Typed, so the outcome and the log line can name both types.
+					var tt *oauth2common.UnexpectedTokenTypeError
+					require.ErrorAs(t, err, &tt)
+					assert.Equal(t, tc.requested, tt.Requested)
+					assert.Equal(t, tc.issued, tt.Issued)
 					return
 				}
 				require.NoError(t, err)

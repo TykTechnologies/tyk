@@ -27,6 +27,10 @@ const (
 	// (interaction_required). An expected control-flow event relayed to the
 	// caller as a 401 insufficient_claims challenge — not an idp_error.
 	OutcomeStepUpRequired OutcomeKind = "step_up_required"
+	// OutcomeUnexpectedTokenType: the IdP issued a token whose
+	// issued_token_type does not satisfy the provider's requestedTokenType. The
+	// gateway refused it (502); the IdP itself did not fail.
+	OutcomeUnexpectedTokenType OutcomeKind = "unexpected_token_type"
 )
 
 // ClassifyExchangeOutcome maps an exchange result to its bounded OutcomeKind.
@@ -48,6 +52,10 @@ func ClassifyExchangeOutcome(err error) OutcomeKind {
 	var stepUp *StepUpRequiredError
 	if errors.As(err, &stepUp) {
 		return OutcomeStepUpRequired
+	}
+	var tokenType *UnexpectedTokenTypeError
+	if errors.As(err, &tokenType) {
+		return OutcomeUnexpectedTokenType
 	}
 	return OutcomeIdPError
 }
@@ -78,4 +86,9 @@ type Outcome struct {
 	// description on an idp_error outcome. Never metric labels — logs/audit only.
 	IdpErrorCode string
 	IdpErrorDesc string
+
+	// RequestedTokenType and IssuedTokenType carry the requested and the
+	// received token type on an unexpected_token_type outcome. Logs/audit only.
+	RequestedTokenType string
+	IssuedTokenType    string
 }

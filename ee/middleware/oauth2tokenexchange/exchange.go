@@ -59,6 +59,11 @@ func (m *Middleware) runExchange(r *http.Request, st *oauth2common.State) (oauth
 			out.IdpErrorCode = fe.IdpError
 			out.IdpErrorDesc = fe.Description
 		}
+		var tt *oauth2common.UnexpectedTokenTypeError
+		if errors.As(err, &tt) {
+			out.RequestedTokenType = tt.Requested
+			out.IssuedTokenType = tt.Issued
+		}
 		return out, err
 	}
 	out.ExchangedToken = exchanged
@@ -429,8 +434,7 @@ func parseExchangeResponse(body []byte, requested string) (string, time.Duration
 		return "", 0, errors.New("exchange response missing access_token")
 	}
 	if requested != "" && parsed.IssuedTokenType != "" && !issuedTokenTypeMatches(requested, parsed.IssuedTokenType) {
-		return "", 0, fmt.Errorf("exchange response issued_token_type %q does not match requested_token_type %q",
-			parsed.IssuedTokenType, requested)
+		return "", 0, &oauth2common.UnexpectedTokenTypeError{Requested: requested, Issued: parsed.IssuedTokenType}
 	}
 	var expiresIn time.Duration
 	if parsed.ExpiresIn > 0 {

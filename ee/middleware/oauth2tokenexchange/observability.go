@@ -26,6 +26,9 @@ const (
 	fieldAudience        = "oauth2_audience"
 	fieldScopesRequested = "oauth2_scopes_requested"
 
+	fieldRequestedTokenType = "oauth2_requested_token_type"
+	fieldIssuedTokenType    = "oauth2_issued_token_type"
+
 	truncatedSuffix = "...(truncated)"
 )
 
@@ -48,6 +51,11 @@ type EventPayload struct {
 	// length-capped before emission.
 	IdpError     string
 	IdpErrorDesc string
+
+	// RequestedTokenType / IssuedTokenType are populated on an
+	// unexpected_token_type outcome; the issued type is IdP-supplied, so capped.
+	RequestedTokenType string
+	IssuedTokenType    string
 
 	// SubjectAzp is the inbound token's authorized party (the calling app).
 	SubjectAzp string
@@ -105,18 +113,23 @@ func (p EventPayload) addOptional(m map[string]interface{}) {
 			m[fieldIdpErrorDesc] = capField(p.IdpErrorDesc)
 		}
 	}
+	if p.Outcome == oauth2common.OutcomeUnexpectedTokenType {
+		m[fieldRequestedTokenType] = p.RequestedTokenType
+		m[fieldIssuedTokenType] = capField(p.IssuedTokenType)
+	}
 }
 
 // AuditDecision returns the audit event type for this outcome and whether an
 // audit event is emitted at all. ok audits as OAuth2ExchangeSucceeded;
-// idp_error and no_matching_provider audit as OAuth2ExchangeFailed (the outcome
-// distinguishes them); misconfig is an operator fault, not an authorization
-// decision, so it is not audited (it still emits a metric and a log line).
+// idp_error, no_matching_provider and unexpected_token_type audit as
+// OAuth2ExchangeFailed (the outcome distinguishes them); misconfig is an
+// operator fault, not an authorization decision, so it is not audited (it still
+// emits a metric and a log line).
 func (p EventPayload) AuditDecision() (event.Event, bool) {
 	switch p.Outcome {
 	case oauth2common.OutcomeOK:
 		return event.OAuth2ExchangeSucceeded, true
-	case oauth2common.OutcomeIdPError, oauth2common.OutcomeNoMatchingProvider:
+	case oauth2common.OutcomeIdPError, oauth2common.OutcomeNoMatchingProvider, oauth2common.OutcomeUnexpectedTokenType:
 		return event.OAuth2ExchangeFailed, true
 	default:
 		return "", false
