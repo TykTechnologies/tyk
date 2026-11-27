@@ -53,9 +53,9 @@ jobs:
       fail-fast: false
       matrix:
         golang_cross:
-          - 1.26-bullseye
+          - 1.27-bullseye
         include:
-          - golang_cross: 1.26-bullseye
+          - golang_cross: 1.27-bullseye
             goreleaser: 'ci/goreleaser/goreleaser.yml'
             cgo: 1
             rpmvers: 'el/7 el/8 el/9 amazon/2 amazon/2023'
@@ -108,7 +108,7 @@ jobs:
           mask-aws-account-id: false
       - uses: aws-actions/amazon-ecr-login@7290e214a610b32bc0eef81748948b6d466a8783 # v2.2.0
         id: ecr
-        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.27-bullseye' }}
         with:
           mask-password: 'true'
       # Restore-only here; the matching save runs after Build and only off-PR
@@ -268,7 +268,7 @@ jobs:
           key: ${{ steps.go-cache.outputs.cache-primary-key }}
       - name: Docker metadata for ee CI
         id: ci_metadata_ee
-        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.27-bullseye' }}
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: |
@@ -284,7 +284,7 @@ jobs:
             type=semver,pattern={{version}},prefix=v
       - name: push ee image to CI
         id: ci_push_ee
-        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.27-bullseye' }}
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: "dist"
@@ -302,7 +302,7 @@ jobs:
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
             NONROOT_CHOWN=true
       - name: Verify compression format for ee CI image
-        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.27-bullseye' }}
         run: |
           # Resolve the first tag for verification
           TAG=$(echo "${{ steps.ci_metadata_ee.outputs.tags }}" | tr ',' '\n' | head -n1)
@@ -345,7 +345,7 @@ jobs:
           fi
           echo "Success: All layers are uniformly compressed using gzip."
       - name: Scan ee image for secrets
-        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.27-bullseye' }}
         continue-on-error: true
         timeout-minutes: 20
         uses: TykTechnologies/github-actions/.github/actions/secret-scan@production
@@ -372,7 +372,7 @@ jobs:
             org.opencontainers.image.vendor=tyk.io
             org.opencontainers.image.version=${{ github.ref_name }}
       - name: push ee image to prod
-        if: ${{ matrix.golang_cross == '1.26-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        if: ${{ matrix.golang_cross == '1.27-bullseye' && startsWith(github.ref, 'refs/tags') }}
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: "dist"
@@ -389,7 +389,7 @@ jobs:
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
             NONROOT_CHOWN=true
       - name: Verify compression format for ee prod image
-        if: ${{ matrix.golang_cross == '1.26-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        if: ${{ matrix.golang_cross == '1.27-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
           # Resolve the first tag for verification
           TAG=$(echo "${{ steps.tag_metadata_ee.outputs.tags }}" | tr ',' '\n' | head -n1)
@@ -433,7 +433,7 @@ jobs:
           echo "Success: All layers are uniformly compressed using gzip."
       - name: Docker metadata for fips CI
         id: ci_metadata_fips
-        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.27-bullseye' }}
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: |
@@ -449,7 +449,7 @@ jobs:
             type=semver,pattern={{version}},prefix=v
       - name: push fips image to CI
         id: ci_push_fips
-        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.27-bullseye' }}
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: "dist"
@@ -467,7 +467,7 @@ jobs:
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
             NONROOT_CHOWN=true
       - name: Verify compression format for fips CI image
-        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.27-bullseye' }}
         run: |
           # Resolve the first tag for verification
           TAG=$(echo "${{ steps.ci_metadata_fips.outputs.tags }}" | tr ',' '\n' | head -n1)
@@ -510,7 +510,7 @@ jobs:
           fi
           echo "Success: All layers are uniformly compressed using gzip."
       - name: Scan fips image for secrets
-        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.27-bullseye' }}
         continue-on-error: true
         timeout-minutes: 20
         uses: TykTechnologies/github-actions/.github/actions/secret-scan@production
@@ -536,7 +536,7 @@ jobs:
             org.opencontainers.image.vendor=tyk.io
             org.opencontainers.image.version=${{ github.ref_name }}
       - name: push fips image to prod
-        if: ${{ matrix.golang_cross == '1.26-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        if: ${{ matrix.golang_cross == '1.27-bullseye' && startsWith(github.ref, 'refs/tags') }}
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: "dist"
@@ -553,7 +553,7 @@ jobs:
             BASE_IMAGE=tykio/dhi-busybox:1.37-fips
             NONROOT_CHOWN=true
       - name: Verify compression format for fips prod image
-        if: ${{ matrix.golang_cross == '1.26-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        if: ${{ matrix.golang_cross == '1.27-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
           # Resolve the first tag for verification
           TAG=$(echo "${{ steps.tag_metadata_fips.outputs.tags }}" | tr ',' '\n' | head -n1)
@@ -597,7 +597,7 @@ jobs:
           echo "Success: All layers are uniformly compressed using gzip."
       - name: Docker metadata for std CI
         id: ci_metadata_std
-        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.27-bullseye' }}
         uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
         with:
           images: |
@@ -613,7 +613,7 @@ jobs:
             type=semver,pattern={{version}},prefix=v
       - name: push std image to CI
         id: ci_push_std
-        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.27-bullseye' }}
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: "dist"
@@ -629,7 +629,7 @@ jobs:
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway
       - name: Verify compression format for std CI image
-        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.27-bullseye' }}
         run: |
           # Resolve the first tag for verification
           TAG=$(echo "${{ steps.ci_metadata_std.outputs.tags }}" | tr ',' '\n' | head -n1)
@@ -672,7 +672,7 @@ jobs:
           fi
           echo "Success: All layers are uniformly compressed using gzip."
       - name: Scan std image for secrets
-        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.27-bullseye' }}
         continue-on-error: true
         timeout-minutes: 20
         uses: TykTechnologies/github-actions/.github/actions/secret-scan@production
@@ -699,7 +699,7 @@ jobs:
             org.opencontainers.image.vendor=tyk.io
             org.opencontainers.image.version=${{ github.ref_name }}
       - name: push std image to prod
-        if: ${{ matrix.golang_cross == '1.26-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        if: ${{ matrix.golang_cross == '1.27-bullseye' && startsWith(github.ref, 'refs/tags') }}
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
           context: "dist"
@@ -714,7 +714,7 @@ jobs:
           build-args: |
             BUILD_PACKAGE_NAME=tyk-gateway
       - name: Verify compression format for std prod image
-        if: ${{ matrix.golang_cross == '1.26-bullseye' && startsWith(github.ref, 'refs/tags') }}
+        if: ${{ matrix.golang_cross == '1.27-bullseye' && startsWith(github.ref, 'refs/tags') }}
         run: |
           # Resolve the first tag for verification
           TAG=$(echo "${{ steps.tag_metadata_std.outputs.tags }}" | tr ',' '\n' | head -n1)
@@ -758,7 +758,7 @@ jobs:
           echo "Success: All layers are uniformly compressed using gzip."
       - name: save deb
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.27-bullseye' }}
         with:
           name: deb
           retention-days: 1
@@ -768,7 +768,7 @@ jobs:
             !dist/*fips*.deb
       - name: save rpm
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: ${{ matrix.golang_cross == '1.26-bullseye' }}
+        if: ${{ matrix.golang_cross == '1.27-bullseye' }}
         with:
           name: rpm
           retention-days: 1
@@ -1143,7 +1143,7 @@ jobs:
             -e GOMODCACHE=/go/pkg/mod \
             -v /tmp/build-dashboard.sh:/tmp/build-dashboard.sh \
             -w /go/src/github.com/TykTechnologies/tyk-analytics \
-            tykio/golang-cross:1.26-bullseye /tmp/build-dashboard.sh
+            tykio/golang-cross:1.27-bullseye /tmp/build-dashboard.sh
 
           echo "✅ Packages built successfully for $GOARCH"
       - name: Detect platform for Docker build
