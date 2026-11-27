@@ -58,7 +58,7 @@ tasks:
     dir: '{{.dir}}'
     desc: "Run e2e/integration tests"
     aliases: [ e2e-combined ]
-    deps: [ clean, deps, plugin:race, plugin:norace, services:up ]
+    deps: [ clean, deps, compile, plugin:race, plugin:norace, services:up ]
     vars:
       package:
         sh: go mod edit -json | jq .Module.Path -r
@@ -67,6 +67,17 @@ tasks:
       - defer: { task: report }
       - rm -rf coverage && mkdir -p coverage
       - go test -p 1 -parallel 1 -json {{.testArgs}} -coverprofile=coverage/{{.product}}-all.cov -count=1 -v ./... > coverage/{{.product}}-all.json
+
+  # compile - build and vet every test binary with all CPUs, without running
+  # any test (-exec=true runs /bin/true instead of the binary). The serial
+  # `go test -p 1` run then finds compiled packages and vet results in the
+  # build cache and only links. Flags must match testArgs, or the cache
+  # misses. A failure only warns; the test run reports it per package.
+  compile:
+    dir: '{{.dir}}'
+    desc: "Compile test binaries in parallel without running tests"
+    cmds:
+      - go test -exec=true -count=1 {{.testArgs}} ./... > /dev/null || echo "::warning::test compile pre-pass failed; the test run reports the errors"
 
   plugin:race:
     dir: '{{.dir}}'

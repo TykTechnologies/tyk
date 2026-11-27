@@ -57,10 +57,37 @@ jobs:
           git rev-parse origin/${{ env.BRANCH_NAME }}
 
       - name: Setup Golang
-        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5  # v7.1.0 # zizmor: ignore[cache-poisoning] test/lint job; the cache was already on before this PR
+        id: setup-go
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5  # v7.1.0
         with:
           go-version-file: go.mod
-          cache-dependency-path: go.sum
+          cache: false
+
+      # Pull requests only restore the Go caches and pushes to master save
+      # them, so per-PR entries don't fill the 10 GB repo cache and evict
+      # master's. Go refreshes the mtime of build cache entries it uses (when
+      # older than an hour), so entries older than the marker are unused and
+      # are trimmed before saving.
+      - name: Resolve Go cache paths
+        id: go-env
+        run: |
+          echo "modcache=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+          echo "buildcache=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          touch -d '1 hour ago' "$RUNNER_TEMP/go-cache-restored"
+
+      - name: Restore Go module cache
+        id: go-mod
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ${{ steps.go-env.outputs.modcache }}
+          key: go-mod-${{ runner.os }}-${{ hashFiles('go.sum') }}
+
+      - name: Restore Go build cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ${{ steps.go-env.outputs.buildcache }}
+          key: go-build-lint-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-${{ github.sha }}
+          restore-keys: go-build-lint-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-
 
       - name: Setup CI Tooling
         uses: shrink/actions-docker-extract@f1ef61065b78731fe3310b4e84e511f6a927a77e  # v4
@@ -79,6 +106,7 @@ jobs:
           task --exit-code lint:check-git-state MESSAGE="task tidy made git state dirty, please run task lint locally and update PR"
 
       - name: golangci-lint
+        id: golangci
         uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a  # v9.3.0
         timeout-minutes: 20
         with:
@@ -88,7 +116,18 @@ jobs:
           # Generates: text to stdout + checkstyle JSON for SonarQube
           args: --issues-exit-code=0 -v ./...
           skip-cache: false
-          skip-save-cache: false
+          skip-save-cache: ${{ github.event_name == 'pull_request' }}
+
+      - name: Trim Go build cache
+        if: ${{ !cancelled() && steps.golangci.conclusion != 'skipped' && github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        run: find "$(go env GOCACHE)" -type f ! -newer "$RUNNER_TEMP/go-cache-restored" -delete
+
+      - name: Save Go build cache
+        if: ${{ !cancelled() && steps.golangci.conclusion != 'skipped' && github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ${{ steps.go-env.outputs.buildcache }}
+          key: go-build-lint-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-${{ github.sha }}
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         if: ${{ always() }}
@@ -101,7 +140,7 @@ jobs:
   test:
     name: Go ${{ matrix.go-version }} Redis ${{ matrix.redis-version }}
     if: ${{ !github.event.pull_request.draft }}
-    needs: [dep-guard, lint]
+    needs: [dep-guard]
     # Runs on is pinned to a version that provides python 3.10.
     # See: https://github.com/actions/runner-images?tab=readme-ov-file#available-images
     # Avoid using ubuntu-latest as it would upgrade python unattended.
@@ -149,10 +188,37 @@ jobs:
           destination: /usr/local/bin
 
       - name: Setup Golang
-        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5  # v7.1.0 # zizmor: ignore[cache-poisoning] test/lint job; the cache was already on before this PR
+        id: setup-go
+        uses: actions/setup-go@d8cbb8045d7f43706b9177cceb36c1f91a6644d5  # v7.1.0
         with:
           go-version-file: go.mod
-          cache-dependency-path: go.sum
+          cache: false
+
+      # Pull requests only restore the Go caches and pushes to master save
+      # them, so per-PR entries don't fill the 10 GB repo cache and evict
+      # master's. Go refreshes the mtime of build cache entries it uses (when
+      # older than an hour), so entries older than the marker are unused and
+      # are trimmed before saving.
+      - name: Resolve Go cache paths
+        id: go-env
+        run: |
+          echo "modcache=$(go env GOMODCACHE)" >> "$GITHUB_OUTPUT"
+          echo "buildcache=$(go env GOCACHE)" >> "$GITHUB_OUTPUT"
+          touch -d '1 hour ago' "$RUNNER_TEMP/go-cache-restored"
+
+      - name: Restore Go module cache
+        id: go-mod
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ${{ steps.go-env.outputs.modcache }}
+          key: go-mod-${{ runner.os }}-${{ hashFiles('go.sum') }}
+
+      - name: Restore Go build cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ${{ steps.go-env.outputs.buildcache }}
+          key: go-build-test-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-${{ github.sha }}
+          restore-keys: go-build-test-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-
 
       - name: Install Dependencies
         id: dependencies
@@ -176,6 +242,24 @@ jobs:
         run: |
           task test:e2e-combined args="-race -timeout=15m"
           task test:coverage
+
+      - name: Trim Go build cache
+        if: ${{ !cancelled() && steps.ci-tests.conclusion != 'skipped' && github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        run: find "$(go env GOCACHE)" -type f ! -newer "$RUNNER_TEMP/go-cache-restored" -delete
+
+      - name: Save Go build cache
+        if: ${{ !cancelled() && steps.ci-tests.conclusion != 'skipped' && github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ${{ steps.go-env.outputs.buildcache }}
+          key: go-build-test-${{ runner.os }}-go${{ steps.setup-go.outputs.go-version }}-${{ github.sha }}
+
+      - name: Save Go module cache
+        if: ${{ !cancelled() && steps.ci-tests.conclusion != 'skipped' && github.event_name == 'push' && github.ref == 'refs/heads/master' && steps.go-mod.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ${{ steps.go-env.outputs.modcache }}
+          key: go-mod-${{ runner.os }}-${{ hashFiles('go.sum') }}
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9  # v7.0.2
         if: ${{ always() }}
@@ -267,7 +351,7 @@ jobs:
     name: Unit Tests & Linting
     runs-on: ubuntu-latest
     if: ${{ always() && github.event_name == 'pull_request' }}
-    needs: [ test ]
+    needs: [ dep-guard, lint, test ]
     steps:
       - name: Aggregate results
         run: |
