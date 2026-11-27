@@ -3144,6 +3144,7 @@ func TestURLAllowedAndIgnored_CORSPreflight(t *testing.T) {
 				OptionsPassthrough: false,
 			},
 		},
+		endpointMatcher: legacyEndpointMatcher{},
 	}
 
 	testPath := "/test"

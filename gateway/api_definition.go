@@ -363,6 +363,7 @@ func (a APIDefinitionLoader) MakeSpec(def *model.MergedAPI, logger *logrus.Entry
 	}
 
 	spec.GlobalConfig = a.Gw.GetConfig()
+	spec.endpointMatcher = newEndpointMatcher(spec)
 
 	if err = a.Gw.loadBundle(spec); err != nil {
 		logger.WithError(err).Error("Couldn't load bundle")
@@ -985,6 +986,10 @@ func (a APIDefinitionLoader) generateRegex(stringSpec string, newSpec *URLSpec, 
 
 	newSpec.Status = specType
 	newSpec.spec = asRegex
+
+	if specType == WhiteList || specType == Ignored {
+		newSpec.oasExact = newOASExactPath(stringSpec, isIgnoreCase)
+	}
 }
 
 func (a APIDefinitionLoader) compilePathSpec(paths []string, specType URLStatus, conf config.Config) []URLSpec {
@@ -2241,6 +2246,10 @@ func (a *APISpec) URLAllowedAndIgnored(r *http.Request, rxPaths []URLSpec, white
 	// Check if ignored
 	for i := range rxPaths {
 		if !rxPaths[i].matchesPath(r.URL.Path, a) {
+			continue
+		}
+
+		if !a.endpointMatcher.grants(r, &rxPaths[i], a) {
 			continue
 		}
 

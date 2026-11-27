@@ -1,16 +1,115 @@
 package gateway
 
 import (
+	"net/url"
+	"strings"
+
 	"github.com/TykTechnologies/tyk/apidef"
 	"github.com/TykTechnologies/tyk/apidef/oas"
 	"github.com/TykTechnologies/tyk/regexp"
 )
+
+var oasPathParamRegex = regexp.MustCompile(`\{([^}]+)\}`)
+
+// oasExactPath is an OAS path template compiled to an anchored regex with one
+// capture group per path parameter. It is enabled only on allow and
+// ignoreAuthentication entries; a template that fails to compile never matches.
+type oasExactPath struct {
+	enabled bool
+	re      *regexp.Regexp
+	err     error
+	params  []string
+}
+
+// quoteOASPathLiteral quotes a literal part of an OAS path template, keeping
+// the mux wildcards the way httputil.PreparePathRegexp reads them: "/*/" is
+// one segment, a trailing "/*" is the rest of the path.
+func quoteOASPathLiteral(literal string) string {
+	quoted := regexp.QuoteMeta(strings.ReplaceAll(literal, "%", "%25"))
+	quoted = strings.ReplaceAll(quoted, `/\*/`, "/[^/]+/")
+	quoted = strings.ReplaceAll(quoted, `/\*`, "/.*")
+	return quoted
+}
+
+// newOASExactPath compiles the template; a trailing slash on the request path
+// is tolerated. A compile failure is logged once, here.
+func newOASExactPath(template string, ignoreCase bool) oasExactPath {
+	var (
+		b      strings.Builder
+		params []string
+		last   int
+	)
+
+	if ignoreCase {
+		b.WriteString("(?i)")
+	}
+	b.WriteString("^")
+
+	for _, m := range oasPathParamRegex.FindAllStringSubmatchIndex(template, -1) {
+		b.WriteString(quoteOASPathLiteral(template[last:m[0]]))
+		b.WriteString("([^/]+)")
+		params = append(params, template[m[2]:m[3]])
+		last = m[1]
+	}
+
+	b.WriteString(quoteOASPathLiteral(template[last:]))
+	b.WriteString("/?$")
+
+	re, err := regexp.Compile(b.String())
+	if err != nil {
+		log.WithError(err).Errorf("OAS path %q: cannot compile exact matcher, requests to it will be denied", template)
+	}
+
+	return oasExactPath{enabled: true, re: re, err: err, params: params}
+}
+
+// oasMatchPath returns the request path decoded segment by segment, so a
+// non-ASCII listen path or template literal matches as written while an
+// encoded slash stays inside its parameter value.
+func oasMatchPath(u *url.URL) string {
+	segments := strings.Split(u.EscapedPath(), "/")
+	for i, segment := range segments {
+		decoded, err := url.PathUnescape(segment)
+		if err != nil {
+			continue
+		}
+		decoded = strings.ReplaceAll(decoded, "%", "%25")
+		segments[i] = strings.ReplaceAll(decoded, "/", "%2F")
+	}
+	return strings.Join(segments, "/")
+}
+
+// matches returns the path parameter values when path is exactly the template.
+func (p *oasExactPath) matches(path string) (map[string]string, bool) {
+	if !p.enabled || p.err != nil {
+		return nil, false
+	}
+
+	m := p.re.FindStringSubmatch(path)
+	if m == nil {
+		return nil, false
+	}
+
+	params := make(map[string]string, len(p.params))
+	for i, name := range p.params {
+		value, err := url.PathUnescape(m[i+1])
+		if err != nil {
+			value = m[i+1]
+		}
+		params[name] = value
+	}
+
+	return params, true
+}
 
 // URLSpec represents a flattened specification for URLs, used to check if a proxy URL
 // path is on any of the white, black or ignored lists. This is generated as part of the
 // configuration init
 type URLSpec struct {
 	spec *regexp.Regexp
+	// oasExact is the OAS path template behind an allow or ignoreAuthentication
+	// entry, used to grant only the declared operation. Disabled for other entries.
+	oasExact oasExactPath
 
 	Status                    URLStatus
 	MethodActions             map[string]apidef.EndpointMethodMeta
@@ -183,24 +282,8 @@ func (u *URLSpec) matchesMethod(method string) bool {
 	}
 }
 
-// matchesPath takes the input string and matches it against an internal regex.
-// it will match the regex against the clean URL with stripped listen path first,
-// then it will match against the full URL including the listen path as provided.
-// APISpec to provide URL sanitization of the input is passed along.
+// matchesPath matches the request path against the internal regex the way
+// the API's endpointMatcher prescribes.
 func (a *URLSpec) matchesPath(reqPath string, api *APISpec) bool {
-	clean := api.StripListenPath(reqPath)
-	noVersion := api.StripVersionPath(clean)
-	// match /users
-	if noVersion != clean && a.spec.MatchString(noVersion) {
-		return true
-	}
-	// match /v3/users
-	if a.spec.MatchString(clean) {
-		return true
-	}
-	// match /listenpath/v3/users
-	if a.spec.MatchString(reqPath) {
-		return true
-	}
-	return false
+	return api.endpointMatcher.matchesPath(a, reqPath, api)
 }

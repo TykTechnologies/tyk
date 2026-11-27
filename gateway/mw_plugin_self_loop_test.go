@@ -70,7 +70,8 @@ func TestGoPluginMiddleware_SkipsOnSelfLoop(t *testing.T) {
 	t.Run("Endpoint-level plugin always checks path matching", func(t *testing.T) {
 		// Arrange: Create an endpoint-level Go plugin middleware
 		spec := &APISpec{
-			APIDefinition: &apidef.APIDefinition{},
+			APIDefinition:   &apidef.APIDefinition{},
+			endpointMatcher: legacyEndpointMatcher{},
 		}
 		spec.RxPaths = map[string][]URLSpec{
 			"Default": {}, // No matching path configured

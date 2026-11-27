@@ -456,6 +456,7 @@ func (s *Test) TestNewWrappedServeHTTP() *ReverseProxy {
 		APIDefinition:          &def,
 		EnforcedTimeoutEnabled: true,
 		CircuitBreakerEnabled:  true,
+		endpointMatcher:        legacyEndpointMatcher{},
 	}
 	return s.Gw.TykNewSingleHostReverseProxy(target, spec, nil)
 }
@@ -1991,7 +1992,7 @@ func TestReverseProxyWebSocketCancelation(t *testing.T) {
 	defer cst.Close()
 
 	backendURL, _ := url.Parse(cst.URL)
-	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}}
+	spec := &APISpec{APIDefinition: &apidef.APIDefinition{}, endpointMatcher: legacyEndpointMatcher{}}
 	rproxy := ts.Gw.TykNewSingleHostReverseProxy(backendURL, spec, nil)
 
 	handler := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
