@@ -867,8 +867,9 @@ func (r *RPCStorageHandler) CheckForReload(orgId string) bool {
 				r.CheckForReload(orgId)
 			}
 		} else if !strings.Contains(err.Error(), "Cannot obtain response during") {
-			forcer := rpc.NewSyncForcer(r.Gw.StorageConnectionHandler, r.buildNodeInfo)
-			forcer.SetFirstConnection(true)
+			// ask for a resync on the next login; it is coordinated across the
+			// group so only one gateway forces MDCB to synchronise
+			r.requestResync()
 			log.Warning("[RPC STORE] RPC Reload Checker encountered unexpected error: ", err)
 		}
 
@@ -1010,14 +1011,21 @@ func (r *RPCStorageHandler) CheckForKeyspaceChanges(orgId string) {
 		return
 	}
 
+	var changes []string
 	if keys == nil {
 		log.Info("Keys returned nil object, skipping check")
-		return
+	} else {
+		changes, _ = keys.([]string)
 	}
 
-	if len(keys.([]string)) > 0 {
+	// keys that couldn't be checked with MDCB because it timed out are retried
+	if retries := r.Gw.keyspaceRetries.take(); len(retries) > 0 {
+		changes = append(changes, retries...)
+	}
+
+	if len(changes) > 0 {
 		log.Info("Keyspace changes detected, updating local cache")
-		go r.ProcessKeySpaceChanges(keys.([]string), orgId)
+		go r.ProcessKeySpaceChanges(changes, orgId)
 	}
 }
 
@@ -1028,6 +1036,10 @@ func (gw *Gateway) getSessionAndCreate(keyName string, r *RPCStorageHandler, isH
 	if !isHashed {
 		key = storage.HashKey(keyName, gw.GetConfig().HashKeys)
 	}
+
+	// a cached value may predate the change being processed, e.g. a key that was
+	// just removed on the control plane would be recreated from it
+	gw.RPCGlobalCache.Delete("apikey-" + key)
 
 	sessionString, err := r.GetRawKey("apikey-" + key)
 	if err != nil {
@@ -1273,6 +1285,9 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 	}
 
 	synchronizerEnabled := r.Gw.GetConfig().SlaveOptions.SynchroniserEnabled
+	// keys with nothing to flush in other gateways: unchanged, or kept for a retry
+	skipNotify := map[string]bool{}
+	masterUnavailable := false
 	for _, key := range keys {
 		// Skip keys that are user keys to be reset
 		splitKeys := strings.Split(key, ":")
@@ -1291,6 +1306,32 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 			_, resetQuota := keysToReset[splitKeys[0]]
 
 			isHashed := len(splitKeys) > 1 && splitKeys[1] == "hashed"
+
+			// update keys stored locally in place instead of removing and recreating
+			// them (TT-15569); quota resets keep using the delete-and-recreate path
+			if !resetQuota {
+				event := key
+				switch r.updateKeyInPlace(event, isHashed, orgId) {
+				case keyUpdateUnchanged:
+					r.Gw.keyspaceRetries.done(event)
+					skipNotify[event] = true
+					continue
+				case keyUpdateApplied:
+					r.Gw.keyspaceRetries.done(event)
+					continue
+				case keyUpdateTimeout:
+					// MDCB is busy: keep the key and check it again later
+					if r.Gw.keyspaceRetries.retry(event) {
+						skipNotify[event] = true
+						continue
+					}
+					log.Warning("--> giving up checking key with master after timeouts: ", r.Gw.obfuscateKey(splitKeys[0]))
+				case keyUpdateUnavailable:
+					masterUnavailable = true
+				}
+				r.Gw.keyspaceRetries.done(event)
+			}
+
 			var status int
 			var err error
 			if isHashed {
@@ -1321,6 +1362,12 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		}
 	}
 
+	if masterUnavailable {
+		// keys that couldn't be fetched were removed as before; a forced
+		// synchronisation restores the ones still on the control plane (TT-12417)
+		r.requestResync()
+	}
+
 	for _, apiID := range apiIDsToDeleteCache {
 		if r.Gw.invalidateAPICache(apiID) {
 			log.WithField("apiID", apiID).Info("cache invalidated")
@@ -1335,13 +1382,15 @@ func (r *RPCStorageHandler) ProcessKeySpaceChanges(keys []string, orgId string) 
 		r.Gw.invalidateJWKSCacheByAPIID(apiID)
 	}
 
-	// Notify rest of gateways in cluster to flush cache
-	n := Notification{
-		Command: KeySpaceUpdateNotification,
-		Payload: strings.Join(keys, ","),
-		Gw:      r.Gw,
+	// Notify rest of gateways in cluster to flush cache, except for keys left untouched
+	if payload := keyspaceNotificationPayload(keys, skipNotify); payload != "" {
+		n := Notification{
+			Command: KeySpaceUpdateNotification,
+			Payload: payload,
+			Gw:      r.Gw,
+		}
+		r.Gw.MainNotifier.Notify(n)
 	}
-	r.Gw.MainNotifier.Notify(n)
 }
 
 // Function to handle fallback deletion using token ID
