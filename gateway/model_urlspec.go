@@ -25,7 +25,7 @@ type oasExactPath struct {
 // the mux wildcards the way httputil.PreparePathRegexp reads them: "/*/" is
 // one segment, a trailing "/*" is the rest of the path.
 func quoteOASPathLiteral(literal string) string {
-	quoted := regexp.QuoteMeta(literal)
+	quoted := regexp.QuoteMeta(strings.ReplaceAll(literal, "%", "%25"))
 	quoted = strings.ReplaceAll(quoted, `/\*/`, "/[^/]+/")
 	quoted = strings.ReplaceAll(quoted, `/\*`, "/.*")
 	return quoted
@@ -61,6 +61,22 @@ func newOASExactPath(template string, ignoreCase bool) oasExactPath {
 	}
 
 	return oasExactPath{enabled: true, re: re, err: err, params: params}
+}
+
+// oasMatchPath returns the request path decoded segment by segment, so a
+// non-ASCII listen path or template literal matches as written while an
+// encoded slash stays inside its parameter value.
+func oasMatchPath(u *url.URL) string {
+	segments := strings.Split(u.EscapedPath(), "/")
+	for i, segment := range segments {
+		decoded, err := url.PathUnescape(segment)
+		if err != nil {
+			continue
+		}
+		decoded = strings.ReplaceAll(decoded, "%", "%25")
+		segments[i] = strings.ReplaceAll(decoded, "/", "%2F")
+	}
+	return strings.Join(segments, "/")
 }
 
 // matches returns the path parameter values when path is exactly the template.

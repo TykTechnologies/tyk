@@ -152,6 +152,25 @@ func TestOASAllowList_DeclaredOperationOnly(t *testing.T) {
 		}...)
 	})
 
+	t.Run("non-ASCII listen path and literal path", func(t *testing.T) {
+		ts := StartTest(nil)
+		defer ts.Close()
+
+		ts.Gw.LoadAPI(buildOASAPIWithPaths("/café", true, oas.Operations{
+			"menu":    {Allow: &oas.Allowance{Enabled: true}},
+			"getUser": {Allow: &oas.Allowance{Enabled: true}},
+		}, map[string]*openapi3.PathItem{
+			"/menú":       {Get: &openapi3.Operation{OperationID: "menu", Responses: oasResponse200()}},
+			"/users/{id}": {Get: integerIDOperation("getUser")},
+		}))
+
+		_, _ = ts.Run(t, []test.TestCase{
+			{Path: "/caf%C3%A9/men%C3%BA", Code: http.StatusOK},
+			{Path: "/caf%C3%A9/users/1", Code: http.StatusOK, BodyMatch: `"Url":"/users/1"`},
+			{Path: "/caf%C3%A9/users/abc", Code: http.StatusForbidden},
+		}...)
+	})
+
 	t.Run("wildcard template", func(t *testing.T) {
 		ts := StartTest(nil)
 		defer ts.Close()
@@ -240,24 +259,31 @@ func TestOASIgnoreAuthentication_ListenPathPrefixOfEndpoints(t *testing.T) {
 // stripped path.
 // TestOASBlockList_ListenPathPrefixOfEndpoints: a block entry keeps matching
 // the full URL, so the listen-path-only form stays blocked.
-func TestOASBlockList_ListenPathPrefixOfEndpoints(t *testing.T) {
-	for _, unsafe := range []bool{false, true} {
-		t.Run("allow_unsafe_listen_path_matching="+jsonMarshalString(unsafe), func(t *testing.T) {
-			ts := StartTest(func(globalConf *config.Config) {
-				globalConf.AllowUnsafeListenPathMatching = unsafe
+// TestOASDenyingEntries_ListenPathPrefixOfEndpoints checks that block and
+// internal entries still deny the listen-path-only form in both matchers.
+func TestOASDenyingEntries_ListenPathPrefixOfEndpoints(t *testing.T) {
+	denying := map[string]*oas.Operation{
+		"block":    {Block: &oas.Allowance{Enabled: true}},
+		"internal": {Internal: &oas.Internal{Enabled: true}},
+	}
+
+	for name, op := range denying {
+		for _, unsafe := range []bool{false, true} {
+			t.Run(name+"/allow_unsafe_listen_path_matching="+jsonMarshalString(unsafe), func(t *testing.T) {
+				ts := StartTest(func(globalConf *config.Config) {
+					globalConf.AllowUnsafeListenPathMatching = unsafe
+				})
+				defer ts.Close()
+
+				ts.Gw.LoadAPI(buildOASAPIWithPaths("/employees", true, oas.Operations{"getStatic": op}, employeesPaths()))
+
+				_, _ = ts.Run(t, []test.TestCase{
+					{Path: "/employees/employees/static", Code: http.StatusForbidden},
+					{Path: "/employees/static", Code: http.StatusForbidden},
+					{Path: "/employees/employees/123", Code: http.StatusOK, BodyMatch: `"Url":"/employees/123"`},
+				}...)
 			})
-			defer ts.Close()
-
-			ts.Gw.LoadAPI(buildOASAPIWithPaths("/employees", true, oas.Operations{
-				"getStatic": {Block: &oas.Allowance{Enabled: true}},
-			}, employeesPaths()))
-
-			_, _ = ts.Run(t, []test.TestCase{
-				{Path: "/employees/employees/static", Code: http.StatusForbidden},
-				{Path: "/employees/static", Code: http.StatusForbidden},
-				{Path: "/employees/employees/123", Code: http.StatusOK, BodyMatch: `"Url":"/employees/123"`},
-			}...)
-		})
+		}
 	}
 }
 

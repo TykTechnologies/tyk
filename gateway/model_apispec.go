@@ -523,10 +523,10 @@ func (oasEndpointMatcher) matchesPath(spec *URLSpec, reqPath string, api *APISpe
 	if spec.spec.MatchString(clean) {
 		return true
 	}
-	// Block entries keep the full URL step: narrowing a denial is not safe.
+	// Denying entries keep the full URL step: narrowing a denial is not safe.
 	// VEM paths are internal looping targets without a listen path, so the
 	// full URL is the only form they can be matched against.
-	if spec.Status == BlackList || agentprotocol.IsProtocolVEMPath(reqPath) {
+	if spec.Status == BlackList || spec.Status == Internal || agentprotocol.IsProtocolVEMPath(reqPath) {
 		return spec.spec.MatchString(reqPath)
 	}
 	return false
@@ -565,8 +565,7 @@ func (a *APISpec) oasOperationMatches(r *http.Request, spec *URLSpec) bool {
 		return true
 	}
 
-	// The escaped path keeps an encoded slash inside one parameter value.
-	clean := a.StripListenPath(r.URL.EscapedPath())
+	clean := a.StripListenPath(oasMatchPath(r.URL))
 	for _, candidate := range []string{a.StripVersionPath(clean), clean} {
 		params, ok := spec.oasExact.matches(candidate)
 		if !ok {
