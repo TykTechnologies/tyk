@@ -70,7 +70,8 @@ func (e *JWTBearerSigningError) Unwrap() error { return e.Err }
 
 // JWTBearerIdPError is returned when the token endpoint answers with an error
 // or an unusable response. StatusCode is the HTTP status the gateway returns to
-// the client: 401 or 403 for a rejection, 500 when the IdP is unavailable.
+// the client: 401 or 403 for a rejection, 500 when the IdP is unavailable or
+// its response is unusable.
 type JWTBearerIdPError struct {
 	// IdPStatus is the HTTP status returned by the token endpoint.
 	IdPStatus int
@@ -286,12 +287,14 @@ func (client *JWTBearerClient) parseTokenResponse(status int, body []byte) (*oau
 		ExpiresIn   json.Number `json:"expires_in"`
 	}
 
+	// A success without an access token is a broken IdP response, not a
+	// rejection, so it is reported as a gateway error like an IdP outage.
 	if err := json.Unmarshal(body, &tr); err != nil || tr.AccessToken == "" {
 		return nil, &JWTBearerIdPError{
 			IdPStatus:   status,
 			IdPError:    "invalid_token_response",
 			Description: "token endpoint response has no access_token",
-			StatusCode:  http.StatusUnauthorized,
+			StatusCode:  http.StatusInternalServerError,
 		}
 	}
 

@@ -426,6 +426,15 @@ func TestJWTBearer_IdPRejection(t *testing.T) {
 			wantIdPErr: "unsupported_grant_type",
 		},
 		{
+			name: "success with non JSON body maps to 500",
+			respond: func(t *testing.T, w http.ResponseWriter) {
+				_, err := w.Write([]byte("<html>login</html>"))
+				assert.NoError(t, err)
+			},
+			wantStatus: http.StatusInternalServerError,
+			wantIdPErr: "invalid_token_response",
+		},
+		{
 			name: "IdP 500 server_error maps to 500",
 			respond: func(t *testing.T, w http.ResponseWriter) {
 				writeOAuthError(t, w, http.StatusInternalServerError, "server_error")
@@ -470,13 +479,13 @@ func TestJWTBearer_IdPRejection(t *testing.T) {
 			wantIdPErr: "unknown",
 		},
 		{
-			name: "success without access_token maps to 401",
+			name: "success without access_token maps to 500",
 			respond: func(t *testing.T, w http.ResponseWriter) {
 				w.Header().Set("Content-Type", "application/json")
 				_, err := w.Write([]byte(`{"token_type":"Bearer"}`))
 				assert.NoError(t, err)
 			},
-			wantStatus: http.StatusUnauthorized,
+			wantStatus: http.StatusInternalServerError,
 			wantIdPErr: "invalid_token_response",
 		},
 	}
