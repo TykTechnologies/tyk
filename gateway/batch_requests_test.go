@@ -79,6 +79,46 @@ func TestBatch(t *testing.T) {
 	}
 }
 
+func TestBatchFailedSubRequest(t *testing.T) {
+	ts := StartTest(nil)
+	defer ts.Close()
+
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	addr := ln.Addr().String()
+	if err := ln.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	relURL := "http://" + addr + "/x"
+	raw, err := (&BatchRequestHandler{Gw: ts.Gw}).ManualBatchRequest([]byte(`{
+		"requests": [{
+			"method": "GET",
+			"relative_url": "` + relURL + `"
+		}],
+		"suppress_parallel_execution": true
+	}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var replies []BatchReplyUnit
+	if err := json.Unmarshal(raw, &replies); err != nil {
+		t.Fatalf("unmarshal reply %s: %v", raw, err)
+	}
+	if len(replies) != 1 {
+		t.Fatalf("expected 1 reply, got %d: %s", len(replies), raw)
+	}
+	if replies[0].RelativeURL != relURL {
+		t.Errorf("relative_url = %q, want %q", replies[0].RelativeURL, relURL)
+	}
+	if replies[0].Code != http.StatusBadGateway {
+		t.Errorf("code = %d, want %d", replies[0].Code, http.StatusBadGateway)
+	}
+}
+
 const virtBatchTest = `function batchTest(request, session, config) {
     // Set up a response object
     var response = {
