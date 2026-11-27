@@ -635,6 +635,12 @@
         },
         "max_response_body_size": {
           "type": "integer"
+        },
+        "trusted_proxy_cidrs": {
+          "type": ["array", "null"],
+          "items": {
+            "type": "string"
+          }
         }
       }
     },
@@ -1279,6 +1285,10 @@
       "type": ["object", "null"],
       "additionalProperties": true,
       "properties": {}
+    },
+    "allow_unsafe_websocket_origin": {
+      "type": ["boolean", "null"],
+      "additionalProperties": false
     }
   }
 }

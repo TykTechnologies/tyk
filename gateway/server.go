@@ -1454,6 +1454,9 @@ func (gw *Gateway) initSystem() error {
 	defer globalMu.Unlock()
 
 	gwConfig := gw.GetConfig()
+	if err := gwConfig.HttpServerOptions.ValidateTrustedProxyCIDRs(); err != nil {
+		return fmt.Errorf("invalid http_server_options.trusted_proxy_cidrs: %w", err)
+	}
 
 	// Initialize the appropriate log formatter
 	if !gw.isRunningTests() && os.Getenv("TYK_LOGFORMAT") == "" && !*cli.DebugMode {
@@ -1736,6 +1739,11 @@ func (gw *Gateway) afterConfSetup() {
 	}
 	regexp.Configure(cacheOpts)
 	httputil.ConfigurePathRegexpCache(maxEntries, conf.DisableRegexpCacheBound, mainLog.Warnf)
+
+	if conf.AllowUnsafeWebSocketOrigin {
+		mainLog.Warn("allow_unsafe_websocket_origin is enabled: WebSocket handshakes for GraphQL and Streams APIs are accepted from any origin. " +
+			"Risk: any website can open a WebSocket to these APIs through a visitor's browser and read the responses.")
+	}
 
 	if conf.HealthCheckEndpointName == "" {
 		conf.HealthCheckEndpointName = "hello"
