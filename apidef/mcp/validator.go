@@ -29,6 +29,7 @@ const (
 	mcpSchemaVersionNotFoundFmt = "schema not found for version %q"
 	ExtensionTykAPIGateway      = "x-tyk-api-gateway"
 	ExtensionTykMCPServer       = "x-tyk-mcp-server"
+	ExtensionTykMCPAggregator   = "x-tyk-mcp-aggregator"
 )
 
 var (
@@ -64,12 +65,17 @@ func loadMCPSchema() error {
 		if err != nil {
 			return fmt.Errorf("%s loading failed: %w", ExtensionTykMCPServer, err)
 		}
+		xTykMCPAggregatorSchema, err := schemaDir.ReadFile(fmt.Sprintf("schema/%s.json", ExtensionTykMCPAggregator))
+		if err != nil {
+			return fmt.Errorf("%s loading failed: %w", ExtensionTykMCPAggregator, err)
+		}
 		extensionSchemas := []struct {
 			name string
 			data []byte
 		}{
 			{name: ExtensionTykAPIGateway, data: xTykAPIGwSchema},
 			{name: ExtensionTykMCPServer, data: xTykMCPServerSchema},
+			{name: ExtensionTykMCPAggregator, data: xTykMCPAggregatorSchema},
 		}
 
 		mcpJSONSchemas = make(map[string][]byte)
@@ -136,7 +142,8 @@ func loadMCPSchema() error {
 
 func isMCPExtensionSchema(fileName string) bool {
 	return strings.HasSuffix(fileName, fmt.Sprintf("%s.json", ExtensionTykAPIGateway)) ||
-		strings.HasSuffix(fileName, fmt.Sprintf("%s.json", ExtensionTykMCPServer))
+		strings.HasSuffix(fileName, fmt.Sprintf("%s.json", ExtensionTykMCPServer)) ||
+		strings.HasSuffix(fileName, fmt.Sprintf("%s.json", ExtensionTykMCPAggregator))
 }
 
 func mergeMCPExtensionDefinitions(data, extensionSchema []byte, defsKey string) ([]byte, error) {

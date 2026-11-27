@@ -93,7 +93,7 @@ func (gw *Gateway) validateMCP(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		if errMsg, errCode := gw.validatePairedMCPAdapterUpstream(r, mcpObj); errMsg != "" {
+		if errMsg, errCode := gw.validateMCPProxyReferences(r, mcpObj); errMsg != "" {
 			doJSONWrite(w, errCode, apiError(errMsg))
 			return
 		}
@@ -342,6 +342,9 @@ func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int)
 
 	newDef.IsOAS = true
 	oasObj.GetTykExtension().Info.ID = newDef.APIID
+	if errMsg, errCode := gw.probeMCPAggregatorUpstreams(r, oasObj); errMsg != "" {
+		return apiError(errMsg), errCode
+	}
 	if dryRun {
 		if expand {
 			expanded, err := gw.expandMCPProxyDefinition(oasObj)
@@ -358,6 +361,7 @@ func (gw *Gateway) handleAddMCP(r *http.Request, fs afero.Fs) (interface{}, int)
 	if err != nil {
 		return apiError(err.Error()), errCode
 	}
+	gw.mcpAggregatorWrites.written(newDef.APIID, newDef, oasObj)
 
 	if resp, code := handleBaseVersionUpdate(gw, versionParams, newDef.APIID, fs); resp != nil {
 		return resp, code
@@ -396,6 +400,10 @@ func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (
 		return resp, code
 	}
 
+	if errMsg, errCode := gw.mcpAggregatorUpdateConflict(apiID, newDef, oasObj); errMsg != "" {
+		return apiError(errMsg), errCode
+	}
+
 	if err := gw.validator.Validate(identifier.CustomApiId(newDef.APIID)); err != nil {
 		log.WithField("api_id", newDef.APIID).WithError(err).Error("Failed to validate API ID")
 		return apiError(identifier.ErrInvalidCustomApiId.Error()), http.StatusBadRequest
@@ -409,12 +417,17 @@ func (gw *Gateway) handleUpdateMCP(apiID string, r *http.Request, fs afero.Fs) (
 		return apiError(err.Error()), http.StatusBadRequest
 	}
 
+	if errMsg, errCode := gw.probeMCPAggregatorUpstreams(r, oasObj); errMsg != "" {
+		return apiError(errMsg), errCode
+	}
+
 	newDef.IsOAS = true
 	oasObj.CompactTykMCPServerExtension()
 	err, errCode := gw.writeOASAndAPIDefToFile(fs, newDef, oasObj)
 	if err != nil {
 		return apiError(err.Error()), errCode
 	}
+	gw.mcpAggregatorWrites.written(newDef.APIID, newDef, oasObj)
 
 	return buildSuccessResponse(newDef.APIID, "modified")
 }
@@ -571,10 +584,15 @@ func (gw *Gateway) handleDeleteMCP(apiID string, fs afero.Fs) (interface{}, int)
 		return apiError("API is not an MCP Proxy"), http.StatusNotFound
 	}
 
+	if resp, code := gw.mcpAggregatorDeleteConflict(apiID); resp != nil {
+		return resp, code
+	}
+
 	if err := deleteAPIFiles(apiID, "mcp", gw.GetConfig().AppPath, fs); err != nil {
 		log.Warning("Delete failed: ", err)
 		return apiError(errMsgDeleteFailed), http.StatusInternalServerError
 	}
+	gw.mcpAggregatorWrites.written(apiID, nil, nil)
 
 	handleBaseVersionCleanup(gw, spec, apiID, fs)
 

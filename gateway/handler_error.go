@@ -104,6 +104,7 @@ func (e *ErrorHandler) HandleError(w http.ResponseWriter, r *http.Request, errMs
 
 func (e *ErrorHandler) handleErrorExtended(w http.ResponseWriter, r *http.Request, err error, errCode int, writeResponse bool) {
 	defer e.Base().UpdateRequestSession(r)
+	recordMCPAggregatorErrorClassification(r)
 	response := &http.Response{}
 	errMsg := err.Error()
 
@@ -242,7 +243,7 @@ func (e *ErrorHandler) handleErrorExtended(w http.ResponseWriter, r *http.Reques
 			ExpireAt:      t,
 		}
 		recordGraphDetails(&record, r, response, e.Spec)
-		if e.Spec.IsMCP() {
+		if e.Spec.IsMCPManaged() {
 			recordMCPDetails(&record, r)
 		}
 

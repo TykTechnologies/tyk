@@ -1,0 +1,501 @@
+package gateway
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"net/http"
+	"slices"
+	"strings"
+	"unicode/utf8"
+
+	"github.com/sirupsen/logrus"
+
+	"github.com/TykTechnologies/tyk/apidef"
+	tykerrors "github.com/TykTechnologies/tyk/internal/errors"
+	"github.com/TykTechnologies/tyk/internal/httpctx"
+	jsonrpcerrors "github.com/TykTechnologies/tyk/internal/jsonrpc/errors"
+	"github.com/TykTechnologies/tyk/internal/mcp"
+	mcpaggregator "github.com/TykTechnologies/tyk/internal/mcp/aggregator"
+)
+
+const (
+	mcpAggregatorToolCallFailedMsg = "MCP aggregator could not call aggregated MCP proxy"
+
+	// mcpAggregatorUpstreamErrorCode reports an aggregated MCP proxy that could
+	// not answer, in the modern server-defined namespace the gateway uses for
+	// upstream errors on 2026-07-28.
+	mcpAggregatorUpstreamErrorCode = jsonrpcerrors.CodeModernUpstreamError
+)
+
+var (
+	errMCPAggregatorUnknownTool = errors.New("unknown tool")
+	// errMCPAggregatorAmbiguousName rejects params whose tool name more than
+	// one decoder could read differently.
+	errMCPAggregatorAmbiguousName = errors.New("params must carry exactly one name")
+)
+
+// mcpAggregatorUnavailableError reports an aggregated MCP proxy that could not
+// serve a tool call; Reason is logged, never sent to the agent.
+type mcpAggregatorUnavailableError struct {
+	Reason string
+}
+
+func (e *mcpAggregatorUnavailableError) Error() string { return "upstream unavailable: " + e.Reason }
+
+func mcpAggregatorUnavailable(format string, args ...any) error {
+	return &mcpAggregatorUnavailableError{Reason: fmt.Sprintf(format, args...)}
+}
+
+// mcpAggregatorToolReply is an aggregated MCP proxy's answer to tools/call:
+// either its raw result or its raw JSON-RPC error.
+type mcpAggregatorToolReply struct {
+	Result json.RawMessage
+	Error  json.RawMessage
+}
+
+// serveToolsCall resolves a namespaced tool from the aggregator's
+// configuration, forwards the call to the owning aggregated MCP proxy under
+// the proxy's own tool name, and returns that proxy's answer unchanged. A
+// JSON-RPC error from the proxy is answered with HTTP 200, as JSON-RPC errors
+// are over Streamable HTTP: the proxy's own status describes the aggregator's
+// hop, and a 401 or 429 relayed as is would send the agent into OAuth
+// discovery or backoff against the aggregator.
+func (m *MCPAggregatorMiddleware) serveToolsCall(w http.ResponseWriter, r *http.Request, state *httpctx.JSONRPCRoutingState) {
+	d := mcpAggregatorDispatcher{gw: m.Gw, aggregator: m.Spec}
+	name := mcp.ExtractStringField(state.Params, "name")
+
+	upstream, tool, err := d.resolveTool(name)
+	var reply *mcpAggregatorToolReply
+	if err == nil {
+		reply, err = d.callTool(r, upstream, tool, state.Params)
+	}
+
+	var unavailable *mcpAggregatorUnavailableError
+	switch {
+	case err != nil && mcpAggregatorClientGone(r):
+		log.WithFields(logrus.Fields{
+			"aggregator_api_id": m.Spec.APIID,
+			"upstream_api_id":   upstream.APIID,
+			"alias":             upstream.Alias,
+			"tool":              name,
+		}).Debug("MCP aggregator cancelled tool call: the agent cancelled the request")
+	case err != nil && errors.Is(r.Context().Err(), context.DeadlineExceeded):
+		timeout := mcpAggregatorTimeout(m.Spec, r)
+		log.WithFields(logrus.Fields{
+			"aggregator_api_id": m.Spec.APIID,
+			"upstream_api_id":   upstream.APIID,
+			"alias":             upstream.Alias,
+			"tool":              name,
+			"reason":            fmt.Sprintf("timeout after %s", timeout),
+		}).Warn(mcpAggregatorToolCallFailedMsg)
+		writeMCPAggregatorError(w, state.ID, http.StatusGatewayTimeout, mcpAggregatorUpstreamErrorCode,
+			fmt.Sprintf("upstream timeout: aggregated MCP proxy %q did not answer within %s", upstream.Alias, timeout))
+	case errors.Is(err, errMCPAggregatorUnknownTool):
+		writeMCPAggregatorError(w, state.ID, http.StatusBadRequest, mcp.JSONRPCInvalidParams, fmt.Sprintf("unknown tool %q", name))
+	case errors.Is(err, errMCPAggregatorAmbiguousName):
+		writeMCPAggregatorError(w, state.ID, http.StatusBadRequest, mcp.JSONRPCInvalidParams, err.Error())
+	case errors.As(err, &unavailable):
+		log.WithFields(logrus.Fields{
+			"aggregator_api_id": m.Spec.APIID,
+			"upstream_api_id":   upstream.APIID,
+			"alias":             upstream.Alias,
+			"tool":              name,
+			"reason":            unavailable.Reason,
+		}).Warn(mcpAggregatorToolCallFailedMsg)
+		writeMCPAggregatorError(w, state.ID, http.StatusServiceUnavailable, mcpAggregatorUpstreamErrorCode,
+			fmt.Sprintf("upstream unavailable: aggregated MCP proxy %q", upstream.Alias))
+	case err != nil:
+		writeMCPAggregatorError(w, state.ID, http.StatusInternalServerError, mcp.JSONRPCInternalError, "MCP aggregator could not call the tool")
+	case reply.Error != nil:
+		writeMCPAggregatorRaw(w, http.StatusOK, state.ID, "error", reply.Error)
+	default:
+		writeMCPAggregatorRaw(w, http.StatusOK, state.ID, "result", reply.Result)
+	}
+}
+
+// resolveTool splits a namespaced tool name at the first separator, since
+// aliases cannot contain underscores, and checks from configuration alone
+// that the alias names an admitted aggregated MCP proxy. It makes no upstream
+// call, so each tools/call costs the proxy exactly one request against its
+// rate limits; a tool the proxy does not have is rejected by the proxy.
+func (d mcpAggregatorDispatcher) resolveTool(name string) (mcpaggregator.Upstream, string, error) {
+	alias, tool, found := strings.Cut(name, mcpaggregator.NamespaceSeparator)
+	if !found || alias == "" || tool == "" {
+		return mcpaggregator.Upstream{}, "", errMCPAggregatorUnknownTool
+	}
+	ext := d.aggregator.OAS.GetTykMCPAggregatorExtension()
+	if ext == nil {
+		return mcpaggregator.Upstream{}, "", errMCPAggregatorUnknownTool
+	}
+	var upstream mcpaggregator.Upstream
+	for _, ref := range ext.Upstreams {
+		if ref.Alias == alias {
+			upstream = mcpaggregator.Upstream{APIID: ref.APIID, Alias: ref.Alias, Tools: ref.Tools}
+			break
+		}
+	}
+	if upstream.Alias == "" {
+		return mcpaggregator.Upstream{}, "", errMCPAggregatorUnknownTool
+	}
+
+	if !mcpAggregatorSelects(upstream, tool) || !mcpAggregatorNameFits(name) {
+		return upstream, "", errMCPAggregatorUnknownTool
+	}
+	if status := classifyMCPAggregatorUpstream(d.aggregator.OrgID, d.gw.getApiSpec(upstream.APIID)); status != mcpAggregatorUpstreamAdmitted {
+		return upstream, "", mcpAggregatorUnavailable("%s", status.String())
+	}
+	return upstream, tool, nil
+}
+
+// mcpAggregatorSelects reports whether the aggregator exposes tool of an
+// aggregated MCP proxy: every tool when the proxy has no selection, otherwise
+// only the selected names, matched exactly against the names the proxy
+// exposes. tools/call applies it to one name, and tools/list applies the same
+// rule through mcpAggregatorToolSelection, so a deselected tool is neither
+// listed nor callable.
+func mcpAggregatorSelects(upstream mcpaggregator.Upstream, tool string) bool {
+	return upstream.Tools == nil || slices.Contains(upstream.Tools, tool)
+}
+
+// mcpAggregatorToolSelection is an aggregated MCP proxy's tool selection as a
+// set, for checking every tool of a tools/list in constant time. It is nil
+// when the proxy has no selection.
+type mcpAggregatorToolSelection map[string]struct{}
+
+func newMCPAggregatorToolSelection(upstream mcpaggregator.Upstream) mcpAggregatorToolSelection {
+	if upstream.Tools == nil {
+		return nil
+	}
+	selection := make(mcpAggregatorToolSelection, len(upstream.Tools))
+	for _, tool := range upstream.Tools {
+		selection[tool] = struct{}{}
+	}
+	return selection
+}
+
+func (s mcpAggregatorToolSelection) selects(tool string) bool {
+	if s == nil {
+		return true
+	}
+	_, ok := s[tool]
+	return ok
+}
+
+// mcpAggregatorNameFits reports whether an aggregated tool name is within
+// MCP's tool name limit. Admission rejects a configuration that would
+// aggregate a longer name; the runtime also omits and refuses one, for a
+// proxy that gains such a tool after the aggregator was admitted.
+func mcpAggregatorNameFits(aggregatedName string) bool {
+	return utf8.RuneCountInString(aggregatedName) <= mcpaggregator.MaxToolNameLength
+}
+
+// isMCPUnknownToolError reports a proxy's unknown-tool rejection: -32602 with
+// the "unknown tool" wording of the MCP SDKs and the specification's example,
+// which the gateway's API-to-MCP adapter and remote go-sdk servers both send.
+func isMCPUnknownToolError(raw json.RawMessage) bool {
+	var rpcErr struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	}
+	return json.Unmarshal(raw, &rpcErr) == nil && rpcErr.Code == mcp.JSONRPCInvalidParams &&
+		strings.HasPrefix(strings.ToLower(rpcErr.Message), "unknown tool")
+}
+
+// isJSONRPCErrorObject reports whether raw is a JSON-RPC error object: an
+// object with an integer code and a string message.
+func isJSONRPCErrorObject(raw json.RawMessage) bool {
+	var rpcErr struct {
+		Code    *int    `json:"code"`
+		Message *string `json:"message"`
+	}
+	return len(raw) > 0 && json.Unmarshal(raw, &rpcErr) == nil && rpcErr.Code != nil && rpcErr.Message != nil
+}
+
+// isGatewayJSONRPCError reports whether raw is a JSON-RPC error written by
+// the gateway's own error handling, which records the HTTP status it answered
+// with in data.http_code.
+func isGatewayJSONRPCError(raw json.RawMessage, statusCode int) bool {
+	var rpcErr struct {
+		Data struct {
+			HTTPCode *int `json:"http_code"`
+		} `json:"data"`
+	}
+	return json.Unmarshal(raw, &rpcErr) == nil && rpcErr.Data.HTTPCode != nil && *rpcErr.Data.HTTPCode == statusCode
+}
+
+// callTool forwards a tools/call to an aggregated MCP proxy. Only the name in
+// params changes, to the proxy's own tool name; arguments, _meta and every
+// other field keep their bytes. Mcp-Name mirrors the new name, and the
+// agent's Mcp-Param-* headers and the headers the aggregator's request header
+// transform set travel with the call.
+func (d mcpAggregatorDispatcher) callTool(parent *http.Request, upstream mcpaggregator.Upstream, tool string, params json.RawMessage) (*mcpAggregatorToolReply, error) {
+	spec, err := d.upstreamSpec(upstream.APIID)
+	if err != nil {
+		return nil, mcpAggregatorUnavailable("%s", err.Error())
+	}
+	encodedTool, err := json.Marshal(tool)
+	if err != nil {
+		return nil, err
+	}
+	forwarded, err := replaceJSONObjectField(params, "name", encodedTool)
+	if err != nil {
+		return nil, errMCPAggregatorAmbiguousName
+	}
+	body := append([]byte(`{"jsonrpc":"2.0","id":1,"method":"tools/call","params":`), forwarded...)
+	body = append(body, '}')
+
+	extra := mcpAggregatorTransformedHeaders(parent, d.aggregator)
+	for name, values := range parent.Header {
+		if strings.HasPrefix(http.CanonicalHeaderKey(name), mcp.HeaderParamPrefix) {
+			extra[name] = values
+		}
+	}
+	extra.Set(mcp.HeaderName, mcp.EncodeMirroredHeader(tool))
+
+	rec, err := d.exchange(parent, spec, mcp.MethodToolsCall, body, extra, d.loopTrust(spec))
+	if err != nil {
+		return nil, mcpAggregatorUnavailable("tools/call failed: %s", err.Error())
+	}
+	if detail := mcpAggregatorVersionMismatch(mcp.MethodToolsCall, rec.statusCode, rec.header, rec.body.Bytes()); detail != "" {
+		return nil, mcpAggregatorUnavailable("version mismatch: does not support MCP version %s: %s", mcp.ModernProtocolVersion, detail)
+	}
+
+	message := rec.body.Bytes()
+	var streamErr error
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(rec.header.Get(headerContentType))), "text/event-stream") {
+		message, streamErr = mcpAggregatorEventStreamResponse(message)
+	}
+	var resp struct {
+		Result json.RawMessage `json:"result"`
+		Error  json.RawMessage `json:"error"`
+	}
+	decodeErr := streamErr
+	if decodeErr == nil {
+		decodeErr = json.Unmarshal(message, &resp)
+	}
+	// A server error is the proxy being unavailable unless it carries a
+	// JSON-RPC error from the MCP server behind the proxy, which is the
+	// server's own answer and reaches the agent. An error the proxy's gateway
+	// chain wrote itself, such as for an unreachable upstream, still means the
+	// proxy is unavailable.
+	if rec.statusCode >= http.StatusInternalServerError && (decodeErr != nil || !isJSONRPCErrorObject(resp.Error) || isGatewayJSONRPCError(resp.Error, rec.statusCode)) {
+		return nil, mcpAggregatorUnavailable("tools/call failed with HTTP %d", rec.statusCode)
+	}
+	if streamErr != nil {
+		return nil, mcpAggregatorUnavailable("tools/call failed: %s", streamErr.Error())
+	}
+	if decodeErr != nil {
+		return nil, mcpAggregatorUnavailable("tools/call failed with HTTP %d: invalid JSON-RPC response", rec.statusCode)
+	}
+	switch {
+	case len(resp.Error) > 0 && string(resp.Error) != "null" && isMCPUnknownToolError(resp.Error):
+		return nil, errMCPAggregatorUnknownTool
+	case len(resp.Error) > 0 && string(resp.Error) != "null" && !isJSONObject(resp.Error):
+		return mcpAggregatorGatewayErrorReply(parent, rec.statusCode, rec.classification, resp.Error)
+	case len(resp.Error) > 0 && string(resp.Error) != "null":
+		return &mcpAggregatorToolReply{Error: resp.Error}, nil
+	case rec.statusCode >= http.StatusBadRequest || len(resp.Result) == 0:
+		return nil, mcpAggregatorUnavailable("tools/call failed with HTTP %d: JSON-RPC response has no result", rec.statusCode)
+	}
+	return &mcpAggregatorToolReply{Result: resp.Result}, nil
+}
+
+func isJSONObject(raw json.RawMessage) bool {
+	trimmed := bytes.TrimSpace(raw)
+	return len(trimmed) > 0 && trimmed[0] == '{'
+}
+
+// mcpAggregatorGatewayErrorReply turns a refusal an aggregated proxy wrote in
+// the gateway's generic {"error":"..."} form, as an API-to-MCP proxy does
+// before it reaches JSON-RPC routing, into the JSON-RPC error object the proxy
+// would have written as an MCP API: the code the gateway selects for the HTTP
+// status and the proxy chain's error classification on 2026-07-28, the
+// message, and data.http_code.
+func mcpAggregatorGatewayErrorReply(parent *http.Request, status int, classification *tykerrors.ErrorClassification, raw json.RawMessage) (*mcpAggregatorToolReply, error) {
+	if status < http.StatusBadRequest {
+		return nil, mcpAggregatorUnavailable("tools/call failed with HTTP %d: invalid JSON-RPC response", status)
+	}
+	var message string
+	if json.Unmarshal(raw, &message) != nil || message == "" {
+		message = http.StatusText(status)
+	}
+	encoded, err := json.Marshal(jsonrpcerrors.JSONRPCError{
+		Code:    jsonrpcerrors.SelectJSONRPCCode(status, classification, httpctx.GetMCPProtocolContext(parent)),
+		Message: message,
+		Data:    map[string]any{"http_code": status},
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &mcpAggregatorToolReply{Error: encoded}, nil
+}
+
+// replaceJSONObjectField replaces the value of the top-level field key in a
+// JSON object and keeps every other byte of the object as it was.
+//
+// Ingress already refuses a request whose params.name is duplicated or spelled
+// in another case (mcp.RequestEnvelope.UnmarshalJSON, through
+// validateOwnedJSONObject, answers -32700), so every decoder reads the same
+// name. This function does not rely on that: an object holding key more than
+// once, or a case variant of it, fails rather than forward a name a proxy
+// could read differently.
+func replaceJSONObjectField(object json.RawMessage, key string, value []byte) ([]byte, error) {
+	dec := json.NewDecoder(bytes.NewReader(object))
+	if tok, err := dec.Token(); err != nil || tok != json.Delim('{') {
+		return nil, errors.New("params must be a JSON object")
+	}
+	var out []byte
+	last, seen := 0, 0
+	for dec.More() {
+		tok, err := dec.Token()
+		if err != nil {
+			return nil, err
+		}
+		var raw json.RawMessage
+		if err := dec.Decode(&raw); err != nil {
+			return nil, err
+		}
+		field, ok := tok.(string)
+		if !ok {
+			return nil, errors.New("params must be a JSON object")
+		}
+		if !strings.EqualFold(field, key) {
+			continue
+		}
+		if seen++; seen > 1 || field != key {
+			return nil, fmt.Errorf("params must carry %q exactly once", key)
+		}
+		end := int(dec.InputOffset())
+		start := end - len(raw)
+		out = append(out, object[last:start]...)
+		out = append(out, value...)
+		last = end
+	}
+	if seen == 0 {
+		return nil, fmt.Errorf("params must carry %q", key)
+	}
+	return append(out, object[last:]...), nil
+}
+
+// writeMCPAggregatorRaw writes a JSON-RPC response whose result or error member
+// carries the given bytes unchanged.
+func writeMCPAggregatorRaw(w http.ResponseWriter, status int, id any, member string, raw json.RawMessage) {
+	encodedID, err := json.Marshal(id)
+	if err != nil {
+		encodedID = []byte("null")
+	}
+	if status == 0 {
+		status = http.StatusOK
+	}
+	w.Header().Set(headerContentType, contentTypeJSON)
+	w.WriteHeader(status)
+	prefix := fmt.Appendf(nil, `{"jsonrpc":%q,"id":%s,%q:`, apidef.JsonRPC20, encodedID, member)
+	for _, part := range [][]byte{prefix, raw, []byte("}\n")} {
+		if _, err := w.Write(part); err != nil {
+			// The status line is already sent, so a failed write, usually a
+			// client that went away, can only be logged.
+			log.WithError(err).Warn("MCP aggregator could not write the JSON-RPC response")
+			return
+		}
+	}
+}
+
+const mcpAggregatorTransformedHeadersKey mcpContextKey = "mcp_aggregator_transformed_headers"
+
+// ctxAddMCPAggregatorTransformedHeaders records the names of the request
+// headers an aggregator's header transform set on this request.
+func ctxAddMCPAggregatorTransformedHeaders(r *http.Request, names []string) {
+	if len(names) == 0 {
+		return
+	}
+	previous, ok := r.Context().Value(mcpAggregatorTransformedHeadersKey).([]string)
+	if !ok {
+		previous = nil
+	}
+	setCtxValue(r, mcpAggregatorTransformedHeadersKey, append(slices.Clone(previous), names...))
+}
+
+// mcpAggregatorTransformedHeaders returns the headers the aggregator's
+// request header transform set, with their current values, for the internal
+// call to an aggregated MCP proxy. Agent headers are never forwarded this
+// way, and neither are the headers mcpAggregatorForwardsTransformedHeader
+// refuses for the aggregator.
+func mcpAggregatorTransformedHeaders(r *http.Request, aggregator *APISpec) http.Header {
+	out := http.Header{}
+	names, ok := r.Context().Value(mcpAggregatorTransformedHeadersKey).([]string)
+	if !ok {
+		return out
+	}
+	credentials := mcpAggregatorCredentialHeaders(aggregator)
+	for _, name := range names {
+		if !mcpAggregatorForwardsTransformedHeader(name, credentials) {
+			continue
+		}
+		values := r.Header[name]
+		if len(values) == 0 {
+			values = r.Header.Values(name)
+		}
+		if len(values) > 0 {
+			out[name] = slices.Clone(values)
+		}
+	}
+	return out
+}
+
+// Headers a transform may set that never travel to the proxy hop: credentials,
+// client-address and gateway-internal headers (the client address travels in
+// the request context), and headers that frame the internal request. Besides
+// these, the headers the aggregator itself reads credentials from never travel
+// either (see mcpAggregatorCredentialHeaders). A credential an aggregated
+// proxy's upstream needs belongs on that proxy, which scopes it to that
+// upstream, not on the aggregator, which would send it to every proxy.
+var (
+	mcpAggregatorUnforwardedHeaders = []string{
+		"Authorization", "Cookie", "X-Api-Key", "Api-Key", "X-Auth-Token",
+		"Forwarded", "X-Real-Ip",
+		"Accept", "Content-Type", "Content-Length", "Content-Encoding", "Host",
+	}
+	mcpAggregatorUnforwardedHeaderPrefixes = []string{"Mcp-", "Proxy-", "X-Forwarded-", "X-Tyk-"}
+)
+
+// mcpAggregatorCredentialHeaders returns the headers the aggregator reads
+// client credentials from: the header of every authentication method it
+// configures, its custom authentication header names included, and the
+// header carrying a request signature.
+func mcpAggregatorCredentialHeaders(aggregator *APISpec) []string {
+	if aggregator == nil || aggregator.APIDefinition == nil {
+		return nil
+	}
+	var names []string
+	add := func(config apidef.AuthConfig) {
+		if config.AuthHeaderName != "" {
+			names = append(names, config.AuthHeaderName)
+		}
+		if config.Signature.Header != "" {
+			names = append(names, config.Signature.Header)
+		}
+	}
+	add(aggregator.Auth)
+	for _, config := range aggregator.AuthConfigs {
+		add(config)
+	}
+	return names
+}
+
+func mcpAggregatorForwardsTransformedHeader(name string, credentials []string) bool {
+	canonical := http.CanonicalHeaderKey(name)
+	for _, prefix := range mcpAggregatorUnforwardedHeaderPrefixes {
+		if strings.HasPrefix(canonical, prefix) {
+			return false
+		}
+	}
+	for _, blocked := range slices.Concat(mcpAggregatorUnforwardedHeaders, hopHeaders, credentials) {
+		if strings.EqualFold(canonical, blocked) {
+			return false
+		}
+	}
+	return true
+}

@@ -1,6 +1,7 @@
 package mcp
 
 import (
+	"bytes"
 	"fmt"
 	"strings"
 	"testing"
@@ -8,6 +9,7 @@ import (
 	"github.com/buger/jsonparser"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef/oas"
 )
@@ -16,16 +18,22 @@ func getStrPointer(str string) *string {
 	return &str
 }
 
-func TestValidateMCPObject(t *testing.T) {
-	t.Parallel()
-
-	validOASObject := oas.OAS{
+// newMCPValidatorTestOAS returns a fresh OAS document carrying ext. Each call
+// has its own extensions map, so parallel subtests never share one.
+func newMCPValidatorTestOAS(ext *oas.XTykAPIGateway) oas.OAS {
+	doc := oas.OAS{
 		T: openapi3.T{
 			OpenAPI: "3.0.3",
 			Info:    &openapi3.Info{},
 			Paths:   openapi3.NewPaths(),
 		},
 	}
+	doc.SetTykExtension(ext)
+	return doc
+}
+
+func TestValidateMCPObject(t *testing.T) {
+	t.Parallel()
 
 	validXTykAPIGateway := oas.XTykAPIGateway{
 		Info: oas.Info{
@@ -55,7 +63,7 @@ func TestValidateMCPObject(t *testing.T) {
 		},
 	}
 
-	validOASObject.SetTykExtension(&validXTykAPIGateway)
+	validOASObject := newMCPValidatorTestOAS(&validXTykAPIGateway)
 	validMCP3Definition, err := validOASObject.MarshalJSON()
 	if err != nil {
 		t.Fatalf("failed to marshal valid OAS object: %v", err)
@@ -69,7 +77,6 @@ func TestValidateMCPObject(t *testing.T) {
 
 	t.Run("valid MCP object with resources", func(t *testing.T) {
 		t.Parallel()
-		mcpWithResources := validOASObject
 		extWithResources := validXTykAPIGateway
 		extWithResources.Middleware = &oas.Middleware{
 			McpResources: map[string]*oas.MCPPrimitive{
@@ -82,7 +89,7 @@ func TestValidateMCPObject(t *testing.T) {
 				},
 			},
 		}
-		mcpWithResources.SetTykExtension(&extWithResources)
+		mcpWithResources := newMCPValidatorTestOAS(&extWithResources)
 		definition, err := mcpWithResources.MarshalJSON()
 		if err != nil {
 			t.Fatalf("failed to marshal MCP with resources: %v", err)
@@ -94,7 +101,6 @@ func TestValidateMCPObject(t *testing.T) {
 
 	t.Run("valid MCP object with prompts", func(t *testing.T) {
 		t.Parallel()
-		mcpWithPrompts := validOASObject
 		extWithPrompts := validXTykAPIGateway
 		extWithPrompts.Middleware = &oas.Middleware{
 			McpPrompts: map[string]*oas.MCPPrimitive{
@@ -107,7 +113,7 @@ func TestValidateMCPObject(t *testing.T) {
 				},
 			},
 		}
-		mcpWithPrompts.SetTykExtension(&extWithPrompts)
+		mcpWithPrompts := newMCPValidatorTestOAS(&extWithPrompts)
 		definition, err := mcpWithPrompts.MarshalJSON()
 		if err != nil {
 			t.Fatalf("failed to marshal MCP with prompts: %v", err)
@@ -119,7 +125,6 @@ func TestValidateMCPObject(t *testing.T) {
 
 	t.Run("valid MCP object with all MCP fields", func(t *testing.T) {
 		t.Parallel()
-		mcpWithAll := validOASObject
 		extWithAll := validXTykAPIGateway
 		extWithAll.Middleware = &oas.Middleware{
 			McpTools: map[string]*oas.MCPPrimitive{
@@ -144,7 +149,7 @@ func TestValidateMCPObject(t *testing.T) {
 				},
 			},
 		}
-		mcpWithAll.SetTykExtension(&extWithAll)
+		mcpWithAll := newMCPValidatorTestOAS(&extWithAll)
 		definition, err := mcpWithAll.MarshalJSON()
 		if err != nil {
 			t.Fatalf("failed to marshal MCP with all fields: %v", err)
@@ -154,11 +159,10 @@ func TestValidateMCPObject(t *testing.T) {
 		assert.Nil(t, err)
 	})
 
-	invalidOASObject := validOASObject
 	invalidXTykAPIGateway := validXTykAPIGateway
 	invalidXTykAPIGateway.Info = oas.Info{} // Empty name should fail
 	invalidXTykAPIGateway.Server.GatewayTags = &oas.GatewayTags{Enabled: true, Tags: []string{}}
-	invalidOASObject.SetTykExtension(&invalidXTykAPIGateway)
+	invalidOASObject := newMCPValidatorTestOAS(&invalidXTykAPIGateway)
 	invalidMCP3Definition, err := invalidOASObject.MarshalJSON()
 	if err != nil {
 		t.Fatalf("failed to marshal invalid OAS object: %v", err)
@@ -774,4 +778,86 @@ func TestGetMCPSchema_ContainsMCPExtensions(t *testing.T) {
 		_, _, _, err = jsonparser.Get(schema, keyProperties, ExtensionTykMCPServer)
 		assert.NoError(t, err, "x-tyk-mcp-server should be present in MCP schema")
 	})
+}
+
+func TestValidateMCPObject_WithTykMCPAggregatorExtension(t *testing.T) {
+	t.Parallel()
+
+	doc := func(aggregator string) []byte {
+		return []byte(`{
+			"openapi": "3.0.3",
+			"info": {"title": "company-tools", "version": "1.0.0"},
+			"paths": {},
+			"x-tyk-api-gateway": {
+				"info": {"name": "company-tools", "state": {"active": true}},
+				"upstream": {"url": "tyk://mcp-aggregator"},
+				"server": {"listenPath": {"value": "/company-tools/"}}
+			},
+			"x-tyk-mcp-aggregator": ` + aggregator + `
+		}`)
+	}
+
+	t.Run("schema contains the extension", func(t *testing.T) {
+		t.Parallel()
+		schema, err := GetMCPSchema("3.0")
+		require.NoError(t, err)
+		_, _, _, err = jsonparser.Get(schema, keyProperties, ExtensionTykMCPAggregator)
+		assert.NoError(t, err)
+	})
+
+	t.Run("accepts upstreams with and without tools", func(t *testing.T) {
+		t.Parallel()
+		assert.NoError(t, ValidateMCPObject(doc(`{"upstreams":[
+			{"apiId":"orders-mcp","alias":"orders","tools":["list_orders"]},
+			{"apiId":"github-mcp","alias":"github"}
+		]}`), "3.0.3"))
+	})
+
+	t.Run("requires apiId and alias", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateMCPObject(doc(`{"upstreams":[{"alias":"orders"}]}`), "3.0.3")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "apiId")
+
+		err = ValidateMCPObject(doc(`{"upstreams":[{"apiId":"orders-mcp"}]}`), "3.0.3")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "alias")
+	})
+
+	t.Run("rejects unknown fields and wrong tool types", func(t *testing.T) {
+		t.Parallel()
+		err := ValidateMCPObject(doc(`{"upstreams":[{"apiId":"orders-mcp","alias":"orders","enabled":true}]}`), "3.0.3")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "enabled")
+
+		err = ValidateMCPObject(doc(`{"upstreams":[{"apiId":"orders-mcp","alias":"orders","tools":[1]}]}`), "3.0.3")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "x-tyk-mcp-aggregator.upstreams.0.tools.0")
+	})
+}
+
+func TestValidateMCPObject_LimitsMCPAggregatorUpstreams(t *testing.T) {
+	t.Parallel()
+
+	upstreams := make([]string, 51)
+	for i := range upstreams {
+		upstreams[i] = fmt.Sprintf(`{"apiId":"mcp-%d","alias":"a%d"}`, i, i)
+	}
+	doc := []byte(`{
+		"openapi": "3.0.3",
+		"info": {"title": "company-tools", "version": "1.0.0"},
+		"paths": {},
+		"x-tyk-api-gateway": {
+			"info": {"name": "company-tools", "state": {"active": true}},
+			"upstream": {"url": "tyk://mcp-aggregator"},
+			"server": {"listenPath": {"value": "/company-tools/"}}
+		},
+		"x-tyk-mcp-aggregator": {"upstreams": [` + strings.Join(upstreams, ",") + `]}
+	}`)
+
+	err := ValidateMCPObject(doc, "3.0.3")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "x-tyk-mcp-aggregator.upstreams")
+
+	assert.NoError(t, ValidateMCPObject(bytes.Replace(doc, []byte(`,{"apiId":"mcp-50","alias":"a50"}`), nil, 1), "3.0.3"))
 }

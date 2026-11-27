@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/TykTechnologies/tyk/internal/httpctx"
 	"github.com/TykTechnologies/tyk/internal/mcp"
@@ -9,9 +10,26 @@ import (
 
 // SupportedProtocolVersions describes the runtime behind this endpoint. Native
 // and paired REST-as-MCP endpoints serve the same four Gateway-qualified
-// versions once the cached stateless adapter handler is active.
+// versions once the cached stateless adapter handler is active. An MCP
+// aggregator serves only the modern version and has no legacy fallback.
 func (s *APISpec) SupportedProtocolVersions() []string {
+	if s.IsMCPAggregator() {
+		return []string{mcp.ModernProtocolVersion}
+	}
 	return mcp.ServedProtocolVersions()
+}
+
+// ServesModernInitialize reports whether this endpoint answers a modern
+// initialize itself: the MCP aggregator negotiates 2026-07-28 for clients
+// that still open with initialize.
+func (s *APISpec) ServesModernInitialize() bool {
+	return s.IsMCPAggregator()
+}
+
+// ServesModernPing reports whether this endpoint answers ping on 2026-07-28
+// itself: the MCP aggregator answers it locally.
+func (s *APISpec) ServesModernPing() bool {
+	return s.IsMCPAggregator()
 }
 
 func (m *JSONRPCMiddleware) validateMCPIngress(w http.ResponseWriter, r *http.Request) bool {
@@ -25,6 +43,10 @@ func (m *JSONRPCMiddleware) validateMCPIngress(w http.ResponseWriter, r *http.Re
 		err = mcp.ValidateModernMirroredHeaders(r.Header, ingress.Envelope)
 	}
 	if err != nil {
+		if err.Code == mcp.CodeUnsupportedProtocolVersion && m.Spec.IsMCPAggregator() {
+			// Clients such as Claude Desktop show only the message, not data.supported.
+			err.Message = "unsupported protocol version: this MCP aggregator supports only " + strings.Join(m.Spec.SupportedProtocolVersions(), ", ")
+		}
 		m.writeMCPIngressError(w, r, err)
 		return false
 	}

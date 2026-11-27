@@ -1402,7 +1402,10 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 
 		newDef.IsOAS = true
 		oasObj.GetTykExtension().Info.ID = newDef.APIID
-		if errMsg, errCode := gw.validatePairedMCPAdapterUpstream(r, &oasObj); errMsg != "" {
+		if errMsg, errCode := gw.validateMCPProxyReferences(r, &oasObj); errMsg != "" {
+			return apiError(errMsg), errCode
+		}
+		if errMsg, errCode := gw.probeMCPAggregatorUpstreams(r, &oasObj); errMsg != "" {
 			return apiError(errMsg), errCode
 		}
 
@@ -1419,6 +1422,7 @@ func (gw *Gateway) handleAddApi(r *http.Request, fs afero.Fs, oasEndpoint bool) 
 			return apiError(err.Error()), errCode
 		}
 	}
+	gw.mcpAggregatorWrites.written(newDef.APIID, &newDef, &oasObj)
 
 	if !versionParams.IsEmpty(lib.BaseAPIID) {
 		baseAPIID := versionParams.Get(lib.BaseAPIID)
@@ -1473,6 +1477,14 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 		return resp, code
 	}
 
+	var updatedOAS *oas.OAS
+	if oasEndpoint {
+		updatedOAS = &oasObj
+	}
+	if errMsg, errCode := gw.mcpAggregatorUpdateConflict(apiID, &newDef, updatedOAS); errMsg != "" {
+		return apiError(errMsg), errCode
+	}
+
 	if err := gw.validator.Validate(identifier.CustomApiId(newDef.APIID)); err != nil {
 		log.WithField("api_id", newDef.APIID).WithError(err).Error("Failed to validate API ID")
 		return apiError(identifier.ErrInvalidCustomApiId.Error()), http.StatusBadRequest
@@ -1489,7 +1501,10 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 		}
 
 		newDef.IsOAS = true
-		if errMsg, errCode := gw.validatePairedMCPAdapterUpstream(r, &oasObj); errMsg != "" {
+		if errMsg, errCode := gw.validateMCPProxyReferences(r, &oasObj); errMsg != "" {
+			return apiError(errMsg), errCode
+		}
+		if errMsg, errCode := gw.probeMCPAggregatorUpstreams(r, &oasObj); errMsg != "" {
 			return apiError(errMsg), errCode
 		}
 
@@ -1506,6 +1521,7 @@ func (gw *Gateway) handleUpdateApi(apiID string, r *http.Request, fs afero.Fs, o
 			return apiError(err.Error()), errCode
 		}
 	}
+	gw.mcpAggregatorWrites.written(newDef.APIID, &newDef, &oasObj)
 
 	return buildSuccessResponse(newDef.APIID, "modified")
 }
@@ -1582,6 +1598,9 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 			return apiError("API is referenced by paired MCP proxies: " + strings.Join(pairedProxyIDs, ", ")), http.StatusConflict
 		}
 	}
+	if resp, code := gw.mcpAggregatorDeleteConflict(apiID); resp != nil {
+		return resp, code
+	}
 
 	fs := afero.NewOsFs()
 
@@ -1604,6 +1623,7 @@ func (gw *Gateway) handleDeleteAPI(apiID string) (interface{}, int) {
 			return apiError("Delete failed"), http.StatusInternalServerError
 		}
 	}
+	gw.mcpAggregatorWrites.written(apiID, nil, nil)
 
 	handleBaseVersionCleanup(gw, spec, apiID, fs)
 	return buildSuccessResponse(apiID, "deleted")
