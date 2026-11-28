@@ -296,3 +296,95 @@ func TestXFFDepth(t *testing.T) {
 		})
 	}
 }
+
+// TestRealIPWithPort tests the case where ALB or proxy adds port to IP addresses
+func TestRealIPWithPort(t *testing.T) {
+	// Initialize the Global function with a mock config
+	mockConfig := config.Config{}
+	mockConfig.HttpServerOptions.XFFDepth = 0
+	Global = func() config.Config {
+		return mockConfig
+	}
+
+	testCases := []struct {
+		name       string
+		remoteAddr string
+		headerKey  string
+		headerVal  string
+		expected   string
+		comment    string
+	}{
+		{
+			name:       "X-Real-IP with port",
+			remoteAddr: "10.0.1.4:8080",
+			headerKey:  "X-Real-IP",
+			headerVal:  "192.168.1.1:54321",
+			expected:   "192.168.1.1",
+			comment:    "X-Real-IP with port (ALB behavior)",
+		},
+		{
+			name:       "X-Forwarded-For with port on first IP",
+			remoteAddr: "10.0.1.4:8080",
+			headerKey:  "X-Forwarded-For",
+			headerVal:  "192.168.1.1:54321",
+			expected:   "192.168.1.1",
+			comment:    "X-Forwarded-For with port (ALB behavior)",
+		},
+		{
+			name:       "X-Forwarded-For with port in chain",
+			remoteAddr: "10.0.1.4:8080",
+			headerKey:  "X-Forwarded-For",
+			headerVal:  "192.168.1.1:54321, 10.0.0.2:12345, 10.0.0.3",
+			expected:   "192.168.1.1",
+			comment:    "X-Forwarded-For chain with ports",
+		},
+		{
+			name:       "X-Forwarded-For with port and depth=1",
+			remoteAddr: "10.0.1.4:8080",
+			headerKey:  "X-Forwarded-For",
+			headerVal:  "192.168.1.1:54321, 10.0.0.2:12345, 10.0.0.3:9999",
+			expected:   "10.0.0.3",
+			comment:    "X-Forwarded-For with port and depth=1 (last IP)",
+		},
+		{
+			name:       "X-Forwarded-For IPv6 with port",
+			remoteAddr: "10.0.1.4:8080",
+			headerKey:  "X-Forwarded-For",
+			headerVal:  "[2001:db8::1]:54321",
+			expected:   "2001:db8::1",
+			comment:    "X-Forwarded-For IPv6 with port",
+		},
+		{
+			name:       "X-Real-IP IPv6 with port",
+			remoteAddr: "10.0.1.4:8080",
+			headerKey:  "X-Real-IP",
+			headerVal:  "[2001:db8::1]:54321",
+			expected:   "2001:db8::1",
+			comment:    "X-Real-IP IPv6 with port",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			// Set depth for depth-specific tests
+			if tc.comment == "X-Forwarded-For with port and depth=1 (last IP)" {
+				mockConfig.HttpServerOptions.XFFDepth = 1
+			} else {
+				mockConfig.HttpServerOptions.XFFDepth = 0
+			}
+
+			r, err := http.NewRequest(http.MethodGet, "http://abc.com:8080", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			r.Header.Set(tc.headerKey, tc.headerVal)
+			r.RemoteAddr = tc.remoteAddr
+
+			ip := RealIP(r)
+
+			if ip != tc.expected {
+				t.Errorf("Test %q: expected %s, got %s", tc.comment, tc.expected, ip)
+			}
+		})
+	}
+}
