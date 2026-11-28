@@ -543,6 +543,7 @@ func (m *proxyMux) generateListener(listenPort int, protocol string, gw *Gateway
 			ClientAuth:         tls.NoClientCert,
 			InsecureSkipVerify: httpServerOptions.SSLInsecureSkipVerify,
 			CipherSuites:       getCipherAliases(httpServerOptions.Ciphers),
+			CurvePreferences:   defaultCurvePreferences(),
 		}
 
 		if httpServerOptions.EnableHttp2 {
