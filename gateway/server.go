@@ -2066,7 +2066,6 @@ func (gw *Gateway) afterConfSetup() error {
 		conf.AnalyticsConfig.PurgeInterval = 10
 	}
 
-	rpc.GlobalRPCPingTimeout = time.Second * time.Duration(conf.SlaveOptions.PingTimeout)
 	rpc.GlobalRPCCallTimeout = time.Second * time.Duration(conf.SlaveOptions.CallTimeout)
 	gw.initGenericEventHandlers()
 	configureAutoMaxProcs(conf.DisableAutoMaxProcs)

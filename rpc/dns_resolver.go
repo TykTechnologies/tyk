@@ -142,9 +142,10 @@ func checkAndHandleDNSChange(connectionString string, suppressRegister bool) (dn
 	return false, false // DNS unchanged, should not retry
 }
 
-func defaultSafeReconnectRPCClient(suppressRegister bool) {
-	// Stop DNS monitor before reconnecting
-	StopDNSMonitor()
+// replaceClient swaps the RPC client under rpcConnectMu, so it cannot interleave with Connect.
+func replaceClient() {
+	rpcConnectMu.Lock()
+	defer rpcConnectMu.Unlock()
 
 	// Stop existing client
 	if clientSingleton != nil {
@@ -161,6 +162,13 @@ func defaultSafeReconnectRPCClient(suppressRegister bool) {
 	if dispatcher != nil {
 		funcClientSingleton = dispatcher.NewFuncClient(clientSingleton)
 	}
+}
+
+func defaultSafeReconnectRPCClient(suppressRegister bool) {
+	// Stop DNS monitor before reconnecting
+	StopDNSMonitor()
+
+	replaceClient()
 
 	// Relogin
 	handleLogin()
