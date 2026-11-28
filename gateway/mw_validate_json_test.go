@@ -4,9 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/TykTechnologies/tyk/apidef"
@@ -208,4 +210,41 @@ func TestValidateJSONSchemaTemplateData(t *testing.T) {
 			},
 		})
 	})
+}
+
+func TestValidateJSONDoesNotMutateSharedErrorResponseCode(t *testing.T) {
+	gw := &Gateway{}
+	gw.SetConfig(config.Config{})
+
+	var schema map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(testJsonSchema), &schema))
+
+	loader := APIDefinitionLoader{Gw: gw}
+	urlSpecs := loader.compileValidateJSONPathsSpec([]apidef.ValidatePathMeta{{
+		Path:   "/v",
+		Method: http.MethodPost,
+		Schema: schema,
+	}}, ValidateJSONRequest, config.Config{})
+	require.Len(t, urlSpecs, 1)
+	require.Equal(t, 0, urlSpecs[0].ValidatePathMeta.ErrorResponseCode)
+
+	spec := BuildAPI(func(s *APISpec) {
+		s.Proxy.ListenPath = "/"
+		UpdateAPIVersion(s, "v1", func(v *apidef.VersionInfo) {
+			v.Name = "v1"
+		})
+		s.RxPaths = map[string][]URLSpec{
+			"v1": urlSpecs,
+		}
+	})[0]
+
+	mw := &ValidateJSON{BaseMiddleware: &BaseMiddleware{Spec: spec, Gw: gw}}
+	req := httptest.NewRequest(http.MethodPost, "/v", strings.NewReader(`{"age":23}`))
+	req.Header.Set("Content-Type", "application/json")
+
+	err, code := mw.ProcessRequest(httptest.NewRecorder(), req, nil)
+	require.Error(t, err)
+	require.Equal(t, http.StatusUnprocessableEntity, code)
+	// Shared path meta must remain unset (0), not permanently rewritten to 422.
+	assert.Equal(t, 0, urlSpecs[0].ValidatePathMeta.ErrorResponseCode)
 }
