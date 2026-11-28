@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"sync/atomic"
@@ -37,6 +38,7 @@ import (
 	"github.com/TykTechnologies/tyk/internal/mcp"
 	"github.com/TykTechnologies/tyk/internal/model"
 	"github.com/TykTechnologies/tyk/internal/oasutil"
+	"github.com/TykTechnologies/tyk/internal/pathnormalizer"
 	"github.com/TykTechnologies/tyk/internal/result"
 	"github.com/TykTechnologies/tyk/internal/service/gojsonschema"
 	"github.com/TykTechnologies/tyk/pkg/schema"
@@ -1607,6 +1609,13 @@ func (a APIDefinitionLoader) compileOASValidateRequestPathSpec(apiSpec *APISpec,
 		}
 
 		a.generateRegex(path, &newSpec, OASValidateRequest, conf)
+
+		if classicPath := classicPathOf(apiSpec.OAS.Paths, path); classicPath != path {
+			var classic URLSpec
+			a.generateRegex(classicPath, &classic, OASValidateRequest, conf)
+			newSpec.classicMatcher = classic.spec
+		}
+
 		urlSpec = append(urlSpec, newSpec)
 	}
 
@@ -1734,6 +1743,7 @@ func mergeGroupIntoPrimary(indices []int, specs []URLSpec, toRemove map[int]bool
 			OASValidateRequestMeta: specs[idx].OASValidateRequestMeta,
 			OASMethod:              specs[idx].OASMethod,
 			OASPath:                specs[idx].OASPath,
+			classicMatcher:         specs[idx].classicMatcher,
 		}
 		if idx != primary {
 			toRemove[idx] = true
@@ -1778,7 +1788,7 @@ func pathParamRestrictiveness(oasPath, method string, oasPaths *openapi3.Paths) 
 	}
 
 	score := 0
-	for _, paramRef := range op.Parameters {
+	for _, paramRef := range candidatePathParameters(pathItem, op) {
 		if paramRef == nil || paramRef.Value == nil || paramRef.Value.In != "path" {
 			continue
 		}
@@ -1848,7 +1858,7 @@ func pathParamPatternLength(oasPath, method string, oasPaths *openapi3.Paths) in
 	}
 
 	total := 0
-	for _, paramRef := range op.Parameters {
+	for _, paramRef := range candidatePathParameters(pathItem, op) {
 		if paramRef == nil || paramRef.Value == nil || paramRef.Value.In != "path" {
 			continue
 		}
@@ -1857,6 +1867,36 @@ func pathParamPatternLength(oasPath, method string, oasPaths *openapi3.Paths) in
 		}
 	}
 	return total
+}
+
+// candidatePathParameters returns the operation's parameters plus the path item's,
+// leaving out any path-item parameter the operation redeclares.
+func candidatePathParameters(pathItem *openapi3.PathItem, op *openapi3.Operation) openapi3.Parameters {
+	if len(pathItem.Parameters) == 0 {
+		return op.Parameters
+	}
+
+	if len(op.Parameters) == 0 {
+		return pathItem.Parameters
+	}
+
+	params := make(openapi3.Parameters, 0, len(op.Parameters)+len(pathItem.Parameters))
+	params = append(params, op.Parameters...)
+
+	for _, ref := range pathItem.Parameters {
+		if ref == nil || ref.Value == nil {
+			continue
+		}
+
+		redeclared := slices.ContainsFunc(op.Parameters, func(own *openapi3.ParameterRef) bool {
+			return own != nil && own.Value != nil && own.Value.In == ref.Value.In && own.Value.Name == ref.Value.Name
+		})
+		if !redeclared {
+			params = append(params, ref)
+		}
+	}
+
+	return params
 }
 
 // compileOASMockResponsePathSpec extracts MockResponse operations from OAS middleware
@@ -1892,7 +1932,7 @@ func (a APIDefinitionLoader) compileOASMockResponsePathSpec(apiSpec *APISpec, co
 			OASPath:             path,
 		}
 
-		a.generateRegex(path, &newSpec, OASMockResponse, conf)
+		a.generateRegex(classicPathOf(apiSpec.OAS.Paths, path), &newSpec, OASMockResponse, conf)
 		urlSpec = append(urlSpec, newSpec)
 	}
 
@@ -1982,6 +2022,23 @@ func (a APIDefinitionLoader) findPathAndMethodForOperation(apiSpec *APISpec, ope
 	}
 
 	return "", ""
+}
+
+// classicPathOf takes an OAS path and converts it to the Tyk Classic path it was migrated from.
+//
+//	/users/{customRegex1}, customRegex1 has pattern [a-z]+  ->  /users/[a-z]+
+//	/users/{id}, id has pattern [0-9]+                      ->  /users/{id}
+//	/users/{id}                                             ->  /users/{id}
+//	/users                                                  ->  /users
+//
+// Only the customRegexN placeholders migration generates are converted.
+func classicPathOf(paths *openapi3.Paths, oasPath string) string {
+	pathItem := paths.Value(oasPath)
+	if pathItem == nil {
+		return oasPath
+	}
+
+	return pathnormalizer.Denormalize(oasPath, pathItem.Parameters)
 }
 
 // sortURLSpecsByPathPriority sorts URLSpec entries using the same path priority

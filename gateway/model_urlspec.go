@@ -11,6 +11,9 @@ import (
 // configuration init
 type URLSpec struct {
 	spec *regexp.Regexp
+	// classicMatcher is the endpoint's Classic path compiled as the router compiles it.
+	// Set only for validate request endpoints migration generated.
+	classicMatcher *regexp.Regexp
 
 	Status                    URLStatus
 	MethodActions             map[string]apidef.EndpointMethodMeta
@@ -67,6 +70,7 @@ type ValidateRequestCandidate struct {
 	OASValidateRequestMeta *oas.ValidateRequest
 	OASMethod              string
 	OASPath                string
+	classicMatcher         *regexp.Regexp
 }
 
 // MockResponseCandidate represents one OAS endpoint that maps to the same
@@ -188,18 +192,23 @@ func (u *URLSpec) matchesMethod(method string) bool {
 // then it will match against the full URL including the listen path as provided.
 // APISpec to provide URL sanitization of the input is passed along.
 func (a *URLSpec) matchesPath(reqPath string, api *APISpec) bool {
+	return pathMatches(a.spec, reqPath, api)
+}
+
+// pathMatches is matchesPath for an arbitrary compiled matcher.
+func pathMatches(spec *regexp.Regexp, reqPath string, api *APISpec) bool {
 	clean := api.StripListenPath(reqPath)
 	noVersion := api.StripVersionPath(clean)
 	// match /users
-	if noVersion != clean && a.spec.MatchString(noVersion) {
+	if noVersion != clean && spec.MatchString(noVersion) {
 		return true
 	}
 	// match /v3/users
-	if a.spec.MatchString(clean) {
+	if spec.MatchString(clean) {
 		return true
 	}
 	// match /listenpath/v3/users
-	if a.spec.MatchString(reqPath) {
+	if spec.MatchString(reqPath) {
 		return true
 	}
 	return false

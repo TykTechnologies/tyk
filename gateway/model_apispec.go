@@ -456,7 +456,7 @@ func (a *APISpec) matchCandidatePath(oasPath, oasMethod, strippedPath string) (*
 	}
 
 	pathParams := extractPathParams(oasPath, strippedPath)
-	if !pathParamsMatchOperation(pathParams, operation) {
+	if !pathParamsMatchOperation(pathParams, candidatePathParameters(pathItem, operation)) {
 		return nil, nil, nil, false
 	}
 
