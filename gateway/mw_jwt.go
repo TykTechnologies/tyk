@@ -149,8 +149,17 @@ type JWKs struct {
 
 // parseJWK parses a JWKS the way go-jose v3 did, so key sets that loaded before
 // the move to go-jose v4 still load (for example RSA keys over 4096 bits).
+// A key set with no keys is rejected: an error body that parses as JSON would
+// otherwise load as an empty set and get cached as if it were valid.
 func parseJWK(buf []byte) (*jose.JSONWebKeySet, error) {
-	return jwkcompat.ParseKeySet(buf)
+	set, err := jwkcompat.ParseKeySet(buf)
+	if err != nil {
+		return nil, err
+	}
+	if len(set.Keys) == 0 {
+		return nil, errors.New("JWKS response contains no keys")
+	}
+	return set, nil
 }
 
 func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interface{}, error) {
@@ -177,8 +186,20 @@ func (k *JWTMiddleware) legacyGetSecretFromURL(url, kid, keyType string) (interf
 		}
 		defer resp.Body.Close()
 
+		if resp.StatusCode < 200 || resp.StatusCode > 299 {
+			err := fmt.Errorf("JWKS endpoint returned HTTP status %d", resp.StatusCode)
+			k.Gw.logJWKError(k.Logger(), url, err)
+			return nil, err
+		}
+
 		// Decode it
 		if err := json.NewDecoder(resp.Body).Decode(&jwkSet); err != nil {
+			k.Gw.logJWKError(k.Logger(), url, err)
+			return nil, err
+		}
+
+		if len(jwkSet.Keys) == 0 {
+			err := errors.New("JWKS response contains no keys")
 			k.Gw.logJWKError(k.Logger(), url, err)
 			return nil, err
 		}
