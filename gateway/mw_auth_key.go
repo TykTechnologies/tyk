@@ -250,7 +250,10 @@ func (k *AuthKey) ProcessRequest(w http.ResponseWriter, r *http.Request, _ inter
 }
 
 func (k *AuthKey) reportInvalidKey(key string, r *http.Request, msg string, errMsg string) (error, int) {
-	k.Logger().WithField("key", k.Gw.obfuscateKey(key)).Info(msg)
+	k.Logger().
+		WithField("key", k.Gw.obfuscateKey(key)).
+		WithField("key_hashed", storage.HashKey(key, k.Gw.GetConfig().HashKeys)).
+		Info(msg)
 
 	// Set error classification for access logs
 	if ec := tykerrors.ClassifyAuthError(errMsg, k.Name()); ec != nil {
@@ -283,7 +286,6 @@ func (k *AuthKey) shouldValidateCertificateBinding(session *user.SessionState) b
 }
 
 func (k *AuthKey) validateSignature(r *http.Request, key string) (error, int) {
-
 	_, authConfig := k.getAuthToken(k.getAuthType(), r)
 	logger := k.Logger().WithField("key", k.Gw.obfuscateKey(key))
 
